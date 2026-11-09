@@ -127,7 +127,7 @@ CAD text affected:
 Proposed wording: cursors know a lattice only through the shape, merge, signing,
 ownership and stamping interfaces, each supplied by the component that owns the level.
 The hierarchy becomes root (with the publication seam), path cursor (optionally
-shaped), forked cursor, transaction draft and the update cursors.
+shaped), forked cursor, transaction draft and the signed, stamped and default views.
 
 ## 4. Declared children replace lattice-walk auto-initialisation
 

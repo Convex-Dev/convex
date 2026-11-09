@@ -158,8 +158,9 @@ public class ForkedCursorTest {
 		var root=Root.<ASet<CVMLong>>create(Sets.empty());
 		AtomicBoolean reject=new AtomicBoolean(true);
 		AtomicInteger merges=new AtomicInteger();
-		var destination=new AUpdateCursor<ASet<CVMLong>,ASet<CVMLong>>(root) {
-			@Override protected ASet<CVMLong> prepareWrite(ASet<CVMLong> value) {
+		var destination=new ATransformCursor<ASet<CVMLong>,ASet<CVMLong>>(root) {
+			@Override protected ASet<CVMLong> view(ASet<CVMLong> stored) { return stored; }
+			@Override protected ASet<CVMLong> write(ASet<CVMLong> current,ASet<CVMLong> value) {
 				if (reject.get()) throw new IllegalArgumentException("Preparation failed");
 				return value;
 			}

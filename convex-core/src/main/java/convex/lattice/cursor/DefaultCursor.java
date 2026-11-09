@@ -16,7 +16,7 @@ import convex.core.data.ACell;
  *
  * @param <V> Value type
  */
-public final class DefaultCursor<V extends ACell> extends AUpdateCursor<V,V> {
+public final class DefaultCursor<V extends ACell> extends ATransformCursor<V,V> {
 
 	private final V defaultValue;
 
@@ -27,5 +27,5 @@ public final class DefaultCursor<V extends ACell> extends AUpdateCursor<V,V> {
 
 	@Override protected V view(V stored) { return stored==null?defaultValue:stored; }
 	@Override protected Object readValue() { return view(base.getOrDefault(null)); }
-	@Override protected V prepareWrite(V value) { return value; }
+	@Override protected V write(V current,V value) { return value; }
 }

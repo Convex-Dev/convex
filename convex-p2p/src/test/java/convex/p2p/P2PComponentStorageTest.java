@@ -153,7 +153,6 @@ class P2PComponentStorageTest {
 		assertEquals(0,signatures.get());
 		draft.sync();
 		assertEquals(2,attempts.get(),"A conflicting root write must force a retry");
-		assertEquals(1,signatures.get(),"An unchanged candidate reuses its prepared signature");
 		assertEquals(SECOND,component(user,node).cursor().get());
 		var actual=(Index<?,?>)root.get();
 		assertSame(opaque,actual.get(P2PLattice.KEY_KAD));

@@ -61,29 +61,35 @@ public class StampedCursorTest {
 		assertSame(root.get(),working.cursor().get());
 	}
 
-	@Test public void testChangedRetryKeepsOneOperationTimestamp() {
+	/** Last-write-wins would otherwise discard a retried write in favour of the one it built on. */
+	@Test public void testRetriedWriteIsStampedAfterTheWriteItLostTo() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO,B,CVMLong.ZERO));
-		AtomicInteger clocks=new AtomicInteger();
-		AtomicInteger preparations=new AtomicInteger();
+		AtomicInteger clock=new AtomicInteger();
+		var winner=StampedCursor.create(root,() -> CVMLong.create(clock.incrementAndGet()),
+			(value,time) -> stampWith(value,time.longValue()));
+		AtomicInteger attempts=new AtomicInteger();
 		StampedCursor<ACell> cursor=StampedCursor.create(root,
-			() -> CVMLong.create(clocks.incrementAndGet()),(value,time) -> {
-			// Force the first candidate to lose its CAS to a different field update.
-			if (preparations.incrementAndGet()==1) root.set(Maps.of(A,CVMLong.ZERO,B,CVMLong.ONE));
+			() -> CVMLong.create(clock.incrementAndGet()),(value,time) -> {
+			// Lose the first attempt to a write of another field, stamped after this attempt's clock read.
+			if (attempts.incrementAndGet()==1) winner.updateAndGet(current -> RT.assoc(RT.ensureMap(current),B,CVMLong.ONE));
 			return stampWith(value,time.longValue());
 		});
 		cursor.updateAndGet(value -> RT.assoc(RT.ensureMap(value),A,CVMLong.ONE));
-		assertEquals(2,preparations.get());
-		assertEquals(1,clocks.get());
 		assertEquals(CVMLong.ONE,RT.getIn(cursor.get(),A));
 		assertEquals(CVMLong.ONE,RT.getIn(cursor.get(),B));
-		assertEquals(1,tsOf(cursor.get()));
+		assertEquals(3,tsOf(cursor.get()),"The retry is stamped after the winning write, which read 2");
+	}
 
-		cursor.set(cursor.get());
+	@Test public void testNoOpAndRemovalNeedNoClock() {
+		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
+		StampedCursor<ACell> cursor=StampedCursor.create(root,
+			() -> { throw new AssertionError("Only a changed value is stamped"); },
+			(value,time) -> stampWith(value,time.longValue()));
+		ACell stored=root.get();
+		cursor.set(stored);
+		assertSame(stored,root.get());
 		cursor.set(null);
-		assertEquals(1,clocks.get(),"No-op writes and removal do not resolve a timestamp");
-		cursor.set(Maps.of(A,CVMLong.ZERO));
-		assertEquals(2,clocks.get(),"The next operation resolves its own timestamp");
-		assertEquals(2,tsOf(cursor.get()));
+		assertNull(root.get());
 	}
 
 	static final AString USERS = Strings.create("users");

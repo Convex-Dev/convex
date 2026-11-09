@@ -8,7 +8,7 @@ import convex.core.data.ACell;
 import convex.core.data.SignedData;
 
 /** An unsigned view over signed storage, with an explicit authoring function. */
-public class SignedCursor<V extends ACell> extends AUpdateCursor<V,SignedData<V>> {
+public class SignedCursor<V extends ACell> extends ATransformCursor<V,SignedData<V>> {
 	private final Function<V,SignedData<V>> signer;
 
 	private SignedCursor(ACursor<SignedData<V>> base,
@@ -33,7 +33,8 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V,SignedData<V>
 		return (stored==null)?null:stored.getValue();
 	}
 
-	@Override protected SignedData<V> prepareWrite(V value) {
+	@Override protected SignedData<V> write(SignedData<V> current,V value) {
+		if (value==null) return null;
 		SignedData<V> signed=signer.apply(value);
 		if (signed==null) throw new IllegalStateException("No authorised signer available");
 		return signed;

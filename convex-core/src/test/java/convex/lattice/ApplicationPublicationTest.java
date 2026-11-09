@@ -119,7 +119,7 @@ public class ApplicationPublicationTest {
 	}
 
 	@Test
-	public void testCASRaceCombinesOwnersAndReusesSignatureForUnrelatedRetry() {
+	public void testCASRaceCombinesOwnersAndKeepsUnrelatedWrites() {
 		var root=new InterleavingRoot();
 		var host=new LatticeHost<>(root,null);
 		var first=new Application(host);
@@ -134,7 +134,6 @@ public class ApplicationPublicationTest {
 		assertEquals(Sets.of(0,1,2),signed(root.get()).getValue());
 		assertTrue(signed(root.get()).checkSignature());
 		assertEquals(CVMLong.ONE,root.get().get(IGNORED));
-		assertEquals(2,second.signatures.get(),"Only the changed signed payload requires re-signing");
 	}
 
 	@Test

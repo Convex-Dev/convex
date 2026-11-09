@@ -2,7 +2,6 @@ package convex.lattice.cursor;
 
 import java.util.Objects;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import convex.core.data.ACell;
@@ -11,7 +10,8 @@ import convex.core.util.Utils;
 
 /**
  * A same-type view which stamps changed values using an explicit clock function.
- * One logical atomic write resolves the clock once, including across CAS retries.
+ * Each attempt at a changed write reads the clock, so a write that loses a race and
+ * retries is stamped no earlier than the write it lost to.
  * No-op writes retain their timestamp. Components merge incoming values through
  * the underlying storage cursor so accepted remote values are not re-stamped.
  *
@@ -30,7 +30,7 @@ import convex.core.util.Utils;
  *
  * @param <V> Value type
  */
-public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
+public class StampedCursor<V extends ACell> extends ATransformCursor<V, V> {
 
 	private final BiFunction<V,CVMLong,V> stamp;
 	private final Supplier<CVMLong> clock;
@@ -52,14 +52,9 @@ public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 		return create(base,Utils::getCurrentTimestampCell,stamp);
 	}
 
-	@Override
-	protected V prepareWrite(V value) {
-		return stamp.apply(value,clock.get());
-	}
+	@Override protected V view(V stored) { return stored; }
 
-	@Override
-	protected Function<V,V> prepareWriteOperation() {
-		CVMLong timestamp=clock.get();
-		return value -> stamp.apply(value,timestamp);
+	@Override protected V write(V current,V value) {
+		return value==null?null:stamp.apply(value,clock.get());
 	}
 }

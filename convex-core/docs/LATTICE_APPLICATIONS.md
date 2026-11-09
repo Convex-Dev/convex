@@ -405,8 +405,9 @@ merging does not re-stamp them. Resolve authority data outside atomic operations
 so verification uses locally available information. Updating that information
 affects later checks, without retroactively deleting previously accepted state.
 
-One logical write uses its chosen timestamp through atomic retries. Reusing a
-timestamp creates a tie rather than an implicit increment. This keeps time
+An operation that chooses its own timestamp keeps it through atomic retries,
+while a `StampedCursor` reads its clock on each attempt. Reusing a timestamp
+creates a tie rather than an implicit increment. This keeps time
 policy explicit and reproducible; applications needing ordered delete and
 recreate operations must supply timestamps that express that order.
 

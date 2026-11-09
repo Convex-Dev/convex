@@ -167,17 +167,16 @@ class TimestampedTest {
 		}
 	}
 
-	@Test void retriesKeepOneTimestampAndPreserveConcurrentFields() {
+	@Test void retriesStampFromALaterClockReadAndPreserveConcurrentFields() {
 		var root=Root.create(record(1,0));
-		var calls=new AtomicInteger();
+		var time=new AtomicInteger(1);
 		var component=Timestamped.create(root,() -> {
-			calls.incrementAndGet();
-			root.set(root.get().assoc(B,CVMLong.ONE)); // Force the first candidate to lose its CAS.
-			return CVMLong.create(2);
+			int now=time.incrementAndGet();
+			if (now==2) root.set(root.get().assoc(B,CVMLong.ONE)); // Force the first candidate to lose its CAS.
+			return CVMLong.create(now);
 		});
 		component.cursor().path(A).set(CVMLong.ONE);
-		assertEquals(record(2,1).assoc(B,CVMLong.ONE),root.get());
-		assertEquals(1,calls.get());
+		assertEquals(record(3,1).assoc(B,CVMLong.ONE),root.get());
 	}
 
 	@Test void customRecordRepresentationSuppliesItsStampAndOrderingRule() {

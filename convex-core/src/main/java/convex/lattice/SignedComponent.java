@@ -15,10 +15,9 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>Lightweight domain components use this component's working cursor. Their
  * updates do not sign or publish. Sync reconciles a snapshot with the destination
- * using the unsigned lattice and signs the result outside the destination CAS.
- * An unrelated ancestor write reuses the prepared signature; a conflict changing
- * the payload may require another signature. An unchanged publication does not
- * sign. The bound lattice supplies both the merge and the authorisation rule.</p>
+ * using the unsigned lattice and signs the result in the destination update, signing
+ * again if that update retries. An unchanged publication does not sign.
+ * The bound lattice supplies both the merge and the authorisation rule.</p>
  *
  * <p>This component composes an ordinary fork with a {@link SignedCursor} over its
  * destination. The fork reconciles unsigned values; the cursor signs on publication.

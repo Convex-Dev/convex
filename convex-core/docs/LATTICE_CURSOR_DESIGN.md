@@ -19,10 +19,9 @@ ACursor<V>                                get / atomic update / persist / path
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
         ├── PathCursor<V>                 navigation through existing containers
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
-        └── AUpdateCursor<V,S>            cached preparation per atomic operation
-            ├── StampedCursor<V>          explicit clock and stamp function
-            ├── SignedCursor<V>           explicit signing function
-            └── DefaultCursor<V>          explicit default for absent storage
+        ├── StampedCursor<V>              explicit clock and stamp function
+        ├── SignedCursor<V>               explicit signing function
+        └── DefaultCursor<V>              explicit default for absent storage
 AView<T>                                  read-only cursor views
 Transactions                              optimistic and exclusive subtree transactions
 ```
@@ -341,9 +340,9 @@ builds it in its write: a default from its default, an authoring view its envelo
 or record, a component's projection what its write function supplies.
 
 `ProjectionCursor` rebuilds from the current source on retries, preserving siblings.
-`AUpdateCursor` adds caching for prepared replacements. Prepared signatures are reused while retries request the
-same value; a genuinely different payload must be signed again. `StampedCursor`
-resolves its clock once per changed operation, reusing that timestamp across retries.
+Signed and stamped views also rebuild on each attempt: a retried write signs again,
+and `StampedCursor` reads its clock again, so a write that loses a race is stamped
+no earlier than the write it lost to.
 Writes through descendant views pass through the same authoring boundary atomically.
 
 `SignedCursor` unwraps `SignedData` on reads and uses the bound function on writes.

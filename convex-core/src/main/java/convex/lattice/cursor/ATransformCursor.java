@@ -1,7 +1,6 @@
 package convex.lattice.cursor;
 
 import java.util.Objects;
-import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -53,9 +52,6 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	/** Rebuilds source storage for a changed view value, including nil. */
 	protected abstract S write(S current,V value);
 
-	/** One write operation; subclasses may retain preparation across its retries. */
-	protected BiFunction<S,V,S> writeOperation() { return this::write; }
-
 	@Override protected Claim claim(Function<? super V,? extends ACell> reader) {
 		return base.claim(stored -> reader.apply(view(stored)));
 	}
@@ -68,13 +64,12 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 		return stored==MISSING?MISSING:viewValue((S)stored);
 	}
 
-	/** Builds one source update, with preparation shared across retries. */
+	/** Builds one source update, which leaves the source as it is when the view is unchanged. */
 	private UnaryOperator<S> sourceUpdate(UnaryOperator<V> action) {
-		BiFunction<S,V,S> writer=writeOperation();
 		return current -> {
 			V previous=view(current);
 			V next=action.apply(previous);
-			return Utils.equals(previous,next)?current:writer.apply(current,next);
+			return Utils.equals(previous,next)?current:write(current,next);
 		};
 	}
 
