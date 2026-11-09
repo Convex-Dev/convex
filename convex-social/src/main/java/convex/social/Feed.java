@@ -12,6 +12,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.IndexComponent;
+import convex.lattice.LatticeOps;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -138,6 +139,12 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 	@Override
 	public Feed rebind(AForkableCursor<Index<Blob, ACell>> cursor) {
 		return new Feed(cursor,author,clock);
+	}
+
+	/** Posts made on both sides of a fork are all kept; only the same key changing on both is refused. */
+	@Override
+	protected Index<Blob, ACell> mergePublication(Index<Blob, ACell> base,Index<Blob, ACell> own,Index<Blob, ACell> other) {
+		return LatticeOps.mergeChanges(base,own,other);
 	}
 
 }

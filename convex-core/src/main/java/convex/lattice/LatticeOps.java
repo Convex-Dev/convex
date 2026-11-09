@@ -4,9 +4,12 @@ import java.util.Map;
 
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
+import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.lattice.generic.AKeyedLattice;
 
@@ -115,6 +118,70 @@ public class LatticeOps {
 			}
 		}
 		return (V)result;
+	}
+
+	/**
+	 * Merges two values that changed from a common base, location by location. A change
+	 * made by one side is kept, so changes to different locations never conflict, and a
+	 * delete survives where the other side left the entry alone. Where both sides
+	 * changed a location to different values the merge is rejected. Maps of the same
+	 * kind are compared entry by entry; any other value, including a record, vector or
+	 * signed envelope, is one location. Nil and an absent entry count as the same.
+	 *
+	 * <p>The result is built on {@code other}, so everything {@code own} did not change
+	 * keeps other's cells, including persisted ones. The cost follows the size of
+	 * own's change, not the size of the values.</p>
+	 *
+	 * @param <V> Value type
+	 * @param base Value both sides last agreed on, or null if there was none
+	 * @param own This side's value
+	 * @param other The other side's value
+	 * @return Merged value
+	 * @throws MergeConflictException if both sides changed a location to different values
+	 */
+	@SuppressWarnings("unchecked")
+	public static <V extends ACell> V mergeChanges(V base,V own,V other) {
+		return (V)mergeLocation(base,own,other);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static ACell mergeLocation(ACell base,ACell own,ACell other) {
+		if (Utils.equals(own,base) || Utils.equals(own,other)) return other;
+		if (Utils.equals(other,base)) return own;
+		if (!isSameMapKind(own,other)) throw new MergeConflictException();
+		AMap<ACell,ACell> ownMap=(AMap<ACell,ACell>)own;
+		AMap<ACell,ACell> from=isSameMapKind(base,own)?(AMap<ACell,ACell>)base:ownMap.empty();
+		OwnChanges changes=new OwnChanges((AMap<ACell,ACell>)other);
+		from.mergeDifferences(ownMap,changes);
+		return changes.result;
+	}
+
+	private static boolean isSameMapKind(ACell a,ACell b) {
+		return (a instanceof Index && b instanceof Index) || (a instanceof AHashMap && b instanceof AHashMap);
+	}
+
+	/** Applies to one map the entries that differ between a base and another map. */
+	private static final class OwnChanges implements MergeFunction<ACell> {
+		private final AMap<ACell,ACell> other;
+		private AMap<ACell,ACell> result;
+
+		OwnChanges(AMap<ACell,ACell> other) {
+			this.other=other;
+			this.result=other;
+		}
+
+		@Override public ACell merge(ACell base,ACell own) {
+			throw new IllegalStateException("A map's difference walk always supplies the key");
+		}
+
+		/** Returns the base value so the walk, whose own result is discarded, builds nothing. */
+		@Override public ACell merge(Object key,ACell base,ACell own) {
+			ACell k=(ACell)key;
+			ACell current=other.get(k);
+			ACell merged=mergeLocation(base,own,current);
+			if (merged!=current) result=(merged==null)?result.dissoc(k):result.assoc(k,merged);
+			return base;
+		}
 	}
 
 	/** The value a delivery at a path means at this level: that path alone, in the lattice's empty containers. */

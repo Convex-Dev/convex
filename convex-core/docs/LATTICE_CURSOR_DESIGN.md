@@ -178,9 +178,10 @@ root.updateAndGet(values -> values.include(item));
 destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
 that publication: an unchanged copy adopts the destination, an unchanged destination
 accepts the working value, and divergent changes invoke the supplied function.
-The fork retains no merge callback. Ordinary roots, paths and transformed views
-implement `sync(merge)` as a read-only no-op without invoking that function or
-publishing any enclosing fork; a read-only view refuses it.
+`reconcile(merge)` is the same with a `ThreeWayMerge`, which also receives the value
+both sides last agreed on. The fork retains no merge callback. Ordinary roots, paths
+and transformed views implement both as a read-only no-op without invoking that
+function or publishing any enclosing fork; a read-only view refuses them.
 
 The destination has the same value type as the fork. Signing and stamping compose
 through cursor views, and where an authoring view sits relative to the fork decides
@@ -212,6 +213,11 @@ that component's merge, called only when both sides changed. No `ALattice` is
 required. `LatticeComponent` adapts a lattice for components that choose to use one. An application overrides it
 to take regions that its own components publish from the destination; each such
 component publishes through its own fork of the host.
+A component can override `mergePublication(base, own, other)` instead, to use the
+value both sides last agreed on; by default that form calls the two-value one.
+`LatticeOps.mergeChanges` is a rule for it: each side's changes are kept, so changes
+to different locations never conflict, and it throws `MergeConflictException` where
+both sides changed one location to different values.
 For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use
 `Transactions`.
 

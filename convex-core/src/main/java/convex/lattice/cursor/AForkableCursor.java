@@ -68,4 +68,15 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 	public V sync(BinaryOperator<V> merge) {
 		return getOrDefault(null);
 	}
+
+	/**
+	 * As {@link #sync}, also giving the merge the value both sides last agreed on, so
+	 * that it can tell which side changed what.
+	 *
+	 * @param merge Reconciliation of base, working and destination values
+	 * @return The current value, or nil for absence
+	 */
+	public V reconcile(ThreeWayMerge<V> merge) {
+		return getOrDefault(null);
+	}
 }

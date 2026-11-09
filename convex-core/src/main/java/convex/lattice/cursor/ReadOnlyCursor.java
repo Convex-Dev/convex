@@ -42,4 +42,5 @@ public final class ReadOnlyCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override public V getAndAccumulate(V x,BinaryOperator<V> accumulatorFunction) { throw new ReadOnlyCursorException(); }
 	@Override public V accumulateAndGet(V x,BinaryOperator<V> accumulatorFunction) { throw new ReadOnlyCursorException(); }
 	@Override public V sync(BinaryOperator<V> merge) { throw new ReadOnlyCursorException(); }
+	@Override public V reconcile(ThreeWayMerge<V> merge) { throw new ReadOnlyCursorException(); }
 }

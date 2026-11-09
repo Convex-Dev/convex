@@ -65,6 +65,19 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override
 	public V sync(BinaryOperator<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
+		return reconcile((base,own,other) -> merge.apply(own,other));
+	}
+
+	/**
+	 * As {@link #sync}, also giving the merge the value both sides last agreed on. On a
+	 * retry that is the destination value already merged, so it sees only what is new.
+	 * @param merge Reconciliation of base, working and destination values when both
+	 *        changed; must be retry-safe and must not mutate either cursor
+	 * @return Published value
+	 */
+	@Override
+	public V reconcile(ThreeWayMerge<V> merge) {
+		Objects.requireNonNull(merge,"Merge function must not be null");
 		try (Claim claim=working.claim(value -> value)) {
 			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
 			working.set(published);
@@ -75,11 +88,11 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	/** Retains reconciled changes as the destination update retries. */
 	private final class Reconciliation implements UnaryOperator<V> {
-		private final BinaryOperator<V> merge;
+		private final ThreeWayMerge<V> merge;
 		private V previous=baseline.get();
 		private V candidate;
 
-		Reconciliation(V snapshot,BinaryOperator<V> merge) {
+		Reconciliation(V snapshot,ThreeWayMerge<V> merge) {
 			this.merge=merge;
 			candidate=snapshot;
 		}
@@ -88,7 +101,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 			if (Utils.equals(candidate,previous) || Utils.equals(candidate,other)) {
 				candidate=other;
 			} else if (!Utils.equals(other,previous)) {
-				candidate=merge.apply(candidate,other);
+				candidate=merge.merge(previous,candidate,other);
 			}
 			previous=other;
 			return candidate;

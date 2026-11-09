@@ -103,6 +103,21 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
+	 * Reconciles as {@link #mergePublication(ACell,ACell)} does, also given the value
+	 * both sides last agreed on. Sync calls this form, and by default it ignores the
+	 * base. A component whose changes conflict only at the same location overrides it
+	 * with {@link LatticeOps#mergeChanges}, and then needs no two-value merge.
+	 *
+	 * @param base Value both sides last agreed on, or null if there was none
+	 * @param own Working value
+	 * @param other Destination value
+	 * @return Reconciled value
+	 */
+	protected V mergePublication(V base,V own,V other) {
+		return mergePublication(own,other);
+	}
+
+	/**
 	 * Returns the atomic editing view. Domain operations and children use this
 	 * accessor so an override can consistently apply policies such as timestamping.
 	 * A subclass can wrap {@code super.cursor()} during construction; constructors
@@ -242,7 +257,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * publish enclosing storage. No host persistence is implied.
 	 */
 	public V sync() {
-		return storage.sync(this::mergePublication);
+		return storage.reconcile(this::mergePublication);
 	}
 
 	/**
