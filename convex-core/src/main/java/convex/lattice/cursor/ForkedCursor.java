@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -32,14 +33,15 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final ACursor<V> destination;
 	private final Root<V> working;
-	/** Last reconciled destination value, protected by the working root's claim. */
-	private V baseline;
+	/** Last reconciled destination value. Moved by sync under the claim; persist swaps in only an equal value. */
+	private final AtomicReference<V> baseline;
 
 	private ForkedCursor(ACursor<V> destination) {
 		this.destination=Objects.requireNonNull(destination,"Destination must not be null");
 		// A fork can prepare a new entry; no destination state is created here.
-		this.baseline=destination.getOrDefault(null);
-		this.working=new Root<>(baseline);
+		V initial=destination.getOrDefault(null);
+		this.baseline=new AtomicReference<>(initial);
+		this.working=new Root<>(initial);
 	}
 
 	/**
@@ -66,7 +68,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		try (Claim claim=working.claim(value -> value)) {
 			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
 			working.set(published);
-			baseline=published;
+			baseline.set(published);
 			return published;
 		}
 	}
@@ -74,7 +76,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	/** Retains reconciled changes as the destination update retries. */
 	private final class Reconciliation implements UnaryOperator<V> {
 		private final BinaryOperator<V> merge;
-		private V previous=baseline;
+		private V previous=baseline.get();
 		private V candidate;
 
 		Reconciliation(V snapshot,BinaryOperator<V> merge) {
@@ -95,19 +97,15 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	/**
 	 * Persists the working value as any cursor does, then the reconciled baseline,
-	 * so the fork keeps no copy the persister has made redundant. The baseline is
-	 * persisted outside the claim and replaced only if no sync has moved it meanwhile;
-	 * a moved baseline waits for the next persist.
+	 * so the fork keeps no copy the persister has made redundant. This takes no claim,
+	 * so it never waits for a transaction. The baseline is replaced only if no sync
+	 * has moved it meanwhile; a moved baseline waits for the next persist.
 	 */
 	@Override
 	public V persist(Persister<V> persister) throws IOException {
 		V persisted=working.persist(persister);
-		V previous;
-		try (Claim claim=working.claim(value -> value)) { previous=baseline; }
-		V retained=(previous==null)?null:persister.persist(previous);
-		try (Claim claim=working.claim(value -> value)) {
-			if (baseline==previous) baseline=retained;
-		}
+		V previous=baseline.get();
+		if (previous!=null) baseline.compareAndSet(previous,persister.persist(previous));
 		return persisted;
 	}
 

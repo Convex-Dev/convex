@@ -169,7 +169,20 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 		 * the same data, is no change. It proceeds, and is the value the root then holds.
 		 */
 		boolean blocks(Object next) {
-			return !isOwnedByCaller() && !Utils.equals(reader.apply(next),seen);
+			return !isOwnedByCaller() && !keepsClaimedPart(next);
+		}
+
+		/**
+		 * A value the claim's reader refuses is not the value it saw. That is a change to
+		 * wait for rather than the writer's failure: the writer knows nothing of this
+		 * view, and after the release its write proceeds as if no claim had been taken.
+		 */
+		private boolean keepsClaimedPart(Object next) {
+			try {
+				return Utils.equals(reader.apply(next),seen);
+			} catch (RuntimeException e) {
+				return false;
+			}
 		}
 
 		void awaitRelease() {

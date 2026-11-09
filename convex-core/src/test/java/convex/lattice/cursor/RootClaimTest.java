@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -275,6 +276,55 @@ class RootClaimTest {
 			draft.set(CVMLong.TWO);
 		}));
 		assertEquals(CVMLong.ONE,claimed.get(),"The callback's own draft was not committed over it");
+	}
+
+	@Test void aWriteTheClaimingViewCannotReadWaitsThenLands() throws Exception {
+		var root=new Root<ACell>(CVMLong.ZERO);
+		ACell unreadable=Strings.create("not a number");
+		CountDownLatch inCallback=new CountDownLatch(1), viewRefused=new CountDownLatch(1);
+		AForkableCursor<AInteger> claimed=ProjectionCursor.create(root,stored -> {
+			if (stored instanceof AInteger number) return number;
+			viewRefused.countDown();
+			throw new IllegalStateException("Not a number");
+		},(stored,value) -> value);
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			var writer=executor.submit(() -> {
+				await(inCallback);
+				root.set(unreadable);
+			});
+			Transactions.executeExclusively(claimed,draft -> {
+				inCallback.countDown();
+				await(viewRefused);
+				draft.set(CVMLong.ONE);
+				assertEquals(CVMLong.ZERO,root.get(),"The write waits for the release");
+			});
+			writer.get(10,TimeUnit.SECONDS);
+		}
+		assertSame(unreadable,root.get(),"After the release the write lands as if unclaimed");
+	}
+
+	@Test void persistingAForkCarriesOnDuringAClaim() throws Exception {
+		var root=tree();
+		var original=root.get();
+		var fork=root.fork();
+		fork.<AInteger>path(A,Y).set(CVMLong.ONE);
+		var persisted=new CopyOnWriteArrayList<ACell>();
+		Persister<AHashMap<Keyword,ACell>> persister=value -> {
+			persisted.add(value);
+			return value;
+		};
+		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
+			Transactions.executeExclusively(fork.<AInteger>path(A,X),draft -> {
+				// Completes inside the callback, so it did not wait for the claim.
+				complete(other.submit(() -> fork.persist(persister)));
+				assertDoesNotThrow(() -> fork.persist(persister),"The claim's owner can persist too");
+				draft.set(CVMLong.TWO);
+			});
+		}
+		assertTrue(persisted.contains(original),"The reconciled baseline was persisted");
+		fork.sync((mine,theirs) -> mine);
+		assertEquals(CVMLong.TWO,root.get(A,X));
+		assertEquals(CVMLong.ONE,root.get(A,Y));
 	}
 
 	private static void complete(Future<?> work) {

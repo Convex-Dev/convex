@@ -117,8 +117,8 @@ transaction that changes nothing commits, since it writes nothing. `AView` subcl
 Etch store the stored cells are then soft references and need not stay in memory.
 The cursor holds no store. An edit landing meanwhile repeats the update on the
 edited value; persisting again only finds the cells already stored. A fork persists
-its working value, then its reconciled baseline outside its lock, replacing the
-baseline only if no sync has moved it meanwhile. Views hold no value of their own:
+its working value, then its reconciled baseline without taking a claim, replacing
+the baseline only if no sync has moved it meanwhile. Views hold no value of their own:
 they treat the equal value as unchanged, so the cells are stored and their source
 is left to its owner. A read-only view refuses to persist, as it refuses any write.
 
@@ -255,9 +255,9 @@ expensive to repeat or with side effects.
 A root holds at most one claim, so claims queue whatever they cover. A claim covers
 what the claiming cursor reads: each derived view composes its own read into the
 claim through its source link, and the root needs to know nothing about paths or
-views. While a claim is held, a write that would change that part of the value waits
-for the release and recalculates, and a write that leaves it equal carries on. An
-equal value in new cells is the value the root then holds, so persisting during a
+views. While a claim is held, a write that would change that part of the value, or
+leave it unreadable to the claiming view, waits for the release and recalculates, and
+a write that leaves it equal carries on. An equal value in new cells is the value the root then holds, so persisting during a
 claim keeps the persisted cells, and an exclusive transaction that changes nothing
 writes nothing over them. Reads never wait. Without a claim, each read or compare-and-set of the root adds
 one type check, and nothing is recorded per transaction.

@@ -61,7 +61,8 @@ public abstract class ACursor<V extends ACell> {
 	 * {@link Transactions} and atomic fork publication.
 	 *
 	 * @param reader Reads the claimed part from this cursor's value. Side-effect free;
-	 *        runs on writers' threads while the claim is held
+	 *        runs on writers' threads while the claim is held, and a value it refuses
+	 *        counts as a change to the claimed part
 	 * @return The claim, to be closed by the calling thread
 	 * @throws IllegalStateException if the calling thread already holds this root's claim
 	 */
