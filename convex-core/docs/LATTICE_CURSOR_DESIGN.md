@@ -257,8 +257,8 @@ what the claiming cursor reads: each derived view composes its own read into the
 claim through its source link, and the root needs to know nothing about paths or
 views. While a claim is held, a write that would change that part of the value waits
 for the release and recalculates, and a write that leaves it the same cell carries
-on, with no other cost. Reads never wait. Without a claim a write costs one type
-check, and nothing is recorded per transaction.
+on. Reads never wait. Without a claim, each read or compare-and-set of the root adds
+one type check, and nothing is recorded per transaction.
 
 Typed domain
 transactions use `rebind` to retain component policy; a component opts in by
