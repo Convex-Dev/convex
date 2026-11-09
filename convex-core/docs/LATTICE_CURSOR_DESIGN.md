@@ -112,15 +112,29 @@ transaction that changes nothing commits, since it writes nothing. `AView` subcl
 
 ## Persistence
 
-`persist(persister)` replaces the value a cursor holds with the equal value a
-`Persister` returns, such as `LatticeHost::persist`, in one atomic update. On an
-Etch store the stored cells are then soft references and need not stay in memory.
-The cursor holds no store. An edit landing meanwhile repeats the update on the
-edited value; persisting again only finds the cells already stored. A fork persists
-its working value, then its reconciled baseline without taking a claim, replacing
-the baseline only if no sync has moved it meanwhile. Views hold no value of their own:
-they treat the equal value as unchanged, so the cells are stored and their source
-is left to its owner. A read-only view refuses to persist, as it refuses any write.
+Persisting a value builds new cells and leaves the ones it was given as they are.
+On an Etch store the new cells reach their children through soft references, so
+stored data can leave memory; the original cells keep strong references to theirs.
+The two values are equal, so only memory use tells them apart. Stored data is
+released only once whoever holds the value has switched to the new cells: a holder
+left on the original keeps the whole tree in memory, however much of it is stored.
+
+`persist(persister)` makes that switch for a cursor, replacing the value it holds
+with the equal value a `Persister` returns, such as `LatticeHost::persist`, in one
+atomic update. The cursor holds no store. An edit landing meanwhile repeats the
+update on the edited value; persisting again only finds the cells already stored. A
+fork persists its working value, then its reconciled baseline without taking a claim,
+replacing the baseline only if no sync has moved it meanwhile. Views hold no value of
+their own: they treat the equal value as unchanged, so the cells are stored and their
+source is left to its owner. A read-only view refuses to persist, as it refuses any
+write.
+
+Saving a value switches nobody else. A fork is separate storage, so a host sync that
+saves its destination leaves the fork on the cells it already held. A long-lived fork
+keeps what is written to it in memory until its owner calls `persist`, or until it
+syncs with no edits since its last sync and so adopts the saved value. The host root
+switches as part of its own sync, unless a write
+[lands during the save](../../convex-peer/docs/PERSISTENCE.md#ordering).
 
 ## Component-supplied construction
 
@@ -178,6 +192,10 @@ root.updateAndGet(values -> values.include(item));
 destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
 that publication: an unchanged copy adopts the destination, an unchanged destination
 accepts the working value, and divergent changes invoke the supplied function.
+Both tests are by value, so a destination persisted since the last sync counts as
+unchanged, and accepting the working value replaces its persisted cells with the
+fork's. A fork persisted first hands over persisted cells; otherwise the destination
+holds the fork's cells strongly until it is next saved.
 `reconcile(merge)` is the same with a `ThreeWayMerge`, which also receives the value
 both sides last agreed on. The fork retains no merge callback. Ordinary roots, paths
 and transformed views implement both as a read-only no-op without invoking that
@@ -267,7 +285,9 @@ views. While a claim is held, a write that would change that part of the value, 
 leave it unreadable to the claiming view, waits for the release and recalculates, and
 a write that leaves it equal carries on. An equal value in new cells is the value the root then holds, so persisting during a
 claim keeps the persisted cells, and an exclusive transaction that changes nothing
-writes nothing over them. Reads never wait. Without a claim, each read or compare-and-set of the root adds
+writes nothing over them. A transaction that does change the value commits cells built
+from the value it started with, so cells persisted meanwhile are replaced until the
+next save. Reads never wait. Without a claim, each read or compare-and-set of the root adds
 one type check, and nothing is recorded per transaction.
 
 Typed domain

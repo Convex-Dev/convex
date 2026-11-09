@@ -14,6 +14,8 @@ import convex.core.util.Utils;
  * Independent working storage which reconciles with a destination on sync.
  * An unchanged fork adopts the destination; an unchanged destination accepts
  * the working value. When both changed, the merge supplied to sync decides.
+ * Unchanged means equal in value, so a destination persisted since the last sync
+ * is unchanged, and accepting the working value replaces its persisted cells.
  *
  * <p>Sync updates the destination atomically while holding the claim on the whole
  * working root. Working writes are ordered around sync; reads never wait. Failed
@@ -114,7 +116,8 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	/**
 	 * Persists the working value as any cursor does, then the reconciled baseline,
 	 * so the fork keeps no copy the persister has made redundant. Saving the destination,
-	 * as a host sync does, leaves this fork's cells as they were; only this switches them.
+	 * as a host sync does, leaves this fork's cells as they were, so a long-lived fork
+	 * needs this to release memory.
 	 * This takes no claim, so it never waits for a transaction. The baseline is replaced
 	 * only if no sync has moved it meanwhile; a moved baseline waits for the next persist.
 	 */

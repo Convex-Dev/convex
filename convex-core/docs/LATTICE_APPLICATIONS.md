@@ -432,11 +432,15 @@ snapshot. A failed barrier does not roll back publication already performed.
 A component with working state of its own, given a persistence function when
 built, persists it with `persist()`. An application holding a private copy of the
 root is built as `super(host.cursor().fork(), host::persist)`. Its cells go to the
-store and need not stay in memory, but nothing is published, signed or retained as
-the root, so it survives a restart only once synced and checkpointed. The component
+store and the copy switches to them, so they can leave memory, but nothing is
+published, signed or retained as the root, so it survives a restart only once synced
+and checkpointed. A host save does not do this for the copy: until it is persisted, a
+copy keeps in memory what has been written to it, however much of that the host has
+saved ([cursor persistence](LATTICE_CURSOR_DESIGN.md#persistence)). The component
 never holds a store: it persists through the function it was built with. A component without one refuses,
 since its state is its parent's. Which components persist, and when, is the
-application's policy.
+application's policy; a long-lived working copy needs persisting regularly, such as
+after each host sync.
 
 State that is not meant to be shared externally, such as configuration or what
 a node has seen of others, lives in the owner's slot in `:local`, one record per
