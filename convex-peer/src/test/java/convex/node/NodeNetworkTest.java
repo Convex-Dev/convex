@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -30,6 +31,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -212,13 +214,15 @@ public class NodeNetworkTest {
 		// Update the :data path with the updated Index
 		server0.getCursor().assoc(dataKeyword, updatedDataIndex);
 
-		// Sync so the propagator has the value for LATTICE_QUERY responses.
-		// Synchronous commit: announce completes on this thread before return.
-		server0.getHost().sync();
-
 		// Create the query path [:data valueHash] for reuse
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);
-		
+		Predicate<ACell> holdsTestValue = root -> testValue.equals(RT.getIn(root, dataKeyword, valueHash));
+
+		// Sync publishes the value; the propagator's worker then announces it, and
+		// LATTICE_QUERY answers from what has been announced.
+		server0.getHost().sync();
+		propagators.get(0).whenAnnounced(holdsTestValue).get(10, TimeUnit.SECONDS);
+
 		// Verify server 0 has the value at [:data valueHash] by sending a LATTICE_QUERY via ConvexRemote
 		InetSocketAddress server0Address = transports.get(0).getHostAddress();
 		assertNotNull(server0Address, "Server 0 should have a host address");
@@ -251,7 +255,8 @@ public class NodeNetworkTest {
 		
 		// Call sync on the last server to sync with server 0
 		assertTrue(lastServer.pull(propagators.get(NETWORK_SIZE - 1)), "Pull should succeed");
-		
+		propagators.get(NETWORK_SIZE - 1).whenAnnounced(holdsTestValue).get(10, TimeUnit.SECONDS);
+
 		// Verify the last server has the new data value at [:data valueHash] path via LATTICE_QUERY
 		InetSocketAddress lastServerAddress = transports.get(NETWORK_SIZE-1).getHostAddress();
 		assertNotNull(lastServerAddress, "Last server should have a host address");
