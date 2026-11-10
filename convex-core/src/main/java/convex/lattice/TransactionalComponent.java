@@ -32,7 +32,7 @@ import convex.lattice.cursor.Transactions;
  * {@link Transactions}; this interface adds the typed component view. Rebinding
  * rebuilds the component's editing views over the draft, so a stamp the component
  * builds over its storage applies within the draft. Authoring within bound storage,
- * such as a signing view or a stamp bound there, applies once at commit. Commit uses
+ * such as a signing view or a stamp bound there, applies at each commit attempt. Commit uses
  * bound storage so editing views are not applied twice.</p>
  *
  * <p>Transactions rerun domain operations on conflict; they do not invoke incoming
