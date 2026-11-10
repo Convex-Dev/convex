@@ -51,7 +51,7 @@ class LocalComponentTest {
 		}
 
 		void put(Keyword key,ACell value) {
-			cursor().path(key).set(value);
+			cursor().assoc(key,value);
 		}
 	}
 

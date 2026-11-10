@@ -64,7 +64,7 @@ class TaskBoardApplicationTest {
 	/** Constructs the domain component directly at its host path. */
 	static final class TaskBoardApp extends SingleRegion<Board> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			super(host.cursor(),BOARD,new Board(host.cursor().path(BOARD),getTimestamp).fork());
+			super(host.cursor(),BOARD,new Board(new IndexComponent<>(host.cursor()).path(BOARD),getTimestamp).fork());
 		}
 		Board board() { return component(); }
 	}

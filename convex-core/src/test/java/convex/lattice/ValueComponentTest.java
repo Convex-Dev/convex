@@ -251,8 +251,13 @@ class ValueComponentTest {
 		assertFalse(absent.exists());
 		assertEquals(1,assertThrows(PathWriteException.class,() -> absent.cursor().set(CVMLong.ONE)).getIndex());
 		assertEquals(Maps.empty(),root.get());
-		json.resolve(NAME).cursor().set(CVMLong.ONE);
-		assertEquals(Maps.of(NAME,CVMLong.ONE),root.get());
+		// A key its container does not hold is no place to write; writing the container creates it
+		var name=json.resolve(NAME);
+		assertEquals(0,assertThrows(PathWriteException.class,() -> name.cursor().set(CVMLong.ONE)).getIndex());
+		assertEquals(Maps.empty(),root.get());
+		root.assoc(NAME,CVMLong.ONE);
+		name.cursor().set(CVMLong.TWO);
+		assertEquals(Maps.of(NAME,CVMLong.TWO),root.get());
 	}
 
 	@Test void refusedWritesNameTheKeyInTheResolvedComponent() {

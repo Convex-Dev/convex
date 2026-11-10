@@ -129,7 +129,7 @@ public class SignedComponentTest {
 		Keyword slot=Keyword.intern("owner");
 		Keyword sibling=Keyword.intern("sibling");
 		var root=new Root<>(Index.<Keyword,ACell>none());
-		var destination=root.<SignedData<ASet<CVMLong>>>path(slot);
+		var destination=new IndexComponent<>(root).<SignedData<ASet<CVMLong>>>path(slot);
 		AtomicInteger signatures=new AtomicInteger();
 		var component=new SignedComponent<>(SIGNED,destination,signer(() -> {
 			// Change the ancestor after the update reads it, forcing a CAS retry.

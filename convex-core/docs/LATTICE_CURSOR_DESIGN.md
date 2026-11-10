@@ -64,30 +64,31 @@ reads throw `MissingValueException`; optional reads return their fallback, and
 presence checks return false.
 
 `path(keys...)` creates a view without reading or changing state. Writes
-use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
-intermediate containers must already exist. An absent final value can be replaced,
-but writing through an absent container throws `PathWriteException`, and so does a
-write to a container that cannot hold its key, such as a vector given a key that is
-not an index within it. The exception carries the keys from the one that does not
-fit, and its depth. `assoc` and `assocIn` follow the same rule. A plain path write
-through a signed envelope is refused with `IllegalArgumentException`.
+use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. A plain
+path write through a signed envelope is refused with `IllegalArgumentException`.
 
-Atomic updates keep their creation semantics: a missing final entry is supplied
-as null, and a changed result can insert it into an existing map. Unchanged writes
-preserve absence. Forks and transactions can likewise start from a missing location
-as nil without creating destination state. None of these operations creates a
-missing intermediate container implicitly.
-
-A cursor that cannot be written refuses every write, whatever the values: a write
+A write lands only where the cursor's place exists, which is where `exists()` is
+true. A path whose entry or any container above it is missing throws
+`PathWriteException`, and so does a write to a container that cannot hold its key,
+such as a vector given a key that is not an index within it. The exception carries
+the keys from the one that does not fit, and its depth. A read-only view throws
+`ReadOnlyCursorException`. Both refuse every write, whatever the values: a write
 that would change nothing, a compare-and-set that would not match and a
-transaction that changes nothing are refused like any other. A read-only view
-throws `ReadOnlyCursorException`, and a path with nowhere to write throws
-`PathWriteException`. The refusal is decided on the value the write would land on
-and leaves it untouched, so a fork whose container has gone is refused at sync and
-keeps its edits. Where a write could land, as at a missing final entry or under a
-view that constructs its container, a write that changes nothing stays silent and
-creates nothing. A value the cursor will not accept, such as one no signer is
-authorised for, is refused only when it would be written.
+transaction that changes nothing are refused like any other. The refusal is
+decided on the value the write would land on and leaves it untouched, so a fork
+whose place has been deleted is refused at sync and keeps its edits. Views over a
+path, such as a default, a signed view or a stamp, write through it and are
+refused with it.
+
+An entry is created by writing the container that holds it: `assoc` and `assocIn`
+on the container's cursor, or an update function there. This is the standard, and
+what applications should do by default. A component may instead supply a view
+that creates its place lazily when written, and takes responsibility for doing so
+correctly: atomically with a changed write, and never on a read or a write that
+changes nothing. The entry views of map and index components and lattice paths
+below do this, and are the examples to follow. A value the cursor will not
+accept, such as one no signer is authorised for, is refused only when it would be
+written.
 
 Transformations propagate source absence without applying their read function.
 A projection over present storage returns the value its supplied function defines,
@@ -194,10 +195,14 @@ sync, even when a write
 
 ## Component-supplied construction
 
+A plain path writes only where its entry exists. A component that wants its place
+created by its first write supplies a view that does so, and these are the ways to
+do it properly.
+
 For ordinary collections, use `MapComponent.path(key)` or `IndexComponent.path(key)`.
 An entry reads as a path does: a missing key is absent and a stored nil is present.
-They reject incompatible stored containers and create a correctly typed container
-only on a changed write. Their pure `createContainer()` hook can supply initial
+They reject incompatible stored containers, and on a changed write insert their key,
+creating a correctly typed container first if there is none. Their pure `createContainer()` hook can supply initial
 contents or refuse creation. Reads and no-op edits leave missing storage absent.
 
 For custom representations, a component can use
@@ -225,12 +230,13 @@ back leaves the source unchanged by value equality. Construction and the child e
 commit in the same atomic source update. Exceptions commit nothing. Obtaining a view
 or reading it has no state-changing effects.
 
-`cursor.withDefault(emptyContainer).path(key)` supplies a known container type
-without any merge definition. The optional adapter helper
+`cursor.withDefault(emptyContainer)` supplies a known container type for reads
+and for update functions, without any merge definition; a plain path below it
+still writes only to an entry that exists. The optional adapter helper
 `LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
 lattice key, using an explicit lattice. It reads as any path does, so a missing
-key is absent. Its writes use `LatticeOps.assocIn` to construct an absent
-container from the lattice's zero at that level.
+key is absent. Its writes use `LatticeOps.assocIn` to insert its key, constructing an
+absent container from the lattice's zero at that level.
 Unknown missing container types fail; keys never determine container types.
 JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
 Owner envelopes still require an explicit signing boundary.
@@ -388,10 +394,12 @@ stamping. Read functions must accept the values that policy can produce.
 A transform behaves as any cursor does for its consumers. It is absent where it
 finds no value, including wherever its source is absent; a view that should hold a
 value when nothing is stored is built over `withDefault`. A transform creates no
-storage by default: a navigating view refuses a missing container with
+place by default: a navigating view refuses a missing entry or container with
 `PathWriteException`. A transform whose definition knows how to build its storage
 builds it in its write: a default from its default, an authoring view its envelope
-or record, a component's projection what its write function supplies.
+or record, a component's projection what its write function supplies. Each still
+writes through its source, so it lands only where the source's place exists or
+is created by the source.
 
 `ProjectionCursor` rebuilds from the current source on retries, preserving siblings.
 Signed and stamped views also rebuild on each attempt: a retried write signs again,

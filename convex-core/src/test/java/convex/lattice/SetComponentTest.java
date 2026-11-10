@@ -105,8 +105,8 @@ class SetComponentTest {
 		var sibling=Keyword.intern("other");
 		var other=Sets.of(99);
 		var root=Root.create(Index.<Keyword,ACell>of(sibling,other));
-		var first=new SetComponent<CVMLong>(root.path(key));
-		var second=new SetComponent<CVMLong>(root.path(key));
+		var first=new SetComponent<CVMLong>(new IndexComponent<>(root).path(key));
+		var second=new SetComponent<CVMLong>(new IndexComponent<>(root).path(key));
 		var initial=root.get();
 		assertFalse(first.remove(CVMLong.ONE));
 		second.clear();

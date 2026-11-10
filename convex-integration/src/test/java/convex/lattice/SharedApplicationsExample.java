@@ -61,7 +61,8 @@ public final class SharedApplicationsExample {
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
 			super(host.cursor());
-			social=region(Social.KEY_SOCIAL,Social.connect(cursor().path(Social.KEY_SOCIAL),
+			// The region is the host index's entry, created by its first publication
+			social=region(Social.KEY_SOCIAL,Social.connect(new IndexComponent<>(cursor()).path(Social.KEY_SOCIAL),
 				DIDKeyAuthorizer.CONVEX,(owner,value) -> user.signData(value),() -> CVMLong.create(time)).fork());
 		}
 
@@ -105,7 +106,7 @@ public final class SharedApplicationsExample {
 			// Infrastructure is registered once; both domain applications use its live state.
 			host.addApplication(new LatticeComponent<>(P2PLattice.ROOT,host.cursor()));
 			social=host.addApplication(new SocialApp(host,ALICE,time));
-			var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),store,
+			var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),store,
 				BOB::signData,() -> CVMLong.create(time));
 			// Choose a private publication boundary explicitly; the application retains it.
 			files=host.addApplication(new DLFSApplication(host,Keywords.FS,region.fork()));

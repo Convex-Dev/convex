@@ -51,11 +51,11 @@ class ApplicationLifecycleTest {
 				if (fail[0]) throw new IllegalStateException("preparation failed");
 			}
 		};
-		AForkableCursor<Index<Keyword,ACell>> nestedPath=host.cursor().path(NESTED);
+		AForkableCursor<Index<Keyword,ACell>> nestedPath=new IndexComponent<>(host.cursor()).path(NESTED);
 		var nested=new Regions(nestedPath) {
 			@Override protected void beforeSync() { events.add("nested"); }
 		};
-		var values=new Values(nestedPath.withDefault(Index.none()).<ASet<CVMLong>>path(ITEMS).fork()) {
+		var values=new Values(new IndexComponent<>(nestedPath).<ASet<CVMLong>>path(ITEMS).fork()) {
 			@Override public ASet<CVMLong> sync() {
 				events.add("values");
 				return super.sync();

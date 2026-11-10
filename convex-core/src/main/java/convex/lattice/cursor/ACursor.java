@@ -13,8 +13,8 @@ import convex.lattice.LatticeOps;
 
 /**
  * Atomic read/write access to one immutable CVM value.
- * Paths update existing nested containers atomically through their base cursor.
- * Components construct missing containers. Cursors carry no lattice policy,
+ * Paths write existing entries atomically through their base cursor.
+ * Components create missing entries and containers. Cursors carry no lattice policy,
  * signing context, clock or store; components own those concerns.
  *
  * @param <V> Value type
@@ -304,7 +304,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>Reading from the path cursor returns the nested value; writing to it
 	 * atomically updates this cursor's entire value with the nested change. A write
-	 * through an absent intermediate fails; components supply any construction logic.</p>
+	 * where the location does not exist fails; components supply any construction logic.</p>
 	 *
 	 * @param <T> Type of value at the path
 	 * @param path Keys to navigate through nested data structures

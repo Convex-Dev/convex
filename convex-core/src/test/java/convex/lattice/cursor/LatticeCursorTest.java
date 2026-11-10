@@ -43,6 +43,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.MapComponent;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
@@ -61,7 +62,7 @@ public class LatticeCursorTest {
 		KeyedLattice lattice=KeyedLattice.create(
 			Keywords.FOO,MaxLattice.INSTANCE,
 			Keywords.BAR,MaxLattice.INSTANCE);
-		Root<Index<Keyword,ACell>> root=Cursors.root(lattice.zero());
+		Root<Index<Keyword,ACell>> root=Cursors.root(lattice.zero().assoc(Keywords.FOO,CVMLong.ZERO));
 		ACell[] path={Keywords.FOO};
 		AForkableCursor<AInteger> cursor=root.path(path);
 		path[0]=Keywords.BAR;
@@ -108,7 +109,7 @@ public class LatticeCursorTest {
 				ExecutorService reader = Executors.newSingleThreadExecutor()) {
 			for (long i = 1; i <= 1_000; i++) {
 				CVMLong committed = CVMLong.create(i);
-				ASet<CVMLong> written=writer.submit(() -> fork.<ASet<CVMLong>>path(Keywords.FOO)
+				ASet<CVMLong> written=writer.submit(() -> new MapComponent<>(fork).<ASet<CVMLong>>path(Keywords.FOO)
 						.updateAndGet(values -> (values==null?Sets.<CVMLong>empty():values).include(committed))).get();
 
 				ASet<CVMLong> observed = reader.submit(() ->
@@ -595,8 +596,9 @@ public class LatticeCursorTest {
 		Root<AHashMap<AString, ASet<CVMLong>>> mapRoot =
 			Cursors.root(Maps.empty());
 
-		// Derive a path cursor for key "users"
+		// Derive a path cursor for key "users", an entry its container holds
 		AString key = Strings.create("users");
+		mapRoot.assoc(key, Sets.empty());
 		AForkableCursor<ASet<CVMLong>> userCursor = mapRoot.path(key);
 
 		// Write through the path cursor
@@ -614,12 +616,12 @@ public class LatticeCursorTest {
 	public void testPathDerivedWriteIsPublishedByExplicitHostSync() {
 		// Combination test: path-derived write, then explicit host.sync() — publication runs.
 		LatticeHost<AHashMap<AString, ASet<CVMLong>>> host =
-			LatticeHost.<AHashMap<AString, ASet<CVMLong>>>create(Maps.empty(), null);
+			LatticeHost.<AHashMap<AString, ASet<CVMLong>>>create(Maps.of(Strings.create("k"), Sets.empty()), null);
 
 		AtomicInteger callCount = new AtomicInteger();
 		host.attachPublisher(value -> { callCount.incrementAndGet(); return value; });
 
-		// Write through a path-derived view
+		// Write through a path-derived view of an existing entry
 		AForkableCursor<ASet<CVMLong>> pathCursor = host.cursor().path(Strings.create("k"));
 		pathCursor.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
@@ -1071,7 +1073,7 @@ public class LatticeCursorTest {
 
 		// === Step 2: Descend root cursor to the :kv level (OwnerLattice) ===
 		ALattice<ACell> kvLattice = Lattice.ROOT.path(kvPath);
-		AForkableCursor<ACell> kvCursor = root.path(kvPath);
+		AForkableCursor<ACell> kvCursor = LatticeComponent.resolve(root, Lattice.ROOT, kvPath);
 		assertNotNull(kvCursor);
 
 		// === Step 3: Create and populate a KV database via the high-level API ===

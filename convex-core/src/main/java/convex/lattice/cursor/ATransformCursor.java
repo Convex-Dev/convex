@@ -18,7 +18,7 @@ import convex.core.util.Utils;
  * stored value. A view that should hold a value when nothing is stored is built
  * over a source with a default ({@link AForkableCursor#withDefault}). A transform
  * creates no storage by default: its write receives null for absent storage, and
- * a navigating view refuses a missing container with
+ * a navigating view refuses a missing entry or container with
  * {@link convex.lattice.PathWriteException}. A subclass whose definition knows how
  * to build its storage, as a default, an authoring view or a component's
  * projection does, builds it in its write.</p>

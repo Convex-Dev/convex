@@ -21,6 +21,7 @@ import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.fs.DLFSLattice;
+import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Root;
 
@@ -125,7 +126,7 @@ public class DLFSApplicationTest {
 
 	@Test void sharedForkReconcilesIncomingFilesWithoutPublishingPendingEdits() throws Exception {
 		var host=LatticeHost.create();
-		var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),null,OWNER::signData,() -> CVMLong.create(100));
+		var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),null,OWNER::signData,() -> CVMLong.create(100));
 		var staged=region.fork();
 		var app=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
 		var shared=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));

@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
@@ -17,6 +18,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.MapComponent;
 import convex.lattice.PathWriteException;
 
 /** Required reads, explicit absence, and composition over one immutable snapshot. */
@@ -146,21 +148,35 @@ class CursorPresenceTest {
 		assertNull(cached.get());
 	}
 
-	@Test void explicitDefaultsAndWritesCanCreateMissingEntries() {
-		var root=Root.<ACell>create(Maps.empty());
+	@Test void defaultsAndPathsWriteOnlyWhereTheirEntryExists() {
+		Root<AHashMap<Keyword,ACell>> root=Root.create(Maps.empty());
 		var path=root.<ACell>path(A);
 		var defaulted=path.withDefault(CVMLong.ZERO);
 		assertTrue(defaulted.exists());
 		assertEquals(CVMLong.ZERO,defaulted.get());
-		defaulted.set(CVMLong.ZERO);
+		// A default supplies a value to read, not a place to write
+		assertThrows(PathWriteException.class,() -> defaulted.set(CVMLong.ZERO));
+		assertThrows(PathWriteException.class,() -> defaulted.compareAndSet(CVMLong.ZERO,CVMLong.ONE));
+		assertThrows(PathWriteException.class,() -> path.set(CVMLong.TWO));
+		assertThrows(PathWriteException.class,() -> path.getAndUpdate(value -> CVMLong.ONE));
 		assertFalse(path.exists());
-		assertTrue(defaulted.compareAndSet(CVMLong.ZERO,CVMLong.ONE));
+		assertEquals(Maps.empty(),root.get());
+		// Writing the container creates the entry, which both views then write
+		root.assoc(A,CVMLong.TWO);
+		assertEquals(CVMLong.TWO,path.get());
+		assertTrue(defaulted.compareAndSet(CVMLong.TWO,CVMLong.ONE));
+		assertEquals(CVMLong.ONE,path.getAndUpdate(value -> CVMLong.TWO));
+		assertEquals(CVMLong.TWO,path.get());
+		// A component's entry view creates its entry when a write changes it
+		root.set(Maps.empty());
+		AForkableCursor<ACell> entry=new MapComponent<>(root).path(A);
+		var entryDefault=entry.withDefault(CVMLong.ZERO);
+		entryDefault.set(CVMLong.ZERO);
+		assertFalse(path.exists());
+		assertTrue(entryDefault.compareAndSet(CVMLong.ZERO,CVMLong.ONE));
 		assertEquals(CVMLong.ONE,path.get());
 		root.set(Maps.empty());
-		path.set(CVMLong.TWO);
-		assertEquals(CVMLong.TWO,path.get());
-		root.set(Maps.empty());
-		assertNull(path.getAndUpdate(value -> { assertNull(value); return CVMLong.ONE; }));
+		assertNull(entry.getAndUpdate(value -> { assertNull(value); return CVMLong.ONE; }));
 		assertEquals(CVMLong.ONE,path.get());
 		root.set(Maps.empty());
 		assertThrows(IllegalStateException.class,() -> path.path(B).set(CVMLong.ONE));

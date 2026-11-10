@@ -149,9 +149,10 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 			return value==MISSING?null:(ACell)value;
 		}
 
-		/** Writing back what is there changes nothing, and fails exactly where a changed write would. */
+		/** A path writes only where its entry exists; writing back what is there finds a container that cannot hold it. */
 		@Override protected void requireWritable(ACell stored) {
 			write(stored,view(stored));
+			if (viewValue(stored)==MISSING) throw new PathWriteException("Cannot write an entry that does not exist",keys,keys.length-1);
 		}
 
 		@Override protected ACell write(ACell current,ACell value) {

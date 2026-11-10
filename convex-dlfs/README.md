@@ -327,7 +327,7 @@ A custom application can embed `DLFSRegion` at any correctly bound cursor.
 For a root application that stages files, explicitly supply a fork:
 
 ```java
-var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store,
+var files = DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS), store,
     myKeyPair::signData, Utils::getCurrentTimestampCell);
 var app = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
 ```

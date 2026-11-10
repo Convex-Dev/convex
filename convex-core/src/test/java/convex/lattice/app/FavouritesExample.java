@@ -15,8 +15,10 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ASignedComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.KeyOwnedIndex;
 import convex.lattice.LatticeHost;
+import convex.lattice.MapComponent;
 import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
@@ -125,7 +127,8 @@ public final class FavouritesExample {
 		private final Supplier<CVMLong> getTimestamp;
 
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			this(host,new KeyOwnedIndex<>(host.cursor().path(FAVOURITES),Timestamped.lattice()).fork(),getTimestamp);
+			// The region is the host index's entry, created by its first publication
+			this(host,new KeyOwnedIndex<>(new IndexComponent<>(host.cursor()).path(FAVOURITES),Timestamped.lattice()).fork(),getTimestamp);
 		}
 
 		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */
@@ -173,7 +176,8 @@ public final class FavouritesExample {
 			this.getTimestamp=getTimestamp;
 			// Wrap the base signing view once; every domain edit uses cursor().
 			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
-			itemSet=new SetComponent<>(cursor().path(ITEMS));
+			// The items are the record's entry, created by the first add
+			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
 		}
 
 		private Favourites(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
@@ -181,7 +185,7 @@ public final class FavouritesExample {
 			super(rule,cursor);
 			this.getTimestamp=getTimestamp;
 			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
-			itemSet=new SetComponent<>(cursor().path(ITEMS));
+			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
 		}
 
 		@Override public Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {

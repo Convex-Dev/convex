@@ -136,7 +136,7 @@ public final class Transactions {
 
 		/** One optimistic attempt. False leaves the caller to try again or take the claim. */
 		boolean commit() {
-			// A transaction can create a missing final entry, as an atomic update can.
+			// An absent place reads as nil; whether the commit can create it is the cursor's rule.
 			V observed=cursor.getOrDefault(null);
 			if (!computed || !Utils.equals(observed,input)) {
 				if (computed && ++conflicts>=CONFLICTS_BEFORE_CLAIM) return false;

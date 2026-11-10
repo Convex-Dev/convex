@@ -198,7 +198,7 @@ public class ALatticeComponentTest {
 		var unrelated=Keyword.intern("unrelated");
 		var marker=Blob.fromHex("abcd");
 		var host=LatticeHost.create(Index.<Keyword,ACell>none().assoc(unrelated,marker),null);
-		var live=new TestComponent(host.cursor().<ASet<ACell>>path(key).withDefault(Sets.empty()));
+		var live=new TestComponent(new IndexComponent<>(host.cursor()).<ASet<ACell>>path(key).withDefault(Sets.empty()));
 		var draft=live.fork();
 		var regions=new Regions(host.cursor());
 		regions.add(key,draft);

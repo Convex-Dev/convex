@@ -107,7 +107,7 @@ public class SharedApplicationInternalsTest {
 			if (socialApp) {
 				var policy=context(SOCIAL_KEY,signing);
 				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-				social=Social.connect(cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+				social=Social.connect(new IndexComponent<>(cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).rebind(socialState.cursor());
 				files=null;
 				fileState=null;
@@ -245,9 +245,9 @@ public class SharedApplicationInternalsTest {
 			super(cursor);
 			this.policy=policy;
 			for (Keyword key:new Keyword[]{Social.KEY_SOCIAL,Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
-				region(key,LatticeComponent.live(SOCIAL_ROOT.path(key),cursor.path(key),LatticeContext.EMPTY));
+				region(key,LatticeComponent.live(SOCIAL_ROOT.path(key),new IndexComponent<>(cursor).path(key),LatticeContext.EMPTY));
 			}
-			social=Social.connect(cursor.path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+			social=Social.connect(new IndexComponent<>(cursor).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
 		@Override public SocialWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
@@ -266,7 +266,7 @@ public class SharedApplicationInternalsTest {
 			super(cursor,store,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
 			policy=context;
 			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
-				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),cursor.path(key),context));
+				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),new IndexComponent<>(cursor).path(key),context));
 			}
 		}
 		@Override public FilesWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
@@ -393,7 +393,7 @@ public class SharedApplicationInternalsTest {
 					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 				}
 			});
-			var feed=Social.connect(f.social.cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+			var feed=Social.connect(new IndexComponent<>(f.social.cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> delayedPolicy.signAs(owner,value),delayedPolicy::currentTimestamp).user(SOCIAL_KEY.getAccountKey()).feed();
 			var beforePost=f.node.getCursor().get();
 			try (var executor=Executors.newSingleThreadExecutor()) {

@@ -514,7 +514,7 @@ class KeyedRegionsTest {
 		for (var rule:rules) {
 			var host=LatticeHost.create();
 			var app=new TestRegions(host);
-			var child=app.region(A,new SignedComponent<>(rule,host.cursor().path(A),owner::signData));
+			var child=app.region(A,new SignedComponent<>(rule,new IndexComponent<>(host.cursor()).path(A),owner::signData));
 			app.merge(Index.of(A,stranger.signData(payload)));
 			app.mergeAt(stranger.signData(payload),A);
 			assertNull(child.cursor().get());

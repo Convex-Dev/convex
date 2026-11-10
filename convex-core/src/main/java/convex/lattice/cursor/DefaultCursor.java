@@ -11,8 +11,8 @@ import convex.core.data.ACell;
  * clears storage, after which reads again return the default.
  *
  * <p>The default is a value chosen by the caller, not an inferred container type
- * or lattice policy. Descendant paths can therefore edit an absent container
- * without creating it until an actual change occurs.</p>
+ * or lattice policy. A write goes through the source, so it lands only where the
+ * source's place exists or the source creates it.</p>
  *
  * @param <V> Value type
  */

@@ -115,6 +115,11 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 			this.step=new ACell[] {key};
 		}
 
+		/** Creates its entry on a changed write, so only a container it cannot build or use refuses it. */
+		@Override protected void requireWritable(ACell stored) {
+			write(stored,view(stored));
+		}
+
 		@Override protected ACell write(ACell current,ACell value) {
 			return LatticeOps.assocIn(current,value,lattice,step);
 		}

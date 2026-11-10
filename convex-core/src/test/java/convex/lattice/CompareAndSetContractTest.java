@@ -65,15 +65,15 @@ public class CompareAndSetContractTest {
 	 * @param stored What the holder stores at the view's place for that value
 	 * @param plain Removes what the view's own writing adds, such as a stamp
 	 * @param nested Whether the view's place is under {@link #NEST}
-	 * @param nullWhereAbsent Whether the view shows null where nothing is stored
+	 * @param createsItsPlace Whether a write through the view creates its place where none exists
 	 */
 	private record Kind(String name,View view,LongFunction<ACell> value,LongFunction<ACell> stored,
-			UnaryOperator<ACell> plain,boolean nested,boolean nullWhereAbsent) {
+			UnaryOperator<ACell> plain,boolean nested,boolean createsItsPlace) {
 		@Override public String toString() { return name; }
 	}
 
-	private static Kind plainKind(String name,View view) {
-		return new Kind(name,view,CVMLong::create,CVMLong::create,value -> value,false,true);
+	private static Kind plainKind(String name,boolean createsItsPlace,View view) {
+		return new Kind(name,view,CVMLong::create,CVMLong::create,value -> value,false,createsItsPlace);
 	}
 
 	private static AHashMap<Keyword,ACell> numbered(long n) {
@@ -106,27 +106,30 @@ public class CompareAndSetContractTest {
 
 	static Stream<Kind> kinds() {
 		return Stream.of(
-			plainKind("path",(source,authored) -> source.path(KEY)),
-			new Kind("default view over a path",(source,authored) -> source.<ACell>path(KEY).withDefault(DEFAULT),
-				CVMLong::create,CVMLong::create,value -> value,false,false),
-			plainKind("projection",(source,authored) -> ProjectionCursor.<AHashMap<Keyword,ACell>,ACell>create(source,
+			plainKind("path",false,(source,authored) -> source.path(KEY)),
+			plainKind("default view over a path",false,(source,authored) -> source.<ACell>path(KEY).withDefault(DEFAULT)),
+			plainKind("projection",true,(source,authored) -> ProjectionCursor.<AHashMap<Keyword,ACell>,ACell>create(source,
 				map -> map==null?null:map.get(KEY),(map,value) -> map.assoc(KEY,value))),
 			new Kind("signed view over a path",(source,authored) -> signed(source.path(KEY),authored),
-				CVMLong::create,n -> KEYS.signData(CVMLong.create(n)),value -> value,false,true),
+				CVMLong::create,n -> KEYS.signData(CVMLong.create(n)),value -> value,false,false),
 			new Kind("stamped view over a path",(source,authored) -> stamped(source.path(KEY),authored),
-				CompareAndSetContractTest::numbered,CompareAndSetContractTest::numbered,CompareAndSetContractTest::unstamped,false,true),
-			plainKind("lattice path",(source,authored) -> LatticeComponent.resolve(source,null,KEY)),
-			plainKind("map entry",(source,authored) -> new MapComponent<Keyword,ACell>(source).path(KEY)),
-			plainKind("JSON path",(source,authored) -> jsonPath(source)),
+				CompareAndSetContractTest::numbered,CompareAndSetContractTest::numbered,CompareAndSetContractTest::unstamped,false,false),
+			plainKind("lattice path",true,(source,authored) -> LatticeComponent.resolve(source,null,KEY)),
+			plainKind("map entry",true,(source,authored) -> new MapComponent<Keyword,ACell>(source).path(KEY)),
+			plainKind("JSON path",false,(source,authored) -> jsonPath(source)),
 			new Kind("path over a path",(source,authored) -> source.<ACell>path(NEST).path(KEY),
-				CVMLong::create,CVMLong::create,value -> value,true,true));
+				CVMLong::create,CVMLong::create,value -> value,true,false));
 	}
 
 	private enum Holder { ROOT, FORK }
 
-	static Stream<Arguments> subjects() {
-		return kinds().flatMap(kind -> Stream.of(Holder.values()).map(holder -> Arguments.of(kind,holder)));
+	private static Stream<Arguments> subjects(Stream<Kind> kinds) {
+		return kinds.flatMap(kind -> Stream.of(Holder.values()).map(holder -> Arguments.of(kind,holder)));
 	}
+
+	static Stream<Arguments> subjects() { return subjects(kinds()); }
+	static Stream<Arguments> subjectsThatCreateTheirPlace() { return subjects(kinds().filter(Kind::createsItsPlace)); }
+	static Stream<Arguments> subjectsWhosePlaceMustExist() { return subjects(kinds().filter(kind -> !kind.createsItsPlace)); }
 
 	// ===== A cursor under test, and the root or fork its writes land in =====
 
@@ -219,21 +222,26 @@ public class CompareAndSetContractTest {
 	}
 
 	@ParameterizedTest(name="{0}, {1}")
-	@MethodSource("subjects")
-	void nullIsTheExpectedValueWhereNothingIsStored(Kind kind,Holder holder) {
+	@MethodSource("subjectsThatCreateTheirPlace")
+	void nullIsTheExpectedValueWhereAViewCreatesItsPlace(Kind kind,Holder holder) {
 		var subject=new Subject(kind,holder,false);
 		var twin=new Subject(kind,holder,false);
+
+		assertTrue(subject.cursor.compareAndSet(null,subject.value(2)));
+		twin.cursor.set(twin.value(2));
+
+		assertEquals(twin.holder.get(),subject.holder.get());
+	}
+
+	@ParameterizedTest(name="{0}, {1}")
+	@MethodSource("subjectsWhosePlaceMustExist")
+	void aPlaceThatDoesNotExistRefusesIt(Kind kind,Holder holder) {
+		var subject=new Subject(kind,holder,false);
 		var before=subject.holder.get();
 
-		boolean matched=subject.cursor.compareAndSet(null,subject.value(2));
+		assertThrows(PathWriteException.class,() -> subject.cursor.compareAndSet(null,subject.value(2)));
 
-		assertEquals(kind.nullWhereAbsent,matched);
-		if (matched) {
-			twin.cursor.set(twin.value(2));
-			assertEquals(twin.holder.get(),subject.holder.get());
-		} else {
-			assertEquals(before,subject.holder.get());
-		}
+		assertEquals(before,subject.holder.get());
 	}
 
 	// ===== Only a change to the cursor's own value fails it =====

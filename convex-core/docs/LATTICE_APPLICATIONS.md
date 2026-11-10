@@ -246,8 +246,9 @@ containers and key types:
   nil, from: the string itself; the keyword, then the symbol, with that name; then
   the blob, address and integer that `Blobs.parse`, `Address.parse` and
   `AInteger.parse` read from it. Blob keys therefore take hex with or without `0x`.
-- A segment naming no existing key keeps its string key, so a write creates a
-  string field, as parsing JSON would.
+- A segment naming no existing key keeps its string key, as parsing JSON would.
+  The component there is absent, and is written only once its container holds
+  that key.
 - Sets and other values have no addressable children.
 
 Selecting this variant declares the intended addressing policy; it does not
@@ -257,20 +258,21 @@ JSON resolution selects keys from one snapshot. A returned component keeps those
 keys: resolve again to interpret a later container shape. A resolved position
 becomes absent if its container becomes a map, as does an integer map key if its
 container becomes a sequence, and writes through such a handle refuse the
-incompatible container. Neither variant creates missing intermediate containers or
+incompatible container. Neither variant creates a missing entry or container, or
 supplies a merge rule. A parent needing those behaviours provides them explicitly.
 
 A resolved value component keeps only its keys, in its cursor: the literal
 segments, or the keys JSON resolution selected. A write through it that cannot be
 made throws `PathWriteException` with those keys from the first that cannot be
-written, and that key's depth among them, as any cursor path write does. Its
-container is either absent, or cannot hold its key: a scalar, a set, a position
-past the end of a sequence (appending included), or a key of the wrong kind. For
-an absent container, the container is the value the keys before it reach, or the
-component's own value when nothing precedes it. A write through a signed envelope
-is refused with `IllegalArgumentException`, as for any cursor. A write that
-changes nothing is refused in the same places: the refusal depends on where the
-write would go, not on its value.
+written, and that key's depth among them, as any cursor path write does. Either
+its entry does not exist, or its container is absent or cannot hold its key: a
+scalar, a set, a position past the end of a sequence (appending included), or a
+key of the wrong kind. For an absent container, the container is the value the
+keys before it reach, or the component's own value when nothing precedes it. A
+write through a signed envelope is refused with `IllegalArgumentException`, as for
+any cursor. A write that changes nothing is refused in the same places: the
+refusal depends on where the write would go, not on its value. A new entry is
+made by writing its container.
 
 `value()` uses the strict cursor read contract from
 [CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable

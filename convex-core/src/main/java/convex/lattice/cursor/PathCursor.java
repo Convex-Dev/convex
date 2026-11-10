@@ -6,14 +6,15 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.lattice.LatticeOps;
+import convex.lattice.PathWriteException;
 
 /**
  * A cursor that navigates to a path within a base cursor's value.
  *
  * <p>Required reads throw for absence, including unresolvable paths; a stored nil remains
  * nil. Optional reads handle absence explicitly. Changed writes rebuild existing ancestors.
- * A write through a missing container, or to one that cannot hold its key, throws
- * {@link convex.lattice.PathWriteException} at that key.
+ * Any write where the entry does not exist, or to a container that cannot hold its key,
+ * throws {@link convex.lattice.PathWriteException} at that key.
  * Update functions receive the actual
  * value, including null; components supply any defaults or construction logic.
  * Atomic operations, unchanged-write handling and claims come from
@@ -50,9 +51,10 @@ public class PathCursor<V extends ACell> extends ATransformCursor<V,ACell> {
 		return RT.getIn(stored,path);
 	}
 
-	/** Writing back what is there changes nothing, and fails exactly where a changed write would. */
+	/** A path writes only where its entry exists; writing back what is there finds a container that cannot hold it. */
 	@Override protected void requireWritable(ACell stored) {
 		write(stored,view(stored));
+		if (viewValue(stored)==MISSING) throw new PathWriteException("Cannot write an entry that does not exist",path,path.length-1);
 	}
 
 	/** Associates through existing containers, preserving sibling values. */

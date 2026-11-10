@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish forks of social feeds and follows when both sides changed, using the same rules as incoming merges.
 - Build signed, stamped and default lattice cursor views on one writable view base; see [Class hierarchy](convex-core/docs/LATTICE_CURSOR_DESIGN.md#class-hierarchy) when upgrading.
 - Compare by value in every lattice cursor write, so compare-and-set accepts an equal value and fails only when the cursor's own value differs, and writing an equal value changes nothing; see [Values and the cells that hold them](convex-core/docs/LATTICE_CURSOR_DESIGN.md#values-and-the-cells-that-hold-them) when upgrading.
-- Refuse every write through a lattice cursor that is read-only or has nowhere to write, including a write or transaction that changes nothing; see [Atomic operations and paths](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths) when upgrading.
+- Write through a lattice cursor only where its place exists: a read-only cursor, and a path whose entry or container is missing, refuse every write, and a new entry is created by writing its container or through a component's entry view; see [Atomic operations and paths](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths) when upgrading.
 
 ### Fixed
 

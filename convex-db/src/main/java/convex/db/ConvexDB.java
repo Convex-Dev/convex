@@ -20,6 +20,7 @@ import convex.core.util.Utils;
 import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -227,7 +228,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return Cursor of the database's state, which may be absent
 	 */
 	public AForkableCursor<Index<Keyword, ACell>> path(AString name) {
-		return cursor().withDefault(EMPTY).path(name);
+		return new MapComponent<>(cursor()).path(name);
 	}
 
 	/**

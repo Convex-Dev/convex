@@ -176,7 +176,7 @@ class FavouritesApplicationTest {
 		assertNull(alice.sync(),"Sync returns the absent bound value without materialising editing defaults");
 		assertEquals(Maps.empty(),alice.cursor().get());
 		assertNull(app.component().get(ALICE.getAccountKey()),"Reading the default view creates no envelope");
-		alice.cursor().path(Keyword.intern("note")).set(CVMLong.ONE);
+		alice.cursor().assoc(Keyword.intern("note"),CVMLong.ONE);
 		var record=app.component().get(ALICE.getAccountKey());
 		assertEquals(CVMLong.create(123),record.getValue().get(TIMESTAMP));
 		assertTrue(record.checkSignature());

@@ -28,9 +28,12 @@ import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.Transactions;
 
 /**
- * A cursor that cannot be written refuses every write, whatever the values: a write
- * that would change nothing and a compare-and-set that would not match included.
- * Where a write could land, one that changes nothing stays silent and creates nothing.
+ * A write lands only where the cursor's place exists. A cursor that is read-only, or
+ * whose place does not exist, refuses every write, whatever the values: a write that
+ * would change nothing and a compare-and-set that would not match included. An entry
+ * is created by writing its container. A view that creates its place when written is
+ * a choice of the component supplying it; there, a write that changes nothing stays
+ * silent and creates nothing.
  */
 public class UnwritableCursorTest {
 
@@ -57,9 +60,11 @@ public class UnwritableCursorTest {
 		return (AForkableCursor<ACell>)new JSONValueComponent<>(source).resolve(keys).cursor();
 	}
 
-	/** Places where a changed write is refused because it has nowhere to go. */
+	/** Places that do not exist. */
 	static Stream<Place> nowhereToWrite() {
 		return Stream.of(
+			new Place("missing entry of an existing container",Maps.empty(),source -> source.path(A)),
+			new Place("default view over a missing entry",Maps.empty(),source -> source.<ACell>path(A).withDefault(CVMLong.ZERO)),
 			new Place("path through a missing container",Maps.empty(),source -> source.path(A,B)),
 			new Place("path below nil",null,source -> source.path(A)),
 			new Place("path through a scalar",Maps.of(A,CVMLong.ONE),source -> source.path(A,B)),
@@ -70,12 +75,12 @@ public class UnwritableCursorTest {
 			new Place("signed view over a path through a missing container",Maps.empty(),source -> signed(source.path(A,B))));
 	}
 
-	/** Places holding nothing where a write could still land. */
-	static Stream<Place> absentButWritable() {
+	/** Places holding nothing that their view creates when written. */
+	static Stream<Place> createdWhenWritten() {
 		return Stream.of(
-			new Place("missing entry of an existing container",Maps.empty(),source -> source.path(A)),
+			new Place("entry of a map component",Maps.empty(),source -> mapEntry(source)),
 			new Place("entry of a map component over nil",null,source -> mapEntry(source)),
-			new Place("default view over a missing entry",Maps.empty(),source -> source.<ACell>path(A).withDefault(CVMLong.ZERO)));
+			new Place("default view over the entry of a map component",Maps.empty(),source -> mapEntry(source).withDefault(CVMLong.ZERO)));
 	}
 
 	@SuppressWarnings({"unchecked","rawtypes"})
@@ -133,13 +138,14 @@ public class UnwritableCursorTest {
 	}
 
 	static Stream<Arguments> everyWriteWithNowhereToLand() { return each(nowhereToWrite(),UnwritableCursorTest::writes); }
-	static Stream<Arguments> unchangingWritesWhereOneCouldLand() { return each(absentButWritable(),UnwritableCursorTest::unchanging); }
+	static Stream<Arguments> unchangingWritesWhereThePlaceIsCreated() { return each(createdWhenWritten(),UnwritableCursorTest::unchanging); }
+	static Stream<Arguments> changingWritesWhereThePlaceIsCreated() { return each(createdWhenWritten(),UnwritableCursorTest::changing); }
 
 	// ===== The rule =====
 
 	@ParameterizedTest(name="{0}, {1}, {2}")
 	@MethodSource("everyWriteWithNowhereToLand")
-	void aCursorWithNowhereToWriteRefusesEveryWrite(Place place,Holder holder,Write write) {
+	void aPlaceThatDoesNotExistRefusesEveryWrite(Place place,Holder holder,Write write) {
 		var storage=holder.holding(place.initial);
 		var cursor=place.view.apply(storage);
 
@@ -148,15 +154,37 @@ public class UnwritableCursorTest {
 		assertEquals(place.initial,storage.get());
 	}
 
+	@Test void anEntryIsCreatedByWritingItsContainer() {
+		Root<ACell> root=Root.create(Maps.empty());
+		AForkableCursor<ACell> entry=root.path(A);
+		assertThrows(PathWriteException.class,() -> entry.set(NEW));
+
+		root.assoc(A,CVMLong.ONE);
+		entry.set(NEW);
+
+		assertEquals(Maps.of(A,NEW),root.get());
+	}
+
 	@ParameterizedTest(name="{0}, {1}, {2}")
-	@MethodSource("unchangingWritesWhereOneCouldLand")
-	void aWriteThatChangesNothingIsSilentWhereOneCouldLand(Place place,Holder holder,Write write) {
+	@MethodSource("unchangingWritesWhereThePlaceIsCreated")
+	void aWriteThatChangesNothingCreatesNothingWhereAViewCreatesItsPlace(Place place,Holder holder,Write write) {
 		var storage=holder.holding(place.initial);
 		var cursor=place.view.apply(storage);
 
 		assertDoesNotThrow(() -> write.action.accept(cursor));
 
 		assertEquals(place.initial,storage.get(),"Nothing was created");
+	}
+
+	@ParameterizedTest(name="{0}, {1}, {2}")
+	@MethodSource("changingWritesWhereThePlaceIsCreated")
+	void aChangedWriteCreatesThePlaceWhereItsViewDoes(Place place,Holder holder,Write write) {
+		var storage=holder.holding(place.initial);
+		var cursor=place.view.apply(storage);
+
+		write.action.accept(cursor);
+
+		assertEquals(Maps.of(A,NEW),storage.get());
 	}
 
 	@ParameterizedTest(name="{0}")
@@ -180,6 +208,18 @@ public class UnwritableCursorTest {
 		assertThrows(PathWriteException.class,() -> fork.sync((own,other) -> own));
 
 		assertEquals(Maps.empty(),root.get());
+	}
+
+	@Test void aForkWhoseEntryHasGoneIsRefusedAtSync() {
+		Root<ACell> root=Root.create(Maps.of(A,Maps.of(B,CVMLong.ONE)));
+		var fork=root.<ACell>path(A,B).fork();
+		fork.set(NEW);
+		root.path(A).set(Maps.empty());
+
+		assertThrows(PathWriteException.class,() -> fork.sync((own,other) -> own));
+
+		assertEquals(NEW,fork.get());
+		assertEquals(Maps.of(A,Maps.empty()),root.get(),"The deleted entry does not come back");
 	}
 
 	@Test void aForkRefusedAtSyncKeepsItsEdits() {

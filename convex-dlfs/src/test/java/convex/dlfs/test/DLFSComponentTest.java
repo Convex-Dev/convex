@@ -42,6 +42,7 @@ import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.core.util.Utils;
+import convex.lattice.IndexComponent;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
@@ -165,7 +166,7 @@ public class DLFSComponentTest {
 
 		CompositeDLFSApplication(LatticeHost<Index<Keyword,ACell>> host,AKeyPair keyPair) {
 			super(host,keyPair::signData,KEY_DOCUMENTS);
-			this.archive=region(KEY_ARCHIVE,DLFSRegion.connect(cursor().path(KEY_ARCHIVE),store(),keyPair::signData,Utils::getCurrentTimestampCell));
+			this.archive=region(KEY_ARCHIVE,DLFSRegion.connect(new IndexComponent<>(cursor()).path(KEY_ARCHIVE),store(),keyPair::signData,Utils::getCurrentTimestampCell));
 		}
 	}
 

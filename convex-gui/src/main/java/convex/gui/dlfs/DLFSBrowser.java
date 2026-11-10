@@ -50,6 +50,7 @@ import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
@@ -313,7 +314,8 @@ public class DLFSBrowser extends AbstractGUI {
 			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
 			var rule=OWNER_LATTICE.signingFor(ownerKey);
-			drivesCursor = SignedCursor.create(rootCursor.path(ownerKey),v -> rule.sign(ctx,v));
+			// The owner's slot is created by its first write, so it is the map's entry and not a plain path
+			drivesCursor = SignedCursor.create(new MapComponent<>(rootCursor).path(ownerKey),v -> rule.sign(ctx,v));
 
 			// Rebuild drives from restored lattice state
 			drives.clear();

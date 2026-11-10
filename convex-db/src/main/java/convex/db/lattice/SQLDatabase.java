@@ -24,6 +24,8 @@ import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -216,7 +218,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			BinaryOperator<Index<Keyword, ACell>> policy) {
 		AString dbName = Strings.create(name);
 		var databases = (AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent;
-		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null, null,
+		return new SQLDatabase(new MapComponent<>(databases).path(dbName), dbName, null, null, null,
 			policy, Utils::getCurrentTimestampCell);
 	}
 
@@ -280,7 +282,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Cursor of the table store, which may be absent
 	 */
 	public AForkableCursor<Index<AString, AVector<ACell>>> tablesPath() {
-		return cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES);
+		return new IndexComponent<>(cursor()).path(ConvexDB.KEY_TABLES);
 	}
 
 	/**

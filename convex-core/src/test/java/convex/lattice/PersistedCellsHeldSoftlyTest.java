@@ -460,7 +460,7 @@ public class PersistedCellsHeldSoftlyTest {
 	@Test void aSignedForkHoldsItsValueSoftlyInsideTheSignature() {
 		var key=AKeyPair.createSeeded(1234);
 		var host=LatticeHost.<AHashMap<ACell,ACell>>create(Maps.empty(),store);
-		AForkableCursor<SignedData<AHashMap<ACell,ACell>>> slot=host.cursor().path(SIGNED);
+		AForkableCursor<SignedData<AHashMap<ACell,ACell>>> slot=new MapComponent<>(host.cursor()).path(SIGNED);
 		var signed=SignedCursor.create(slot,key);
 		signed.set(tree());
 		host.sync();

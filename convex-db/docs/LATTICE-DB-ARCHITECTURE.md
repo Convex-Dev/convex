@@ -2,8 +2,9 @@
 
 ## Cursor Chain
 
-A SQL database is a tree of lattice cursors. Each component navigates to its
-section of the tree via `cursor.path(key)`, which creates a descended cursor.
+A SQL database is a tree of lattice cursors. Each component is bound to its
+section of the tree through its parent's entry view (`MapComponent.path(key)` or
+`IndexComponent.path(key)`), which creates the entry on the first changed write.
 
 ```
 LatticeHost                     ← persistence and publication policy
@@ -43,7 +44,7 @@ LatticeHost   cursor: AHashMap<AString, Index>    hosted root
 ```
 
 `database()`, `tables()` and `table()` each construct the child component over
-`cursor.path(key)`, one level down, passing on the merge policy and clock. This is the same pattern as
+its entry view, one level down, passing on the merge policy and clock. This is the same pattern as
 `SocialUser.feed()` and `SocialUser.follows()` in convex-social.
 
 Components hold no link to their parent. Constructing one reads and writes nothing:
