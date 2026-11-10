@@ -364,6 +364,6 @@ for unsigned working state that is signed only when published, and
   merge policy and publication lifecycle.
 - `convex.lattice.LatticeContext`: optional policy for lattice adapters; domain
   components bind their own signing and clock functions.
-- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): earlier cursor model.
+- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): the cursor rules this implements.
 - [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice): lattice specification.
 - [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth): authorisation.
