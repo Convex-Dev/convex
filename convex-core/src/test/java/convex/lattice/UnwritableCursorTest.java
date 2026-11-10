@@ -4,8 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -22,6 +26,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
@@ -33,7 +38,8 @@ import convex.lattice.cursor.Transactions;
  * would change nothing and a compare-and-set that would not match included. An entry
  * is created by writing its container. A view that creates its place when written is
  * a choice of the component supplying it; there, a write that changes nothing stays
- * silent and creates nothing.
+ * silent and creates nothing. A transaction reads its place first, so it is refused
+ * wherever that read finds nothing, before its callback runs.
  */
 public class UnwritableCursorTest {
 
@@ -60,27 +66,47 @@ public class UnwritableCursorTest {
 		return (AForkableCursor<ACell>)new JSONValueComponent<>(source).resolve(keys).cursor();
 	}
 
-	/** Places that do not exist. */
-	static Stream<Place> nowhereToWrite() {
+	/** Places that do not exist and read as absent. */
+	static Stream<Place> absentWithNowhereToWrite() {
 		return Stream.of(
 			new Place("missing entry of an existing container",Maps.empty(),source -> source.path(A)),
-			new Place("default view over a missing entry",Maps.empty(),source -> source.<ACell>path(A).withDefault(CVMLong.ZERO)),
 			new Place("path through a missing container",Maps.empty(),source -> source.path(A,B)),
 			new Place("path below nil",null,source -> source.path(A)),
 			new Place("path through a scalar",Maps.of(A,CVMLong.ONE),source -> source.path(A,B)),
 			new Place("position outside a vector",Vectors.of(CVMLong.ZERO),source -> source.path(CVMLong.create(5))),
 			new Place("JSON path through a missing container",Maps.empty(),source -> jsonPath(source,"a","b")),
-			new Place("default view over a path through a missing container",Maps.empty(),
-				source -> source.<ACell>path(A,B).withDefault(CVMLong.ZERO)),
 			new Place("signed view over a path through a missing container",Maps.empty(),source -> signed(source.path(A,B))));
+	}
+
+	/** Places that do not exist, read through a view that supplies a default. */
+	static Stream<Place> defaultedWithNowhereToWrite() {
+		return Stream.of(
+			new Place("default view over a missing entry",Maps.empty(),source -> source.<ACell>path(A).withDefault(CVMLong.ZERO)),
+			new Place("default view over a path through a missing container",Maps.empty(),
+				source -> source.<ACell>path(A,B).withDefault(CVMLong.ZERO)));
+	}
+
+	/** Places that do not exist. */
+	static Stream<Place> nowhereToWrite() {
+		return Stream.concat(absentWithNowhereToWrite(),defaultedWithNowhereToWrite());
+	}
+
+	/** Places holding nothing that their view creates when written, and that read as absent. */
+	static Stream<Place> absentAndCreatedWhenWritten() {
+		return Stream.of(
+			new Place("entry of a map component",Maps.empty(),source -> mapEntry(source)),
+			new Place("entry of a map component over nil",null,source -> mapEntry(source)));
+	}
+
+	/** A place holding nothing that its view creates when written, read through a view that supplies a default. */
+	static Stream<Place> defaultedAndCreatedWhenWritten() {
+		return Stream.of(
+			new Place("default view over the entry of a map component",Maps.empty(),source -> mapEntry(source).withDefault(CVMLong.ZERO)));
 	}
 
 	/** Places holding nothing that their view creates when written. */
 	static Stream<Place> createdWhenWritten() {
-		return Stream.of(
-			new Place("entry of a map component",Maps.empty(),source -> mapEntry(source)),
-			new Place("entry of a map component over nil",null,source -> mapEntry(source)),
-			new Place("default view over the entry of a map component",Maps.empty(),source -> mapEntry(source).withDefault(CVMLong.ZERO)));
+		return Stream.concat(absentAndCreatedWhenWritten(),defaultedAndCreatedWhenWritten());
 	}
 
 	@SuppressWarnings({"unchecked","rawtypes"})
@@ -115,31 +141,44 @@ public class UnwritableCursorTest {
 			new Write("getAndAccumulate changing nothing",cursor -> cursor.getAndAccumulate(NEW,(value,x) -> value)),
 			new Write("accumulateAndGet changing nothing",cursor -> cursor.accumulateAndGet(NEW,(value,x) -> value)),
 			new Write("compareAndSet to the value held",cursor -> cursor.compareAndSet(current(cursor),current(cursor))),
-			new Write("compareAndSet that does not match",cursor -> cursor.compareAndSet(UNEXPECTED,NEW)),
-			new Write("transaction changing nothing",cursor -> Transactions.execute(cursor,draft -> {})),
-			new Write("exclusive transaction changing nothing",cursor -> Transactions.executeExclusively(cursor,draft -> {})));
+			new Write("compareAndSet that does not match",cursor -> cursor.compareAndSet(UNEXPECTED,NEW)));
 	}
 
 	static Stream<Write> changing() {
 		return Stream.of(
 			new Write("set",cursor -> cursor.set(NEW)),
-			new Write("compareAndSet that matches",cursor -> cursor.compareAndSet(current(cursor),NEW)),
-			new Write("transaction",cursor -> Transactions.execute(cursor,draft -> draft.set(NEW))),
-			new Write("exclusive transaction",cursor -> Transactions.executeExclusively(cursor,draft -> draft.set(NEW))));
+			new Write("compareAndSet that matches",cursor -> cursor.compareAndSet(current(cursor),NEW)));
 	}
 
 	static Stream<Write> writes() {
 		return Stream.concat(unchanging(),changing());
 	}
 
-	private static Stream<Arguments> each(Stream<Place> places,java.util.function.Supplier<Stream<Write>> writes) {
+	/** The two ways of running a transaction, each given the callback to run. */
+	private record Form(String name,BiConsumer<AForkableCursor<ACell>,Consumer<AForkableCursor<ACell>>> runner) {
+		void run(AForkableCursor<ACell> cursor,Consumer<AForkableCursor<ACell>> callback) { runner.accept(cursor,callback); }
+		@Override public String toString() { return name; }
+	}
+
+	static Stream<Form> forms() {
+		return Stream.of(
+			new Form("transaction",(cursor,callback) -> Transactions.execute(cursor,callback)),
+			new Form("exclusive transaction",(cursor,callback) -> Transactions.executeExclusively(cursor,callback)));
+	}
+
+	private static <T> Stream<Arguments> each(Stream<Place> places,Supplier<Stream<T>> operations) {
 		return places.flatMap(place -> Stream.of(Holder.values()).flatMap(holder ->
-			writes.get().map(write -> Arguments.of(place,holder,write))));
+			operations.get().map(operation -> Arguments.of(place,holder,operation))));
 	}
 
 	static Stream<Arguments> everyWriteWithNowhereToLand() { return each(nowhereToWrite(),UnwritableCursorTest::writes); }
 	static Stream<Arguments> unchangingWritesWhereThePlaceIsCreated() { return each(createdWhenWritten(),UnwritableCursorTest::unchanging); }
 	static Stream<Arguments> changingWritesWhereThePlaceIsCreated() { return each(createdWhenWritten(),UnwritableCursorTest::changing); }
+	static Stream<Arguments> transactionsWhereThePlaceIsAbsent() {
+		return each(Stream.concat(absentWithNowhereToWrite(),absentAndCreatedWhenWritten()),UnwritableCursorTest::forms);
+	}
+	static Stream<Arguments> transactionsThroughADefaultWithNowhereToLand() { return each(defaultedWithNowhereToWrite(),UnwritableCursorTest::forms); }
+	static Stream<Arguments> transactionsThroughADefaultWhereThePlaceIsCreated() { return each(defaultedAndCreatedWhenWritten(),UnwritableCursorTest::forms); }
 
 	// ===== The rule =====
 
@@ -196,6 +235,90 @@ public class UnwritableCursorTest {
 		assertThrows(ReadOnlyCursorException.class,() -> write.action.accept(root.readOnly().path(A)));
 
 		assertEquals(Maps.of(A,CVMLong.ONE),root.get());
+	}
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("forms")
+	void aReadOnlyCursorRefusesEveryTransaction(Form form) {
+		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ONE));
+
+		assertThrows(ReadOnlyCursorException.class,() -> form.run(root.readOnly(),draft -> {}));
+		assertThrows(ReadOnlyCursorException.class,() -> form.run(root.readOnly().path(A),draft -> draft.set(NEW)));
+
+		assertEquals(Maps.of(A,CVMLong.ONE),root.get());
+	}
+
+	// ===== A transaction reads its place =====
+
+	@ParameterizedTest(name="{0}, {1}, {2}")
+	@MethodSource("transactionsWhereThePlaceIsAbsent")
+	void aTransactionWhereThePlaceIsAbsentIsRefusedBeforeItsCallbackRuns(Place place,Holder holder,Form form) {
+		var storage=holder.holding(place.initial);
+		var cursor=place.view.apply(storage);
+		var runs=new AtomicInteger();
+
+		assertThrows(MissingValueException.class,() -> form.run(cursor,draft -> {
+			runs.incrementAndGet();
+			draft.set(NEW);
+		}));
+
+		assertEquals(0,runs.get());
+		assertEquals(place.initial,storage.get());
+	}
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("absentWithNowhereToWrite")
+	void aRefusedExclusiveTransactionLeavesTheRootFreeToClaim(Place place) {
+		Root<ACell> root=Root.create(place.initial);
+		var cursor=place.view.apply(root);
+		assertThrows(MissingValueException.class,() -> Transactions.executeExclusively(cursor,draft -> draft.set(NEW)));
+
+		Transactions.executeExclusively(root,draft -> draft.set(NEW));
+
+		assertEquals(NEW,root.get());
+	}
+
+	@Test void aTransactionRunsOnceItsPlaceHasBeenCreated() {
+		Root<ACell> root=Root.create(Maps.empty());
+		AForkableCursor<ACell> entry=root.path(A);
+		assertThrows(MissingValueException.class,() -> Transactions.execute(entry,draft -> draft.set(NEW)));
+
+		root.assoc(A,null);
+		Transactions.execute(entry,draft -> draft.set(NEW));
+
+		assertEquals(Maps.of(A,NEW),root.get());
+	}
+
+	@ParameterizedTest(name="{0}, {1}, {2}")
+	@MethodSource("transactionsThroughADefaultWithNowhereToLand")
+	void aTransactionThroughADefaultStartsFromItAndIsRefusedWithNowhereToLand(Place place,Holder holder,Form form) {
+		var storage=holder.holding(place.initial);
+		var cursor=place.view.apply(storage);
+		var seen=new AtomicReference<ACell>();
+
+		assertThrows(PathWriteException.class,() -> form.run(cursor,draft -> {
+			seen.set(draft.get());
+			draft.set(NEW);
+		}));
+
+		assertEquals(CVMLong.ZERO,seen.get());
+		assertEquals(place.initial,storage.get());
+	}
+
+	@ParameterizedTest(name="{0}, {1}, {2}")
+	@MethodSource("transactionsThroughADefaultWhereThePlaceIsCreated")
+	void aTransactionThroughADefaultStartsFromItAndCreatesThePlaceWhereItsViewDoes(Place place,Holder holder,Form form) {
+		var storage=holder.holding(place.initial);
+		var cursor=place.view.apply(storage);
+		var seen=new AtomicReference<ACell>();
+
+		form.run(cursor,draft -> seen.set(draft.get()));
+		assertEquals(place.initial,storage.get(),"Nothing was created");
+
+		form.run(cursor,draft -> draft.set(NEW));
+
+		assertEquals(CVMLong.ZERO,seen.get());
+		assertEquals(Maps.of(A,NEW),storage.get());
 	}
 
 	// ===== A fork publishes by writing =====

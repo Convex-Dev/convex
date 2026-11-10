@@ -30,25 +30,29 @@ class FavouritesTransactionTest {
 			value -> { signatures.incrementAndGet(); return ALICE.signData(value); },
 			() -> CVMLong.create(stamps.incrementAndGet()));
 		var retained=new AtomicReference<SetComponent<ACell>>();
+		// A transaction needs its record to exist, so an ordinary edit creates it first
+		live.add(1);
+		int created=stamps.get();
+		assertEquals(1,signatures.get());
 		live.execute(draft -> {
 			retained.set(draft.itemSet);
 			draft.add(42);
 			draft.itemSet.add(CVMLong.create(7));
-			assertNull(live.items());
-			assertEquals(0,signatures.get());
+			assertEquals(Sets.of(1),live.items());
+			assertEquals(1,signatures.get());
 		});
-		assertEquals(Sets.of(42,7),live.items());
-		assertEquals(2,stamps.get(),"Commit must not stamp already prepared domain edits again");
-		assertEquals(1,signatures.get());
+		assertEquals(Sets.of(1,42,7),live.items());
+		assertEquals(created+2,stamps.get(),"Commit must not stamp already prepared domain edits again");
+		assertEquals(2,signatures.get());
 		var signed=app.component().get(ALICE.getAccountKey());
-		assertEquals(CVMLong.TWO,signed.getValue().get(TIMESTAMP));
+		assertEquals(CVMLong.create(created+2),signed.getValue().get(TIMESTAMP));
 		assertTrue(signed.checkSignature());
 		retained.get().add(CVMLong.create(99));
-		assertEquals(Sets.of(42,7),live.items(),"Escaped children remain attached to private storage");
+		assertEquals(Sets.of(1,42,7),live.items(),"Escaped children remain attached to private storage");
 		int before=stamps.get();
 		live.execute(draft -> draft.add(42));
 		assertEquals(before,stamps.get());
-		assertEquals(1,signatures.get());
+		assertEquals(2,signatures.get());
 		assertSame(signed,app.component().get(ALICE.getAccountKey()));
 		assertTrue(host.cursor().get().isEmpty(),"Local commit does not publish the containing region");
 	}
@@ -86,6 +90,8 @@ class FavouritesTransactionTest {
 	@Test void concurrentDomainEditIsPreservedByReexecutingTheTransaction() throws Exception {
 		var app=new FavouritesApp(LatticeHost.create(),() -> CVMLong.ONE);
 		var live=app.user(ALICE);
+		// A transaction needs its record to exist, so an ordinary edit creates it first
+		live.add(1);
 		var read=new CountDownLatch(1);
 		var changed=new CountDownLatch(1);
 		var calls=new AtomicInteger();
@@ -106,7 +112,7 @@ class FavouritesTransactionTest {
 			writer.get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(2,calls.get());
-		assertEquals(Sets.of(99,42,7),live.items(),
+		assertEquals(Sets.of(1,99,42,7),live.items(),
 			"Local transactions preserve concurrent operations even when replica merge selects a whole record");
 	}
 

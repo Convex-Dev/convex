@@ -233,14 +233,18 @@ public class SocialAppTest {
 			return alice.signData(value);
 		},() -> CVMLong.ONE);
 		var follows=social.user(alice.getAccountKey()).follows();
+		// A transaction needs its follows map to exist, so an ordinary edit creates it first
+		var dave=Strings.intern("did:web:dave.example");
+		follows.follow(dave);
+		assertEquals(1,signatures.get());
 		follows.execute(draft -> {
 			draft.follow(bob);
 			draft.follow(carol);
-			assertNull(follows.getActive());
-			assertEquals(0,signatures.get());
+			assertEquals(Set.of(dave),follows.getActive());
+			assertEquals(1,signatures.get());
 		});
-		assertEquals(Set.of(bob,carol),follows.getActive());
-		assertEquals(1,signatures.get());
+		assertEquals(Set.of(dave,bob,carol),follows.getActive());
+		assertEquals(2,signatures.get());
 		var before=social.cursor().get();
 		assertTrue(before.get(DID.forKey(alice.getAccountKey())).checkSignature());
 		assertThrows(IllegalStateException.class,() -> follows.execute(draft -> {
@@ -248,7 +252,7 @@ public class SocialAppTest {
 			throw new IllegalStateException("Abort the edit");
 		}));
 		assertSame(before,social.cursor().get());
-		assertEquals(1,signatures.get());
+		assertEquals(2,signatures.get());
 	}
 
 	@Test

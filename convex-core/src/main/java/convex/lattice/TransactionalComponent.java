@@ -68,6 +68,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 * @param <R> Result type
 	 * @param action Domain operations on a private view, returning their result
 	 * @return Result of the run that committed
+	 * @throws convex.lattice.cursor.MissingValueException If this component's storage does not exist, before the callback runs
 	 */
 	default <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);

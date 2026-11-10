@@ -332,6 +332,12 @@ state. Applications may add preparation and managed-child publication explicitly
 CAS, preserving each operation under contention. `transact` returns the result of
 the run that committed; `execute` returns nothing.
 
+A transaction starts with a required read of its cursor, so a place that does not
+exist throws `MissingValueException` before the callback runs, also through an
+entry view that an ordinary write would create. An ordinary write creates the
+place first. A default view is present wherever it is read, so a transaction
+through one starts from the default and its commit is a write like any other.
+
 Optimistic execution is the fast path for transactions that do not collide. Commit
 checks only the transaction's own value: a change elsewhere under the root never
 reruns the callback, and its finished result is applied to the new root. When its own
@@ -360,8 +366,8 @@ storage as a fork is: a read-only view of it, whose transactions rebind the doma
 component to a draft and commit to that storage under its root's claim.
 The transaction targets bound `storage()`, while the rebound view rebuilds the
 component's editing views over the draft. An authoring view within bound storage
-applies once at commit: a signing view signs the committed value, and a stamp there
-gives it the commit's time. A stamp the component builds over its storage applies
+applies at each commit attempt: a signing view signs the committed value, and a stamp
+there gives it the commit's time. A stamp the component builds over its storage applies
 within the draft instead, with the time of the edit, and commit does not apply it
 again. Unsigned staged components defer signing to publication.
 Each attempt uses a fresh `Root` for its draft, supporting

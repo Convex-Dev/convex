@@ -23,6 +23,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Transactions;
@@ -389,12 +390,14 @@ class TransactionBehaviourTest {
 		assertEquals(ticksBefore,ticks.get(),"An unchanged edit is not stamped");
 	}
 
-	@Test void transactionCanCreateMissingState() {
+	@Test void transactionNeedsItsStateToExist() {
 		Ledger east=bank(new ScriptedRoot()).branch(EAST);
-		assertEquals(0L,east.transact(Ledger::total));
-		assertFalse(east.storage().exists(),"Reading creates nothing");
-		east.execute(draft -> draft.open("dave",10));
-		assertEquals(10,east.balance("dave"));
+		assertThrows(MissingValueException.class,() -> east.transact(Ledger::total));
+		assertThrows(MissingValueException.class,() -> east.execute(draft -> draft.open("dave",10)));
+		assertFalse(east.storage().exists(),"A refused transaction creates nothing");
+		east.open("dave",10);
+		east.execute(draft -> draft.deposit("dave",5));
+		assertEquals(15,east.balance("dave"));
 	}
 
 	// ===== Policies and lifetimes =====

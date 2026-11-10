@@ -97,16 +97,20 @@ class P2PComponentStorageTest {
 			signatures.incrementAndGet();
 			return ALICE.signData(value);
 		});
+		// A transaction needs its record to exist, so an ordinary write creates it first
+		component(user,node).cursor().set(FIRST);
+		assertEquals(1,signatures.get());
+		ACell created=root.get();
 		Consumer<ALatticeComponent<ACell>> edits=draft -> {
 			draft.cursor().set(FIRST);
 			draft.cursor().set(SECOND);
-			assertNull(root.get());
-			assertEquals(0,signatures.get());
+			assertSame(created,root.get());
+			assertEquals(1,signatures.get());
 		};
 		if (node) user.node().execute(edits::accept);
 		else user.identity().execute(edits::accept);
 		assertEquals(SECOND,component(user,node).cursor().get());
-		assertEquals(1,signatures.get());
+		assertEquals(2,signatures.get());
 		ACell before=root.get();
 		Consumer<ALatticeComponent<ACell>> abort=draft -> {
 			draft.cursor().set(FIRST);
@@ -117,7 +121,7 @@ class P2PComponentStorageTest {
 			else user.identity().execute(abort::accept);
 		});
 		assertSame(before,root.get());
-		assertEquals(1,signatures.get());
+		assertEquals(2,signatures.get());
 	}
 
 	/** A root conflict during signing must preserve both unrelated regions and owners. */

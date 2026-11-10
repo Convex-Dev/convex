@@ -49,6 +49,7 @@ public final class Transactions {
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 * @return Result of the run that committed
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
 	public static <V extends ACell,R> R transact(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
 		Objects.requireNonNull(cursor);
@@ -85,6 +86,7 @@ public final class Transactions {
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 * @return Result of the callback, which ran once
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
 	public static <V extends ACell,R> R transactExclusively(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
 		Objects.requireNonNull(cursor);
@@ -136,15 +138,14 @@ public final class Transactions {
 
 		/** One optimistic attempt. False leaves the caller to try again or take the claim. */
 		boolean commit() {
-			// An absent place reads as nil; whether the commit can create it is the cursor's rule.
-			V observed=cursor.getOrDefault(null);
+			V observed=cursor.get();
 			if (!computed || !Utils.equals(observed,input)) {
 				if (computed && ++conflicts>=CONFLICTS_BEFORE_CLAIM) return false;
 				run(observed);
 			}
 			// Validate against a fresh observation, including no-ops. Its reference
 			// may differ from the input while denoting exactly the same value.
-			observed=cursor.getOrDefault(null);
+			observed=cursor.get();
 			if (!Utils.equals(observed,input)) return false;
 			// A run that changed nothing still commits as a write, so a cursor that cannot be written refuses it
 			return cursor.compareAndSet(observed,candidate);
@@ -153,10 +154,10 @@ public final class Transactions {
 		/** Finishes under the claim, where the value can change only through this thread. */
 		R commitClaimed() {
 			try (Claim claim=cursor.claim(value -> value)) {
-				V observed=cursor.getOrDefault(null);
+				V observed=cursor.get();
 				if (!computed || !Utils.equals(observed,input)) run(observed);
 				for (;;) {
-					observed=cursor.getOrDefault(null);
+					observed=cursor.get();
 					if (!Utils.equals(observed,input)) throw new IllegalStateException("Re-entrant write during transaction commit");
 					if (cursor.compareAndSet(observed,candidate)) return output;
 				}

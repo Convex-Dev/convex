@@ -344,6 +344,10 @@ state. This matters when both operations must survive: two independent edits to
 a whole-value register may select one result, while retrying transactions can
 apply both operations in sequence.
 
+A transaction reads the component's stored value first, so on a component that
+nothing has written yet it throws `MissingValueException` before the callback
+runs. An ordinary edit creates the record; transactions follow.
+
 Transaction callbacks operate only on their private view and must be safe to
 retry. External effects happen after commit. Decisions spanning several paths
 belong in a transaction at their common ancestor. Separate component calls and
