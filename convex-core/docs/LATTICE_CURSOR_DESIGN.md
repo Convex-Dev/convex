@@ -73,8 +73,9 @@ A write lands only where the cursor's place exists. For a path that is where its
 such as a vector given a key that is not an index within it. The exception carries
 the keys from the one that does not fit, and its depth. A read-only view throws
 `ReadOnlyCursorException`. Both refuse every write, whatever the values: a write
-that would change nothing, a compare-and-set that would not match and a
-transaction that changes nothing are refused like any other. The refusal is
+that would change nothing and a compare-and-set that would not match are refused
+like any other. A transaction is refused as well: at its first read where its
+place does not exist, and at commit on a read-only view. The refusal of a write is
 decided on the value the write would land on and leaves it untouched, so a fork
 whose place has been deleted is refused at sync and keeps its edits. Views over a
 path, such as a default, a signed view or a stamp, write through it and are

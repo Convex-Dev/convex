@@ -11,9 +11,10 @@ import convex.core.util.Utils;
  * Atomic subtree transactions over a cursor: run a callback against a private draft
  * of the cursor's value, then commit by compare-and-set.
  *
- * <p>This is {@code updateAndGet} whose update function receives a cursor instead of
- * a bare value, so a callback can navigate, wrap boundaries and write through
- * descendants exactly as it would against the live tree. The draft uses independent,
+ * <p>The callback receives a cursor instead of a bare value, so it can navigate, wrap
+ * boundaries and write through descendants exactly as it would against the live
+ * tree. A transaction starts with a required read of the cursor, so its location
+ * must exist. The draft uses independent,
  * thread-safe root storage. Complete all work contributing to the transaction before
  * returning from the callback; later edits only change the retained draft.
  * Typed domain transactions build on this in
