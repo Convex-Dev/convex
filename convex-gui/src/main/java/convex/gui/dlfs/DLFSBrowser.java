@@ -467,10 +467,9 @@ public class DLFSBrowser extends AbstractGUI {
 		DLFSLocal removed = drives.remove(name);
 		if (removed == null) return false;
 
-		// Clear from lattice
+		// Clear from lattice: a write to the drives map, so an entry already gone is nothing to do
 		AString cvmName = Strings.create(name);
-		AForkableCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
-		cursor.set(null);
+		drivesCursor.update(current -> (current==null || !current.containsKey(cvmName))?current:current.assoc(cvmName,null));
 
 		// Remove from WebDAV
 		if (webdavServer != null) {
