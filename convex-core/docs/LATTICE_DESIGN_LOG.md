@@ -298,8 +298,9 @@ CAD045 *Connecting to Node Infrastructure* and CAD024 *Cursor Sync Guarantees*
 `RootComponent` became `LatticeHost`. The host holds the published root value, an
 optional store, the publication policy that runs on its sync, and an immutable list
 of applications that receive incoming values. It has no lattice: it never merges on
-its own, an unconfigured host ignores incoming values, and its sync is a plain
-compare-and-set that leaves a racing write pending for the next sync (entry 6).
+its own, an unconfigured host ignores incoming values, and its sync switches the
+root to the published cells only while it still holds that snapshot, leaving a
+racing write pending for the next sync (entry 6).
 Without a store, persist returns its input and flush is a no-op; a networked node
 still requires a store. Persistence is the host's: a host with a store writes its
 root on every sync, attached to a node or not, and the node's `persist` setting

@@ -37,8 +37,8 @@ most one hook, resolved through existing source links: `claim()`, for
 transactions and fork publication, is the only one. Storage, durability and
 publication attach at the host, and a module that needs a store mid-write, such as
 DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
-hook: it is one concrete method over `updateAndGet` with a store-agnostic
-`Persister`, which views inherit and only `ForkedCursor` overrides.
+hook: it is one method with a store-agnostic `Persister`, which views inherit and
+only the cursors that hold a value, `Root` and `ForkedCursor`, override.
 
 ## Atomic operations and paths
 
@@ -89,11 +89,6 @@ When migrating callers, retain required reads where absence is a defect. Use
 `getOrDefault(null)` only where missing state is expected, or `exists()` when only
 presence matters. CVM collection lookups and `RT.getIn` retain their existing rules.
 
-Root CAS uses reference identity. Path, projection and signing views compare the
-view by value equality, then make one CAS attempt against the observed underlying
-value. A concurrent source change can therefore make their CAS fail even when it
-changed an unrelated field. Atomic update operations retry as needed.
-
 Multi-key paths use one `PathCursor`. External key conversion remains a lattice or
 component concern; cursors accept canonical CVM keys.
 
@@ -109,6 +104,43 @@ source. Paths and views over it keep the ordinary sync, which only reads. A
 transaction that changes nothing commits, since it writes nothing. `AView` subclasses refuse writes with the same exception, an
 `UnsupportedOperationException`.
 
+## Values and the cells that hold them
+
+A value is what CAD3 equality sees. The same value can be held as different Java
+objects: cells built by an edit reach their children through strong references,
+and the equal cells a store returns reach theirs through soft ones. Which is held
+decides only memory use, and cursors keep the two apart with four rules.
+
+1. **Every operation decides by value.** Compare-and-set, an unchanged write, a
+   conflict, a claim and a fork's test of which side changed all compare values, on
+   a root, a fork and a view alike. Component code never compares cells with `==`.
+2. **A write of an equal value keeps the cells held.** It changes nothing, signs
+   and stamps nothing, and cannot displace persisted cells with a copy built
+   elsewhere.
+3. **Only a holder switches cells for equal ones.** A `Root` holds a value, and a
+   fork holds two, its working value and its baseline; a view holds none. `persist`
+   is the switch, and a fork also adopts its destination's cells at sync. Neither is
+   a write, so rule 2 does not stop them and a claim does not delay them.
+4. **A changed write is built on the cells held when it lands, where the cursor
+   has the function to run.** An update function, at a root or through any view,
+   runs again if the cells were switched beneath it, so what it leaves untouched
+   stays persisted. Compare-and-set and a transaction commit bring a finished
+   value, which is installed as given.
+
+`Root.install` is the one place a changed write lands and the only test of object
+identity; whatever fails there looks again by value. A view's compare-and-set
+compares its view by value, then makes one attempt against the source value it
+read, so a concurrent change to an unrelated part of the source can fail it.
+Atomic update operations retry as needed.
+
+Rule 2 costs one comparison per write: the same object is recognised at once, and
+otherwise the comparison hashes the branch cells on the changed path, which are
+kept and needed again when the value is saved ([Equality](EQUALITY.md)).
+
+A finished value built before a persist landed puts the cells it was built on
+back, so they stay in memory until the holder is next persisted. Prefer an update
+function for an edit to a large value.
+
 ## Persistence
 
 Persisting a value builds new cells and leaves the ones it was given as they are.
@@ -118,17 +150,17 @@ The two values are equal, so only memory use tells them apart. Stored data is
 released only once whoever holds the value has switched to the new cells: a holder
 left on the original keeps the whole tree in memory, however much of it is stored.
 
-`persist(persister)` makes that switch for a cursor, replacing the value it holds
-with the equal value a `Persister` returns, such as `LatticeHost::persist`, in one
-atomic update. The cursor holds no store. An edit landing meanwhile repeats the
-update on the edited value; persisting again only finds the cells already stored.
+`persist(persister)` makes that switch for a cursor, replacing the cells it holds
+with the equal ones a `Persister` returns, such as `LatticeHost::persist`, in one
+atomic step. The cursor holds no store. An edit landing meanwhile repeats the
+persist on the edited value; persisting again only finds the cells already stored.
 After three attempts the cursor keeps the value as it stands, so writes that never
 pause cannot hold a persist up, and a later persist switches what is then held. A
 fork persists its working value, then its reconciled baseline without taking a claim,
 replacing the baseline only if no sync has moved it meanwhile. Views hold no value of
-their own: they treat the equal value as unchanged, so the cells are stored and their
-source is left to its owner. A read-only view refuses to persist, as it refuses any
-write.
+their own: to them the persisted value is a write of an equal value, so the cells are
+stored and their source is left to its owner. A read-only view refuses to persist, as
+it refuses any write.
 
 Saving a value switches nobody else. A fork is separate storage, so a host sync that
 saves its destination leaves the fork on the cells it already held. A long-lived fork
@@ -285,9 +317,9 @@ what the claiming cursor reads: each derived view composes its own read into the
 claim through its source link, and the root needs to know nothing about paths or
 views. While a claim is held, a write that would change that part of the value, or
 leave it unreadable to the claiming view, waits for the release and recalculates, and
-a write that leaves it equal carries on. An equal value in new cells is the value the root then holds, so persisting during a
-claim keeps the persisted cells, and an exclusive transaction that changes nothing
-writes nothing over them. A transaction that does change the value commits cells built
+a write that leaves it equal carries on. Persisting leaves the whole value equal, so it
+proceeds during a claim and the root then holds the persisted cells; an exclusive
+transaction that changes nothing writes nothing over them. A transaction that does change the value commits cells built
 from the value it started with, so cells persisted meanwhile are replaced until the
 next save. Reads never wait. Without a claim, each read or compare-and-set of the root adds
 one type check, and nothing is recorded per transaction.

@@ -98,15 +98,15 @@ these ordinary host rules. Storage flags are not `NodeConfig` settings.
 ## Ordering
 
 All publication entry points run inside the host's ordered sync, which captures
-the current root, publishes it and installs the store-backed result by identity
-compare-and-set. Launch seeds replication through this path. The same host lock
+the current root, publishes it and switches the root to the store-backed result
+while the root still holds that snapshot. Launch seeds replication through this path. The same host lock
 serialises checkpoints and flushes with root publication; an older snapshot
 cannot arrive late and replace a newer retained root. Network close does not
 publish another snapshot.
 
-If a local write intervenes during publication, the compare-and-set fails: the
-store-backed result is not installed and the racing write stays pending for the
-next sync. The sync result is the exact completed publication, while the live
+If a local write intervenes during publication, the root no longer holds the
+snapshot: the store-backed result is not installed and the racing write stays
+pending for the next sync. The sync result is the exact completed publication, while the live
 cursor may contain additional pending changes. The root then persists as it
 stands, racing write included, so what was saved can still leave memory. Its
 cells are written, but the store's root pointer stays at the published snapshot.
@@ -122,9 +122,11 @@ Consecutive node notifications use a latest-update queue and may
 coalesce because lattice snapshots are monotonic. Coalescing affects transport
 work, not the ordering or durability of the node root.
 
-This pipeline uses identity CAS, while CAD035 describes value-equality CAS; that
-discrepancy needs resolution separately from this publication ordering. The
-pipeline does not change generic lattice conflict resolution.
+The switch is the host persisting its own root, not a write: cursor writes compare
+by value, as CAD035 specifies, and only the holder of a value replaces its cells
+with equal ones
+([Values and the cells that hold them](../../convex-core/docs/LATTICE_CURSOR_DESIGN.md#values-and-the-cells-that-hold-them)).
+The pipeline does not change generic lattice conflict resolution.
 
 The node and a propagator may deliberately share the same thread-safe `AStore`.
 Only the node calls `setRootData` while attached; propagators merely announce

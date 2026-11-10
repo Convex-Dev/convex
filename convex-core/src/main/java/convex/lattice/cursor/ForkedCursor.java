@@ -82,7 +82,9 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		Objects.requireNonNull(merge,"Merge function must not be null");
 		try (Claim claim=working.claim(value -> value)) {
 			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
-			working.set(published);
+			// The destination's cells, even where they only equal the working value: they
+			// may be persisted, and one copy is then held, not two.
+			working.adopt(published);
 			baseline.set(published);
 			return published;
 		}

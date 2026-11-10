@@ -1,5 +1,6 @@
 package convex.lattice.cursor;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
@@ -16,8 +17,16 @@ import convex.core.util.Utils;
  * <p>Writes are optimistic and take no lock. A root can hold one {@link Claim} at a
  * time, which reserves part of its value for one thread: another thread's write that
  * would change that part waits for the release, and writes elsewhere carry on. Reads
- * never wait. Atomic updates go through {@link #compareAndSet}, so a subclass can
- * observe or interleave every update attempt there.</p>
+ * never wait.</p>
+ *
+ * <p>Every operation decides by value. A write of a value equal to the one held
+ * changes nothing and keeps the cells held, so a copy built elsewhere never displaces
+ * persisted cells. Two operations replace the cells held with equal ones on purpose:
+ * {@link #persist}, and a fork adopting its destination. Which object is held is
+ * otherwise this class's own business: atomic updates, compare-and-set and persist
+ * all replace it through {@link #install}, so an update that finds the cells switched
+ * beneath it runs again on the new ones, and a subclass can observe or interleave
+ * every attempt there.</p>
  *
  * @param <V> Value type
  */
@@ -53,25 +62,57 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 
 	@Override
 	public V getAndSet(V newValue) {
-		return replace(newValue);
+		return replace(newValue,false);
 	}
 
 	@Override
 	public void set(V newValue) {
-		replace(newValue);
+		replace(newValue,false);
 	}
 
-	private V replace(V newValue) {
+	/**
+	 * Holds exactly this object, even where its value equals the one held. For a holder
+	 * switching to cells it knows it should keep, as a fork adopting its destination's.
+	 */
+	void adopt(V value) {
+		replace(value,true);
+	}
+
+	private V replace(V newValue,boolean switching) {
 		for (;;) {
 			Object current=state.get();
+			V held=valueOf(current);
+			if (!switching && Utils.equals(held,newValue)) return held;
 			if (current instanceof Claimed claimed) {
 				if (claimed.claim.blocks(newValue)) {
 					claimed.claim.awaitRelease();
 				} else if (state.compareAndSet(current,new Claimed(newValue,claimed.claim))) {
-					return valueOf(current);
+					return held;
 				}
 			} else if (state.compareAndSet(current,newValue)) {
-				return valueOf(current);
+				return held;
+			}
+		}
+	}
+
+	/**
+	 * Replaces the object held, if it is still exactly {@code held}. This is the one
+	 * place a changed write lands, and the only test of object identity: a caller that
+	 * fails here looks again, by value.
+	 *
+	 * @param held Object the caller read
+	 * @param next Object to hold in its place
+	 * @return false if this root no longer holds that object
+	 */
+	protected boolean install(V held,V next) {
+		for (;;) {
+			Object current=state.get();
+			if (!(current instanceof Claimed claimed)) return state.compareAndSet(held,next);
+			if (claimed.value!=held) return false;
+			if (claimed.claim.blocks(next)) {
+				claimed.claim.awaitRelease();
+			} else if (state.compareAndSet(current,new Claimed(next,claimed.claim))) {
+				return true;
 			}
 		}
 	}
@@ -79,32 +120,46 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 	@Override
 	public boolean compareAndSet(V expected, V newValue) {
 		for (;;) {
-			Object current=state.get();
-			if (!(current instanceof Claimed claimed)) return state.compareAndSet(expected,newValue);
-			if (claimed.value!=expected) return false;
-			if (claimed.claim.blocks(newValue)) {
-				claimed.claim.awaitRelease();
-			} else if (state.compareAndSet(current,new Claimed(newValue,claimed.claim))) {
-				return true;
-			}
+			V held=get();
+			if (!Utils.equals(held,expected)) return false;
+			if (Utils.equals(held,newValue) || install(held,newValue)) return true;
 		}
 	}
 
 	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
 		for (;;) {
-			V current=get();
-			if (compareAndSet(current,updateFunction.apply(current))) return current;
+			V held=get();
+			V next=updateFunction.apply(held);
+			if (Utils.equals(held,next) || install(held,next)) return held;
 		}
 	}
 
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {
 		for (;;) {
-			V current=get();
-			V next=updateFunction.apply(current);
-			if (compareAndSet(current,next)) return next;
+			V held=get();
+			V next=updateFunction.apply(held);
+			if (Utils.equals(held,next)) return held;
+			if (install(held,next)) return next;
 		}
+	}
+
+	/**
+	 * Replaces the cells held with the equal ones the persister returns. This is not
+	 * a write: the value does not change, so it is never an unchanged write to skip,
+	 * and it proceeds during a claim. An edit landing meanwhile makes it persist the
+	 * edited value instead.
+	 */
+	@Override
+	public V persist(Persister<V> persister) throws IOException {
+		for (int attempt=0;attempt<PERSIST_ATTEMPTS;attempt++) {
+			V held=get();
+			if (held==null) return null;
+			V persisted=persister.persist(held);
+			if (persisted==held || install(held,persisted)) return persisted;
+		}
+		return get();
 	}
 
 	@Override

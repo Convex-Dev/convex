@@ -116,8 +116,9 @@ A new exception belongs in this table with its reason. No exception may change a
 
 - Comparing a new version of a tree with its predecessor hashes the branch nodes on the
   changed path; shared children match by identity or cached hash. The work is kept if
-  that version is stored or published. Updates inside a lattice draft do not compare
-  values (only `sync()` does), so high-rate writers batch there.
+  that version is stored or published. Every write through a lattice cursor makes
+  this comparison, to keep the cells it holds when nothing changed, so a high-rate
+  writer builds its value first and writes it once.
 - Separately built equal values compare equal without either being encoded or hashed
   when they are embedded or have a fixed handful of fields; branch tree nodes compare by
   hash, which is kept. `convex.test.Assertions.assertEqualityCachesNothing` and

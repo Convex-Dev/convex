@@ -46,11 +46,11 @@ public class ApplicationPublicationTest {
 	private static final class InterleavingRoot extends Root<Index<Keyword,ACell>> {
 		Runnable beforeCAS;
 		InterleavingRoot() { super(initial()); }
-		@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
+		@Override protected boolean install(Index<Keyword,ACell> held,Index<Keyword,ACell> value) {
 			Runnable action=beforeCAS;
 			beforeCAS=null;
 			if (action!=null) action.run();
-			return super.compareAndSet(expected,value);
+			return super.install(held,value);
 		}
 	}
 

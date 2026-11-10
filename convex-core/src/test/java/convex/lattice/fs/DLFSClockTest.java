@@ -57,9 +57,9 @@ class DLFSClockTest {
 		var attempts=new AtomicInteger();
 		var metadata=Strings.create("concurrent edit");
 		var root=new Root<AVector<ACell>>(DLFSLattice.INSTANCE.zero()) {
-			@Override public boolean compareAndSet(AVector<ACell> expected,AVector<ACell> value) {
-				if (attempts.incrementAndGet()==1) set(expected.assoc(DLFSNode.POS_METADATA,metadata));
-				return super.compareAndSet(expected,value);
+			@Override protected boolean install(AVector<ACell> held,AVector<ACell> value) {
+				if (attempts.incrementAndGet()==1) set(held.assoc(DLFSNode.POS_METADATA,metadata));
+				return super.install(held,value);
 			}
 		};
 		var ticks=new AtomicInteger();

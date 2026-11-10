@@ -323,19 +323,23 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 			ensureOpen();
 			V snapshot=cursor().get();
 			V published=publish.apply(storeRoot(snapshot));
-			// The root must switch to the persisted cells or it stays strong (see Persister).
-			// A write landing during the save stays unpublished until the next sync, so the
-			// root it is in cannot take the published value and persists as it stands instead.
-			if (!cursor().compareAndSet(snapshot,published)) persistCurrentRoot();
+			switchRoot(snapshot,published);
 			return published;
 		} finally {
 			syncLock.unlock();
 		}
 	}
 
-	private void persistCurrentRoot() {
+	/**
+	 * Switches the root to persisted cells, or it stays strong (see Persister): the
+	 * published ones while it still holds the very snapshot that was published. A
+	 * write landing during the save stays unpublished until the next sync, so the root
+	 * it is in takes nothing from the publisher, whose cells may belong to another
+	 * store, and persists as it stands instead.
+	 */
+	private void switchRoot(V snapshot,V published) {
 		try {
-			cursor().persist(this::persist);
+			cursor().persist(held -> (held==snapshot)?published:persist(held));
 		} catch (IOException e) {
 			throw new StoreException("Lattice host sync failed: persistence error",e);
 		}

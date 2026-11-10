@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -14,11 +15,16 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -160,9 +166,101 @@ public class PersistedCellsHeldSoftlyTest {
 		return false;
 	}
 
+	/** The edit is held strongly, and so is nothing that does not lead to it. */
+	private static void assertOnlyTheEditIsStrong(ACell held,long seed) {
+		Set<ACell> strong=strongCells(held);
+		ABlob edit=blob(seed);
+		assertTrue(strong.stream().anyMatch(edit::equals),"The edit itself is strong");
+		for (ACell cell:strong) assertTrue(leadsTo(cell,edit),"Strong but not on the edit's path: "+cell.getClass());
+	}
+
 	private static <T> T result(Future<T> work) {
 		try { return work.get(10,TimeUnit.SECONDS); }
 		catch (Exception e) { throw new AssertionError(e); }
+	}
+
+	// ===== Cursors under test =====
+
+	private AHashMap<ACell,ACell> save(AHashMap<ACell,ACell> value) throws IOException {
+		return Cells.persist(value,store);
+	}
+
+	private void persist(AForkableCursor<AHashMap<ACell,ACell>> cursor) {
+		try { cursor.persist(this::save); }
+		catch (IOException e) { throw new UncheckedIOException(e); }
+	}
+
+	/** A root holding the saved cells of {@link #tree()}. */
+	private Root<AHashMap<ACell,ACell>> savedRoot() {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+		persist(root);
+		return root;
+	}
+
+	/** Runs the action the first time only, since the callbacks it is injected into may repeat. */
+	private static Runnable once(Runnable action) {
+		var done=new AtomicBoolean();
+		return () -> { if (done.compareAndSet(false,true)) action.run(); };
+	}
+
+	private static final Runnable NOTHING=() -> {};
+
+	/** One way of making a local edit, with a point part-way through at which something else can land. */
+	private interface EditAction {
+		void apply(AForkableCursor<AHashMap<ACell,ACell>> cursor,long seed,Runnable during);
+	}
+
+	private record Edit(String name,EditAction action) {
+		void apply(AForkableCursor<AHashMap<ACell,ACell>> cursor,long seed,Runnable during) {
+			action.apply(cursor,seed,during);
+		}
+		@Override public String toString() { return name; }
+	}
+
+	/** Edits made by a function the cursor runs, and runs again on the cells it then holds. */
+	static Stream<Edit> updateFunctions() {
+		return Stream.of(
+			new Edit("update function",(cursor,seed,during) -> cursor.updateAndGet(root -> {
+				during.run();
+				return with(root,seed);
+			})),
+			new Edit("update through a path",(cursor,seed,during) -> cursor.<AHashMap<ACell,ACell>>path(GROUP).updateAndGet(entries -> {
+				during.run();
+				return entries.assoc(CVMLong.create(seed),blob(seed));
+			})));
+	}
+
+	/** Every edit, including those that hand the cursor a finished value built from the cells they read. */
+	static Stream<Edit> edits() {
+		return Stream.concat(updateFunctions(),Stream.of(
+			new Edit("compare and set",(cursor,seed,during) -> {
+				var read=cursor.get();
+				during.run();
+				assertTrue(cursor.compareAndSet(read,with(read,seed)),"The cursor still holds the value that was read");
+			}),
+			new Edit("transaction",(cursor,seed,during) -> Transactions.execute(cursor,draft -> {
+				during.run();
+				draft.updateAndGet(root -> with(root,seed));
+			})),
+			new Edit("exclusive transaction",(cursor,seed,during) -> Transactions.executeExclusively(cursor,draft -> {
+				during.run();
+				draft.updateAndGet(root -> with(root,seed));
+			}))));
+	}
+
+	/** One way of writing a whole value. */
+	private record Write(String name,BiConsumer<AForkableCursor<AHashMap<ACell,ACell>>,AHashMap<ACell,ACell>> action) {
+		@Override public String toString() { return name; }
+	}
+
+	static Stream<Write> writes() {
+		return Stream.of(
+			new Write("set",(cursor,value) -> cursor.set(value)),
+			new Write("getAndSet",(cursor,value) -> cursor.getAndSet(value)),
+			new Write("update function",(cursor,value) -> cursor.updateAndGet(current -> value)),
+			new Write("compare and set",(cursor,value) -> assertTrue(cursor.compareAndSet(cursor.get(),value))),
+			new Write("transaction",(cursor,value) -> Transactions.execute(cursor,draft -> draft.set(value))),
+			new Write("exclusive transaction",(cursor,value) -> Transactions.executeExclusively(cursor,draft -> draft.set(value))));
 	}
 
 	// ===== Components under test =====
@@ -423,11 +521,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		component.edit(9001);
 
-		Set<ACell> strong=strongCells(component.held());
-		assertFalse(strong.isEmpty());
-		ABlob edit=blob(9001);
-		assertTrue(strong.stream().anyMatch(edit::equals),"The edit itself is strong");
-		for (ACell cell:strong) assertTrue(leadsTo(cell,edit),"Strong but not on the edit's path: "+cell.getClass());
+		assertOnlyTheEditIsStrong(component.held(),9001);
 	}
 
 	@Test void aSignedForkHoldsItsValueSoftlyInsideTheSignature() {
@@ -505,5 +599,134 @@ public class PersistedCellsHeldSoftlyTest {
 		assertSame(failure,thrown.getCause());
 		assertTrue(holds(host.cursor().get(),9000),"The publication stands");
 		assertEquals(held,component.held());
+	}
+
+	// ===== Persist: the holder switches to the saved cells =====
+
+	@Test void persistingARootSwitchesItToTheSavedCells() throws IOException {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+		var before=root.get();
+
+		var saved=root.persist(this::save);
+
+		assertSame(saved,root.get());
+		assertNotSame(before,root.get(),"The saved cells are other objects");
+		assertEquals(before,root.get(),"With the same value");
+		assertHeldSoftly(root.get());
+	}
+
+	@Test void persistingAForkSwitchesTheForkAndLeavesItsDestination() {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+		var destination=root.get();
+		var fork=root.fork();
+		fork.updateAndGet(value -> with(value,9000));
+
+		persist(fork);
+
+		assertHeldSoftly(fork.get());
+		assertTrue(holds(fork.get(),9000));
+		assertSame(destination,root.get());
+	}
+
+	// ===== Local edits to saved data =====
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("edits")
+	void anEditToSavedDataLeavesOnlyItsOwnPathStrong(Edit edit) {
+		var root=savedRoot();
+
+		edit.apply(root,9000,NOTHING);
+
+		assertTrue(holds(root.get(),9000));
+		assertOnlyTheEditIsStrong(root.get(),9000);
+	}
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("writes")
+	void writingAnEqualValueToASavedRootKeepsTheSavedCells(Write write) {
+		var root=savedRoot();
+		var saved=root.get();
+
+		write.action.accept(root,tree());
+
+		assertSame(saved,root.get());
+	}
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("writes")
+	void writingAnEqualValueToAForkOfSavedDataKeepsTheSavedCells(Write write) {
+		var fork=savedRoot().fork();
+		var saved=fork.get();
+
+		write.action.accept(fork,tree());
+
+		assertSame(saved,fork.get());
+	}
+
+	// ===== An edit and a persist at the same moment =====
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("edits")
+	void anEditLandingDuringAPersistIsKeptAndHeldSoftly(Edit edit) throws IOException {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+		Runnable landing=once(() -> edit.apply(root,9000,NOTHING));
+
+		root.persist(value -> {
+			landing.run();
+			return save(value);
+		});
+
+		assertTrue(holds(root.get(),9000),"The edit is kept");
+		assertHeldSoftly(root.get());
+	}
+
+	@ParameterizedTest(name="{0}")
+	@MethodSource("updateFunctions")
+	void aPersistLandingDuringAnUpdateFunctionLeavesOnlyTheEditStrong(Edit edit) {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+
+		edit.apply(root,9000,once(() -> persist(root)));
+
+		assertTrue(holds(root.get(),9000),"The edit is kept");
+		assertOnlyTheEditIsStrong(root.get(),9000);
+	}
+
+	/**
+	 * A finished value, from a compare-and-set or a transaction, is built on the cells
+	 * read before the persist and goes in as it is, so those cells are held again
+	 * until the next persist.
+	 */
+	@ParameterizedTest(name="{0}")
+	@MethodSource("edits")
+	void afterAPersistLandsDuringAnEditTheNextPersistLeavesEverythingSoft(Edit edit) {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+		edit.apply(root,9000,once(() -> persist(root)));
+
+		persist(root);
+
+		assertTrue(holds(root.get(),9000),"The edit is kept");
+		assertHeldSoftly(root.get());
+	}
+
+	@Test void aPersistLandingDuringATransactionThatChangesNothingKeepsTheSavedCells() {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+
+		Transactions.execute(root,draft -> {
+			persist(root);
+			draft.set(tree());
+		});
+
+		assertHeldSoftly(root.get());
+	}
+
+	@Test void aPersistLandingDuringAnExclusiveTransactionThatChangesNothingKeepsTheSavedCells() {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+
+		Transactions.executeExclusively(root,draft -> {
+			persist(root);
+			draft.set(tree());
+		});
+
+		assertHeldSoftly(root.get());
 	}
 }

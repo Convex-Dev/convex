@@ -1151,7 +1151,11 @@ public class LatticePropagator implements Closeable {
 			// root announcement and must still complete the caller's publication future.
 			lastSource=source;
 			if (replacement!=null) filter=replacement;
-			announcedCursor.set(value);
+			// The cursor holds the cells this store returned. Announcing an equal value
+			// again is not a write, so the cursor switches to its cells as a persist does.
+			ACell announced=value;
+			announcedCursor.set(announced);
+			announcedCursor.persist(held -> Cells.equals(held,announced)?announced:held);
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
 			sequence = ++announceSequence;

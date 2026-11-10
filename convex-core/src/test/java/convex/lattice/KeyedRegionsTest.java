@@ -406,11 +406,11 @@ class KeyedRegionsTest {
 
 	@Test void publicationRetriesPreserveConcurrentUnregisteredWrites() {
 		AtomicInteger attempts=new AtomicInteger();
-		// This root's atomic updates use CAS, allowing a race at the commit boundary.
+		// Every changed write lands through install, allowing a race at the commit boundary.
 		var root=new Root<>(Index.<Keyword,ACell>none()) {
-			@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
+			@Override protected boolean install(Index<Keyword,ACell> held,Index<Keyword,ACell> value) {
 				if (attempts.incrementAndGet()==1) set(get().assoc(UNKNOWN,CVMLong.TWO));
-				return super.compareAndSet(expected,value);
+				return super.install(held,value);
 			}
 		};
 		var host=new LatticeHost<>(root,null);
