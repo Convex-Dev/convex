@@ -122,11 +122,9 @@ Consecutive node notifications use a latest-update queue and may
 coalesce because lattice snapshots are monotonic. Coalescing affects transport
 work, not the ordering or durability of the node root.
 
-These are the implementation's directional `ALattice` semantics. CAD035/036 in
-the current design checkout still require universal commutativity (and CAD035
-describes value-equality CAS); those specification discrepancies need resolution
-separately from this publication ordering. This pipeline uses identity CAS and
-does not change generic lattice conflict resolution.
+This pipeline uses identity CAS, while CAD035 describes value-equality CAS; that
+discrepancy needs resolution separately from this publication ordering. The
+pipeline does not change generic lattice conflict resolution.
 
 The node and a propagator may deliberately share the same thread-safe `AStore`.
 Only the node calls `setRootData` while attached; propagators merely announce
