@@ -67,8 +67,8 @@ presence checks return false.
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. A plain
 path write through a signed envelope is refused with `IllegalArgumentException`.
 
-A write lands only where the cursor's place exists, which is where `exists()` is
-true. A path whose entry or any container above it is missing throws
+A write lands only where the cursor's place exists. For a path that is where its
+`exists()` is true: a path whose entry or any container above it is missing throws
 `PathWriteException`, and so does a write to a container that cannot hold its key,
 such as a vector given a key that is not an index within it. The exception carries
 the keys from the one that does not fit, and its depth. A read-only view throws
