@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileTime;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -201,30 +202,53 @@ public class DLFSLocal extends DLFileSystem {
 
 	/**
 	 * Atomically transforms the latest file data across all views of this drive.
-	 * Checkpointing runs before installation, outside cursor retry callbacks. A
-	 * changed root with unchanged file data reuses the prepared blob; only a change
-	 * to this file's data requires recomputation and another checkpoint.
+	 * The new content is prepared, and checkpointed, outside the cursor's update, and
+	 * installed by an update function, so the drive around it is built on the cells
+	 * the cursor holds. A changed root with unchanged file data redoes only the
+	 * install; a change to this file's data prepares the content again. A transform
+	 * that leaves the content equal changes nothing.
 	 */
 	AVector<ACell> updateFileData(DLPath path, UnaryOperator<ABlob> transform,
 			CVMLong operationTime, boolean checkpoint) throws IOException {
 		checkOpen();
-		ABlob preparedFrom=null;
-		ABlob prepared=null;
 		while (true) {
-			AVector<ACell> root=rootCursor.get();
-			AVector<ACell> node=DLFSNode.resolveValidPath(root,path);
+			AVector<ACell> node=DLFSNode.resolveValidPath(rootCursor.get(),path);
 			ABlob data=(node==null)?null:DLFSNode.getData(node);
 			if (data==null) throw new NoSuchFileException(path.toString());
-			if (data!=preparedFrom) {
-				prepared=transform.apply(data);
-				if (prepared==data) return node;
-				if (checkpoint) prepared=checkpointBlob(prepared);
-				preparedFrom=data;
-			}
-			AVector<ACell> updated=DLFSNode.withContentTime(node.assoc(DLFSNode.POS_DATA,prepared),operationTime);
-			AVector<ACell> next=DLFSNode.updateNode(root,path,updated,operationTime);
-			if (rootCursor.compareAndSet(root,next)) return updated;
+			ABlob prepared=transform.apply(data);
+			if (Utils.equals(prepared,data)) return node;
+			if (checkpoint) prepared=checkpointBlob(prepared);
+			AVector<ACell> updated=installFileData(path,data,prepared,operationTime);
+			if (updated!=null) return updated;
 		}
+	}
+
+	/**
+	 * Installs content prepared from a file's data, if the drive still holds the very
+	 * cells it was prepared from. The prepared content shares those cells, so it goes
+	 * in only over them: equal data in other cells means the cursor was switched to
+	 * persisted ones, and content built on the old ones would put them back in memory.
+	 *
+	 * @return The file's new node, or null if its data is no longer those cells
+	 */
+	private AVector<ACell> installFileData(DLPath path,ABlob from,ABlob prepared,CVMLong operationTime) throws IOException {
+		// Set by every run of the update function, so it reflects the run that landed
+		AtomicReference<AVector<ACell>> installed=new AtomicReference<>();
+		try {
+			rootCursor.updateAndGet(root -> {
+				AVector<ACell> node=resolveValidUnchecked(root,path);
+				if (node==null || DLFSNode.getData(node)!=from) {
+					installed.set(null);
+					return root;
+				}
+				AVector<ACell> updated=DLFSNode.withContentTime(node.assoc(DLFSNode.POS_DATA,prepared),operationTime);
+				installed.set(updated);
+				return DLFSNode.updateNode(root,path,updated,operationTime);
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+		return installed.get();
 	}
 
 	@Override
@@ -238,28 +262,30 @@ public class DLFSLocal extends DLFileSystem {
 		// Save before the update, so a retry under contention redoes only the install
 		ABlob data=checkpointBlob(content);
 		CVMLong operationTime=currentTimestamp();
+		// Set by every run of the update function, so it reflects the run that landed
+		AtomicReference<AVector<ACell>> replaced=new AtomicReference<>();
 		try {
-			while (true) {
-				AVector<ACell> root=rootCursor.get();
+			rootCursor.updateAndGet(root -> {
 				requireDirectory(root,parent);
 				AVector<ACell> existing=resolveValidUnchecked(root,target);
-				if (!condition.test(existing)) throw new ConditionFailedException(target.toString());
+				if (!condition.test(existing)) throw new UncheckedIOException(new ConditionFailedException(target.toString()));
 				AVector<ACell> base;
 				if (existing==null) {
 					base=DLFSNode.createEmptyFile(operationTime);
 				} else if (DLFSNode.isRegularFile(existing)) {
 					base=existing;
 				} else {
-					throw new FileSystemException(target.toString(),null,"Is a directory");
+					throw new UncheckedIOException(new FileSystemException(target.toString(),null,"Is a directory"));
 				}
+				replaced.set(existing);
 				// Editing the existing entry keeps its metadata and unknown trailing fields
 				AVector<ACell> updated=DLFSNode.withContentTime(base.assoc(DLFSNode.POS_DATA,data),operationTime);
-				AVector<ACell> next=DLFSNode.updateNode(root,target,updated,operationTime);
-				if (rootCursor.compareAndSet(root,next)) return existing;
-			}
+				return DLFSNode.updateNode(root,target,updated,operationTime);
+			});
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
 		}
+		return replaced.get();
 	}
 
 	@Override

@@ -1,17 +1,16 @@
 package convex.lattice;
 
+import static convex.test.HeldCells.assertHeldSoftly;
+import static convex.test.HeldCells.assertOnlyStrongAround;
+import static convex.test.HeldCells.strongCells;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -32,11 +31,8 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
-import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.Ref;
-import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
@@ -109,69 +105,6 @@ public class PersistedCellsHeldSoftlyTest {
 
 	private static void write(LatticeHost<AHashMap<ACell,ACell>> host,long seed) {
 		host.cursor().updateAndGet(root -> with(root,seed));
-	}
-
-	// ===== What is held =====
-
-	/** Non-embedded cells below this one reached through strong references alone, loading nothing. */
-	private static Set<ACell> strongCells(ACell top) {
-		Set<ACell> strong=Collections.newSetFromMap(new IdentityHashMap<>());
-		collectStrong(top,strong,Collections.newSetFromMap(new IdentityHashMap<>()));
-		return strong;
-	}
-
-	private static void collectStrong(ACell cell,Set<ACell> strong,Set<ACell> seen) {
-		if (cell==null || !seen.add(cell)) return;
-		for (int i=0;i<Cells.refCount(cell);i++) {
-			Ref<ACell> ref=Cells.getRef(cell,i);
-			if (!ref.isDirect()) continue;
-			ACell child=ref.getValue();
-			if (child!=null && !ref.isEmbedded()) strong.add(child);
-			collectStrong(child,strong,seen);
-		}
-	}
-
-	/** Every non-embedded reference in the whole tree is soft, bound to this store, persisted and present there. */
-	private void assertHeldSoftly(ACell top) {
-		assertTrue(checkSoft(top,new HashSet<>())>0,"Nothing to check");
-	}
-
-	private int checkSoft(ACell cell,Set<Hash> seen) {
-		int checked=0;
-		for (int i=0;i<Cells.refCount(cell);i++) {
-			Ref<ACell> ref=Cells.getRef(cell,i);
-			if (!ref.isEmbedded()) {
-				assertInstanceOf(RefSoft.class,ref,"Held strongly");
-				assertSame(store,((RefSoft<ACell>)ref).getStore(),"Bound to another store");
-				// A reference decoded from the store has no status of its own until read, so ask the store
-				Ref<ACell> stored=store.refForHash(ref.getHash());
-				assertNotNull(stored,"Not in the store");
-				assertTrue(stored.getStatus()>=Ref.PERSISTED,"Not persisted");
-				checked++;
-				if (!seen.add(ref.getHash())) continue;
-			}
-			ACell child=ref.getValue();
-			if (child!=null) checked+=checkSoft(child,seen);
-		}
-		return checked;
-	}
-
-	/** Whether this cell is the target or leads to it through strong references. */
-	private static boolean leadsTo(ACell cell,ACell target) {
-		if (target.equals(cell)) return true;
-		for (int i=0;i<Cells.refCount(cell);i++) {
-			Ref<ACell> ref=Cells.getRef(cell,i);
-			if (ref.isDirect() && ref.getValue()!=null && leadsTo(ref.getValue(),target)) return true;
-		}
-		return false;
-	}
-
-	/** The edit is held strongly, and so is nothing that does not lead to it. */
-	private static void assertOnlyTheEditIsStrong(ACell held,long seed) {
-		Set<ACell> strong=strongCells(held);
-		ABlob edit=blob(seed);
-		assertTrue(strong.stream().anyMatch(edit::equals),"The edit itself is strong");
-		for (ACell cell:strong) assertTrue(leadsTo(cell,edit),"Strong but not on the edit's path: "+cell.getClass());
 	}
 
 	private static <T> T result(Future<T> work) {
@@ -330,7 +263,7 @@ public class PersistedCellsHeldSoftlyTest {
 	@Test void aFreshWriteIsHeldStrongly() {
 		AHashMap<ACell,ACell> value=tree();
 		assertFalse(strongCells(value).isEmpty());
-		assertThrows(AssertionError.class,() -> assertHeldSoftly(value),"The check must reject strong cells");
+		assertThrows(AssertionError.class,() -> assertHeldSoftly(store,value),"The check must reject strong cells");
 	}
 
 	// ===== Host save =====
@@ -339,7 +272,7 @@ public class PersistedCellsHeldSoftlyTest {
 		var host=LatticeHost.create(tree(),store);
 		var published=host.sync();
 		assertSame(published,host.cursor().get(),"The root holds the persisted value");
-		assertHeldSoftly(host.cursor().get());
+		assertHeldSoftly(store,host.cursor().get());
 		assertEquals(tree(),host.cursor().get());
 	}
 
@@ -351,7 +284,7 @@ public class PersistedCellsHeldSoftlyTest {
 			return persisted;
 		});
 		var root=host.cursor().get();
-		assertHeldSoftly(root);
+		assertHeldSoftly(store,root);
 		assertTrue(holds(root,9000),"The write is kept");
 		assertEquals(snapshot,published,"The sync published the snapshot it took");
 		assertEquals(snapshot,store.getRootData(),"The write is not published until the next sync");
@@ -366,7 +299,7 @@ public class PersistedCellsHeldSoftlyTest {
 				write(host,racing);
 				return persisted;
 			});
-			assertHeldSoftly(host.cursor().get());
+			assertHeldSoftly(store,host.cursor().get());
 			assertTrue(holds(host.cursor().get(),racing));
 		}
 	}
@@ -384,7 +317,7 @@ public class PersistedCellsHeldSoftlyTest {
 				during.set(host.cursor().get());
 			});
 		}
-		assertHeldSoftly(during.get());
+		assertHeldSoftly(store,during.get());
 		assertTrue(holds(during.get(),9000));
 	}
 
@@ -408,7 +341,7 @@ public class PersistedCellsHeldSoftlyTest {
 		AHashMap<ACell,ACell> reopened=store.getRootData();
 		assertEquals(saved,reopened);
 		assertTrue(holds(reopened,8000));
-		assertHeldSoftly(reopened);
+		assertHeldSoftly(store,reopened);
 	}
 
 	// ===== Forks and persist =====
@@ -447,7 +380,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		component.sync();
 
-		assertHeldSoftly(component.held());
+		assertHeldSoftly(store,component.held());
 		assertTrue(holds(component.held(),9000));
 		assertTrue(holds(host.cursor().get(),9000),"Published");
 		assertEquals(saved,store.getRootData(),"Before the host saves it");
@@ -464,7 +397,7 @@ public class PersistedCellsHeldSoftlyTest {
 		component.sync();
 
 		assertNotNull(component.mergedBase,"Both sides changed");
-		assertHeldSoftly(component.mergedBase);
+		assertHeldSoftly(store,component.mergedBase);
 	}
 
 	@Test void aForkTakenBeforeTheFirstSaveLeavesTheHostSoftAfterTheNextSave() {
@@ -475,10 +408,10 @@ public class PersistedCellsHeldSoftlyTest {
 
 		component.edit(9000);
 		component.sync();
-		assertHeldSoftly(component.held());
+		assertHeldSoftly(store,component.held());
 
 		host.sync();
-		assertHeldSoftly(host.cursor().get());
+		assertHeldSoftly(store,host.cursor().get());
 		assertTrue(holds(host.cursor().get(),9000));
 	}
 
@@ -491,7 +424,7 @@ public class PersistedCellsHeldSoftlyTest {
 		component.sync();
 
 		assertNotNull(component.mergedOwn,"Both sides changed");
-		assertHeldSoftly(component.held());
+		assertHeldSoftly(store,component.held());
 		assertTrue(holds(component.held(),9000));
 		assertTrue(holds(component.held(),9001));
 	}
@@ -508,7 +441,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		component.get().sync();
 
-		assertHeldSoftly(component.get().held());
+		assertHeldSoftly(store,component.get().held());
 		assertTrue(holds(component.get().held(),9001),"The edit is kept");
 		assertFalse(holds(host.cursor().get(),9001),"The edit came after the publication");
 	}
@@ -521,7 +454,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		component.edit(9001);
 
-		assertOnlyTheEditIsStrong(component.held(),9001);
+		assertOnlyStrongAround(component.held(),blob(9001));
 	}
 
 	@Test void aSignedForkHoldsItsValueSoftlyInsideTheSignature() {
@@ -535,10 +468,10 @@ public class PersistedCellsHeldSoftlyTest {
 		component.edit(9000);
 
 		component.sync();
-		assertHeldSoftly(component.held());
+		assertHeldSoftly(store,component.held());
 
 		host.sync();
-		assertHeldSoftly(host.cursor().get());
+		assertHeldSoftly(store,host.cursor().get());
 		@SuppressWarnings("unchecked")
 		SignedData<AHashMap<ACell,ACell>> saved=(SignedData<AHashMap<ACell,ACell>>)(ACell)host.cursor().get().get(SIGNED);
 		assertTrue(saved.checkSignature());
@@ -554,11 +487,11 @@ public class PersistedCellsHeldSoftlyTest {
 		application.child.edit(9001);
 
 		application.sync();
-		assertHeldSoftly(application.held());
-		assertHeldSoftly(application.child.held());
+		assertHeldSoftly(store,application.held());
+		assertHeldSoftly(store,application.child.held());
 
 		host.sync();
-		assertHeldSoftly(host.cursor().get());
+		assertHeldSoftly(store,host.cursor().get());
 		assertTrue(holds(host.cursor().get(),9000));
 		assertTrue(holds(application.child.held(),9001));
 	}
@@ -569,10 +502,10 @@ public class PersistedCellsHeldSoftlyTest {
 		for (long cycle=0;cycle<10;cycle++) {
 			for (long write=0;write<10;write++) component.edit(1000+cycle*100+write);
 			component.sync();
-			assertHeldSoftly(component.held());
+			assertHeldSoftly(store,component.held());
 			host.sync();
-			assertHeldSoftly(host.cursor().get());
-			assertHeldSoftly(component.held());
+			assertHeldSoftly(store,host.cursor().get());
+			assertHeldSoftly(store,component.held());
 		}
 	}
 
@@ -612,7 +545,7 @@ public class PersistedCellsHeldSoftlyTest {
 		assertSame(saved,root.get());
 		assertNotSame(before,root.get(),"The saved cells are other objects");
 		assertEquals(before,root.get(),"With the same value");
-		assertHeldSoftly(root.get());
+		assertHeldSoftly(store,root.get());
 	}
 
 	@Test void persistingAForkSwitchesTheForkAndLeavesItsDestination() {
@@ -623,7 +556,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		persist(fork);
 
-		assertHeldSoftly(fork.get());
+		assertHeldSoftly(store,fork.get());
 		assertTrue(holds(fork.get(),9000));
 		assertSame(destination,root.get());
 	}
@@ -638,7 +571,7 @@ public class PersistedCellsHeldSoftlyTest {
 		edit.apply(root,9000,NOTHING);
 
 		assertTrue(holds(root.get(),9000));
-		assertOnlyTheEditIsStrong(root.get(),9000);
+		assertOnlyStrongAround(root.get(),blob(9000));
 	}
 
 	@ParameterizedTest(name="{0}")
@@ -677,7 +610,7 @@ public class PersistedCellsHeldSoftlyTest {
 		});
 
 		assertTrue(holds(root.get(),9000),"The edit is kept");
-		assertHeldSoftly(root.get());
+		assertHeldSoftly(store,root.get());
 	}
 
 	@ParameterizedTest(name="{0}")
@@ -688,7 +621,7 @@ public class PersistedCellsHeldSoftlyTest {
 		edit.apply(root,9000,once(() -> persist(root)));
 
 		assertTrue(holds(root.get(),9000),"The edit is kept");
-		assertOnlyTheEditIsStrong(root.get(),9000);
+		assertOnlyStrongAround(root.get(),blob(9000));
 	}
 
 	/**
@@ -705,7 +638,7 @@ public class PersistedCellsHeldSoftlyTest {
 		persist(root);
 
 		assertTrue(holds(root.get(),9000),"The edit is kept");
-		assertHeldSoftly(root.get());
+		assertHeldSoftly(store,root.get());
 	}
 
 	@Test void aPersistLandingDuringATransactionThatChangesNothingKeepsTheSavedCells() {
@@ -716,7 +649,7 @@ public class PersistedCellsHeldSoftlyTest {
 			draft.set(tree());
 		});
 
-		assertHeldSoftly(root.get());
+		assertHeldSoftly(store,root.get());
 	}
 
 	@Test void aPersistLandingDuringAnExclusiveTransactionThatChangesNothingKeepsTheSavedCells() {
@@ -727,6 +660,6 @@ public class PersistedCellsHeldSoftlyTest {
 			draft.set(tree());
 		});
 
-		assertHeldSoftly(root.get());
+		assertHeldSoftly(store,root.get());
 	}
 }

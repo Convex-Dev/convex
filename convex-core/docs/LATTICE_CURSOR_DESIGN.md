@@ -113,8 +113,8 @@ decides only memory use, and cursors keep the two apart with four rules.
 
 1. **Every operation decides by value.** Compare-and-set, an unchanged write, a
    conflict, a claim and a fork's test of which side changed all compare values, on
-   a root, a fork and a view alike. Component code has no need to compare cells
-   with `==`.
+   a root, a fork and a view alike. No result depends on which object holds a
+   value.
 2. **A write of an equal value keeps the cells held.** It changes nothing, signs
    and stamps nothing, and cannot displace persisted cells with a copy built
    elsewhere.
@@ -128,8 +128,13 @@ decides only memory use, and cursors keep the two apart with four rules.
    stays persisted. Compare-and-set and a transaction commit bring a finished
    value, which is installed as given.
 
-`Root.install` is the one place a changed write lands and the only test of object
-identity; whatever fails there looks again by value. A view's compare-and-set
+`Root.install` is the one place a changed write lands and the cursors' only test of
+object identity; whatever fails there looks again by value. Component code that
+edits through update functions needs no such test. The exception is work prepared
+outside an update function because it does I/O, as DLFS prepares and checkpoints
+file content: it is built on the cells it read, so it goes in only over those very
+cells and is prepared again otherwise. That test decides whether work is redone,
+never what the result is. A view's compare-and-set
 compares its view by value, then makes one attempt against the source value it
 read, so a concurrent change to an unrelated part of the source can fail it.
 CAD035 specifies success whenever the value is the expected one, so this single

@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Stamp a lattice edit that retries after losing a race no earlier than the edit it lost to, so last-write-wins merges keep it. ([Signing and stamping composition](convex-core/docs/LATTICE_CURSOR_DESIGN.md#signing-and-stamping-composition))
-- Stop long-running lattice applications keeping saved data in memory: a component given a persistence function now persists at each sync, and a host sync releases saved data even when a write lands during it. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
+- Stop long-running lattice applications keeping saved data in memory: a component given a persistence function now persists at each sync, a host sync releases saved data even when a write lands during it, and a DLFS file write no longer brings saved data back when a save lands during it. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
 
 ## [0.8.19] - 2026-11-07
 

@@ -255,6 +255,16 @@ entry keeps its metadata and unknown trailing fields, as CAD028 requires; the
 content is saved to the drive's store before the update, so a retry under contention
 redoes only the install.
 
+Installs and channel writes change the drive through a cursor update function, so
+the drive around the written file is rebuilt on the cells its cursor holds. A save
+of the drive that lands during a write therefore leaves everything but the new
+content reclaimable. A channel write prepares its content, and checkpoints it,
+outside that update, and installs it only over the file data it was prepared from;
+if that data has changed, or the cursor has been switched to its saved cells, the
+content is prepared again. A channel write or truncation that leaves a file's
+content equal changes nothing, on any kind of cursor; an install always sets the
+file's content time.
+
 `newWriter(path, condition)` builds content in bounded memory, saving it to the
 drive's store as it arrives, and installs it on an explicit `commit()`. Closing
 without commit discards the content, so a source that fails partway publishes
