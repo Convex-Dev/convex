@@ -113,7 +113,8 @@ decides only memory use, and cursors keep the two apart with four rules.
 
 1. **Every operation decides by value.** Compare-and-set, an unchanged write, a
    conflict, a claim and a fork's test of which side changed all compare values, on
-   a root, a fork and a view alike. Component code never compares cells with `==`.
+   a root, a fork and a view alike. Component code has no need to compare cells
+   with `==`.
 2. **A write of an equal value keeps the cells held.** It changes nothing, signs
    and stamps nothing, and cannot displace persisted cells with a copy built
    elsewhere.
@@ -131,7 +132,8 @@ decides only memory use, and cursors keep the two apart with four rules.
 identity; whatever fails there looks again by value. A view's compare-and-set
 compares its view by value, then makes one attempt against the source value it
 read, so a concurrent change to an unrelated part of the source can fail it.
-Atomic update operations retry as needed.
+CAD035 specifies success whenever the value is the expected one, so this single
+attempt falls short of it. Atomic update operations retry as needed.
 
 Rule 2 costs one comparison per write: the same object is recognised at once, and
 otherwise the comparison hashes the branch cells on the changed path, which are
