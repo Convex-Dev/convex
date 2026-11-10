@@ -15,9 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run exclusive lattice transactions on any component, holding up only writes to the branch they claim; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run colliding lattice transactions one at a time after two conflicts on their own value.
 - Publish forks of social feeds and follows when both sides changed, using the same rules as incoming merges.
+- Build signed, stamped and default lattice cursor views on one writable view base; see [Class hierarchy](convex-core/docs/LATTICE_CURSOR_DESIGN.md#class-hierarchy) when upgrading.
 
 ### Fixed
 
+- Stamp a lattice edit that retries after losing a race no earlier than the edit it lost to, so last-write-wins merges keep it. ([Signing and stamping composition](convex-core/docs/LATTICE_CURSOR_DESIGN.md#signing-and-stamping-composition))
 - Stop long-running lattice applications keeping saved data in memory: a component given a persistence function now persists at each sync, and a host sync releases saved data even when a write lands during it. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
 
 ## [0.8.19] - 2026-11-07
