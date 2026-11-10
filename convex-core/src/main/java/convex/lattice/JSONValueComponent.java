@@ -149,6 +149,11 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 			return value==MISSING?null:(ACell)value;
 		}
 
+		/** Writing back what is there changes nothing, and fails exactly where a changed write would. */
+		@Override protected void requireWritable(ACell stored) {
+			write(stored,view(stored));
+		}
+
 		@Override protected ACell write(ACell current,ACell value) {
 			ACell container=current;
 			for (int i=0; i<keys.length && container!=null; i++) {

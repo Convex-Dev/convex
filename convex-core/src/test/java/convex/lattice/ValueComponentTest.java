@@ -285,8 +285,8 @@ class ValueComponentTest {
 		assertEquals(1,assertThrows(PathWriteException.class,() -> root.path(NAME,ZERO).set(CVMLong.TWO)).getIndex());
 		assertInstanceOf(IllegalStateException.class,missing);
 		assertEquals(Maps.of(DATA,Vectors.of(CVMLong.ONE),NAME,CVMLong.ONE),root.get());
-		// Unchanged writes touch nothing, so they are not refused
-		json.resolve(RAW,ZERO).cursor().set(null);
+		// A write that changes nothing is refused there too: the refusal is about the place, not the value
+		assertEquals(1,assertThrows(PathWriteException.class,() -> json.resolve(RAW,ZERO).cursor().set(null)).getIndex());
 	}
 
 	@Test void JSONForkRetainsItsResolutionPolicyAndPublicationBoundary() {

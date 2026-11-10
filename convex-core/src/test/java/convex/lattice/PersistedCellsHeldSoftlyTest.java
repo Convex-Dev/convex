@@ -641,6 +641,42 @@ public class PersistedCellsHeldSoftlyTest {
 		assertHeldSoftly(store,root.get());
 	}
 
+	/** One way of handing a view a finished value for its own place. */
+	private record ViewWrite(String name,BiConsumer<AForkableCursor<ABlob>,ABlob> action) {
+		@Override public String toString() { return name; }
+	}
+
+	static Stream<ViewWrite> finishedValuesThroughAView() {
+		return Stream.of(
+			new ViewWrite("compare and set",(view,value) -> assertTrue(view.compareAndSet(view.get(),value))),
+			new ViewWrite("transaction",(view,value) -> Transactions.execute(view,draft -> draft.set(value))),
+			new ViewWrite("exclusive transaction",(view,value) -> Transactions.executeExclusively(view,draft -> draft.set(value))));
+	}
+
+	/**
+	 * A view holds no cells: the source around its value is built as the write lands,
+	 * on the cells held then. So a persist landing after the view has read its source
+	 * brings none of the saved cells back, whichever way the value was handed over.
+	 */
+	@ParameterizedTest(name="{0}")
+	@MethodSource("finishedValuesThroughAView")
+	void aPersistLandingAsAViewWritesLeavesOnlyTheNewValueStrong(ViewWrite write) {
+		Runnable[] landing={NOTHING};
+		Root<AHashMap<ACell,ACell>> root=new Root<>(tree()) {
+			@Override protected boolean install(AHashMap<ACell,ACell> held,AHashMap<ACell,ACell> next) {
+				landing[0].run();
+				return super.install(held,next);
+			}
+		};
+		AForkableCursor<ABlob> view=root.path(GROUP,CVMLong.create(5));
+		landing[0]=once(() -> persist(root));
+
+		write.action.accept(view,blob(9000));
+
+		assertEquals(blob(9000),view.get());
+		assertOnlyStrongAround(root.get(),blob(9000));
+	}
+
 	@Test void aPersistLandingDuringATransactionThatChangesNothingKeepsTheSavedCells() {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 

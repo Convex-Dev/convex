@@ -158,10 +158,10 @@ class TransactionBehaviourTest {
 			}
 		}
 
-		@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> value) {
+		@Override protected boolean install(AHashMap<Keyword,ACell> held,AHashMap<Keyword,ACell> value) {
 			var write=competing.poll();
 			if (write!=null) super.set(write.apply(get(),value));
-			return super.compareAndSet(expected,value);
+			return super.install(held,value);
 		}
 	}
 

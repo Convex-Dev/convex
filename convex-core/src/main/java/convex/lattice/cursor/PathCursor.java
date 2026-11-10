@@ -50,6 +50,11 @@ public class PathCursor<V extends ACell> extends ATransformCursor<V,ACell> {
 		return RT.getIn(stored,path);
 	}
 
+	/** Writing back what is there changes nothing, and fails exactly where a changed write would. */
+	@Override protected void requireWritable(ACell stored) {
+		write(stored,view(stored));
+	}
+
 	/** Associates through existing containers, preserving sibling values. */
 	@Override protected ACell write(ACell current,V value) {
 		return LatticeOps.assocExisting(current,value,path);

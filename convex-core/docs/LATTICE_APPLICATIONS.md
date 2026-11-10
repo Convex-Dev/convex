@@ -268,8 +268,9 @@ container is either absent, or cannot hold its key: a scalar, a set, a position
 past the end of a sequence (appending included), or a key of the wrong kind. For
 an absent container, the container is the value the keys before it reach, or the
 component's own value when nothing precedes it. A write through a signed envelope
-is refused with `IllegalArgumentException`, as for any cursor, and a write that
-changes nothing is never refused.
+is refused with `IllegalArgumentException`, as for any cursor. A write that
+changes nothing is refused in the same places: the refusal depends on where the
+write would go, not on its value.
 
 `value()` uses the strict cursor read contract from
 [CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable

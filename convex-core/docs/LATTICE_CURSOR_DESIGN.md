@@ -78,6 +78,17 @@ preserve absence. Forks and transactions can likewise start from a missing locat
 as nil without creating destination state. None of these operations creates a
 missing intermediate container implicitly.
 
+A cursor that cannot be written refuses every write, whatever the values: a write
+that would change nothing, a compare-and-set that would not match and a
+transaction that changes nothing are refused like any other. A read-only view
+throws `ReadOnlyCursorException`, and a path with nowhere to write throws
+`PathWriteException`. The refusal is decided on the value the write would land on
+and leaves it untouched, so a fork whose container has gone is refused at sync and
+keeps its edits. Where a write could land, as at a missing final entry or under a
+view that constructs its container, a write that changes nothing stays silent and
+creates nothing. A value the cursor will not accept, such as one no signer is
+authorised for, is refused only when it would be written.
+
 Transformations propagate source absence without applying their read function.
 A projection over present storage returns the value its supplied function defines,
 including nil; it cannot infer entry presence from that function. Time caches retain
@@ -101,7 +112,7 @@ fork of the view is ordinary writable storage, but its sync publishes through th
 view and is refused. Syncing the view itself is refused as well: it can publish
 nothing, so a component bound to it fails instead of appearing to publish its
 source. Paths and views over it keep the ordinary sync, which only reads. A
-transaction that changes nothing commits, since it writes nothing. `AView` subclasses refuse writes with the same exception, an
+transaction is a write, so one that changes nothing is refused as well. `AView` subclasses refuse writes with the same exception, an
 `UnsupportedOperationException`.
 
 ## Values and the cells that hold them
@@ -126,7 +137,8 @@ decides only memory use, and cursors keep the two apart with four rules.
    has the function to run.** An update function, at a root or through any view,
    runs again if the cells were switched beneath it, so what it leaves untouched
    stays persisted. Compare-and-set and a transaction commit bring a finished
-   value, which is installed as given.
+   value for the cursor's own place, which goes in as given; through a view, the
+   source around that place is still built on the cells held.
 
 `Root.install` is the one place a changed write lands and the cursors' only test of
 object identity; whatever fails there looks again by value. Component code that
@@ -134,11 +146,14 @@ edits through update functions needs no such test. The exception is work prepare
 outside an update function because it does I/O, as DLFS prepares and checkpoints
 file content: it is built on the cells it read, so it goes in only over those very
 cells and is prepared again otherwise. That test decides whether work is redone,
-never what the result is. A view's compare-and-set
-compares its view by value, then makes one attempt against the source value it
-read, so a concurrent change to an unrelated part of the source can fail it.
-CAD035 specifies success whenever the value is the expected one, so this single
-attempt falls short of it. Atomic update operations retry as needed.
+never what the result is.
+
+Compare-and-set is the atomic update "if the value equals the expected one then
+the new value, otherwise unchanged" on every cursor, and its result says whether
+the value matched. It therefore fails only when the cursor's own value differs:
+a change elsewhere in a view's source makes the update run again, as it does for
+any update function. The contract is about values alone, so a cursor that signs,
+stamps or merges holds what that makes of the new value.
 
 Rule 2 costs one comparison per write: the same object is recognised at once, and
 otherwise the comparison hashes the branch cells on the changed path, which are

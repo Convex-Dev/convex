@@ -155,11 +155,6 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	@Override
-	public boolean compareAndSet(V expected,V newValue) {
-		return working.compareAndSet(expected,newValue);
-	}
-
-	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
 		return working.getAndUpdate(updateFunction);
 	}

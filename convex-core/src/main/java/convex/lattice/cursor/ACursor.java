@@ -8,6 +8,7 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 import convex.lattice.LatticeOps;
 
 /**
@@ -156,19 +157,18 @@ public abstract class ACursor<V extends ACell> {
 	public abstract V getAndSet(V newValue);
 
 	/**
-	 * Atomically sets the value if it currently equals the expected value.
+	 * Atomically writes {@code newValue} if the current value equals {@code expected}, by value.
 	 *
-	 * <p>The comparison is by value: an equal value held as another object is the
-	 * expected value. This enables optimistic concurrency: read a value, compute a new
-	 * value, and attempt to write it back, failing if another thread changed it in
-	 * between. The new value is the caller's finished work, so it is installed as
-	 * given; an update function is instead run on the cells the cursor holds.</p>
-	 *
-	 * @param expected The value expected to be present
-	 * @param newValue The new value to set if expectation holds
-	 * @return true if the cursor held the expected value and now holds the new one
+	 * @param expected Value expected
+	 * @param newValue Value to write
+	 * @return true if the value equalled {@code expected}; false if it differed, leaving it unchanged
+	 * @throws ReadOnlyCursorException If this cursor is read-only
+	 * @throws convex.lattice.PathWriteException If this cursor has nowhere to write
 	 */
-	public abstract boolean compareAndSet(V expected, V newValue);
+	public boolean compareAndSet(V expected, V newValue) {
+		V before=getAndUpdate(current -> Utils.equals(current,expected)?newValue:current);
+		return Utils.equals(before,expected);
+	}
 
 	/**
 	 * Sets the cursor to the new value.

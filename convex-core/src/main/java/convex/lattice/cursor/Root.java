@@ -118,15 +118,6 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	@Override
-	public boolean compareAndSet(V expected, V newValue) {
-		for (;;) {
-			V held=get();
-			if (!Utils.equals(held,expected)) return false;
-			if (Utils.equals(held,newValue) || install(held,newValue)) return true;
-		}
-	}
-
-	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
 		for (;;) {
 			V held=get();

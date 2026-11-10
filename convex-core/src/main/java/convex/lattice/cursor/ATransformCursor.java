@@ -64,9 +64,16 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 		return stored==MISSING?MISSING:viewValue((S)stored);
 	}
 
+	/**
+	 * Refuses a source value in which this view has nowhere to write, whatever value
+	 * is being written. A view that can always place a value has nothing to check.
+	 */
+	protected void requireWritable(S stored) {}
+
 	/** Builds one source update, which leaves the source as it is when the view is unchanged. */
 	private UnaryOperator<S> sourceUpdate(UnaryOperator<V> action) {
 		return current -> {
+			requireWritable(current);
 			V previous=view(current);
 			V next=action.apply(previous);
 			return Utils.equals(previous,next)?current:write(current,next);
@@ -90,12 +97,5 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 
 	@Override public V accumulateAndGet(V value,BinaryOperator<V> action) {
 		return updateAndGet(current -> action.apply(current,value));
-	}
-
-	/** One source CAS attempt, comparing the view by value equality. */
-	@Override public boolean compareAndSet(V expected,V value) {
-		S current=base.getOrDefault(null);
-		if (!Utils.equals(expected,view(current))) return false;
-		return base.compareAndSet(current,sourceUpdate(previous -> value).apply(current));
 	}
 }

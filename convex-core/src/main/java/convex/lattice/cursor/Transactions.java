@@ -39,8 +39,8 @@ public final class Transactions {
 
 	/**
 	 * Runs an isolated subtree transaction and returns the committed run's result. An
-	 * equal input reuses the computed run; a no-op completes without another write
-	 * after validating its input. The callback may repeat; external side effects and
+	 * equal input reuses the computed run; a no-op commits as a write that changes
+	 * nothing. The callback may repeat; external side effects and
 	 * writes outside the supplied draft are not permitted. Exceptions discard the
 	 * private state.
 	 *
@@ -146,11 +146,11 @@ public final class Transactions {
 			// may differ from the input while denoting exactly the same value.
 			observed=cursor.getOrDefault(null);
 			if (!Utils.equals(observed,input)) return false;
-			if (Utils.equals(observed,candidate)) return true;
+			// A run that changed nothing still commits as a write, so a cursor that cannot be written refuses it
 			return cursor.compareAndSet(observed,candidate);
 		}
 
-		/** Finishes under the claim, where only a change elsewhere can fail the commit. */
+		/** Finishes under the claim, where the value can change only through this thread. */
 		R commitClaimed() {
 			try (Claim claim=cursor.claim(value -> value)) {
 				V observed=cursor.getOrDefault(null);
@@ -158,7 +158,7 @@ public final class Transactions {
 				for (;;) {
 					observed=cursor.getOrDefault(null);
 					if (!Utils.equals(observed,input)) throw new IllegalStateException("Re-entrant write during transaction commit");
-					if (Utils.equals(observed,candidate) || cursor.compareAndSet(observed,candidate)) return output;
+					if (cursor.compareAndSet(observed,candidate)) return output;
 				}
 			}
 		}

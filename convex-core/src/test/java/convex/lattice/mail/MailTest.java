@@ -120,14 +120,14 @@ public class MailTest {
 		var commits=new AtomicInteger();
 		var signatures=new AtomicInteger();
 		var root=new Root<>(initial) {
-			@Override public boolean compareAndSet(Index<ABlob,SignedData<ACell>> expected,
+			@Override protected boolean install(Index<ABlob,SignedData<ACell>> held,
 					Index<ABlob,SignedData<ACell>> value) {
 				assertSame(first.signed(),get().get(first.key()));
 				assertSame(second.signed(),get().get(second.key()));
 				assertNotNull(MailReceipt.parse(value.get(first.key())));
 				assertNotNull(MailReceipt.parse(value.get(second.key())));
-				if (commits.incrementAndGet()==1) set(expected.assoc(concurrent.key(),concurrent.signed()));
-				return super.compareAndSet(expected,value);
+				if (commits.incrementAndGet()==1) set(held.assoc(concurrent.key(),concurrent.signed()));
+				return super.install(held,value);
 			}
 		};
 		var inbox=new Mailbox(root,Mail.LATTICE.forMailbox(BOB_DID),(owner,value) -> {
