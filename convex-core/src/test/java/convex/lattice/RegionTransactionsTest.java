@@ -24,11 +24,14 @@ import convex.lattice.generic.SignedLattice;
 
 /**
  * Transactions over a region container that manages its regions: isolated to one
- * region, or spanning several, with forked and live regions side by side.
+ * region, or spanning several, with forked and live regions side by side. Each
+ * region's cursor is a transactional boundary, so exclusive work in one region
+ * leaves the others alone.
  */
 class RegionTransactionsTest {
 	private static final Keyword FORKED=Keyword.intern("forked");
 	private static final Keyword LIVE=Keyword.intern("live");
+	private static final Keyword MORE=Keyword.intern("more");
 	private static final Keyword SIGNED=Keyword.intern("signed");
 	private static final Keyword OTHER=Keyword.intern("other");
 
@@ -44,19 +47,21 @@ class RegionTransactionsTest {
 		void add(long n) { cursor().updateAndGet(s -> union(s,n)); }
 	}
 
-	/** Regions with one forked, one live and one signed region, transacting as a whole. */
+	/** Regions with one forked, two live and one signed region, transacting as a whole. */
 	private static final class App extends Regions
 			implements TransactionalComponent<Index<Keyword,ACell>,App> {
 		App(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			super(cursor);
 			create(FORKED,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c.fork()));
 			create(LIVE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
+			create(MORE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
 			create(SIGNED,(AForkableCursor<SignedData<ASet<CVMLong>>> c) -> new SignedComponent<>(SIGNING,c,OWNER::signData));
 		}
 		private App(AForkableCursor<Index<Keyword,ACell>> cursor,App source) { super(cursor,source); }
 		@Override public App rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new App(cursor,this); }
 		Members forked() { return registered(FORKED); }
 		Members live() { return registered(LIVE); }
+		Members more() { return registered(MORE); }
 		SignedComponent<ASet<CVMLong>> signed() { return registered(SIGNED); }
 	}
 
@@ -199,6 +204,120 @@ class RegionTransactionsTest {
 			view.live().add(2);
 		});
 		assertEquals(Sets.of(1,2),at(root,LIVE));
+	}
+
+	/** A root where both live regions exist, as a transaction on a region needs. */
+	private static Root<Index<Keyword,ACell>> liveRoot() {
+		return new Root<>(Index.<Keyword,ACell>of(LIVE,Sets.empty(),MORE,Sets.empty()));
+	}
+
+	/** Waits until a thread is parked, as one waiting for a claim is, or has finished. */
+	private static void awaitParked(Thread thread) {
+		while (thread.isAlive() && thread.getState()!=Thread.State.WAITING) Thread.onSpinWait();
+	}
+
+	@Test void regionsTransactExclusivelyAtTheSameTime() throws InterruptedException {
+		var root=liveRoot();
+		var app=new App(root);
+		Thread[] other=new Thread[1];
+		app.live().exclusive().execute(m -> {
+			other[0]=Thread.ofPlatform().start(() -> app.more().exclusive().execute(n -> n.add(2)));
+			awaitParked(other[0]);
+			assertFalse(other[0].isAlive(),"the other region's exclusive transaction did not wait");
+			assertEquals(Sets.of(2),at(root,MORE),"and is already in the container");
+			m.add(1);
+		});
+		other[0].join();
+		assertEquals(Sets.of(1),at(root,LIVE));
+	}
+
+	@Test void aWriteThroughARegionWaitsForItsExclusiveTransaction() throws InterruptedException {
+		var root=liveRoot();
+		var app=new App(root);
+		Thread[] writer=new Thread[1];
+		app.live().exclusive().execute(m -> {
+			writer[0]=Thread.ofPlatform().start(() -> app.live().add(5));
+			awaitParked(writer[0]);
+			assertTrue(writer[0].isAlive(),"waits for the region's claim");
+			m.add(1);
+		});
+		writer[0].join();
+		assertEquals(Sets.of(1,5),at(root,LIVE),"and lands on top of its commit");
+	}
+
+	@Test void regionWritesWaitForAnExclusiveTransactionOnTheContainer() throws InterruptedException {
+		var root=liveRoot();
+		var app=new App(root);
+		Thread[] writers=new Thread[2];
+		app.exclusive().execute(view -> {
+			writers[0]=Thread.ofPlatform().start(() -> app.live().add(5));
+			writers[1]=Thread.ofPlatform().start(() -> app.more().exclusive().execute(m -> m.add(6)));
+			for (Thread writer:writers) {
+				awaitParked(writer);
+				assertTrue(writer.isAlive(),"every region waits for the container's claim");
+			}
+			view.live().add(1);
+		});
+		for (Thread writer:writers) writer.join();
+		assertEquals(Sets.of(1,5),at(root,LIVE),"a region write lands on top of the container's commit");
+		assertEquals(Sets.of(6),at(root,MORE),"a region the container left alone commits its exclusive transaction");
+	}
+
+	@Test void aContainerTransactionSeesWhatARegionCommitted() {
+		var root=liveRoot();
+		var app=new App(root);
+		app.live().exclusive().execute(m -> m.add(1));
+		app.more().add(2);
+		app.exclusive().execute(view -> {
+			assertEquals(Sets.of(1),view.live().value());
+			assertEquals(Sets.of(2),view.more().value());
+			view.live().add(3);
+		});
+		assertEquals(Sets.of(1,3),at(root,LIVE));
+	}
+
+	@Test void aRegionCommitDuringAContainerTransactionMakesItRetryOnTop() {
+		var attempts=new AtomicInteger();
+		var root=liveRoot();
+		var app=new App(root);
+		app.execute(view -> {
+			// A region commit lands while the first attempt runs
+			if (attempts.incrementAndGet()==1) app.live().add(7);
+			view.live().add(1);
+		});
+		assertEquals(2,attempts.get());
+		assertEquals(Sets.of(1,7),at(root,LIVE));
+	}
+
+	@Test void aContainerTransactionChangingAClaimedRegionMakesItsCommitFail() {
+		var root=liveRoot();
+		var app=new App(root);
+		assertThrows(IllegalStateException.class,() -> app.live().exclusive().execute(m -> {
+			// The container's own commit does not pass through the region's boundary
+			app.execute(view -> view.live().add(9));
+			m.add(1);
+		}));
+		assertEquals(Sets.of(9),at(root,LIVE),"never overwritten");
+	}
+
+	@Test void anEscalatedRegionTransactionFailsIfTheContainerChangesItUnderItsClaim() throws Exception {
+		var attempts=new AtomicInteger();
+		var root=liveRoot();
+		var app=new App(root);
+		assertThrows(IllegalStateException.class,() -> app.live().execute(m -> {
+			int attempt=attempts.incrementAndGet();
+			if (attempt<3) {
+				// Two changes to the region's own value make the third run take its claim
+				root.set(root.get().assoc(LIVE,Sets.of(100+attempt)));
+			} else {
+				// Under the region's claim, a write that does not pass through its boundary goes ahead
+				Thread other=Thread.ofPlatform().start(() -> root.set(root.get().assoc(LIVE,Sets.of(9))));
+				try { other.join(); } catch (InterruptedException e) { throw new AssertionError(e); }
+			}
+			m.add(1);
+		}));
+		assertEquals(3,attempts.get());
+		assertEquals(Sets.of(9),at(root,LIVE),"never overwritten");
 	}
 
 	@Test void aForkedContainerCarriesARemovalOnEitherSide() {

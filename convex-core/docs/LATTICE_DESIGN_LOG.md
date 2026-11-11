@@ -806,6 +806,22 @@ can; its fork reconciles region by region. This replaces entry 25's container
 with no publication of its own boundary, and the hook moves from
 `ALatticeApplication` to the base component.
 
+A region's committed work is whatever reaches the cursor the container gives it,
+and that cursor is a `BoundaryCursor` over the region's place in the container.
+Writes through it land in the container at once, so a transaction on the container
+works on everything regions have committed and retries when a region commit lands
+mid-attempt; nothing needs syncing first. Claims stop at the boundary, so exclusive
+transactions in separate regions run at the same time, while the container's claim
+lies beneath every boundary and stops all region writes. A region's claim holds only
+against writes through its boundary: a transaction on the container that changes the
+same region meanwhile makes the region's claimed commit fail, never overwrite it.
+That applies to exclusive transactions and to ordinary ones that took the claim
+after two conflicts.
+Applications sharing one root make independent updates in any case, which their
+lattice merges reconcile. Making the container fork its regions itself was tried and
+rejected: a region with its own signing view must reconcile above that view, which a
+container fork cannot.
+
 CAD text affected: none yet. CAD045 says publishing an enclosing collection must
 not publish outstanding drafts. That holds for every component that keeps the
 default. A container that opts in does publish its regions' drafts, each through

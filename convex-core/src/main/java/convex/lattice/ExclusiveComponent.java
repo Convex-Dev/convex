@@ -11,7 +11,7 @@ import convex.lattice.cursor.Transactions;
 /**
  * Exclusive transactions on a component's live state, made by
  * {@link TransactionalComponent#exclusive()}. Each callback runs once, on a private
- * draft, under its root's one claim on this component's value, and commits before the
+ * draft, under the claim beneath this component's storage, and commits before the
  * claim is released. Use it for operations too expensive to repeat, or with side
  * effects.
  *
@@ -26,10 +26,15 @@ import convex.lattice.cursor.Transactions;
  * Commits go to the source's bound storage, which this component holds privately
  * because the read-only view deliberately carries no write access.</p>
  *
- * <p>The claim belongs to the source's root, and covers only this component's value:
- * writes that would change it wait, including incoming merges, and writes elsewhere
- * carry on. A root holds one claim at a time, so exclusive transactions on the same
- * root run one after another whatever they touch. For a staged component the root is
+ * <p>The claim is the one beneath the source's bound storage
+ * ({@link convex.lattice.cursor.ACursor#claim}). A root's claim covers only this
+ * component's value: writes that would change it wait, including incoming merges,
+ * and writes elsewhere carry on. A root holds one claim at a time, so exclusive
+ * transactions on the same root run one after another whatever they touch. Storage
+ * under a {@link convex.lattice.cursor.BoundaryCursor} claims the boundary instead:
+ * exclusive transactions under separate boundaries run at the same time, writes
+ * through the boundary wait, and a write reaching the value another way makes the
+ * transaction fail rather than be overwritten. For a staged component the root is
  * that component's working copy, so the fork's sync waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
  * separate sync. Callbacks must not wait for another operation on the same state,
@@ -53,7 +58,7 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	}
 
 	/**
-	 * Runs domain operations once on a private view under the root's claim,
+	 * Runs domain operations once on a private view under the claim beneath its storage,
 	 * commits them, and returns their result.
 	 *
 	 * @param <R> Result type

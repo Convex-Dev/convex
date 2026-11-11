@@ -26,10 +26,12 @@ import convex.core.util.Utils;
  * <p>Optimistic execution is the fast path for transactions that do not collide. A
  * change elsewhere under the root never reruns a callback: its finished result is
  * applied to the new root. When the transaction's own value has changed twice, it
- * takes the root's one {@link Claim} and finishes under it, so transactions that
- * collide run one at a time and a callback runs at most three times.
- * {@link #transactExclusively} starts with the claim, for work too expensive to
- * repeat or with side effects: its callback runs once.</p>
+ * takes the {@link Claim} beneath its cursor (see {@link ACursor#claim}) and finishes
+ * under it, so transactions that collide run one at a time and a callback runs at
+ * most three times. {@link #transactExclusively} starts with the claim, for work too
+ * expensive to repeat or with side effects: its callback runs once. Under a
+ * {@link BoundaryCursor}, a write that does not pass through the boundary and changes
+ * the value while it is claimed makes the transaction fail rather than overwrite it.</p>
  */
 public final class Transactions {
 
@@ -78,9 +80,9 @@ public final class Transactions {
 	}
 
 	/**
-	 * Runs one isolated callback, once, under the root's claim on this cursor's value,
-	 * and returns its result. Writes that would change this value wait until it
-	 * commits, and so do other claims on the root; writes elsewhere carry on.
+	 * Runs one isolated callback, once, under the claim beneath this cursor (see
+	 * {@link ACursor#claim}), and returns its result. Writes that claim holds back wait
+	 * until it commits, and so do other claims on it; writes elsewhere carry on.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type

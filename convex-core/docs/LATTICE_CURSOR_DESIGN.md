@@ -16,6 +16,7 @@ ACursor<V>                                get / atomic update / persist / path
     ├── Root<V>                           atomic value holder; at most one claim
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
     ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
+    ├── BoundaryCursor<V>                 writes pass through; claims stop here
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
         ├── PathCursor<V>                 navigation through existing containers
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
@@ -359,6 +360,17 @@ transaction that changes nothing writes nothing over them. A transaction that do
 from the value it started with, so cells persisted meanwhile are replaced until the
 next save. Reads never wait. Without a claim, each read or compare-and-set of the root adds
 one type check, and nothing is recorded per transaction.
+
+A `BoundaryCursor` wraps any cursor and holds a claim of its own, so claims from
+cursors over it stop there instead of reaching the root. Exclusive transactions
+under separate boundaries, such as the regions of one container, then run at the
+same time. Writes still pass straight through, so a claim beneath a boundary, on the
+root or an enclosing boundary, stops writes through it too, and the boundary needs to
+know nothing about paths or what lies above or below it. A boundary's claim stops
+only writes through that boundary and covers everything under it; a write reaching
+the same storage another way makes a claimed commit fail rather than be overwritten.
+Each write through a boundary holds the read side of its read-write lock, and its
+claim holds the write side.
 
 Typed domain
 transactions use `rebind` to retain component policy; a component opts in by

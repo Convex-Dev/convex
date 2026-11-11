@@ -13,6 +13,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.BoundaryCursor;
 
 /**
  * A component composed of named regions, at a host root or any nested index.
@@ -22,29 +23,30 @@ import convex.lattice.cursor.AForkableCursor;
  * absent entries do nothing. An explicitly present null is delivered to the child.
  * No lattice merge is inferred from a child's shape.</p>
  *
- * <p>This container manages the regions it makes. A factory gives each region either
- * a working copy of its own, by forking the cursor it is given, so that the region
- * edits and transacts in isolation, or a live view that writes straight into the
- * container. {@link #syncChildren()} syncs every region made so far, in registration
- * order, and {@link #sync()} then reconciles the container's own storage with its
+ * <p>This container manages the regions it makes. Each region's factory is given a
+ * {@link BoundaryCursor} over the region's place in the container: writes through
+ * it land in the container at once, and claims stop at it. A factory may give its
+ * region a working copy of its own by forking that cursor.
+ * {@link #syncChildren()} syncs every region made so far, in registration order,
+ * and {@link #sync()} then reconciles the container's own storage with its
  * destination, which does nothing for live storage. Sync is not atomic across
  * regions: earlier work stands if a later region fails.</p>
  *
- * <p>A transaction on one region, through that region's own component, is isolated
- * to it. A transaction on the whole container, by a subclass that implements
- * {@link TransactionalComponent}, spans its regions: the container rebound over the
- * draft makes its own regions there, and they are synced into the draft before it
- * commits. Work still pending in this instance's regions is not part of such a
- * transaction; it merges with what the transaction committed when the region next
- * syncs.</p>
- *
- * <p>The container holds its regions' committed roots: each slot is what its
- * region last published, and a forked region's working copy is not complete until
- * its owner syncs it. A transaction on the container therefore works on committed
- * roots only. It does not sync pending regions first, which would publish work at
- * a point their owners did not choose, possibly part-way through an operation. A
- * caller who wants pending work included syncs the container first, as a separate
- * step.</p>
+ * <p>Whatever reaches a region's cursor is that region's committed work, and it is
+ * in the container as soon as it lands. A transaction on one region, through that
+ * region's own component, is isolated to it, and an exclusive one claims only that
+ * region's boundary, so regions transact exclusively at the same time. A transaction
+ * on the whole container, by a subclass that implements {@link TransactionalComponent},
+ * spans its regions and works on everything they have committed; a region commit
+ * landing during an attempt makes it retry on top. An exclusive transaction on the
+ * container holds the claim beneath every region's boundary, so region writes wait
+ * for it. Work a region keeps in a working copy of its own, such as unsigned edits
+ * behind a signing view, is not yet committed: it is not part of a transaction on
+ * the container, and it merges with what that committed when the region next
+ * syncs. A region's exclusive transaction, and an ordinary one once it has taken the
+ * claim after two conflicts, holds against writes through its boundary; a
+ * transaction on the container that changes the same region meanwhile makes it fail
+ * at commit rather than be overwritten.</p>
  *
  * <p>A fork of this container, or a container built over a fork, reconciles at sync
  * region by region ({@link #mergePublication(Index,Index,Index)}): a region changed
@@ -99,12 +101,12 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	protected Index<Keyword,ACell> createContainer() { return Index.none(); }
 
 	/**
-	 * Constructs a child with its region cursor. The stored
-	 * value type can differ from the child's working type, as for signed components.
-	 * The factory chooses the region's boundary: a child over a fork of the cursor
-	 * (for example {@code new Notes(cursor).fork()}) edits and transacts in isolation
-	 * and is published by the container's sync; a child over the cursor itself writes
-	 * straight into the container.
+	 * Constructs a child with its region cursor, a {@link BoundaryCursor} over the
+	 * region's place in the container. The stored value type can differ from the
+	 * child's working type, as for signed components. A child over the cursor itself
+	 * commits straight into the container; a child over a fork of it (for example
+	 * {@code new Notes(cursor).fork()}) keeps its work until the container's sync
+	 * publishes it.
 	 */
 	@FunctionalInterface
 	public interface RegionFactory<V extends ACell,C extends ALatticeComponent<?>> {
@@ -161,7 +163,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 					return AKeyedRegions.this.createContainer();
 				}
 			};
-			ALatticeComponent<?> created=((RegionFactory<ACell,?>)factory).create(entries.path(key));
+			ALatticeComponent<?> created=((RegionFactory<ACell,?>)factory).create(BoundaryCursor.over(entries.path(key)));
 			Objects.requireNonNull(created,"Region component must not be null");
 			if (template!=null && created instanceof AKeyedRegions container) container.adoptRegions(template);
 			return created;
