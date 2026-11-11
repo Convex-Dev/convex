@@ -2,6 +2,8 @@ package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -137,6 +139,39 @@ class BoundaryCursorTest {
 			draft.set(CVMLong.ONE);
 		}));
 		assertEquals(CVMLong.create(9),root.get(A),"never overwritten");
+	}
+
+	@Test void givenAMergeABypassingWriteIsMergedWithTheClaimedCommit() {
+		var root=tree();
+		var a=boundary(root,A);
+		var merged=new ArrayList<ACell>();
+		Transactions.executeExclusively(a,draft -> {
+			root.set(root.get().assoc(A,CVMLong.create(9)));
+			draft.set(CVMLong.ONE);
+		},(base,own,other) -> {
+			merged.addAll(List.of(base,own,other));
+			return CVMLong.create(10);
+		});
+		assertEquals(List.of(CVMLong.ZERO,CVMLong.ONE,CVMLong.create(9)),merged,"the run's input, the run's value as its own, then the bypassing write");
+		assertEquals(CVMLong.create(10),root.get(A));
+	}
+
+	@Test void aClaimedRunThatChangedNothingKeepsWhatABypassingWriteLeft() {
+		var root=tree();
+		var a=boundary(root,A);
+		AInteger written=CVMLong.create(123456789);
+		Transactions.executeExclusively(a,draft -> root.set(root.get().assoc(A,written)),(base,own,other) -> fail("nothing to merge"));
+		assertSame(written,a.get(),"the destination's own cells, which may be persisted");
+	}
+
+	@Test void aBypassingWriteThatMatchesTheRunNeedsNoMerge() {
+		var root=tree();
+		var a=boundary(root,A);
+		Transactions.executeExclusively(a,draft -> {
+			root.set(root.get().assoc(A,CVMLong.ONE));
+			draft.set(CVMLong.ONE);
+		},(base,own,other) -> fail("both sides agree"));
+		assertEquals(CVMLong.ONE,a.get());
 	}
 
 	@Test void aBoundaryCannotBeClaimedTwiceByOneThread() {

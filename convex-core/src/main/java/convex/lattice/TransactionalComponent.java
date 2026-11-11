@@ -36,8 +36,12 @@ import convex.lattice.cursor.Transactions;
  * bound storage so editing views are not applied twice.</p>
  *
  * <p>Transactions rerun domain operations on conflict; they do not invoke incoming
- * merge or fork reconciliation. No lattice definition or publication merge is
- * required. Choose a component containing every value the operation reads or
+ * merge or fork reconciliation, with one exception. A write that changes the
+ * component's value under its claim without passing through the claimed boundary,
+ * such as a whole-container commit over a region, is reconciled with the committing
+ * run by {@link ALatticeComponent#mergePublication(ACell,ACell,ACell)}, the run's
+ * value as {@code own}; a component with no publication merge fails the transaction
+ * instead. No lattice definition is required. Choose a component containing every value the operation reads or
  * writes, and obtain children from the callback's view. A transaction on an
  * existing fork commits only to that fork; publishing it remains a separate sync.</p>
  *
@@ -73,7 +77,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 *
 	 * @param <R> Result type
 	 * @param action Domain operations on a private view, returning their result
-	 * @return Result of the run that committed
+	 * @return Result of the run that committed, computed before any merge at commit
 	 * @throws convex.lattice.cursor.MissingValueException If this component's storage does not exist, before the callback runs
 	 */
 	default <R> R transact(Function<? super C,? extends R> action) {
@@ -83,7 +87,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 			R result=action.apply(view);
 			ALatticeComponent.completeDraft(view);
 			return result;
-		});
+		},ALatticeComponent.publicationMerge(this));
 	}
 
 	/**
@@ -97,7 +101,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 			C view=rebind(draft);
 			action.accept(view);
 			ALatticeComponent.completeDraft(view);
-		});
+		},ALatticeComponent.publicationMerge(this));
 	}
 
 	/**
@@ -107,7 +111,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 * @return Exclusive transactions on this component's state
 	 */
 	default ExclusiveComponent<V,C> exclusive() {
-		return new ExclusiveComponent<>(storage(),this::rebind);
+		return new ExclusiveComponent<>(storage(),this::rebind,ALatticeComponent.publicationMerge(this));
 	}
 
 	/**

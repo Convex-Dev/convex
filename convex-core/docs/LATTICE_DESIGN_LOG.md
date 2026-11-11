@@ -817,9 +817,13 @@ reads. Claims stop at the boundary, so exclusive
 transactions in separate regions run at the same time, while the container's claim
 lies beneath every boundary and stops all region writes. A region's claim holds only
 against writes through its boundary: a transaction on the container that changes the
-same region meanwhile makes the region's claimed commit fail, never overwrite it.
-That applies to exclusive transactions and to ordinary ones that took the claim
-after two conflicts.
+same region meanwhile is another lattice value arriving, so the region's claimed
+commit merges it with its own run by the region's publication merge, as a forked
+region does when it syncs, with the run's value as `own` and the change as `other`,
+so the merge's own tie rule decides between local work and the change.
+A region with no publication merge fails rather than overwrite the change. That
+applies to exclusive transactions and to ordinary ones that took the claim after two
+conflicts.
 Applications sharing one root make independent updates in any case, which their
 lattice merges reconcile. Making the container fork its regions itself was tried and
 rejected: a region with its own signing view must reconcile above that view, which a

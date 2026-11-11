@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Run exclusive lattice transactions in separate regions of a container at the same time, through a `BoundaryCursor` that stops claims while writes pass straight through; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
+- Run exclusive lattice transactions in separate regions of a container at the same time, through a `BoundaryCursor` that stops claims while writes pass straight through; a region's claimed commit merges a container change it did not see; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
 
 ### Changed
 

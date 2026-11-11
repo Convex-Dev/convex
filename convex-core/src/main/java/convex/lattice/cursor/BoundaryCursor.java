@@ -19,9 +19,9 @@ import convex.core.data.ACell;
  * <p>While this boundary is claimed, writes through it from other threads wait
  * until the claim is released; the claim's owner writes freely. A claim covers
  * everything under this boundary, whatever part a transaction reads. Writes that
- * reach the same storage without passing through this boundary do not wait, and a
- * claimed transaction whose value they change fails at commit rather than
- * overwriting them. Writes through this boundary pass through whatever cursor it
+ * reach the same storage without passing through this boundary do not wait; a
+ * claimed transaction whose value they change merges them at commit or fails, as
+ * {@link Transactions} describes. Writes through this boundary pass through whatever cursor it
  * wraps, so a claim there, such as on an enclosing boundary or root, still stops
  * them.</p>
  *

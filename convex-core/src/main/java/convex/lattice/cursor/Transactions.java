@@ -29,9 +29,13 @@ import convex.core.util.Utils;
  * takes the {@link Claim} beneath its cursor (see {@link ACursor#claim}) and finishes
  * under it, so transactions that collide run one at a time and a callback runs at
  * most three times. {@link #transactExclusively} starts with the claim, for work too
- * expensive to repeat or with side effects: its callback runs once. Under a
- * {@link BoundaryCursor}, a write that does not pass through the boundary and changes
- * the value while it is claimed makes the transaction fail rather than overwrite it.</p>
+ * expensive to repeat or with side effects: its callback runs once.</p>
+ *
+ * <p>Under a {@link BoundaryCursor}, a write that does not pass through the boundary
+ * can still change the value while it is claimed. Given a {@link ThreeWayMerge}, the
+ * transaction then commits the merge of its run with that change, its run's value as
+ * {@code own} and the changed value as {@code other}, as a fork's reconciliation
+ * does. Without one, it fails rather than overwrite the change.</p>
  */
 public final class Transactions {
 
@@ -45,7 +49,8 @@ public final class Transactions {
 	 * equal input reuses the computed run; a no-op commits as a write that changes
 	 * nothing. The callback may repeat; external side effects and
 	 * writes outside the supplied draft are not permitted. Exceptions discard the
-	 * private state.
+	 * private state. A change under the claim that did not pass through it makes the
+	 * transaction fail.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
@@ -55,9 +60,26 @@ public final class Transactions {
 	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
 	public static <V extends ACell,R> R transact(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
+		return transact(cursor,action,null);
+	}
+
+	/**
+	 * Runs an isolated subtree transaction as {@link #transact(AForkableCursor,Function)},
+	 * merging a change under the claim that did not pass through it with the committed
+	 * run, whose result is returned.
+	 *
+	 * @param <V> Value type
+	 * @param <R> Result type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 * @return Result of the run that committed, computed before any merge at commit
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
+	 */
+	public static <V extends ACell,R> R transact(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(cursor);
 		Objects.requireNonNull(action);
-		Transaction<V,R> attempt=new Transaction<>(cursor,action);
+		Transaction<V,R> attempt=new Transaction<>(cursor,action,merge);
 		while (attempt.conflicts<CONFLICTS_BEFORE_CLAIM) {
 			if (attempt.commit()) return attempt.output;
 		}
@@ -65,24 +87,37 @@ public final class Transactions {
 	}
 
 	/**
-	 * Runs an isolated subtree transaction with no result, as {@link #transact}.
+	 * Runs an isolated subtree transaction with no result, as {@link #transact(AForkableCursor,Function)}.
 	 *
 	 * @param <V> Value type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 */
 	public static <V extends ACell> void execute(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
+		execute(cursor,action,null);
+	}
+
+	/**
+	 * Runs an isolated subtree transaction with no result, as {@link #transact(AForkableCursor,Function,ThreeWayMerge)}.
+	 *
+	 * @param <V> Value type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 */
+	public static <V extends ACell> void execute(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(action);
 		transact(cursor,draft -> {
 			action.accept(draft);
 			return null;
-		});
+		},merge);
 	}
 
 	/**
 	 * Runs one isolated callback, once, under the claim beneath this cursor (see
 	 * {@link ACursor#claim}), and returns its result. Writes through that boundary
-	 * wait until it commits, and so do other claims on it.
+	 * wait until it commits, and so do other claims on it. A change under the claim
+	 * that did not pass through it makes the transaction fail.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
@@ -92,29 +127,59 @@ public final class Transactions {
 	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
 	public static <V extends ACell,R> R transactExclusively(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
-		Objects.requireNonNull(cursor);
-		Objects.requireNonNull(action);
-		return new Transaction<>(cursor,action).commitClaimed();
+		return transactExclusively(cursor,action,null);
 	}
 
 	/**
-	 * Runs one isolated callback with no result, as {@link #transactExclusively}.
+	 * Runs one isolated callback, once, as {@link #transactExclusively(AForkableCursor,Function)},
+	 * merging a change under the claim that did not pass through it with the callback's run.
+	 *
+	 * @param <V> Value type
+	 * @param <R> Result type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 * @return Result of the callback, which ran once, computed before any merge at commit
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
+	 */
+	public static <V extends ACell,R> R transactExclusively(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
+		Objects.requireNonNull(cursor);
+		Objects.requireNonNull(action);
+		return new Transaction<>(cursor,action,merge).commitClaimed();
+	}
+
+	/**
+	 * Runs one isolated callback with no result, as {@link #transactExclusively(AForkableCursor,Function)}.
 	 *
 	 * @param <V> Value type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 */
 	public static <V extends ACell> void executeExclusively(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
+		executeExclusively(cursor,action,null);
+	}
+
+	/**
+	 * Runs one isolated callback with no result, as {@link #transactExclusively(AForkableCursor,Function,ThreeWayMerge)}.
+	 *
+	 * @param <V> Value type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 */
+	public static <V extends ACell> void executeExclusively(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(action);
 		transactExclusively(cursor,draft -> {
 			action.accept(draft);
 			return null;
-		});
+		},merge);
 	}
 
 	private static final class Transaction<V extends ACell,R> {
 		private final AForkableCursor<V> cursor;
 		private final Function<? super AForkableCursor<V>,? extends R> action;
+		/** Reconciles a change under the claim with the computed run, or null to refuse it. */
+		private final ThreeWayMerge<V> merge;
 		private boolean computed;
 		private V input;
 		/** Value the computed run leaves in its draft. */
@@ -124,9 +189,10 @@ public final class Transactions {
 		/** Times a computed run was invalidated by a change to the transaction's own value. */
 		int conflicts;
 
-		Transaction(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
+		Transaction(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
 			this.cursor=cursor;
 			this.action=action;
+			this.merge=merge;
 		}
 
 		private void run(V value) {
@@ -156,12 +222,16 @@ public final class Transactions {
 
 		/**
 		 * Finishes under the claim, where the value can change only through this thread
-		 * or through a write that bypasses the claimed boundary, which is refused.
+		 * or through a write that bypasses the claimed boundary, which is merged or refused.
 		 */
 		R commitClaimed() {
 			try (Claim claim=cursor.claim()) {
 				V observed=cursor.get();
 				if (!computed || !Utils.equals(observed,input)) run(observed);
+				if (merge!=null) {
+					cursor.updateAndGet(new Reconciliation<>(input,candidate,merge));
+					return output;
+				}
 				for (;;) {
 					observed=cursor.get();
 					if (!Utils.equals(observed,input)) {

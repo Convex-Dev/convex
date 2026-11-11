@@ -7,7 +7,6 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.core.util.Utils;
 
 /**
  * Independent working storage which reconciles with a destination on sync.
@@ -80,37 +79,12 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	public V reconcile(ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
 		try (Claim claim=working.claim()) {
-			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
+			V published=destination.updateAndGet(new Reconciliation<>(baseline.get(),working.get(),merge));
 			// The destination's cells, even where they only equal the working value: they
 			// may be persisted, and one copy is then held, not two.
 			working.adopt(published);
 			baseline.set(published);
 			return published;
-		}
-	}
-
-	/** Retains reconciled changes as the destination update retries. */
-	private final class Reconciliation implements UnaryOperator<V> {
-		private final ThreeWayMerge<V> merge;
-		private V previous=baseline.get();
-		private V candidate;
-
-		Reconciliation(V snapshot,ThreeWayMerge<V> merge) {
-			this.merge=merge;
-			candidate=snapshot;
-		}
-
-		@Override public V apply(V other) {
-			// Where only this fork changed, candidate replaces other even if other is the
-			// persisted form of the base: unless this fork was persisted too, that puts
-			// strong cells back over soft ones (see Persister).
-			if (Utils.equals(candidate,previous) || Utils.equals(candidate,other)) {
-				candidate=other;
-			} else if (!Utils.equals(other,previous)) {
-				candidate=merge.merge(previous,candidate,other);
-			}
-			previous=other;
-			return candidate;
 		}
 	}
 

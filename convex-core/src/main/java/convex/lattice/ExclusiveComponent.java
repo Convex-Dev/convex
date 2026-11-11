@@ -6,6 +6,7 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ThreeWayMerge;
 import convex.lattice.cursor.Transactions;
 
 /**
@@ -33,7 +34,9 @@ import convex.lattice.cursor.Transactions;
  * wait, including incoming merges, and exclusive transactions under the same
  * boundary run one after another whatever they touch, while those under separate
  * boundaries run at the same time. A write reaching the value without passing
- * through the boundary makes the transaction fail rather than be overwritten. For a
+ * through the boundary is merged with the callback's run by the source component's
+ * publication merge, as {@link TransactionalComponent} describes, or makes the
+ * transaction fail if it has none. For a
  * staged component the root is that component's working copy, so the fork's sync
  * waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
@@ -51,10 +54,14 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	/** Binds the source's domain operations to each draft. */
 	private final Function<? super AForkableCursor<V>,? extends C> binder;
 
-	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> binder) {
+	/** Reconciles a change under the claim that did not pass through it, or null to fail instead. */
+	private final ThreeWayMerge<V> merge;
+
+	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> binder,ThreeWayMerge<V> merge) {
 		super(target.readOnly());
 		this.target=target;
 		this.binder=Objects.requireNonNull(binder);
+		this.merge=merge;
 	}
 
 	/**
@@ -63,7 +70,7 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	 *
 	 * @param <R> Result type
 	 * @param action Domain operations on a private view, returning their result
-	 * @return Result of the callback
+	 * @return Result of the callback, computed before any merge at commit
 	 */
 	public <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
@@ -72,7 +79,7 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 			R result=action.apply(view);
 			completeDraft(view);
 			return result;
-		});
+		},merge);
 	}
 
 	/**
@@ -86,6 +93,6 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 			C view=binder.apply(draft);
 			action.accept(view);
 			completeDraft(view);
-		});
+		},merge);
 	}
 }

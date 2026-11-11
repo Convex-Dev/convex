@@ -45,8 +45,9 @@ import convex.lattice.cursor.BoundaryCursor;
  * the container, and it merges with what that committed when the region next
  * syncs. A region's exclusive transaction, and an ordinary one once it has taken the
  * claim after two conflicts, holds against writes through its boundary; a
- * transaction on the container that changes the same region meanwhile makes it fail
- * at commit rather than be overwritten.</p>
+ * transaction on the container that changes the same region meanwhile does not pass
+ * through it, so the region's commit merges that change with its own run by the
+ * region's publication merge, or fails if the region has none.</p>
  *
  * <p>A fork of this container, or a container built over a fork, reconciles at sync
  * region by region ({@link #mergePublication(Index,Index,Index)}): a region changed

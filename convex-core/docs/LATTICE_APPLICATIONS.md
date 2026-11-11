@@ -367,7 +367,9 @@ on the parent spans its children. A region container does this for its regions.
 
 A transaction can return a result computed on its private view (`transact`), such
 as the identifier it allocated; `execute` returns nothing. The result comes from
-the run that committed, so it describes that change exactly. It is a local fact,
+the run that committed, so it describes that change exactly; where a write that
+bypassed the claimed boundary was merged in at commit, it describes the run's own
+part of the result. It is a local fact,
 not a statement about what replicas will hold after merging. An operation that
 must not repeat uses the component's `exclusive()` form, whose callback runs once
 while holding the claim of its nearest transactional boundary: a `BoundaryCursor`

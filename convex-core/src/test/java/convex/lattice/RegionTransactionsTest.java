@@ -17,6 +17,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.BoundaryCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
@@ -45,6 +46,13 @@ class RegionTransactionsTest {
 		Members(AForkableCursor<ASet<CVMLong>> cursor) { super(SetLattice.create(),cursor); }
 		@Override public Members rebind(AForkableCursor<ASet<CVMLong>> cursor) { return new Members(cursor); }
 		void add(long n) { cursor().updateAndGet(s -> union(s,n)); }
+	}
+
+	/** A transacting component with no publication merge. */
+	private static final class Unmerged extends ALatticeComponent<ASet<CVMLong>>
+			implements TransactionalComponent<ASet<CVMLong>,Unmerged> {
+		Unmerged(AForkableCursor<ASet<CVMLong>> cursor) { super(cursor); }
+		@Override public Unmerged rebind(AForkableCursor<ASet<CVMLong>> cursor) { return new Unmerged(cursor); }
 	}
 
 	/** Regions with one forked, two live and one signed region, transacting as a whole. */
@@ -289,34 +297,47 @@ class RegionTransactionsTest {
 		assertEquals(Sets.of(1,7),at(root,LIVE));
 	}
 
-	@Test void aContainerTransactionChangingAClaimedRegionMakesItsCommitFail() {
+	@Test void aContainerTransactionChangingAClaimedRegionMergesWithItsCommit() {
+		var runs=new AtomicInteger();
 		var root=liveRoot();
 		var app=new App(root);
-		assertThrows(IllegalStateException.class,() -> app.live().exclusive().execute(m -> {
+		app.live().exclusive().execute(m -> {
+			runs.incrementAndGet();
 			// The container's own commit does not pass through the region's boundary
 			app.execute(view -> view.live().add(9));
 			m.add(1);
-		}));
-		assertEquals(Sets.of(9),at(root,LIVE),"never overwritten");
+		});
+		assertEquals(1,runs.get(),"merged, not run again");
+		assertEquals(Sets.of(1,9),at(root,LIVE),"both survive");
 	}
 
-	@Test void anEscalatedRegionTransactionFailsIfTheContainerChangesItUnderItsClaim() throws Exception {
+	@Test void anEscalatedRegionTransactionMergesWhatTheContainerWroteUnderItsClaim() throws Exception {
 		var attempts=new AtomicInteger();
 		var root=liveRoot();
 		var app=new App(root);
-		assertThrows(IllegalStateException.class,() -> app.live().execute(m -> {
+		app.live().execute(m -> {
 			int attempt=attempts.incrementAndGet();
 			if (attempt<3) {
 				// Two changes to the region's own value make the third run take its claim
 				root.set(root.get().assoc(LIVE,Sets.of(100+attempt)));
 			} else {
 				// Under the region's claim, a write that does not pass through its boundary goes ahead
-				Thread other=Thread.ofPlatform().start(() -> root.set(root.get().assoc(LIVE,Sets.of(9))));
+				Thread other=Thread.ofPlatform().start(() -> app.execute(view -> view.live().add(9)));
 				try { other.join(); } catch (InterruptedException e) { throw new AssertionError(e); }
 			}
 			m.add(1);
-		}));
+		});
 		assertEquals(3,attempts.get());
+		assertEquals(Sets.of(1,9,102),at(root,LIVE),"the container's change and the region's run both survive");
+	}
+
+	@Test void aRegionWithNoPublicationMergeFailsRatherThanLoseAContainerChange() {
+		var root=liveRoot();
+		var region=new Unmerged(BoundaryCursor.over(root.<ASet<CVMLong>>path(LIVE)));
+		assertThrows(UnsupportedOperationException.class,() -> region.exclusive().execute(m -> {
+			root.set(root.get().assoc(LIVE,Sets.of(9)));
+			m.cursor().set(Sets.of(1));
+		}));
 		assertEquals(Sets.of(9),at(root,LIVE),"never overwritten");
 	}
 

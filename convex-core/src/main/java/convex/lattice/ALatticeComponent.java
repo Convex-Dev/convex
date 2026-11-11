@@ -12,6 +12,7 @@ import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.Persister;
+import convex.lattice.cursor.ThreeWayMerge;
 
 /**
  * Domain operations over a cursor at one path.
@@ -289,6 +290,17 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Brings a transaction view's managed children into its draft before the draft commits. */
 	static void completeDraft(Object view) {
 		if (view instanceof ALatticeComponent<?> component) component.syncChildren();
+	}
+
+	/**
+	 * Returns the publication merge of a transacting component, which reconciles a
+	 * change made under its claim without passing through it, or null if it is not a
+	 * lattice component.
+	 */
+	@SuppressWarnings("unchecked")
+	static <V extends ACell> ThreeWayMerge<V> publicationMerge(TransactionalComponent<V,?> source) {
+		if (source instanceof ALatticeComponent<?> component) return ((ALatticeComponent<V>)component)::mergePublication;
+		return null;
 	}
 
 	/**
