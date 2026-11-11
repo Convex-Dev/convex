@@ -375,6 +375,13 @@ commits. A region container is the example:
 - Work pending in the live container's regions is not part of such a
   transaction. It merges with the committed value when the region next syncs.
 
+The container holds its regions' committed roots: each region's slot is what that
+region last published, and a forked region's working copy is not complete until
+its owner syncs it. A transaction on the container therefore works on committed
+roots only. Syncing pending regions first would publish work at a point their
+owners did not choose, possibly part-way through an operation. A caller who wants
+pending work included syncs the container first, as a separate step.
+
 [RegionTransactionsTest](../src/test/java/convex/lattice/RegionTransactionsTest.java)
 exercises each case with forked, live and signed regions.
 
