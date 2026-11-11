@@ -145,6 +145,36 @@ class RegionTransactionsTest {
 		assertEquals(Sets.of(1,2),signedPayload(root),"both survive a signing boundary");
 	}
 
+	@Test void nestedTransactionsShareLiveChildCommitsWithoutSync() {
+		var root=new Root<>(Index.<Keyword,ACell>of(LIVE,Sets.empty()));
+		var app=new App(root);
+		var before=root.get();
+		app.execute(outer -> {
+			Members child=outer.live();
+			child.execute(m -> m.add(1));
+			assertEquals(Sets.of(1),outer.value().get(LIVE),"the child commits directly into the parent's draft");
+			assertEquals(Sets.of(1),child.value(),"the existing child sees its commit through the boundary cursor");
+			assertSame(before,root.get(),"the child commit remains private to the outer transaction");
+
+			outer.execute(inner -> {
+				assertEquals(Sets.of(1),inner.live().value(),"a nested parent sees the preceding child commit without sync");
+				inner.live().execute(m -> m.add(2));
+				assertEquals(Sets.of(1,2),inner.value().get(LIVE),"the nested child commits into its immediate parent's draft");
+				assertEquals(Sets.of(1),child.value(),"the nested parent remains isolated until it commits");
+				assertSame(before,root.get());
+			});
+			assertEquals(Sets.of(1,2),outer.value().get(LIVE),"the nested parent commits into the outer draft");
+			assertEquals(Sets.of(1,2),child.value(),"the retained child immediately sees the nested parent's commit");
+			child.execute(m -> {
+				assertEquals(Sets.of(1,2),m.value(),"a subsequent child transaction starts from the updated parent");
+				m.add(3);
+			});
+			assertEquals(Sets.of(1,2,3),outer.value().get(LIVE));
+			assertSame(before,root.get(),"no nested commit publishes outside the outer transaction");
+		});
+		assertEquals(Sets.of(1,2,3),at(root,LIVE),"the outer commit publishes all nested changes together");
+	}
+
 	@Test void nestedParentTransactionsSeeForkedChildCommitsOnlyAfterSync() {
 		var root=new Root<>(Index.<Keyword,ACell>of(FORKED,Sets.empty()));
 		var app=new App(root);
