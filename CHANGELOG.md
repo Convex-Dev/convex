@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep prepared SQL reads, writes and batches bound to the current transaction across commits and rollbacks. ([#835](https://github.com/Convex-Dev/convex/issues/835))
+- Correct SQL text and date comparisons, integer division and joined sums and averages. ([#836](https://github.com/Convex-Dev/convex/issues/836))
+- Report SQL syntax and numeric execution errors with SQLSTATE codes through JDBC and PostgreSQL clients. ([#800](https://github.com/Convex-Dev/convex/issues/800))
+- Release PostgreSQL statements retained by portals after their named statement is replaced or closed. ([#801](https://github.com/Convex-Dev/convex/issues/801))
 - Stamp a lattice edit that retries after losing a race no earlier than the edit it lost to, so last-write-wins merges keep it. ([Signing and stamping composition](convex-core/docs/LATTICE_CURSOR_DESIGN.md#signing-and-stamping-composition))
 - Stop long-running lattice applications keeping saved data in memory: a component given a persistence function now persists at each sync, a host sync releases saved data even when a write lands during it, and a DLFS file write no longer brings saved data back when a save lands during it. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
 

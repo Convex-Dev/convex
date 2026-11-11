@@ -29,6 +29,7 @@ import convex.core.lang.RT;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
 import convex.db.calcite.convention.ConvexRel;
+import convex.db.calcite.eval.ConvexExpressionEvaluator;
 
 /**
  * Aggregate in CONVEX convention.
@@ -37,7 +38,7 @@ import convex.db.calcite.convention.ConvexRel;
  * <ul>
  *   <li>SUM - uses RT.plus()</li>
  *   <li>COUNT - simple counter</li>
- *   <li>MIN/MAX - uses RT.min()/RT.max()</li>
+ *   <li>MIN/MAX - uses the input column's SQL ordering</li>
  *   <li>AVG - SUM/COUNT with CVMDouble</li>
  *   <li>SINGLE_VALUE - the one value of a scalar subquery, NULL for none, an error for more</li>
  * </ul>
@@ -140,8 +141,8 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 		return switch (kind) {
 			case COUNT -> computeCount(rows, colIndex, aggCall.isDistinct());
 			case SUM, SUM0 -> computeSum(rows, colIndex);
-			case MIN -> computeMin(rows, colIndex);
-			case MAX -> computeMax(rows, colIndex);
+			case MIN -> computeExtremum(rows, colIndex, inputRowType, false);
+			case MAX -> computeExtremum(rows, colIndex, inputRowType, true);
 			case AVG -> computeAvg(rows, colIndex, aggCall.getType());
 			case SINGLE_VALUE -> computeSingleValue(rows, colIndex);
 			default -> throw new UnsupportedOperationException("Aggregate not supported: " + kind);
@@ -212,10 +213,11 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 	}
 
 	/**
-	 * MIN using RT.min().
+	 * MIN/MAX use the same SQL ordering as filters and sorts, ignoring NULLs.
 	 */
-	private ACell computeMin(List<ACell[]> rows, int colIndex) {
+	private ACell computeExtremum(List<ACell[]> rows, int colIndex, RelDataType inputRowType, boolean maximum) {
 		if (rows.isEmpty()) return null;
+		var comparator = ConvexExpressionEvaluator.comparatorFor(inputRowType.getFieldList().get(colIndex).getType().getSqlTypeName());
 
 		ACell min = null;
 		for (ACell[] row : rows) {
@@ -225,30 +227,11 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 			if (min == null) {
 				min = val;
 			} else {
-				min = RT.min(min, val);
+				int comparison = comparator.compare(val, min);
+				if (maximum ? comparison > 0 : comparison < 0) min = val;
 			}
 		}
 		return min;
-	}
-
-	/**
-	 * MAX using RT.max().
-	 */
-	private ACell computeMax(List<ACell[]> rows, int colIndex) {
-		if (rows.isEmpty()) return null;
-
-		ACell max = null;
-		for (ACell[] row : rows) {
-			ACell val = colIndex < row.length ? row[colIndex] : null;
-			if (val == null) continue;
-
-			if (max == null) {
-				max = val;
-			} else {
-				max = RT.max(max, val);
-			}
-		}
-		return max;
 	}
 
 	/**

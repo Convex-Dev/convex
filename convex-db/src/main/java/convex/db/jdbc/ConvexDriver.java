@@ -25,6 +25,7 @@ import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexTableModifyRule;
 import convex.db.calcite.rules.ConvexRules;
+import convex.db.calcite.rules.ConvexEnumerableAggregateRule;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
@@ -100,6 +101,8 @@ public class ConvexDriver extends Driver {
 
 		// Register Convex rules with the planner.
 		Hook.PLANNER.add((RelOptPlanner planner) -> {
+			planner.removeRule(EnumerableRules.ENUMERABLE_AGGREGATE_RULE);
+			planner.addRule(ConvexEnumerableAggregateRule.INSTANCE);
 			planner.removeRule(EnumerableRules.ENUMERABLE_TABLE_MODIFICATION_RULE);
 			planner.addRule(ConvexTableModifyRule.INSTANCE);
 			planner.addRule(ConvexLogicalTableModifyRule.INSTANCE);
@@ -195,7 +198,7 @@ public class ConvexDriver extends Driver {
 			calciteConn.setSchema(name);
 		}
 
-		return conn;
+		return JdbcErrors.wrap(conn);
 	}
 
 	// ========== URL Parsing ==========

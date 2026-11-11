@@ -530,7 +530,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	/**
 	 * Prepared statement info - stores the query and parameter types.
 	 */
-	private record PreparedStmt(String query, int[] paramTypes) {}
+	private record PreparedStmt(String name, String query, int[] paramTypes) {}
 
 	/**
 	 * Portal info - a bound prepared statement ready for execution.
@@ -558,7 +558,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			log.debug("Parse: name='{}', query='{}'", name, query);
 
 			// Store the prepared statement, closing an existing one with the same name (PostgreSQL behavior)
-			closeJdbcStatement(statements.put(name, new PreparedStmt(query, parse.paramTypes())));
+			closeJdbcStatement(statements.put(name, new PreparedStmt(name, query, parse.paramTypes())));
 
 			write(ctx, ParseComplete.INSTANCE);
 		} catch (Exception e) {
@@ -644,6 +644,8 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		} catch (Exception e) {
 			log.warn("Describe error: {}", e.getMessage(), e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
+		} finally {
+			if (describe.type() == 'P') closeDetachedPortalStatement(portals.get(describe.name()));
 		}
 	}
 
@@ -694,6 +696,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		} catch (Exception e) {
 			log.error("Unexpected error during execute", e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
+		} finally {
+			closeDetachedPortalStatement(portals.get(portalName));
+		}
+	}
+
+	/** A portal may outlive its named statement, but cannot keep an unreachable JDBC cache entry. */
+	private void closeDetachedPortalStatement(Portal portal) {
+		if (portal != null && statements.get(portal.stmt().name()) != portal.stmt()) {
+			closeJdbcStatement(portal.stmt());
 		}
 	}
 

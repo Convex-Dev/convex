@@ -64,7 +64,7 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 			return ConvexEnumerable.empty();
 		}
 
-		SQLTable sqlTable = convexTable.boundTable(binding);
+		SQLTable sqlTable = convexTable.executingTable(ctx).boundTable(binding);
 
 		Index<ABlob, AVector<ACell>> rawRows = sqlTable.getRows();
 		if (rawRows == null) return ConvexEnumerable.empty();

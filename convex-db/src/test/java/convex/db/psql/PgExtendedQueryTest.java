@@ -146,12 +146,23 @@ public class PgExtendedQueryTest {
 
 	// ========== Prepared statement reuse ==========
 
+	@Test
+	public void testSqlStateFromJdbcBoundary() {
+		channel.writeInbound(new PgMessageDecoder.Query("SELEC 1"));
+		assertEquals("E(42601)Z", responses());
+		channel.writeInbound(new PgMessageDecoder.Query("SELECT 1 / 0"));
+		assertEquals("E(22012)Z", responses());
+		channel.writeInbound(new PgMessageDecoder.Query("SELECT CAST(name AS INTEGER) FROM users"));
+		assertEquals("TE(22P02)Z", responses());
+		assertEquals("12E(22P02)Z", query("SELECT id FROM users WHERE CAST(name AS INTEGER) > $1", PgType.INT8, "0"));
+	}
+
 	/** A failed execution, in binding or in executing, leaves the statement working after Sync. */
 	@Test
 	public void testStatementWorksAfterError() {
 		parse("s1", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
 		assertEquals("2D[2]CZ", run("s1", "5"));
-		assertEquals("2E(XX000)Z", run("s1", "0"), "division by zero fails in executing");
+		assertEquals("2E(22012)Z", run("s1", "0"), "division by zero fails in executing");
 		assertEquals("2D[5]CZ", run("s1", "2"));
 		assertEquals("2E(22P02)Z", run("s1", "abc"), "invalid text fails in binding");
 		assertEquals("2D[10]CZ", run("s1", "1"));
@@ -190,7 +201,7 @@ public class PgExtendedQueryTest {
 		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
 		parse("s2", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
 		assertEquals("2D[Bob]CZ", run("s1", "2"));
-		assertEquals("2E(XX000)Z", run("s2", "0"));
+		assertEquals("2E(22012)Z", run("s2", "0"));
 		assertEquals("12D[Alice]CZ", query("SELECT name FROM users WHERE id = $1", PgType.INT8, "1"));
 		assertEquals(3, openStatements.get());
 
@@ -199,6 +210,64 @@ public class PgExtendedQueryTest {
 	}
 
 	// ========== A table changed under a kept statement ==========
+
+	@Test
+	public void testPortalOutlivesReplacedStatementWithoutLeaking() {
+		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		bind("s1", "2");
+		channel.writeInbound(PgMessageDecoder.Flush.INSTANCE);
+		assertEquals("2", responses());
+		parse("s1", "SELECT email FROM users WHERE id = $1", PgType.INT8);
+		for (int i = 0; i < 3; i++) {
+			channel.writeInbound(new PgMessageDecoder.Describe((byte) 'P', ""));
+			channel.writeInbound(PgMessageDecoder.Flush.INSTANCE);
+			assertEquals("T", responses());
+			assertEquals(0, openStatements.get());
+			channel.writeInbound(new PgMessageDecoder.Execute("", 0));
+			channel.writeInbound(PgMessageDecoder.Sync.INSTANCE);
+			assertEquals("D[Bob]CZ", responses());
+			assertEquals(0, openStatements.get());
+		}
+		assertEquals("2D[bob@example.com]CZ", run("s1", "2"));
+		channel.writeInbound(new PgMessageDecoder.Close((byte) 'S', "s1"));
+		channel.writeInbound(PgMessageDecoder.Flush.INSTANCE);
+		assertEquals("3", responses());
+		channel.writeInbound(new PgMessageDecoder.Execute("", 0));
+		channel.writeInbound(PgMessageDecoder.Sync.INSTANCE);
+		assertEquals("D[bob@example.com]CZ", responses());
+		assertEquals(0, openStatements.get());
+	}
+
+	@Test
+	public void testKeptStatementsFollowTransactions() {
+		parse("read", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[Alice]CZ", run("read", "1"));
+		channel.writeInbound(new PgMessageDecoder.Query("BEGIN"));
+		assertEquals("CZ", responses());
+		parse("write", "UPDATE users SET name = $1 WHERE id = $2", PgType.VARCHAR, PgType.INT8);
+		assertEquals("2CZ", run("write", "changed", "1"));
+		assertEquals("2D[changed]CZ", run("read", "1"));
+		channel.writeInbound(new PgMessageDecoder.Query("COMMIT; BEGIN"));
+		assertEquals("CCZ", responses());
+		assertEquals("2CZ", run("write", "again", "1"));
+		assertEquals("2D[again]CZ", run("read", "1"));
+		channel.writeInbound(new PgMessageDecoder.Query("ROLLBACK"));
+		assertEquals("CZ", responses());
+		assertEquals("2D[changed]CZ", run("read", "1"));
+	}
+
+	@Test
+	public void testDetachedPortalClosesStatementOnError() {
+		parse("s1", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
+		bind("s1", "0");
+		channel.writeInbound(PgMessageDecoder.Flush.INSTANCE);
+		assertEquals("2", responses());
+		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		channel.writeInbound(new PgMessageDecoder.Execute("", 0));
+		channel.writeInbound(PgMessageDecoder.Sync.INSTANCE);
+		assertEquals("E(22012)Z", responses());
+		assertEquals(0, openStatements.get());
+	}
 
 	/** A kept statement whose table changed is prepared again, and runs on if its rows are described alike. */
 	@Test

@@ -156,6 +156,87 @@ public class PlanBindingTest {
 
 	// ========== Helpers ==========
 
+	@Test
+	void testPreparedReadsFollowTransaction() throws SQLException {
+		try (PreparedStatement scan = prepare("SELECT * FROM t WHERE id > ?", 0);
+			 PreparedStatement key = prepare("SELECT * FROM t WHERE id = ?", 2);
+			 Connection other = cdb.getConnection(dbName)) {
+			conn.setAutoCommit(false);
+			execute("INSERT INTO t VALUES (2, 'two')");
+			try (Statement s = other.createStatement()) {
+				s.executeUpdate("INSERT INTO t VALUES (3, 'three')");
+			}
+			assertEquals(List.of("[1, one]", "[2, two]"), rows(scan));
+			assertEquals(List.of("[2, two]"), rows(key));
+			conn.rollback();
+			assertEquals(List.of("[1, one]", "[3, three]"), rows(scan));
+			assertEquals(List.of(), rows(key));
+			conn.setAutoCommit(true);
+			execute("INSERT INTO t VALUES (2, 'live')");
+			assertEquals(List.of("[2, live]"), rows(key));
+		}
+	}
+
+	@Test
+	void testPreparedWritesFollowCommitAndRollback() throws SQLException {
+		conn.setAutoCommit(false);
+		try (PreparedStatement insert = conn.prepareStatement("INSERT INTO t VALUES (?, ?)");
+			 PreparedStatement update = conn.prepareStatement("UPDATE t SET v = ? WHERE id = ?");
+			 PreparedStatement delete = prepare("DELETE FROM t WHERE id = ?", 1)) {
+			for (int id = 2; id <= 4; id++) {
+				insert.setLong(1, id);
+				insert.setString(2, "row" + id);
+				assertEquals(1, insert.executeUpdate());
+				conn.commit();
+			}
+			update.setString(1, "changed");
+			update.setLong(2, 2);
+			assertEquals(1, update.executeUpdate());
+			conn.commit();
+			assertEquals(1, delete.executeUpdate());
+			conn.rollback();
+			assertEquals(1, delete.executeUpdate());
+			conn.setAutoCommit(true);
+			assertEquals(List.of("[2, changed]", "[3, row3]", "[4, row4]"), rows(prepare("SELECT * FROM t WHERE id > ?", 0)));
+			assertEquals(Vectors.of(2L, "changed"), db.tables().selectByKey("T", CVMLong.create(2)));
+			assertNull(db.tables().selectByKey("T", CVMLong.ONE));
+		}
+	}
+
+	@Test
+	void testPreparedPlanStillChecksSchemaAfterCommit() throws SQLException {
+		conn.setAutoCommit(false);
+		try (PreparedStatement scan = prepare("SELECT * FROM t WHERE id > ?", 0);
+			 PreparedStatement insert = conn.prepareStatement("INSERT INTO t VALUES (2, 'two')")) {
+			conn.commit();
+			execute("DROP TABLE t");
+			execute("CREATE TABLE t (id INTEGER, n INTEGER)");
+			assertStale(() -> rows(scan));
+			assertStale(insert::executeUpdate);
+			conn.rollback();
+			assertEquals(List.of("[1, one]"), rows(scan));
+		}
+	}
+
+	@Test
+	void testPreparedBatchAcrossCommits() throws SQLException {
+		conn.setAutoCommit(false);
+		try (PreparedStatement insert = conn.prepareStatement("INSERT INTO t VALUES (?, ?)");
+			 PreparedStatement count = prepare("SELECT COUNT(*) FROM t WHERE id > ?", 0)) {
+			for (int batch = 0; batch < 3; batch++) {
+				for (int row = 0; row < 2; row++) {
+					insert.setLong(1, 2 + batch * 2 + row);
+					insert.setString(2, "batch");
+					insert.addBatch();
+				}
+				assertArrayEquals(new int[] {1, 1}, insert.executeBatch());
+				conn.commit();
+				assertEquals(List.of("[" + (3 + batch * 2) + "]"), rows(count));
+			}
+			assertEquals(7, db.tables().getLiveTable("T").getRowCount());
+		}
+	}
+
 	/** A table as the validator saw it, of which binding asks only the row type. */
 	private static RelOptTable validatedAs(RelDataType rowType) {
 		return (RelOptTable) Proxy.newProxyInstance(PlanBindingTest.class.getClassLoader(),

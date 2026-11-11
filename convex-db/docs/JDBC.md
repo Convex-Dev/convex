@@ -232,6 +232,30 @@ JDBC transactions use the lattice fork/sync model:
 
 Implementation: `ConvexMeta` (in `org.apache.calcite.jdbc` package).
 
+Prepared statements can be reused across transaction boundaries. Each execution
+reads and writes the connection's current transaction, including its own writes;
+committing or rolling back does not require preparing the statement again. A
+changed table schema or format version still invalidates its plan, as specified
+by [CAD039](https://docs.convex.world/docs/cad/convex_sql).
+
+## Query Errors
+
+Query failures are reported as `SQLException`, including failures while preparing
+a statement or fetching rows with `ResultSet.next()`. The PostgreSQL server
+preserves these SQLSTATE codes:
+
+| Condition | SQLSTATE |
+|-----------|---------|
+| SQL syntax error | `42601` |
+| Validation error, including an unknown table or column | `42000` |
+| Division by zero | `22012` |
+| Invalid text in a numeric cast | `22P02` |
+| Numeric value out of range | `22003` |
+
+Existing specific codes, such as constraint violations, are preserved. Batch
+errors retain their update counts. See [SQL column types](SQL-TYPES.md#errors)
+for column conversion and constraint errors.
+
 ## Query Pipeline
 
 See [CALCITE.md](CALCITE.md) for the full Calcite adapter architecture.

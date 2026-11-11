@@ -3,6 +3,7 @@ package convex.db.calcite;
 import java.util.Map;
 
 import org.apache.calcite.DataContext;
+import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
@@ -52,7 +53,10 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	 */
 	public static ConvexTable getTable(DataContext context, String schemaName, String tableName) {
 		if (context == null) throw new IllegalStateException("No data context for DML table lookup");
-		SchemaPlus root=context.getRootSchema();
+		// A prepared signature's root schema is a planning snapshot. The query
+		// provider is the executing connection, whose schema follows BEGIN/COMMIT.
+		SchemaPlus root = context.getQueryProvider() instanceof CalciteConnection connection
+				? connection.getRootSchema() : context.getRootSchema();
 		SchemaPlus schema=(root==null) ? null : root.getSubSchema(schemaName);
 		ConvexSchema convexSchema=(schema==null) ? null : schema.unwrap(ConvexSchema.class);
 		if (convexSchema==null) {

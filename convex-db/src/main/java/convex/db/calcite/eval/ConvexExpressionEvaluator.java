@@ -18,6 +18,8 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Sarg;
+import org.apache.calcite.util.TimestampString;
+import org.apache.calcite.util.DateString;
 
 import java.util.Comparator;
 
@@ -34,6 +36,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.data.ABlob;
 import convex.db.calcite.ConvexType;
+import convex.db.calcite.ConvexColumnType;
 
 /**
  * Evaluates RexNode expressions against ACell[] rows using CVM operations.
@@ -108,6 +111,8 @@ public class ConvexExpressionEvaluator {
 				Boolean b = literal.getValueAs(Boolean.class);
 				yield CVMBool.create(b);
 			}
+			case TIMESTAMP -> CVMLong.create(literal.getValueAs(TimestampString.class).getMillisSinceEpoch());
+			case DATE -> CVMLong.create(literal.getValueAs(DateString.class).getDaysSinceEpoch());
 			case NULL -> null;
 			default -> {
 				// Fallback: convert to string
@@ -140,7 +145,7 @@ public class ConvexExpressionEvaluator {
 
 		// Handle CASE (short-circuit evaluation)
 		if (kind == SqlKind.CASE) {
-			return evaluateCase(operands, row, rowType);
+			return evaluateCase(operands, row, rowType, ctx);
 		}
 
 		// Handle COALESCE (short-circuit evaluation)
@@ -154,7 +159,7 @@ public class ConvexExpressionEvaluator {
 
 		// Handle SEARCH (Calcite generates this for AND/OR/IN range conditions)
 		if (kind == SqlKind.SEARCH) {
-			return evaluateSearch(call, row, rowType);
+			return evaluateSearch(call, row, rowType, ctx);
 		}
 
 		// Handle IN (short-circuit evaluation)
@@ -179,33 +184,43 @@ public class ConvexExpressionEvaluator {
 			case NOT_EQUALS -> cellNotEquals(args[0], args[1]);
 			case IS_NOT_DISTINCT_FROM -> cellIsNotDistinctFrom(args[0], args[1]);
 			case IS_DISTINCT_FROM -> cellIsDistinctFrom(args[0], args[1]);
-			case LESS_THAN -> RT.lt(args);
-			case LESS_THAN_OR_EQUAL -> RT.le(args);
-			case GREATER_THAN -> RT.gt(args);
-			case GREATER_THAN_OR_EQUAL -> RT.ge(args);
+			case LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL -> {
+				if (args[0] == null || args[1] == null) yield null;
+				int c = comparatorFor(operands.get(0).getType().getSqlTypeName()).compare(args[0], args[1]);
+				yield CVMBool.create(switch (kind) {
+					case LESS_THAN -> c < 0;
+					case LESS_THAN_OR_EQUAL -> c <= 0;
+					case GREATER_THAN -> c > 0;
+					default -> c >= 0;
+				});
+			}
 
 			// BETWEEN: a BETWEEN b AND c -> a >= b AND a <= c
 			case BETWEEN -> {
 				ACell a = args[0], lo = args[1], hi = args[2];
-				CVMBool geq = (CVMBool) RT.ge(new ACell[]{a, lo});
-				CVMBool leq = (CVMBool) RT.le(new ACell[]{a, hi});
-				yield CVMBool.create(geq.booleanValue() && leq.booleanValue());
+				if (a == null || lo == null || hi == null) yield null;
+				Comparator<ACell> comparator = comparatorFor(operands.get(0).getType().getSqlTypeName());
+				yield CVMBool.create(comparator.compare(a, lo) >= 0 && comparator.compare(a, hi) <= 0);
 			}
 
 			// Logical operators
 			case AND -> {
+				boolean unknown = false;
 				for (ACell arg : args) {
-					if (!RT.bool(arg)) yield CVMBool.FALSE;
+					if (CVMBool.FALSE.equals(arg)) yield CVMBool.FALSE;
+					unknown |= arg == null;
 				}
-				yield CVMBool.TRUE;
+				yield unknown ? null : CVMBool.TRUE;
 			}
 			case OR -> {
+				boolean unknown = false;
 				for (ACell arg : args) {
 					if (RT.bool(arg)) yield CVMBool.TRUE;
+					unknown |= arg == null;
 				}
-				yield CVMBool.FALSE;
+				yield unknown ? null : CVMBool.FALSE;
 			}
-			case NOT -> CVMBool.create(!RT.bool(args[0]));
+			case NOT -> args[0] == null ? null : CVMBool.create(!RT.bool(args[0]));
 
 			// IS TRUE family, three-valued: NULL is neither true nor false. Calcite also
 			// produces IS TRUE itself when it lifts a CASE out of an aggregate's argument.
@@ -218,7 +233,7 @@ public class ConvexExpressionEvaluator {
 			case PLUS -> cellAdd(args[0], args[1]);
 			case MINUS -> RT.minus(args);
 			case TIMES -> RT.multiply(args);
-			case DIVIDE -> RT.divide(args);
+			case DIVIDE -> divide(args[0], args[1], call.getType().getSqlTypeName());
 			case MOD -> cellMod(args[0], args[1]);
 			case MINUS_PREFIX -> cellNegate(args[0]);
 
@@ -240,13 +255,17 @@ public class ConvexExpressionEvaluator {
 	 * range/equality conditions like {@code x > 1 AND x < 3} or {@code x IN (1,2)}.
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private static ACell evaluateSearch(RexCall call, ACell[] row, RelDataType rowType) {
-		ACell value = evaluate(call.getOperands().get(0), row, rowType);
+	private static ACell evaluateSearch(RexCall call, ACell[] row, RelDataType rowType, DataContext ctx) {
+		ACell value = evaluate(call.getOperands().get(0), row, rowType, ctx);
 		RexLiteral sargLiteral = (RexLiteral) call.getOperands().get(1);
 		Sarg sarg = sargLiteral.getValueAs(Sarg.class);
 
 		if (value == null) {
-			return CVMBool.FALSE;
+			return switch (sarg.nullAs) {
+				case TRUE -> CVMBool.TRUE;
+				case FALSE -> CVMBool.FALSE;
+				case UNKNOWN -> null;
+			};
 		}
 
 		// Determine what Comparable type the Sarg uses from its range bounds
@@ -274,6 +293,12 @@ public class ConvexExpressionEvaluator {
 			if (cell instanceof AInteger i) return new BigDecimal(i.big());
 			if (cell instanceof ANumeric n) return BigDecimal.valueOf(n.doubleValue());
 		}
+		if (sargType == TimestampString.class && cell instanceof AInteger i) {
+			return TimestampString.fromMillisSinceEpoch(i.longValue());
+		}
+		if (sargType == DateString.class && cell instanceof AInteger i) {
+			return DateString.fromDaysSinceEpoch(Math.toIntExact(i.longValue()));
+		}
 		Object jvm = RT.jvm(cell);
 		if (jvm instanceof Long l) return BigDecimal.valueOf(l);
 		if (jvm instanceof Integer i) return BigDecimal.valueOf(i);
@@ -285,7 +310,7 @@ public class ConvexExpressionEvaluator {
 	/**
 	 * Evaluates CASE WHEN expressions.
 	 */
-	private static ACell evaluateCase(List<RexNode> operands, ACell[] row, RelDataType rowType) {
+	private static ACell evaluateCase(List<RexNode> operands, ACell[] row, RelDataType rowType, DataContext ctx) {
 		// CASE WHEN cond1 THEN val1 WHEN cond2 THEN val2 ... ELSE default END
 		// Operands: [cond1, val1, cond2, val2, ..., default]
 		// If odd number, last is ELSE value; if even, no ELSE (returns null)
@@ -294,14 +319,30 @@ public class ConvexExpressionEvaluator {
 		int pairs = hasElse ? (n - 1) / 2 : n / 2;
 
 		for (int i = 0; i < pairs; i++) {
-			ACell cond = evaluate(operands.get(i * 2), row, rowType);
+			ACell cond = evaluate(operands.get(i * 2), row, rowType, ctx);
 			if (RT.bool(cond)) {
-				return evaluate(operands.get(i * 2 + 1), row, rowType);
+				return evaluate(operands.get(i * 2 + 1), row, rowType, ctx);
 			}
 		}
 
 		// Return ELSE value or null
-		return hasElse ? evaluate(operands.get(n - 1), row, rowType) : null;
+		return hasElse ? evaluate(operands.get(n - 1), row, rowType, ctx) : null;
+	}
+
+	/** SQL integer division truncates towards zero; DECIMAL division does not. */
+	private static ACell divide(ACell a, ACell b, SqlTypeName type) {
+		if (a == null || b == null) return null;
+		if (b instanceof ANumeric n && n.isZero()) {
+			throw new IllegalArgumentException("Division by zero", new java.sql.SQLException("Division by zero", "22012"));
+		}
+		return switch (type) {
+			case TINYINT, SMALLINT, INTEGER, BIGINT -> {
+				AInteger quotient = ((AInteger) a).quot((AInteger) b);
+				ConvexColumnType.toJava(quotient, type);
+				yield quotient;
+			}
+			default -> RT.divide(new ACell[] {a, b});
+		};
 	}
 
 	/**
@@ -312,8 +353,18 @@ public class ConvexExpressionEvaluator {
 
 		SqlTypeName typeName = targetType.getSqlTypeName();
 		return switch (typeName) {
-			case BIGINT, INTEGER, SMALLINT, TINYINT -> RT.castLong(value);
-			case DOUBLE, FLOAT, REAL -> RT.castDouble(value);
+			case BIGINT, INTEGER, SMALLINT, TINYINT -> {
+				AInteger integer = value instanceof AString s
+						? AInteger.create(new java.math.BigInteger(s.toString().trim()))
+						: value instanceof ANumeric n ? n.toInteger() : null;
+				if (integer == null) throw new IllegalArgumentException("Integer cast out of range",
+						new java.sql.SQLDataException("Integer cast out of range", "22003"));
+				ConvexColumnType.toJava(integer, typeName); // validate the SQL range before use in a filter
+				yield integer;
+			}
+			case DOUBLE, FLOAT, REAL -> value instanceof AString s
+					? CVMDouble.create(Double.parseDouble(s.toString().trim())) : RT.castDouble(value);
+			case DECIMAL -> value instanceof AString s ? ConvexType.toNumeric(new BigDecimal(s.toString().trim())) : value;
 			case VARCHAR, CHAR -> {
 				if (value instanceof AString) yield value;
 				yield Strings.create(value.toString());
@@ -470,8 +521,7 @@ public class ConvexExpressionEvaluator {
 	 * Uses RT.compare for numeric types to handle mixed Long/Double comparison.
 	 */
 	private static CVMBool cellEquals(ACell a, ACell b) {
-		if (a == null && b == null) return CVMBool.TRUE;
-		if (a == null || b == null) return CVMBool.FALSE;
+		if (a == null || b == null) return null;
 
 		// Use RT.compare for numeric comparison (handles mixed types)
 		if (RT.isNumber(a) && RT.isNumber(b)) {
@@ -484,8 +534,7 @@ public class ConvexExpressionEvaluator {
 	}
 
 	private static CVMBool cellNotEquals(ACell a, ACell b) {
-		if (a == null && b == null) return CVMBool.FALSE;
-		if (a == null || b == null) return CVMBool.TRUE;
+		if (a == null || b == null) return null;
 
 		if (RT.isNumber(a) && RT.isNumber(b)) {
 			Long cmp = RT.compare(a, b, null);
@@ -598,18 +647,27 @@ public class ConvexExpressionEvaluator {
 		return switch (sqlType) {
 			case BIGINT, INTEGER, SMALLINT, TINYINT,
 				 DECIMAL, DOUBLE, FLOAT, REAL,
-				 TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
+				 DATE, TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
 				(a, b) -> ((ANumeric) a).compareTo((ANumeric) b);
 
-			case CHAR, VARCHAR, BINARY, VARBINARY ->
+			case CHAR, VARCHAR -> (a, b) -> a.toString().compareTo(b.toString());
+			case BINARY, VARBINARY ->
 				(a, b) -> ((ABlobLike<?>) a).compareTo((ABlobLike<?>) b);
 
 			case BOOLEAN ->
 				(a, b) -> ((CVMBool) a).compareTo((CVMBool) b);
+			case ANY -> (a, b) -> {
+				if (a instanceof ANumeric x && b instanceof ANumeric y) return x.compareTo(y);
+				if (a instanceof AString && b instanceof AString) return a.toString().compareTo(b.toString());
+				if (a instanceof ABlob x && b instanceof ABlob y) return x.compareTo(y);
+				if (a instanceof CVMBool x && b instanceof CVMBool y) return x.compareTo(y);
+				throw new IllegalArgumentException("Incomparable SQL values",
+						new java.sql.SQLFeatureNotSupportedException("Incomparable SQL values", "0A000"));
+			};
 
 			default ->
-				// ANY or unknown: compare by encoding hash for deterministic order
-				(a, b) -> a.getHash().compareTo(b.getHash());
+				(a, b) -> { throw new IllegalArgumentException("Unsupported SQL comparison: " + sqlType,
+						new java.sql.SQLFeatureNotSupportedException("Unsupported SQL comparison: " + sqlType, "0A000")); };
 		};
 	}
 

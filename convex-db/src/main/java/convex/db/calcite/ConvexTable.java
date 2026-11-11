@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.calcite.adapter.java.AbstractQueryableTable;
+import org.apache.calcite.DataContext;
 import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Linq4j;
 import org.apache.calcite.linq4j.QueryProvider;
@@ -117,6 +118,11 @@ public class ConvexTable extends AbstractQueryableTable
 			throw new StalePlanException(tableName);
 		}
 		return table;
+	}
+
+	/** Resolves a captured table against the executing connection's active transaction. */
+	public ConvexTable executingTable(DataContext context) {
+		return context == null ? this : ConvexSchemaFactory.getTable(context, schema.getName(), tableName);
 	}
 
 	/**
