@@ -145,6 +145,35 @@ class RegionTransactionsTest {
 		assertEquals(Sets.of(1,2),signedPayload(root),"both survive a signing boundary");
 	}
 
+	@Test void nestedParentTransactionsSeeForkedChildCommitsOnlyAfterSync() {
+		var root=new Root<>(Index.<Keyword,ACell>of(FORKED,Sets.empty()));
+		var app=new App(root);
+		var before=root.get();
+		app.execute(outer -> {
+			Members child=outer.forked();
+			child.execute(m -> m.add(1));
+			assertEquals(Sets.of(1),child.value(),"committed into the child's fork");
+			assertEquals(Sets.empty(),outer.value().get(FORKED),"not yet published into the outer transaction");
+			outer.execute(inner -> {
+				assertEquals(Sets.empty(),inner.forked().value(),"a nested parent sees only the child's published state");
+			});
+
+			child.sync();
+			assertEquals(Sets.of(1),outer.value().get(FORKED));
+			outer.execute(inner -> {
+				assertEquals(Sets.of(1),inner.forked().value(),"the child's sync makes its commit visible");
+				inner.forked().execute(m -> m.add(2));
+			});
+			assertEquals(Sets.of(1,2),outer.value().get(FORKED),"nested completion syncs its managed child into the outer transaction");
+			assertEquals(Sets.of(1),child.value(),"the existing child fork remains independent of its changed destination");
+
+			child.sync();
+			assertEquals(Sets.of(1,2),child.value(),"sync adopts the nested parent's commit");
+			assertSame(before,root.get(),"child syncs and nested commits remain private until the outer commit");
+		});
+		assertEquals(Sets.of(1,2),at(root,FORKED),"outer completion commits the combined state");
+	}
+
 	@Test void aRetriedAttemptLeavesNothingBehind() {
 		var attempts=new AtomicInteger();
 		var root=emptyRoot();
