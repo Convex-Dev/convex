@@ -26,16 +26,16 @@ import convex.lattice.cursor.Transactions;
  * Commits go to the source's bound storage, which this component holds privately
  * because the read-only view deliberately carries no write access.</p>
  *
- * <p>The claim is the one beneath the source's bound storage
- * ({@link convex.lattice.cursor.ACursor#claim}). A root's claim covers only this
- * component's value: writes that would change it wait, including incoming merges,
- * and writes elsewhere carry on. A root holds one claim at a time, so exclusive
- * transactions on the same root run one after another whatever they touch. Storage
- * under a {@link convex.lattice.cursor.BoundaryCursor} claims the boundary instead:
- * exclusive transactions under separate boundaries run at the same time, writes
- * through the boundary wait, and a write reaching the value another way makes the
- * transaction fail rather than be overwritten. For a staged component the root is
- * that component's working copy, so the fork's sync waits for a running transaction.
+ * <p>The claim is that of the nearest transactional boundary beneath the source's
+ * bound storage ({@link convex.lattice.cursor.ACursor#claim}): a
+ * {@link convex.lattice.cursor.BoundaryCursor}, or else the root, which is the
+ * outermost boundary. It covers everything under that boundary: writes through it
+ * wait, including incoming merges, and exclusive transactions under the same
+ * boundary run one after another whatever they touch, while those under separate
+ * boundaries run at the same time. A write reaching the value without passing
+ * through the boundary makes the transaction fail rather than be overwritten. For a
+ * staged component the root is that component's working copy, so the fork's sync
+ * waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
  * separate sync. Callbacks must not wait for another operation on the same state,
  * sync it, or write through a captured live component.</p>

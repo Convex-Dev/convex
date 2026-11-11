@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -80,7 +79,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override
 	public V reconcile(ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
-		try (Claim claim=working.claim(value -> value)) {
+		try (Claim claim=working.claim()) {
 			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
 			// The destination's cells, even where they only equal the working value: they
 			// may be persisted, and one copy is then held, not two.
@@ -134,8 +133,8 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	// ===== Working storage =====
 
 	@Override
-	protected Claim claim(Function<? super V,? extends ACell> reader) {
-		return working.claim(reader);
+	protected Claim claim() {
+		return working.claim();
 	}
 
 	/** Reads the working value without waiting; a read during sync sees the value from before it. */

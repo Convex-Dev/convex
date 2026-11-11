@@ -81,8 +81,8 @@ public final class Transactions {
 
 	/**
 	 * Runs one isolated callback, once, under the claim beneath this cursor (see
-	 * {@link ACursor#claim}), and returns its result. Writes that claim holds back wait
-	 * until it commits, and so do other claims on it; writes elsewhere carry on.
+	 * {@link ACursor#claim}), and returns its result. Writes through that boundary
+	 * wait until it commits, and so do other claims on it.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
@@ -154,14 +154,19 @@ public final class Transactions {
 			return cursor.compareAndSet(observed,candidate);
 		}
 
-		/** Finishes under the claim, where the value can change only through this thread. */
+		/**
+		 * Finishes under the claim, where the value can change only through this thread
+		 * or through a write that bypasses the claimed boundary, which is refused.
+		 */
 		R commitClaimed() {
-			try (Claim claim=cursor.claim(value -> value)) {
+			try (Claim claim=cursor.claim()) {
 				V observed=cursor.get();
 				if (!computed || !Utils.equals(observed,input)) run(observed);
 				for (;;) {
 					observed=cursor.get();
-					if (!Utils.equals(observed,input)) throw new IllegalStateException("Re-entrant write during transaction commit");
+					if (!Utils.equals(observed,input)) {
+						throw new IllegalStateException("Value changed under a transaction's claim, by this thread or by a write that did not pass through the claimed boundary");
+					}
 					if (cursor.compareAndSet(observed,candidate)) return output;
 				}
 			}

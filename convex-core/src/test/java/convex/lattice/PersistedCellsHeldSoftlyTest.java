@@ -38,6 +38,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.BoundaryCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Persister;
 import convex.lattice.cursor.Root;
@@ -304,9 +305,9 @@ public class PersistedCellsHeldSoftlyTest {
 		}
 	}
 
-	@Test void aSaveWithAWriteLandingDoesNotWaitForAClaim() throws Exception {
+	@Test void aSaveWithAWriteLandingElsewhereDoesNotWaitForABoundaryClaim() throws Exception {
 		var host=LatticeHost.create(tree(),store);
-		AForkableCursor<AHashMap<ACell,ACell>> claimed=host.cursor().path(CVMLong.create(1));
+		AForkableCursor<AHashMap<ACell,ACell>> claimed=BoundaryCursor.over(host.cursor().<AHashMap<ACell,ACell>>path(CVMLong.create(1)));
 		var during=new AtomicReference<AHashMap<ACell,ACell>>();
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
 			Transactions.executeExclusively(claimed,draft -> {

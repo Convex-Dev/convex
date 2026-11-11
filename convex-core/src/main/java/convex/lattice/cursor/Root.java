@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -14,10 +13,10 @@ import convex.core.util.Utils;
  * Atomic value storage. A root retains only its current value and has no callbacks;
  * publication belongs to the component or host that owns it.
  *
- * <p>Writes are optimistic and take no lock. A root can hold one {@link Claim} at a
- * time, which reserves part of its value for one thread: another thread's write that
- * would change that part waits for the release, and writes elsewhere carry on. Reads
- * never wait.</p>
+ * <p>Writes are optimistic and take no lock. A root is the outermost transactional
+ * boundary: it can hold one {@link Claim} at a time, which reserves its whole value
+ * for one thread, so another thread's write that would change the value waits for
+ * the release. Reads never wait.</p>
  *
  * <p>Every operation decides by value. A write of a value equal to the one held
  * changes nothing and keeps the cells held, so a copy built elsewhere never displaces
@@ -84,7 +83,7 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 			V held=valueOf(current);
 			if (!switching && Utils.equals(held,newValue)) return held;
 			if (current instanceof Claimed claimed) {
-				if (claimed.claim.blocks(newValue)) {
+				if (claimed.claim.blocks(claimed.value,newValue)) {
 					claimed.claim.awaitRelease();
 				} else if (state.compareAndSet(current,new Claimed(newValue,claimed.claim))) {
 					return held;
@@ -109,7 +108,7 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 			Object current=state.get();
 			if (!(current instanceof Claimed claimed)) return state.compareAndSet(held,next);
 			if (claimed.value!=held) return false;
-			if (claimed.claim.blocks(next)) {
+			if (claimed.claim.blocks(claimed.value,next)) {
 				claimed.claim.awaitRelease();
 			} else if (state.compareAndSet(current,new Claimed(next,claimed.claim))) {
 				return true;
@@ -165,17 +164,15 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 
 	// ===== Claims =====
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected Claim claim(Function<? super V,? extends ACell> reader) {
+	protected Claim claim() {
 		for (;;) {
 			Object current=state.get();
 			if (current instanceof Claimed claimed) {
 				if (claimed.claim.isOwnedByCaller()) throw new IllegalStateException("This thread already holds this root's claim");
 				claimed.claim.awaitRelease();
 			} else {
-				ACell seen=reader.apply((V)current);
-				ActiveClaim claim=new ActiveClaim(state,(Function<Object,ACell>)reader,seen);
+				ActiveClaim claim=new ActiveClaim(state);
 				if (state.compareAndSet(current,new Claimed(current,claim))) return claim;
 			}
 		}
@@ -192,16 +189,11 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 	private static final class ActiveClaim implements Claim {
 		private final AtomicReference<Object> state;
 		private final Thread owner=Thread.currentThread();
-		private final Function<Object,ACell> reader;
-		/** What the claimed part held when taken. Only the owner can change it. */
-		private final ACell seen;
 		/** Held by the owner until release, purely so that other threads can wait on it. */
 		private final ReentrantLock released=new ReentrantLock();
 
-		ActiveClaim(AtomicReference<Object> state,Function<Object,ACell> reader,ACell seen) {
+		ActiveClaim(AtomicReference<Object> state) {
 			this.state=state;
-			this.reader=reader;
-			this.seen=seen;
 			released.lock();
 		}
 
@@ -210,25 +202,13 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 		}
 
 		/**
-		 * Whether a write leaving this root value must wait. Compares by value, as a
-		 * transaction does: an equal value in new cells, such as the persisted form of
-		 * the same data, is no change. It proceeds, and is the value the root then holds.
+		 * Whether a write replacing the value held must wait: any change by another
+		 * thread does. Compares by value, as a transaction does: an equal value in new
+		 * cells, such as the persisted form of the same data, is no change. It proceeds,
+		 * and is the value the root then holds.
 		 */
-		boolean blocks(Object next) {
-			return !isOwnedByCaller() && !keepsClaimedPart(next);
-		}
-
-		/**
-		 * A value the claim's reader refuses is not the value it saw. That is a change to
-		 * wait for rather than the writer's failure: the writer knows nothing of this
-		 * view, and after the release its write proceeds as if no claim had been taken.
-		 */
-		private boolean keepsClaimedPart(Object next) {
-			try {
-				return Utils.equals(reader.apply(next),seen);
-			} catch (RuntimeException e) {
-				return false;
-			}
+		boolean blocks(Object held,Object next) {
+			return !isOwnedByCaller() && !Utils.equals(held,next);
 		}
 
 		void awaitRelease() {

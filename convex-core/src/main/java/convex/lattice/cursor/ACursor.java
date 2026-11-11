@@ -2,7 +2,6 @@ package convex.lattice.cursor;
 
 import java.io.IOException;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -54,22 +53,19 @@ public abstract class ACursor<V extends ACell> {
 	// ===== Exclusive transactions =====
 
 	/**
-	 * Takes the {@link Claim} beneath this cursor, waiting for any earlier claim there:
-	 * that of the nearest {@link BoundaryCursor} this cursor is built over, which
-	 * covers everything under the boundary, or else that of the root holding this
-	 * cursor's state, which covers what the reader finds in this cursor's value.
-	 * Derived cursors compose their own read into the reader through their existing
-	 * links, so a root needs to know nothing about paths or views. This is the only
-	 * root-owned capability a cursor exposes, and it supports {@link Transactions}
-	 * and atomic fork publication.
+	 * Takes the {@link Claim} of the nearest transactional boundary beneath this
+	 * cursor, waiting for any earlier claim on it: a {@link BoundaryCursor} this
+	 * cursor is built over, or else the root holding its state, which is the
+	 * outermost boundary. The claim covers everything under that boundary. Derived
+	 * cursors pass it down through their existing source links, so a boundary needs
+	 * to know nothing about paths or views. This is the only boundary-owned capability
+	 * a cursor exposes, and it supports {@link Transactions} and atomic fork
+	 * publication.
 	 *
-	 * @param reader Reads the claimed part from this cursor's value. Side-effect free;
-	 *        runs on writers' threads while the claim is held, and a value it refuses
-	 *        counts as a change to the claimed part
 	 * @return The claim, to be closed by the calling thread
 	 * @throws IllegalStateException if the calling thread already holds that claim
 	 */
-	protected Claim claim(Function<? super V,? extends ACell> reader) {
+	protected Claim claim() {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" has no root to claim");
 	}
 

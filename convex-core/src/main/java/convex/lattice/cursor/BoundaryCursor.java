@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -61,7 +60,7 @@ public final class BoundaryCursor<V extends ACell> extends AForkableCursor<V> {
 	 *         or is writing through this boundary
 	 */
 	@Override
-	protected Claim claim(Function<? super V,? extends ACell> reader) {
+	protected Claim claim() {
 		if (lock.isWriteLockedByCurrentThread()) throw new IllegalStateException("This thread already holds this boundary's claim");
 		if (lock.getReadHoldCount()>0) throw new IllegalStateException("A write through this boundary cannot claim it");
 		ReentrantReadWriteLock.WriteLock claim=lock.writeLock();

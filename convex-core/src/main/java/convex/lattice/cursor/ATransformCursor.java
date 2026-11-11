@@ -2,7 +2,6 @@ package convex.lattice.cursor;
 
 import java.util.Objects;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -52,8 +51,8 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	/** Rebuilds source storage for a changed view value, including nil. */
 	protected abstract S write(S current,V value);
 
-	@Override protected Claim claim(Function<? super V,? extends ACell> reader) {
-		return base.claim(stored -> reader.apply(view(stored)));
+	@Override protected Claim claim() {
+		return base.claim();
 	}
 
 	@Override public V get() { return CursorValues.require(readValue()); }

@@ -370,9 +370,10 @@ as the identifier it allocated; `execute` returns nothing. The result comes from
 the run that committed, so it describes that change exactly. It is a local fact,
 not a statement about what replicas will hold after merging. An operation that
 must not repeat uses the component's `exclusive()` form, whose callback runs once
-while holding its root's write lock. That lock covers a staged component's working
-copy, or every writer of a live host, so keep such callbacks short. A plain root
-has no lock; a fork always has one.
+while holding the claim of its nearest transactional boundary: a `BoundaryCursor`
+its storage is built over, such as a region of a region container, or else the
+root, which is a staged component's working copy or the live host. Writes through
+that boundary wait, so keep such callbacks short.
 
 Even a single local edit must atomically transform the latest enclosing value.
 Two live views editing different fields of one register should preserve both

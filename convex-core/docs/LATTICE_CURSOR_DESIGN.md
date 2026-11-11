@@ -13,7 +13,7 @@ component-owned working state and batched signing.
 ```text
 ACursor<V>                                get / atomic update / persist / path
 └── AForkableCursor<V>                    typed paths; fork(); sync(merge)
-    ├── Root<V>                           atomic value holder; at most one claim
+    ├── Root<V>                           atomic value holder; the outermost boundary
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
     ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
     ├── BoundaryCursor<V>                 writes pass through; claims stop here
@@ -33,9 +33,9 @@ ordinary Java functions supplied by their owning components.
 
 The base contract stays minimal: get, atomic update and path at one location.
 Subclasses and compositions add behaviour; the base gains no capability hooks that
-every subclass and view would have to forward. A service owned by the root gets at
-most one hook, resolved through existing source links: `claim()`, for
-transactions and fork publication, is the only one. Storage, durability and
+every subclass and view would have to forward. A service owned by a transactional
+boundary gets at most one hook, resolved through existing source links: `claim()`,
+for transactions and fork publication, is the only one. Storage, durability and
 publication attach at the host, and a module that needs a store mid-write, such as
 DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
 hook: it is one method with a store-agnostic `Persister`, which views inherit and
@@ -344,31 +344,32 @@ through one starts from the default and its commit is a write like any other.
 Optimistic execution is the fast path for transactions that do not collide. Commit
 checks only the transaction's own value: a change elsewhere under the root never
 reruns the callback, and its finished result is applied to the new root. When its own
-value has changed twice, the transaction takes the root's claim and finishes under
-it, so transactions that collide run one at a time and a callback runs at most three
-times. An exclusive transaction starts with the claim and runs once, for work too
-expensive to repeat or with side effects.
+value has changed twice, the transaction takes the claim of its nearest boundary and
+finishes under it, so transactions that collide run one at a time and a callback
+runs at most three times. An exclusive transaction starts with that claim and runs
+once, for work too expensive to repeat or with side effects.
 
-A root holds at most one claim, so claims queue whatever they cover. A claim covers
-what the claiming cursor reads: each derived view composes its own read into the
-claim through its source link, and the root needs to know nothing about paths or
-views. While a claim is held, a write that would change that part of the value, or
-leave it unreadable to the claiming view, waits for the release and recalculates, and
-a write that leaves it equal carries on. Persisting leaves the whole value equal, so it
-proceeds during a claim and the root then holds the persisted cells; an exclusive
-transaction that changes nothing writes nothing over them. A transaction that does change the value commits cells built
-from the value it started with, so cells persisted meanwhile are replaced until the
-next save. Reads never wait. Without a claim, each read or compare-and-set of the root adds
-one type check, and nothing is recorded per transaction.
+A claim locks a transactional boundary, wherever in a cursor tree it is taken:
+the nearest `BoundaryCursor` beneath the claiming cursor, or else the root, which is
+the outermost boundary. Derived views pass the claim down through their source
+links, so a boundary needs to know nothing about paths or views. A boundary holds at
+most one claim, and it covers everything under the boundary: while it is held, a
+write through the boundary from another thread that would change its value waits
+for the release and recalculates, and a write that leaves the value equal carries
+on. Persisting leaves the value equal, so it proceeds during a claim and the root
+then holds the persisted cells; an exclusive transaction that changes nothing writes
+nothing over them. A transaction that does change the value commits cells built from
+the value it started with, so cells persisted meanwhile are replaced until the next
+save. Reads never wait. Without a claim, each read or compare-and-set of the root
+adds one type check, and nothing is recorded per transaction.
 
-A `BoundaryCursor` wraps any cursor and holds a claim of its own, so claims from
-cursors over it stop there instead of reaching the root. Exclusive transactions
-under separate boundaries, such as the regions of one container, then run at the
-same time. Writes still pass straight through, so a claim beneath a boundary, on the
-root or an enclosing boundary, stops writes through it too, and the boundary needs to
-know nothing about paths or what lies above or below it. A boundary's claim stops
-only writes through that boundary and covers everything under it; a write reaching
-the same storage another way makes a claimed commit fail rather than be overwritten.
+A `BoundaryCursor` wraps any cursor, and writes pass straight through it. Claims
+from cursors over it stop there instead of reaching the root, so exclusive
+transactions under separate boundaries, such as the regions of one container, run
+at the same time. A claim beneath a boundary, on the root or an enclosing boundary,
+stops writes through it too, since they pass through. A write that reaches a
+boundary's storage without passing through it, while the boundary is claimed, makes
+the claimed commit fail rather than be overwritten: that write is the writer's bug.
 Each write through a boundary holds the read side of its read-write lock, and its
 claim holds the write side.
 
@@ -377,7 +378,7 @@ transactions use `rebind` to retain component policy; a component opts in by
 declaring `TransactionalComponent` and refining `rebind` to return its own type.
 `TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
 storage as a fork is: a read-only view of it, whose transactions rebind the domain
-component to a draft and commit to that storage under its root's claim.
+component to a draft and commit to that storage under its nearest boundary's claim.
 The transaction targets bound `storage()`, while the rebound view rebuilds the
 component's editing views over the draft. An authoring view within bound storage
 applies at each commit attempt: a signing view signs the committed value, and a stamp

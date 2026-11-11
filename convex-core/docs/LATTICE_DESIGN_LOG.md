@@ -810,7 +810,10 @@ A region's committed work is whatever reaches the cursor the container gives it,
 and that cursor is a `BoundaryCursor` over the region's place in the container.
 Writes through it land in the container at once, so a transaction on the container
 works on everything regions have committed and retries when a region commit lands
-mid-attempt; nothing needs syncing first. Claims stop at the boundary, so exclusive
+mid-attempt; nothing needs syncing first. A claim locks the nearest transactional
+boundary wherever in a cursor tree it is taken, and a root is the outermost
+boundary, so its claim covers the whole root rather than the part a transaction
+reads. Claims stop at the boundary, so exclusive
 transactions in separate regions run at the same time, while the container's claim
 lies beneath every boundary and stops all region writes. A region's claim holds only
 against writes through its boundary: a transaction on the container that changes the

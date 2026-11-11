@@ -92,9 +92,9 @@ class RootClaimTest {
 		return new Root<>(Maps.of(A,Maps.of(X,CVMLong.ZERO,Y,CVMLong.ZERO),B,Maps.of(X,CVMLong.ZERO)));
 	}
 
-	@Test void writesElsewhereCarryOnDuringAClaim() {
+	@Test void writesThatDoNotPassThroughAClaimedBoundaryCarryOn() {
 		var root=tree();
-		AForkableCursor<AInteger> claimed=root.path(A,X);
+		AForkableCursor<AInteger> claimed=BoundaryCursor.over(root.<AInteger>path(A,X));
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
 			Transactions.executeExclusively(claimed,draft -> {
 				// Each completes inside the callback, so neither waited for the claim.
@@ -108,18 +108,29 @@ class RootClaimTest {
 		assertEquals(CVMLong.ONE,root.get(B,X));
 	}
 
-	@Test void claimFollowsViewsDownToTheRoot() {
+	@Test void aClaimFollowsViewsDownToTheRootAndCoversAllOfIt() throws InterruptedException {
 		AHashMap<Keyword,ACell> record=Maps.of(X,CVMLong.ZERO,Y,CVMLong.ZERO);
-		var root=new Root<AHashMap<Keyword,ACell>>(Maps.of(A,KEY.signData(record)));
+		var root=new Root<AHashMap<Keyword,ACell>>(Maps.of(A,KEY.signData(record),B,CVMLong.ZERO));
 		AForkableCursor<AHashMap<Keyword,ACell>> signed=SignedCursor.create(root.<SignedData<AHashMap<Keyword,ACell>>>path(A),KEY);
 		AForkableCursor<AInteger> claimed=signed.withDefault(Maps.empty()).path(X);
-		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
-			Transactions.executeExclusively(claimed,draft -> {
-				complete(other.submit(() -> signed.<AInteger>path(Y).set(CVMLong.ONE)));
-				draft.set(CVMLong.TWO);
-			});
-		}
+		Thread[] writers=new Thread[2];
+		Transactions.executeExclusively(claimed,draft -> {
+			writers[0]=Thread.ofPlatform().start(() -> signed.<AInteger>path(Y).set(CVMLong.ONE));
+			writers[1]=Thread.ofPlatform().start(() -> root.<AInteger>path(B).set(CVMLong.ONE));
+			for (Thread writer:writers) {
+				awaitParked(writer);
+				assertTrue(writer.isAlive(),"every write to the root waits for its claim");
+			}
+			draft.set(CVMLong.TWO);
+		});
+		for (Thread writer:writers) writer.join();
 		assertEquals(Maps.of(X,CVMLong.TWO,Y,CVMLong.ONE),signed.get());
+		assertEquals(CVMLong.ONE,root.get(B));
+	}
+
+	/** Waits until a thread is parked, as one waiting for a claim is, or has finished. */
+	private static void awaitParked(Thread thread) {
+		while (thread.isAlive() && thread.getState()!=Thread.State.WAITING) Thread.onSpinWait();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -281,25 +292,18 @@ class RootClaimTest {
 	@Test void aWriteTheClaimingViewCannotReadWaitsThenLands() throws Exception {
 		var root=new Root<ACell>(CVMLong.ZERO);
 		ACell unreadable=Strings.create("not a number");
-		CountDownLatch inCallback=new CountDownLatch(1), viewRefused=new CountDownLatch(1);
 		AForkableCursor<AInteger> claimed=ProjectionCursor.create(root,stored -> {
 			if (stored instanceof AInteger number) return number;
-			viewRefused.countDown();
 			throw new IllegalStateException("Not a number");
 		},(stored,value) -> value);
-		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
-			var writer=executor.submit(() -> {
-				await(inCallback);
-				root.set(unreadable);
-			});
-			Transactions.executeExclusively(claimed,draft -> {
-				inCallback.countDown();
-				await(viewRefused);
-				draft.set(CVMLong.ONE);
-				assertEquals(CVMLong.ZERO,root.get(),"The write waits for the release");
-			});
-			writer.get(10,TimeUnit.SECONDS);
-		}
+		Thread[] writer=new Thread[1];
+		Transactions.executeExclusively(claimed,draft -> {
+			writer[0]=Thread.ofPlatform().start(() -> root.set(unreadable));
+			awaitParked(writer[0]);
+			assertTrue(writer[0].isAlive(),"The write waits for the release");
+			draft.set(CVMLong.ONE);
+		});
+		writer[0].join();
 		assertSame(unreadable,root.get(),"After the release the write lands as if unclaimed");
 	}
 
