@@ -11,6 +11,7 @@ import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -21,23 +22,35 @@ import convex.lattice.cursor.AForkableCursor;
  * absent entries do nothing. An explicitly present null is delivered to the child.
  * No lattice merge is inferred from a child's shape.</p>
  *
- * <p>This component has no private container snapshot. Its cursor shows the
- * destination; pending edits belong to its staged children. Sync publishes each
- * child at its own boundary, in registration order, without subsequently writing
- * the container. Unregistered regions are therefore preserved even when another
- * application changes them. Merge and sync are not atomic across children:
- * earlier successful work stands if a later child fails.</p>
+ * <p>This container manages the regions it makes. A factory gives each region either
+ * a working copy of its own, by forking the cursor it is given, so that the region
+ * edits and transacts in isolation, or a live view that writes straight into the
+ * container. {@link #syncChildren()} syncs every region made so far, in registration
+ * order, and {@link #sync()} then reconciles the container's own storage with its
+ * destination, which does nothing for live storage. Sync is not atomic across
+ * regions: earlier work stands if a later region fails.</p>
  *
- * <p>A supplied fork remains private working storage: syncing this container
- * publishes children into it, but does not publish the fork itself. Its owner
- * must explicitly publish the aggregate with the appropriate merge policy.</p>
+ * <p>A transaction on one region, through that region's own component, is isolated
+ * to it. A transaction on the whole container, by a subclass that implements
+ * {@link TransactionalComponent}, spans its regions: the container rebound over the
+ * draft makes its own regions there, and they are synced into the draft before it
+ * commits. Work still pending in this instance's regions is not part of such a
+ * transaction; it merges with what the transaction committed when the region next
+ * syncs.</p>
+ *
+ * <p>A fork of this container, or a container built over a fork, reconciles at sync
+ * region by region ({@link #mergePublication(Index,Index,Index)}): a region changed
+ * on only one side takes that side, so regions that update independently never
+ * conflict, and a region this container does not serve that both sides changed
+ * keeps the destination's value.</p>
  *
  * <p>Register children during construction, before any delivery or sync;
  * registration takes no lock. The first merge, path delivery or sync freezes
  * this component's registrations. Explicit children may be shared
  * with other applications: registration neither rebinds them nor changes their
- * policy or lifecycle. Shared children may receive repeated or concurrent
- * deliveries and syncs, so their operations must support that use.</p>
+ * policy or lifecycle, and this container never syncs them. Whoever made an
+ * explicit child syncs it. Shared children may receive repeated or concurrent
+ * deliveries, so their operations must support that use.</p>
  *
  * <p>A rebound container keeps its factories but none of the children made by them.
  * It makes each child on its own cursor the first time that child is needed, so a
@@ -203,12 +216,6 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		return result;
 	}
 
-	/** Refused: a container has no working state of its own to fork, as its children do. */
-	@Override
-	public ALatticeComponent<Index<Keyword,ACell>> fork() {
-		throw new UnsupportedOperationException(getClass().getSimpleName()+" has no working state of its own to fork");
-	}
-
 	/** Delivers present registered entries, without publishing staged children. */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
@@ -243,31 +250,104 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		return cursor().getOrDefault(null);
 	}
 
-	/** Freezes registrations, prepares and publishes children, then reads the container. */
+	/**
+	 * Freezes registrations, prepares, syncs the regions this container made, then
+	 * reconciles its own storage with its destination.
+	 */
 	@Override
 	public Index<Keyword,ACell> sync() {
 		regions();
 		beforeSync();
-		syncChildren();
-		return storage.getOrDefault(null);
+		return super.sync();
 	}
 
 	/**
-	 * Prepares state after registrations freeze and before any child publishes.
-	 * Failure prevents child publication. This hook can be called concurrently and
+	 * Prepares state after registrations freeze and before any region syncs.
+	 * Failure prevents the sync. This hook can be called concurrently and
 	 * must use thread-safe component APIs.
 	 */
 	protected void beforeSync() {
 	}
 
 	/**
-	 * Publishes children in registration order; one not yet made has nothing staged.
-	 * The container has no staged snapshot.
+	 * Syncs, in registration order, each region this container made from a factory.
+	 * A region not yet made has nothing pending, and one made live has nothing to
+	 * bring in. Explicit children are never synced here: they belong to whoever
+	 * registered them.
 	 */
+	@Override
 	protected void syncChildren() {
 		for (Region region:regions().values()) {
+			if (region.factory==null) continue;
 			ALatticeComponent<?> made=region.component.get();
 			if (made!=null) made.sync();
 		}
+	}
+
+	/**
+	 * Reconciles this container's working copy with a destination that also changed,
+	 * key by key. A key changed on only one side, or changed to the same value on
+	 * both, takes that value. A key this container does not serve keeps the
+	 * destination's value. A region it serves that the two sides changed differently
+	 * goes to {@link #mergeRegion}.
+	 */
+	@Override
+	protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+		var selected=regions();
+		Index<Keyword,ACell> result=other;
+		for (Index<Keyword,ACell> side:Arrays.asList(base,own)) {
+			if (side==null) continue;
+			long n=side.count();
+			for (long i=0;i<n;i++) {
+				Keyword key=side.entryAt(i).getKey();
+				if (side==own && base!=null && base.containsKey(key)) continue; // already seen with base
+				boolean ownHas=has(own,key);
+				ACell ownValue=get(own,key);
+				if (same(ownHas,ownValue,has(base,key),get(base,key))) continue;
+				boolean otherHas=has(other,key);
+				ACell otherValue=get(other,key);
+				if (same(otherHas,otherValue,has(base,key),get(base,key)) || same(ownHas,ownValue,otherHas,otherValue)) {
+					result=put(result,key,ownHas,ownValue);
+				} else if (selected.containsKey(key)) {
+					result=put(result,key,true,mergeRegion(key,get(base,key),ownValue,otherValue));
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Reconciles one region that this container's working copy and its destination
+	 * changed differently. Called within the destination's atomic update, so it must
+	 * use only the values given. The default refuses: a region's own merge works on
+	 * its component's working type, which may differ from what is stored here, so a
+	 * subclass that forks itself while such conflicts can arise supplies the rule.
+	 *
+	 * @param key Region key
+	 * @param base Stored value both sides last agreed on, or null
+	 * @param own Stored value in this working copy, or null if absent
+	 * @param other Stored value at the destination, or null if absent
+	 * @return Reconciled stored value
+	 */
+	protected ACell mergeRegion(Keyword key,ACell base,ACell own,ACell other) {
+		throw new UnsupportedOperationException("Region "+key+" changed both in "+getClass().getSimpleName()
+			+" and at its destination, and no region merge is defined");
+	}
+
+	private static boolean has(Index<Keyword,ACell> index,Keyword key) {
+		return (index!=null) && index.containsKey(key);
+	}
+
+	private static ACell get(Index<Keyword,ACell> index,Keyword key) {
+		return (index==null)?null:index.get(key);
+	}
+
+	private static boolean same(boolean aHas,ACell a,boolean bHas,ACell b) {
+		return (aHas==bHas) && Utils.equals(a,b);
+	}
+
+	private static Index<Keyword,ACell> put(Index<Keyword,ACell> index,Keyword key,boolean present,ACell value) {
+		if (present) return ((index==null)?Index.<Keyword,ACell>none():index).assoc(key,value);
+		return (index==null)?null:index.dissoc(key);
 	}
 }

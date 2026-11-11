@@ -15,7 +15,6 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ASignedComponent;
-import convex.lattice.IndexComponent;
 import convex.lattice.KeyOwnedIndex;
 import convex.lattice.LatticeHost;
 import convex.lattice.MapComponent;
@@ -128,10 +127,15 @@ public final class FavouritesExample {
 
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
 			// The region is the host index's entry, created by its first publication
-			this(host,new KeyOwnedIndex<>(new IndexComponent<>(host.cursor()).path(FAVOURITES),Timestamped.lattice()).fork(),getTimestamp);
+			super(host.cursor(),FAVOURITES,(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> region) ->
+				new KeyOwnedIndex<>(region,Timestamped.lattice()).fork());
+			this.getTimestamp=getTimestamp;
 		}
 
-		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */
+		/**
+		 * Shares the supplied region's pending state and destination; the clock is
+		 * authoring policy. The application that made the region publishes it.
+		 */
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,
 				KeyOwnedIndex<AHashMap<Keyword,ACell>> shared,Supplier<CVMLong> getTimestamp) {
 			super(host.cursor(),FAVOURITES,shared);

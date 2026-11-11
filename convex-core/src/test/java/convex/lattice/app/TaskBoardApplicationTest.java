@@ -61,10 +61,11 @@ class TaskBoardApplicationTest {
 	private static final IndexLattice<ABlobLike<?>,AHashMap<Keyword,ACell>> BOARD_LATTICE=
 		IndexLattice.create(Timestamped.lattice());
 
-	/** Constructs the domain component directly at its host path. */
+	/** Makes the board over a working copy of its region, which the application's sync publishes. */
 	static final class TaskBoardApp extends SingleRegion<Board> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			super(host.cursor(),BOARD,new Board(new IndexComponent<>(host.cursor()).path(BOARD),getTimestamp).fork());
+			super(host.cursor(),BOARD,(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> region) ->
+				new Board(region,getTimestamp).fork());
 		}
 		Board board() { return component(); }
 	}

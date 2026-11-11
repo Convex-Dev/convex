@@ -787,6 +787,31 @@ stored. A decoded blob owner key becomes an `AccountKey` through `AccountKey.cre
 CAD text affected: CAD035 *Lattice Integration*; CAD036 *JSON Key Compatibility*;
 CAD037 owner key representation.
 
+## 34. Children sync themselves; a container may manage its own in forks
+
+**Status:** Implemented; agreed 11 November 2026.
+
+A component's sync reconciles its own working state with its destination and
+leaves its children alone: a child over a live path writes straight into its
+parent, and a child with a fork of its own is synced by whoever owns it. Managing
+children in forks is an opt-in through `ALatticeComponent.syncChildren()`, which
+does nothing by default. Sync calls it before reconciling, and `TransactionalComponent`
+and `ExclusiveComponent` call it on each attempt's view before the draft commits,
+so a transaction can be isolated to one child or span several.
+
+`AKeyedRegions` is the reference opt-in. It syncs the regions it made from
+factories, never a child registered as an instance, and then reconciles its own
+storage like any component. It can be forked, since any component that rebinds
+can; its fork reconciles region by region. This replaces entry 25's container
+with no publication of its own boundary, and the hook moves from
+`ALatticeApplication` to the base component.
+
+CAD text affected: none yet. CAD045 says publishing an enclosing collection must
+not publish outstanding drafts. That holds for every component that keeps the
+default. A container that opts in does publish its regions' drafts, each through
+the region's own sync and signing boundary, as `AKeyedRegions` already did before
+this entry.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

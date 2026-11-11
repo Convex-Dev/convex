@@ -7,8 +7,9 @@ import convex.lattice.cursor.AForkableCursor;
 
 /**
  * A named region with a typed child, usable directly or as an application base.
- * Existing children retain their destination and policy; factories receive a
- * cursor bound to the named region. Only the child merges and publishes state.
+ * A factory receives a cursor bound to the named region; the child it makes is
+ * remade on each rebind and synced by this container's sync. An existing child
+ * keeps its destination and policy, and whoever made it syncs it.
  *
  * @param <C> Region component type
  */
@@ -16,7 +17,11 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 
 	private final Keyword key;
 
-	/** Wraps an existing component at a root or nested container. */
+	/**
+	 * Wraps an existing component at a root or nested container. This container
+	 * neither syncs it nor can remake it, so a rebound or forked counterpart refuses
+	 * it when it is needed.
+	 */
 	public SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,C component) {
 		super(cursor);

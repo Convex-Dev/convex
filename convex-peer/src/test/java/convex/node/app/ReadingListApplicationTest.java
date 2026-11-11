@@ -18,7 +18,6 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.UnionSet;
 import convex.lattice.SingleRegion;
@@ -36,7 +35,7 @@ class ReadingListApplicationTest {
 	static final class ReadingListApp extends SingleRegion<Books> {
 		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) {
 			// The books are the host index's entry, created by their first publication
-			super(host.cursor(),BOOKS,new Books(new IndexComponent<>(host.cursor()).path(BOOKS)).fork());
+			super(host.cursor(),BOOKS,(AForkableCursor<ASet<AString>> region) -> new Books(region).fork());
 		}
 		void recommend(String title) { component().recommend(title); }
 		ASet<AString> titles() { return component().titles(); }

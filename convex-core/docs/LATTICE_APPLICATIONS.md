@@ -163,16 +163,22 @@ their publication boundaries.
 
 Several applications can share a host without sharing private working state.
 They publish only the regions they own and preserve unrelated regions. Sharing
-the same component instance also shares its pending changes; either application
-can publish them. Separate staged components at the same path reconcile their
-independent copies when publishing.
+the same component instance also shares its pending changes; whoever made the
+component publishes them. Separate staged components at the same path reconcile
+their independent copies when publishing.
 
 A region container (`Regions` or `SingleRegion`) is a component, at the root or
-nested, that routes incoming values to its children and publishes them. It has
-no separate aggregate copy to overwrite the container afterwards. Publishing
-children is sequential, not atomic across regions: earlier successful work
-remains if a later child fails. An operation needing an atomic aggregate belongs
-at a common ancestor that owns that aggregate.
+nested, that routes incoming values to its children. It manages the regions it
+makes from factories: a factory gives its region either a fork of the cursor it
+is given, so that the region edits and transacts in isolation, or a live view
+that writes straight into the container. The container's sync syncs each region
+it made, in registration order, then reconciles its own storage as any component
+does. It never syncs a child registered as an existing instance, which belongs to
+whoever made it. Syncing regions is sequential, not atomic: earlier successful
+work remains if a later region fails. A transaction on the container is atomic
+across its regions ([Forks and transactions](#forks-and-transactions)). A fork of
+the container reconciles region by region, so regions that change independently
+never conflict.
 
 An application made only of regions extends a region container and is registered
 with the host as it is. One with root-level behaviour of its own, such as a merge
@@ -353,6 +359,24 @@ retry. External effects happen after commit. Decisions spanning several paths
 belong in a transaction at their common ancestor. Separate component calls and
 separate publications are not one transaction. Local commit does not promise
 replication or durability.
+
+A component normally leaves its children alone, at sync and in transactions. A
+child over a live path writes straight into its parent, and a child with a fork
+of its own is synced by whoever owns that fork. A component may instead manage
+children in forks of their own, by overriding `syncChildren()`. Sync calls it
+before reconciling, and a transaction calls it on its view before the draft
+commits. A region container is the example:
+
+- A transaction on one region, through that region's component, is isolated to
+  the region's storage.
+- A transaction on the container spans its regions. The regions made on the
+  transaction's view are synced into the draft before it commits, so all of them
+  commit together or not at all.
+- Work pending in the live container's regions is not part of such a
+  transaction. It merges with the committed value when the region next syncs.
+
+[RegionTransactionsTest](../src/test/java/convex/lattice/RegionTransactionsTest.java)
+exercises each case with forked, live and signed regions.
 
 A transaction can return a result computed on its private view (`transact`), such
 as the identifier it allocated; `execute` returns nothing. The result comes from

@@ -252,7 +252,45 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Syncs the bound storage with this component's reconciliation policy. A fork
+	 * Brings the children this component manages in working copies of their own into
+	 * its working state. {@link #sync()} calls this before reconciling, and a
+	 * {@link TransactionalComponent} transaction calls it on each attempt's view
+	 * before the draft commits. The default does nothing.
+	 *
+	 * <p>Almost every component keeps the default. A child over a live path writes
+	 * straight into this component's working state, so there is nothing to bring in.
+	 * A child with a working copy of its own is normally synced by whoever owns that
+	 * copy, never by its parent.</p>
+	 *
+	 * <p>Override this only to sync children that this component itself made over
+	 * forks of its own storage, and whose working copies it has undertaken to bring
+	 * in. {@link AKeyedRegions} does so for the regions it makes. Never sync a child
+	 * that was handed in, shared or made by someone else: that would publish another
+	 * owner's staged work. A component that overrides this owns the boundaries it
+	 * creates:</p>
+	 * <ul>
+	 * <li>a child's edits are not in this component until the child syncs;</li>
+	 * <li>a transaction on this component does not see work still pending in this
+	 * instance's children: that work merges with whatever the transaction committed
+	 * when the child next syncs;</li>
+	 * <li>a failure part-way through leaves earlier children synced and later ones
+	 * pending.</li>
+	 * </ul>
+	 *
+	 * <p>A transaction may call this several times, once per attempt, each time on a
+	 * new view, so it must change nothing outside that view's storage.</p>
+	 */
+	protected void syncChildren() {
+	}
+
+	/** Brings a transaction view's managed children into its draft before the draft commits. */
+	static void completeDraft(Object view) {
+		if (view instanceof ALatticeComponent<?> component) component.syncChildren();
+	}
+
+	/**
+	 * Syncs the bound storage with this component's reconciliation policy, after
+	 * {@link #syncChildren()} has brought in any children it manages. A fork
 	 * publishes into its immediate destination; ordinary cursors return their value.
 	 * Editing-view overrides cannot hide this boundary, and descendant views never
 	 * publish enclosing storage. No host persistence is implied.
@@ -266,6 +304,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * @throws StoreException If persisting the working state fails
 	 */
 	public V sync() {
+		syncChildren();
 		V published=storage.reconcile(this::mergePublication);
 		if (persister!=null) persistWorkingState();
 		return published;

@@ -93,7 +93,7 @@ public class SharedApplicationsTest {
 			assertEquals(2,feed.count(),"the staged feed now holds both posts");
 			assertNotNull(published.getPost(localPost));
 			assertEquals(receivedFiles,target.root().get(Keywords.FS));
-			target.files.sync();
+			target.files.dlfs().sync();
 			assertEquals(TEXT,Files.readString(localDrive.fileSystem().getPath("/hello.txt")));
 			assertEquals("A pending local file",Files.readString(localDrive.fileSystem().getPath("/local.txt")));
 
@@ -120,7 +120,7 @@ public class SharedApplicationsTest {
 			ACell social=node.root().get(Social.KEY_SOCIAL);
 			assertNotNull(social);
 			assertNull(node.root().get(Keywords.FS),"publishing the social region publishes nothing else");
-			node.files.sync();
+			node.files.dlfs().sync();
 			assertEquals(social,node.root().get(Social.KEY_SOCIAL),"publishing files leaves social untouched");
 			assertNotNull(node.root().get(Keywords.FS));
 			node.social.sync();

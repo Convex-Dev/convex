@@ -16,6 +16,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -23,6 +24,7 @@ import convex.core.util.Shutdown;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.etch.EtchStore;
+import convex.lattice.cursor.AForkableCursor;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
@@ -57,17 +59,18 @@ public final class SharedApplicationsExample {
 
 	/** Social feeds, staged at {@code :social}. The P2P regions are shared live. */
 	public static final class SocialApp extends AKeyedRegions {
-		private final Social social;
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
 			super(host.cursor());
-			// The region is the host index's entry, created by its first publication
-			social=region(Social.KEY_SOCIAL,Social.connect(new IndexComponent<>(cursor()).path(Social.KEY_SOCIAL),
-				DIDKeyAuthorizer.CONVEX,(owner,value) -> user.signData(value),() -> CVMLong.create(time)).fork());
+			// The region is the host index's entry, created by its first publication. This
+			// application makes it over a fork, so its sync publishes it.
+			createRegion(Social.KEY_SOCIAL,(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region) ->
+				Social.connect(region,DIDKeyAuthorizer.CONVEX,(owner,value) -> user.signData(value),() -> CVMLong.create(time)).fork());
 		}
 
 		/** A user's feed in the staged region; edits stay private until {@link #sync()}. */
 		public Feed feed(AKeyPair user) {
+			Social social=registered(Social.KEY_SOCIAL);
 			return social.user(user.getAccountKey()).feed();
 		}
 
@@ -108,7 +111,8 @@ public final class SharedApplicationsExample {
 			social=host.addApplication(new SocialApp(host,ALICE,time));
 			var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),store,
 				BOB::signData,() -> CVMLong.create(time));
-			// Choose a private publication boundary explicitly; the application retains it.
+			// Choose a private publication boundary explicitly. The node made it, so the node
+			// publishes it; the application routes to it but does not sync it.
 			files=host.addApplication(new DLFSApplication(host,Keywords.FS,region.fork()));
 
 			var config=NodeConfig.localNetwork();
@@ -128,7 +132,7 @@ public final class SharedApplicationsExample {
 		/** Publishes both applications into the host, persists the root and serves it to peers. */
 		public void publish() throws Exception {
 			social.sync();
-			files.sync();
+			files.dlfs().sync();
 			host.sync();
 			awaitServed();
 		}

@@ -112,7 +112,8 @@ public class DLFSApplication extends Regions {
 
 	/**
 	 * Registers an existing region at a root key, retaining its cursor, policy and
-	 * publication boundary. The caller binds the region to its intended destination.
+	 * publication boundary. The caller binds the region to its intended destination,
+	 * and syncs it: this application's sync does not publish a region it did not make.
 	 */
 	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword key,DLFSRegion files) {
 		super(host.cursor());

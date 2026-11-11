@@ -41,6 +41,12 @@ import convex.lattice.cursor.Transactions;
  * writes, and obtain children from the callback's view. A transaction on an
  * existing fork commits only to that fork; publishing it remains a separate sync.</p>
  *
+ * <p>A transaction on a child is isolated to that child's storage. A transaction on
+ * a parent spans its children: those made on the callback's view write into the
+ * draft, and a parent that manages children in forks of their own has them synced
+ * into the draft, through {@link ALatticeComponent#syncChildren()}, after the
+ * callback returns and before the draft commits.</p>
+ *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
  */
@@ -72,7 +78,12 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transact(storage(),draft -> action.apply(rebind(draft)));
+		return Transactions.transact(storage(),draft -> {
+			C view=rebind(draft);
+			R result=action.apply(view);
+			ALatticeComponent.completeDraft(view);
+			return result;
+		});
 	}
 
 	/**
@@ -82,7 +93,11 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.execute(storage(),draft -> action.accept(rebind(draft)));
+		Transactions.execute(storage(),draft -> {
+			C view=rebind(draft);
+			action.accept(view);
+			ALatticeComponent.completeDraft(view);
+		});
 	}
 
 	/**

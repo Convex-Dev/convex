@@ -51,18 +51,15 @@ class ApplicationLifecycleTest {
 				if (fail[0]) throw new IllegalStateException("preparation failed");
 			}
 		};
-		AForkableCursor<Index<Keyword,ACell>> nestedPath=new IndexComponent<>(host.cursor()).path(NESTED);
-		var nested=new Regions(nestedPath) {
+		var nested=root.<Index<Keyword,ACell>,Regions>create(NESTED,cursor -> new Regions(cursor) {
 			@Override protected void beforeSync() { events.add("nested"); }
-		};
-		var values=new Values(new IndexComponent<>(nestedPath).<ASet<CVMLong>>path(ITEMS).fork()) {
+		});
+		nested.create(ITEMS,(AForkableCursor<ASet<CVMLong>> cursor) -> new Values(cursor.fork()) {
 			@Override public ASet<CVMLong> sync() {
 				events.add("values");
 				return super.sync();
 			}
-		};
-		nested.add(ITEMS,values);
-		root.add(NESTED,nested);
+		});
 		host.addApplication(root);
 		host.mergeAt(Sets.of(1),NESTED,ITEMS);
 		assertTrue(events.isEmpty(),"Delivery does not run publication lifecycle");

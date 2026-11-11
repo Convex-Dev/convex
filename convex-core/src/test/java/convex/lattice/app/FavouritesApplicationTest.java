@@ -460,6 +460,8 @@ class FavouritesApplicationTest {
 		assertEquals(Sets.of(10,20),alice.items());
 		assertTrue(host.cursor().get().isEmpty(),"sharing the workspace does not publish edits");
 		second.sync();
+		assertTrue(host.cursor().get().isEmpty(),"only the application that made the region publishes it");
+		first.sync();
 		var published=host.cursor().get();
 		assertEquals(first.component().cursor().get(),published.get(FAVOURITES));
 		assertEquals(CVMLong.create(200),first.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));

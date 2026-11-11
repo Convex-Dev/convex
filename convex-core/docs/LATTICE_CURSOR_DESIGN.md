@@ -327,7 +327,8 @@ storage, so an editing-view override cannot hide the publication boundary. Wrapp
 bound to the same fork share publication; a path or transformed view over that fork
 has no publication of its own. Sync returns the bound value, which may be nil even
 when the editing view supplies a default. Reads and ordinary view sync never author
-state. Applications may add preparation and managed-child publication explicitly.
+state. A component that manages children in forks of their own syncs them first,
+through `syncChildren()`; applications may also add preparation.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `transact` returns the result of

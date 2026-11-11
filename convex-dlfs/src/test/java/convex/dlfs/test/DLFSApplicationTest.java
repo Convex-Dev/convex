@@ -145,10 +145,12 @@ public class DLFSApplicationTest {
 
 		host.cursor().updateAndGet(root -> root.assoc(UNRELATED,CVMLong.ONE));
 		shared.sync();
+		assertNull(host.cursor().get().get(Keywords.FS),"an application does not publish a region it was given");
+		staged.sync();
 		assertEquals(staged.cursor().get(),host.cursor().get().get(Keywords.FS));
 		assertTrue(staged.cursor().get().get(OWNER.getAccountKey()).checkSignature());
 		Files.writeString(local.getPath("/next"),"next");
-		app.sync();
+		staged.sync();
 		assertEquals("next",Files.readString(region.drives(OWNER.getAccountKey())
 			.drive("home").fileSystem().getPath("/next")));
 		assertEquals(CVMLong.ONE,host.cursor().get().get(UNRELATED));

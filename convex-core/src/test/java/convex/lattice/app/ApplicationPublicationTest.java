@@ -15,7 +15,6 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.SignedComponent;
 import convex.lattice.SingleRegion;
@@ -52,7 +51,7 @@ class ApplicationPublicationTest {
 	static final class NotebookApp extends SingleRegion<Notebook> {
 		NotebookApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair owner) {
 			// The notebook is the host index's entry, created by its first publication
-			super(host.cursor(),NOTEBOOK,new Notebook(new IndexComponent<>(host.cursor()).path(NOTEBOOK),owner));
+			super(host.cursor(),NOTEBOOK,(AForkableCursor<SignedData<ASet<ACell>>> region) -> new Notebook(region,owner));
 		}
 
 		Notebook notebook() { return component(); }

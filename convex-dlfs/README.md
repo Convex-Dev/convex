@@ -329,12 +329,14 @@ For a root application that stages files, explicitly supply a fork:
 ```java
 var files = DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS), store,
     myKeyPair::signData, Utils::getCurrentTimestampCell);
-var app = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
+var staged = files.fork();
+var app = host.addApplication(new DLFSApplication(host, Keywords.FS, staged));
 ```
 
 `app.dlfs()` is the exact registered component. Its incoming merges and local
-edits use the same working state, and `app.sync()` publishes that region only.
-Multiple applications may explicitly register the same component. The default
+edits use the same working state. The application did not make it, so its maker
+publishes it with `staged.sync()`; `app.sync()` does not. Multiple applications may
+explicitly register the same component. The default
 `new DLFSApplication(host, myKeyPair::signData)` instead uses a live region, so edits
 are immediately part of the host's working state. Without a signer,
 `new DLFSApplication(host)` is a relay: it can accept existing signed envelopes,

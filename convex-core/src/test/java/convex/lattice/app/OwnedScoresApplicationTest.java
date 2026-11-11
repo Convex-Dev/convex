@@ -18,7 +18,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ASignedComponent;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.OwnedIndex;
 import convex.lattice.SingleRegion;
@@ -95,7 +94,7 @@ class OwnedScoresApplicationTest {
 		var authority=new Authority();
 		authority.authorise(TEAM,ALICE.getAccountKey(),BOB.getAccountKey());
 		var host=LatticeHost.create();
-		var app=new SingleRegion<>(host.cursor(),SCORES,new Scores(new IndexComponent<>(host.cursor()).path(SCORES),authority).fork());
+		var app=SingleRegion.create(host.cursor(),SCORES,(AForkableCursor<Index<AString,SignedData<AInteger>>> region) -> new Scores(region,authority).fork());
 		var alice=app.component().score(TEAM,ALICE);
 		var bob=app.component().score(TEAM,BOB);
 		alice.record(10);
@@ -105,7 +104,7 @@ class OwnedScoresApplicationTest {
 		app.sync();
 
 		var replicaHost=LatticeHost.create();
-		var replica=new SingleRegion<>(replicaHost.cursor(),SCORES,new Scores(new IndexComponent<>(replicaHost.cursor()).path(SCORES),authority).fork());
+		var replica=SingleRegion.create(replicaHost.cursor(),SCORES,(AForkableCursor<Index<AString,SignedData<AInteger>>> region) -> new Scores(region,authority).fork());
 		replicaHost.addApplication(replica);
 		replicaHost.merge(host.cursor().get());
 		var accepted=replica.component().get(TEAM);

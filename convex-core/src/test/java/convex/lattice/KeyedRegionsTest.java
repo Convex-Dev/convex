@@ -24,7 +24,6 @@ import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
-import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -78,9 +77,10 @@ class KeyedRegionsTest {
 		host.merge(Index.of(A,CVMLong.TWO,UNKNOWN,CVMLong.ONE));
 		assertTrue(host.cursor().get().isEmpty());
 		assertEquals(CVMLong.TWO,shared.cursor().get());
-		assertEquals(Index.of(A,CVMLong.TWO),multiple.sync());
-		assertSame(host.cursor().get(),single.sync());
+		assertSame(host.cursor().get(),multiple.sync(),"a container does not sync a child it did not make");
 		assertSame(host.cursor().get(),another.sync());
+		assertTrue(host.cursor().get().isEmpty());
+		assertEquals(Index.of(A,CVMLong.TWO),single.sync(),"the container that made the child syncs it");
 	}
 
 	@Test void concreteRegionsComposeAtNestedPathsWithoutCreatingUnusedState() {
@@ -116,18 +116,17 @@ class KeyedRegionsTest {
 		assertNull(store.getRootData(),"application sync never persists the host");
 	}
 
-	@Test void emptyRegionsNeverPublishOrRefreshASuppliedFork() {
+	@Test void aContainerOverASuppliedForkPublishesItLikeAnyComponent() {
 		for (boolean moved:List.of(false,true)) {
 			var host=LatticeHost.create();
 			var draft=host.cursor().fork();
 			draft.assoc(B,CVMLong.ONE);
 			var app=new Regions(draft);
 			if (moved) host.cursor().assoc(UNKNOWN,CVMLong.TWO);
-			var published=host.cursor().get();
-			var pending=draft.get();
-			assertSame(pending,app.sync());
-			assertSame(published,host.cursor().get());
-			assertSame(pending,draft.get());
+			var expected=moved?Index.of(B,CVMLong.ONE,UNKNOWN,CVMLong.TWO):Index.of(B,CVMLong.ONE);
+			assertEquals(expected,app.sync());
+			assertEquals(expected,host.cursor().get(),"a concurrent destination change is kept");
+			assertEquals(expected,draft.get());
 		}
 	}
 
@@ -218,11 +217,18 @@ class KeyedRegionsTest {
 		assertEquals(Index.of(A,CVMLong.create(3)),root.get(),"exclusive use needs nothing special of the root");
 	}
 
-	@Test void containerHasNoWorkingStateToFork() {
-		assertThrows(UnsupportedOperationException.class,() -> new Regions(emptyRoot()).fork());
+	@Test void containerForksLikeAnyComponentThatRebinds() {
+		var root=emptyRoot();
+		var app=new Regions(root);
+		app.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		var fork=app.fork();
+		fork.mergeAt(CVMLong.TWO,A);
+		assertTrue(root.get().isEmpty(),"the fork's regions write into the fork");
+		fork.sync();
+		assertEquals(Index.of(A,CVMLong.TWO),root.get());
 	}
 
-	@Test void childrenPublishIntoSuppliedForkWithoutPublishingTheAggregate() {
+	@Test void childrenAndASuppliedForkPublishTogether() {
 		var host=LatticeHost.create();
 		var draft=host.cursor().fork();
 		AtomicInteger preparations=new AtomicInteger();
@@ -233,16 +239,11 @@ class KeyedRegionsTest {
 		child.cursor().set(CVMLong.ONE);
 		draft.assoc(B,CVMLong.TWO);
 		host.cursor().assoc(UNKNOWN,CVMLong.create(3));
-		var published=host.cursor().get();
-		assertEquals(Index.of(A,CVMLong.ONE,B,CVMLong.TWO),app.sync());
+		var expected=Index.of(A,CVMLong.ONE,B,CVMLong.TWO,UNKNOWN,CVMLong.create(3));
+		assertEquals(expected,app.sync());
 		assertEquals(1,preparations.get());
-		assertEquals(CVMLong.ONE,draft.get().get(A));
-		assertSame(published,host.cursor().get(),"Only the enclosing owner may publish the aggregate");
+		assertEquals(expected,host.cursor().get(),"the region, the fork's own edit and the destination's change all survive");
 		assertThrows(IllegalStateException.class,() -> app.counter(UNKNOWN));
-		// The owner explicitly reconciles its complete aggregate, including unrelated destination keys.
-		var aggregate=new LatticeComponent<>(KeyedLattice.create(A,MaxLattice.INSTANCE,B,MaxLattice.INSTANCE),draft);
-		assertEquals(Index.of(A,CVMLong.ONE,B,CVMLong.TWO,UNKNOWN,CVMLong.create(3)),aggregate.sync());
-		assertEquals(aggregate.cursor().get(),host.cursor().get());
 	}
 
 	@Test void emptyAndUnusedNestedApplicationsDoNotCreateContainers() {
@@ -436,7 +437,8 @@ class KeyedRegionsTest {
 		host.merge(Index.of(A,Sets.of(2)));
 		assertEquals(Sets.of(1,2),shared.cursor().get(),"duplicate delivery is harmless for a lattice merge");
 		assertEquals(Index.none(),host.cursor().get());
-		assertEquals(Index.of(A,Sets.of(1,2)),second.sync(),"either application can publish shared edits");
+		assertSame(host.cursor().get(),second.sync(),"a container does not publish a shared child it did not make");
+		assertEquals(Index.of(A,Sets.of(1,2)),first.sync(),"the container that made it does");
 		assertSame(host.cursor().get(),first.sync(),"repeated publication is a no-op");
 		assertSame(policy,shared.getContext());
 	}
@@ -514,7 +516,7 @@ class KeyedRegionsTest {
 		for (var rule:rules) {
 			var host=LatticeHost.create();
 			var app=new TestRegions(host);
-			var child=app.region(A,new SignedComponent<>(rule,new IndexComponent<>(host.cursor()).path(A),owner::signData));
+			var child=app.createRegion(A,(AForkableCursor<SignedData<ASet<CVMLong>>> region) -> new SignedComponent<>(rule,region,owner::signData));
 			app.merge(Index.of(A,stranger.signData(payload)));
 			app.mergeAt(stranger.signData(payload),A);
 			assertNull(child.cursor().get());

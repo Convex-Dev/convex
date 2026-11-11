@@ -62,7 +62,12 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	 */
 	public <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transactExclusively(target,draft -> action.apply(binder.apply(draft)));
+		return Transactions.transactExclusively(target,draft -> {
+			C view=binder.apply(draft);
+			R result=action.apply(view);
+			completeDraft(view);
+			return result;
+		});
 	}
 
 	/**
@@ -72,6 +77,10 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	 */
 	public void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.executeExclusively(target,draft -> action.accept(binder.apply(draft)));
+		Transactions.executeExclusively(target,draft -> {
+			C view=binder.apply(draft);
+			action.accept(view);
+			completeDraft(view);
+		});
 	}
 }
