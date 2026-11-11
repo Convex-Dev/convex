@@ -175,10 +175,7 @@ that writes straight into the container. The container's sync syncs each region
 it made, in registration order, then reconciles its own storage as any component
 does. It never syncs a child registered as an existing instance, which belongs to
 whoever made it. Syncing regions is sequential, not atomic: earlier successful
-work remains if a later region fails. A transaction on the container is atomic
-across its regions ([Forks and transactions](#forks-and-transactions)). A fork of
-the container reconciles region by region, so regions that change independently
-never conflict.
+work remains if a later region fails.
 
 An application made only of regions extends a region container and is registered
 with the host as it is. One with root-level behaviour of its own, such as a merge
@@ -365,25 +362,8 @@ child over a live path writes straight into its parent, and a child with a fork
 of its own is synced by whoever owns that fork. A component may instead manage
 children in forks of their own, by overriding `syncChildren()`. Sync calls it
 before reconciling, and a transaction calls it on its view before the draft
-commits. A region container is the example:
-
-- A transaction on one region, through that region's component, is isolated to
-  the region's storage.
-- A transaction on the container spans its regions. The regions made on the
-  transaction's view are synced into the draft before it commits, so all of them
-  commit together or not at all.
-- Work pending in the live container's regions is not part of such a
-  transaction. It merges with the committed value when the region next syncs.
-
-The container holds its regions' committed roots: each region's slot is what that
-region last published, and a forked region's working copy is not complete until
-its owner syncs it. A transaction on the container therefore works on committed
-roots only. Syncing pending regions first would publish work at a point their
-owners did not choose, possibly part-way through an operation. A caller who wants
-pending work included syncs the container first, as a separate step.
-
-[RegionTransactionsTest](../src/test/java/convex/lattice/RegionTransactionsTest.java)
-exercises each case with forked, live and signed regions.
+commits, so a transaction on a child is isolated to that child and a transaction
+on the parent spans its children. A region container does this for its regions.
 
 A transaction can return a result computed on its private view (`transact`), such
 as the identifier it allocated; `execute` returns nothing. The result comes from

@@ -38,6 +38,14 @@ import convex.lattice.cursor.AForkableCursor;
  * transaction; it merges with what the transaction committed when the region next
  * syncs.</p>
  *
+ * <p>The container holds its regions' committed roots: each slot is what its
+ * region last published, and a forked region's working copy is not complete until
+ * its owner syncs it. A transaction on the container therefore works on committed
+ * roots only. It does not sync pending regions first, which would publish work at
+ * a point their owners did not choose, possibly part-way through an operation. A
+ * caller who wants pending work included syncs the container first, as a separate
+ * step.</p>
+ *
  * <p>A fork of this container, or a container built over a fork, reconciles at sync
  * region by region ({@link #mergePublication(Index,Index,Index)}): a region changed
  * on only one side takes that side, so regions that update independently never
