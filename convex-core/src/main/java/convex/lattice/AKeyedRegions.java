@@ -93,6 +93,10 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	/**
 	 * Constructs a child with its region cursor. The stored
 	 * value type can differ from the child's working type, as for signed components.
+	 * The factory chooses the region's boundary: a child over a fork of the cursor
+	 * (for example {@code new Notes(cursor).fork()}) edits and transacts in isolation
+	 * and is published by the container's sync; a child over the cursor itself writes
+	 * straight into the container.
 	 */
 	@FunctionalInterface
 	public interface RegionFactory<V extends ACell,C extends ALatticeComponent<?>> {
@@ -165,6 +169,11 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * The caller must supply a component bound to this region's intended destination;
 	 * cursors do not expose enough binding information to verify this generally.
 	 * Registration does not relocate the component or take exclusive ownership.
+	 *
+	 * <p>This container routes deliveries to the child but never syncs it, so a child
+	 * over a fork of its own is published only when whoever made it syncs it. Nor can
+	 * the container remake it, so a rebound or forked counterpart refuses it when it
+	 * is needed. Use {@link #createRegion} for a region this container should manage.</p>
 	 */
 	protected final <C extends ALatticeComponent<?>> C region(Keyword key,C component) {
 		checkRegistration(key);
@@ -180,7 +189,8 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * initialises its view before creating regions. A missing containing index is
 	 * created through {@link #createContainer()} on the first changed write, never on
 	 * construction or read. Access rejects incompatible containers. The factory binds
-	 * any domain policy explicitly.
+	 * any domain policy explicitly. This container manages the child: its sync syncs
+	 * it, and a rebound or forked counterpart makes its own with the same factory.
 	 */
 	@SuppressWarnings("unchecked")
 	protected final <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
@@ -264,7 +274,9 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	/**
 	 * Prepares state after registrations freeze and before any region syncs.
 	 * Failure prevents the sync. This hook can be called concurrently and
-	 * must use thread-safe component APIs.
+	 * must use thread-safe component APIs. A container that is itself a region also
+	 * prepares within each attempt of a transaction on its parent, so the hook must
+	 * be safe to repeat and must not depend on the attempt committing.
 	 */
 	protected void beforeSync() {
 	}
@@ -293,13 +305,13 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 */
 	@Override
 	protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-		var selected=regions();
 		Index<Keyword,ACell> result=other;
 		for (Index<Keyword,ACell> side:Arrays.asList(base,own)) {
 			if (side==null) continue;
 			long n=side.count();
 			for (long i=0;i<n;i++) {
-				Keyword key=side.entryAt(i).getKey();
+				// Stored keys are whatever blob-like cells arrived, not necessarily Keywords
+				ABlobLike<?> key=((Index<?,?>)side).entryAt(i).getKey();
 				if (side==own && base!=null && base.containsKey(key)) continue; // already seen with base
 				boolean ownHas=has(own,key);
 				ACell ownValue=get(own,key);
@@ -308,12 +320,21 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				ACell otherValue=get(other,key);
 				if (same(otherHas,otherValue,has(base,key),get(base,key)) || same(ownHas,ownValue,otherHas,otherValue)) {
 					result=put(result,key,ownHas,ownValue);
-				} else if (selected.containsKey(key)) {
-					result=put(result,key,true,mergeRegion(key,get(base,key),ownValue,otherValue));
+				} else {
+					Keyword region=served(key);
+					if (region!=null) result=put(result,key,true,mergeRegion(region,get(base,key),ownValue,otherValue));
 				}
 			}
 		}
 		return result;
+	}
+
+	/** Returns the registered key matching a stored key, by the index's blob comparison, or null. */
+	private Keyword served(ABlobLike<?> key) {
+		for (Keyword registered:regions().keySet()) {
+			if (registered.toBlob().equals(key.toBlob())) return registered;
+		}
+		return null;
 	}
 
 	/**
@@ -334,11 +355,11 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 			+" and at its destination, and no region merge is defined");
 	}
 
-	private static boolean has(Index<Keyword,ACell> index,Keyword key) {
+	private static boolean has(Index<Keyword,ACell> index,ACell key) {
 		return (index!=null) && index.containsKey(key);
 	}
 
-	private static ACell get(Index<Keyword,ACell> index,Keyword key) {
+	private static ACell get(Index<Keyword,ACell> index,ACell key) {
 		return (index==null)?null:index.get(key);
 	}
 
@@ -346,8 +367,11 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		return (aHas==bHas) && Utils.equals(a,b);
 	}
 
-	private static Index<Keyword,ACell> put(Index<Keyword,ACell> index,Keyword key,boolean present,ACell value) {
-		if (present) return ((index==null)?Index.<Keyword,ACell>none():index).assoc(key,value);
-		return (index==null)?null:index.dissoc(key);
+	@SuppressWarnings("unchecked")
+	private static Index<Keyword,ACell> put(Index<Keyword,ACell> index,ABlobLike<?> key,boolean present,ACell value) {
+		Index<ABlobLike<?>,ACell> entries=(Index<ABlobLike<?>,ACell>)(Index<?,?>)index;
+		if (present) entries=((entries==null)?Index.<ABlobLike<?>,ACell>none():entries).assoc(key,value);
+		else if (entries!=null) entries=entries.dissoc(key);
+		return (Index<Keyword,ACell>)(Index<?,?>)entries;
 	}
 }

@@ -5,7 +5,9 @@
  * component behaviour belongs in the corresponding class unit tests.
  * Applications use {@link convex.lattice.SingleRegion} or
  * {@link convex.lattice.Regions} to compose domain components with standard
- * routing and publication, including shared region instances.
+ * routing and publication. Each makes its region with a factory, so the
+ * application's sync publishes it; a shared region instance is published by the
+ * application that made it.
  * Owned collections use {@link convex.lattice.OwnedIndex} with an application
  * verifier or {@link convex.lattice.KeyOwnedIndex} for public-key owners.
  *

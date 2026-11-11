@@ -278,7 +278,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * </ul>
 	 *
 	 * <p>A transaction may call this several times, once per attempt, each time on a
-	 * new view, so it must change nothing outside that view's storage.</p>
+	 * new view. Each child it syncs there is one made on that view, so the child's
+	 * own sync runs within the attempt: its preparation and any persistence function
+	 * it was given must be safe to repeat and must not depend on the attempt
+	 * committing.</p>
 	 */
 	protected void syncChildren() {
 	}

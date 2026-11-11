@@ -7,12 +7,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
@@ -186,6 +188,70 @@ class RegionTransactionsTest {
 		var before=root.get();
 		assertThrows(UnsupportedOperationException.class,fork::sync);
 		assertSame(before,root.get(),"a refused reconcile changes nothing");
+	}
+
+	@Test void aSpanningTransactionSeesWhatALiveRegionCommitted() {
+		var root=new Root<>(Index.<Keyword,ACell>of(LIVE,Sets.empty()));
+		var app=new App(root);
+		app.live().execute(m -> m.add(1));
+		app.execute(view -> {
+			assertEquals(Sets.of(1),view.live().value(),"a live region's commit is already in the container");
+			view.live().add(2);
+		});
+		assertEquals(Sets.of(1,2),at(root,LIVE));
+	}
+
+	@Test void aForkedContainerCarriesARemovalOnEitherSide() {
+		var root=new Root<>(Index.<Keyword,ACell>of(LIVE,Sets.of(1),OTHER,CVMLong.ONE));
+		var app=new App(root);
+		var fork=(App)app.fork();
+		fork.cursor().updateAndGet(m -> m.dissoc(LIVE));
+		fork.forked().add(3);
+		root.set(root.get().dissoc(OTHER));
+		fork.sync();
+		assertEquals(Index.of(FORKED,Sets.of(3)),root.get(),"the fork removed one region and the destination another");
+	}
+
+	@Test void aForkedContainerSyncsIntoAnAbsentOrMovedDestination() {
+		var root=new Root<Index<Keyword,ACell>>();
+		var app=new App(root);
+		var fork=(App)app.fork();
+		fork.forked().add(1);
+		root.set(Index.of(OTHER,CVMLong.ONE));
+		fork.sync();
+		assertEquals(Index.of(OTHER,CVMLong.ONE,FORKED,Sets.of(1)),root.get());
+	}
+
+	@Test void aNestedContainerInsideAForkedOneSyncsItsRegions() {
+		var nestedKey=Keyword.intern("nested");
+		var root=emptyRoot();
+		var app=new Regions(root);
+		var nested=app.<Index<Keyword,ACell>,Regions>create(nestedKey,Regions::new);
+		nested.create(FORKED,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c.fork()));
+		var fork=app.fork();
+		ALatticeComponent<?> forkNested=fork.child(nestedKey);
+		Members region=((Regions)forkNested).registered(FORKED);
+		region.add(7);
+		root.set(root.get().assoc(OTHER,CVMLong.ONE));
+		fork.sync();
+		assertEquals(Index.of(OTHER,CVMLong.ONE,nestedKey,Index.of(FORKED,Sets.of(7))),root.get());
+	}
+
+	@Test void aForkedContainerKeepsEntriesWhoseKeysAreNotKeywords() {
+		var note=Strings.create("note");
+		var root=emptyRoot();
+		var app=new App(root);
+		var fork=(App)app.fork();
+		fork.cursor().updateAndGet(m -> withKey(m,note,CVMLong.ONE));
+		root.set(root.get().assoc(OTHER,CVMLong.TWO));
+		fork.sync();
+		assertEquals(CVMLong.ONE,root.get().get(note));
+		assertEquals(CVMLong.TWO,at(root,OTHER));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Index<Keyword,ACell> withKey(Index<Keyword,ACell> index,ABlobLike<?> key,ACell value) {
+		return (Index<Keyword,ACell>)(Index<?,?>)((Index<ABlobLike<?>,ACell>)(Index<?,?>)index).assoc(key,value);
 	}
 
 	@Test void explicitChildrenAreSyncedByWhoeverMadeThem() {
