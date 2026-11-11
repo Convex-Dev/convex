@@ -66,8 +66,9 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 
 	/**
 	 * Runs domain operations once on a private view under the claim beneath its storage,
-	 * commits the draft after any reconciliation, and returns the callback's result.
-	 * Reconciliation does not recompute that result or guarantee that the draft's
+	 * commits the transaction value after any reconciliation, and returns the
+	 * callback's result.
+	 * Reconciliation does not recompute that result or guarantee that the transaction's
 	 * changes survive; see {@link TransactionalComponent}.
 	 *
 	 * @param <R> Result type

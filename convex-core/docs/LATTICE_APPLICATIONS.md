@@ -350,11 +350,12 @@ commit. These are different ways of handling a conflict: retrying repeats the
 operations, while merging resolves the resulting versions according to component
 policy.
 
-Execution produces a draft value and a callback result. Reconciliation is an
-additional transformation of that draft and the current value; commit atomically
-installs the value after any reconciliation and required authoring. The draft
-need not be separately visible in storage. Successful completion means that this
-local commit succeeded. A component's merge determines which changes survive and
+Execution produces a transaction value and a return value. Commit applies any
+required reconciliation and authoring, then atomically installs the resulting
+state. These additional transformations do not change the execution's return
+value. The transaction value need not be separately visible in storage before
+these transformations. Successful completion means that this local commit
+succeeded. A component's merge determines which changes survive and
 must preserve any invariants that component promises across merges. A check made
 only during callback execution does not constrain subsequent merge decisions.
 
@@ -378,9 +379,9 @@ on the parent spans its children. A region container does this for its regions.
 
 A transaction can return a result computed on its private view (`transact`), such
 as the identifier it allocated; `execute` returns nothing. The result comes from
-the execution whose draft was used for the successful commit. Reconciliation
-does not recompute that result: it records what the execution produced, without
-promising that its draft's changes survive a merge at commit or later updates.
+the execution whose transaction value was used for the successful commit.
+Reconciliation does not recompute that result: it records what the execution
+produced, without promising that its changes survive a merge at commit or later updates.
 For example, an allocation result identifies what the execution allocated even
 if a merge subsequently selects a conflicting version. An operation that
 must not repeat uses the component's `exclusive()` form, whose callback runs once

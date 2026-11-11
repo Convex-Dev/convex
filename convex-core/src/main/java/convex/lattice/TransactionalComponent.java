@@ -21,10 +21,12 @@ import convex.lattice.cursor.Transactions;
  * Complete all draft work before returning from the callback. Retained views and
  * their forks remain independent storage; later edits do not change live state.</p>
  *
- * <p>{@link #transact} returns the callback's result from the execution whose draft
- * was used for the successful commit. Any reconciliation at commit is an additional
- * transformation of the draft value and does not recompute that result. The result
- * records what the execution produced; it does not promise that the draft's changes
+ * <p>Execution produces a transaction value and a return value. Commit applies any
+ * required reconciliation and authoring, then atomically installs the resulting
+ * state. {@link #transact} returns the callback's result from the execution whose
+ * transaction value was used for the successful commit. These additional
+ * transformations do not change the execution's return value. The result
+ * records what the execution produced; it does not promise that its changes
  * survive reconciliation or later updates. The component's merge policy determines
  * which changes survive and must preserve any invariants it promises across merges.
  * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
@@ -54,7 +56,7 @@ import convex.lattice.cursor.Transactions;
  * a parent spans its children: those made on the callback's view write into the
  * draft, and a parent that manages children in forks of their own has them synced
  * into the draft, through {@link ALatticeComponent#syncChildren()}, after the
- * callback returns and before the draft commits.</p>
+ * callback returns and before the transaction value commits.</p>
  *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
