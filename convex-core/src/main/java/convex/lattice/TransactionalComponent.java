@@ -17,7 +17,10 @@ import convex.lattice.cursor.Transactions;
  * <p>Callbacks receive an isolated component view. They may run more than once,
  * must use that view for all lattice changes, and must not perform external side
  * effects. Descendants share the private working state. Exceptions discard the
- * attempt. Successful completion means committed locally, not published or durable.
+ * attempt. Successful completion means committed into this component's bound
+ * storage. Live storage publishes into its enclosing state directly; a fork keeps
+ * the commit in its working state until sync reconciles it with its publication
+ * destination. Neither implies replication or durability.
  * Complete all draft work before returning from the callback. Retained views and
  * their forks remain independent storage; later edits do not change live state.</p>
  *
@@ -123,8 +126,9 @@ public interface TransactionalComponent<V extends ACell,C> {
 
 	/**
 	 * Schedules {@link #transact} on the shared virtual executor. The future completes
-	 * with the result after local commit, or exceptionally on failure. Cancellation does
-	 * not undo a commit or guarantee that a running callback stops. No component owns a thread.
+	 * with the result after commit into bound storage, or exceptionally on failure.
+	 * Cancellation does not undo a commit or guarantee that a running callback stops.
+	 * No component owns a thread.
 	 */
 	default <R> CompletableFuture<R> transactAsync(Function<? super C,? extends R> action) {
 		return transactAsync(action,ThreadUtils.getVirtualExecutor());

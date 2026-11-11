@@ -9,7 +9,8 @@ import convex.core.util.Utils;
 
 /**
  * Atomic subtree transactions over a cursor: run a callback against a private draft
- * of the cursor's value, then commit by compare-and-set.
+ * of the cursor's value, then commit into that cursor's storage. A commit into a
+ * fork updates its working state; syncing the fork to its destination is separate.
  *
  * <p>The callback receives a cursor instead of a bare value, so it can navigate, wrap
  * boundaries and write through descendants exactly as it would against the live

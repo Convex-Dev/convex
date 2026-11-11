@@ -252,6 +252,11 @@ root.updateAndGet(values -> values.include(item));
 
 ## Forks, transactions and publication
 
+A transaction commits into the cursor on which it was started. A live path
+installs the change in its enclosing storage; a fork installs it in its own
+working root. Sync is the separate reconciliation of that fork with its
+publication destination. Neither step implies publication beyond its destination.
+
 `fork()` creates an isolated working copy, a `ForkedCursor`, retaining its
 destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
 that publication: an unchanged copy adopts the destination, an unchanged destination

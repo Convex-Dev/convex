@@ -330,6 +330,19 @@ Absence in a partial view is not evidence that the corresponding data was delete
 
 ## Forks and transactions
 
+**Commit** atomically publishes a transaction's value, after any required
+reconciliation and authoring, into the state on which the transaction was started.
+For a component, that destination is its bound storage. A live child's storage is
+a view into its enclosing component, so its transaction commits there directly.
+A transaction on a fork commits into the fork's working state.
+
+**Sync** reconciles a fork's working state with its publication destination.
+A commit into a fork does not also sync it. A nested transaction commits into
+the enclosing transaction's working state when bound there; that state reaches
+the enclosing transaction's destination only when the enclosing transaction
+commits. Name the destination when distinguishing these steps: "committed into
+the fork" or "published into the container".
+
 A component fork is a reusable private working copy. Publication compares it
 with its destination and their last reconciled value. If only one side changed,
 that side is adopted. If both changed, the component's merge rule reconciles
@@ -354,9 +367,9 @@ Execution produces a transaction value and a return value. Commit applies any
 required reconciliation and authoring, then atomically installs the resulting
 state. These additional transformations do not change the execution's return
 value. The transaction value need not be separately visible in storage before
-these transformations. Successful completion means that this local commit
-succeeded. A component's merge determines which changes survive and
-must preserve any invariants that component promises across merges. A check made
+these transformations. Successful completion means that the commit into the
+component's bound storage succeeded. A component's merge determines which changes
+survive and must preserve any invariants that component promises across merges. A check made
 only during callback execution does not constrain subsequent merge decisions.
 
 A transaction reads the component's stored value first, so on a component that

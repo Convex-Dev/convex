@@ -32,18 +32,19 @@ import convex.lattice.cursor.BoundaryCursor;
  * destination, which does nothing for live storage. Sync is not atomic across
  * regions: earlier work stands if a later region fails.</p>
  *
- * <p>Whatever reaches a region's cursor is that region's committed work, and it is
- * in the container as soon as it lands. A transaction on one region, through that
- * region's own component, is isolated to it, and an exclusive one claims only that
- * region's boundary, so regions transact exclusively at the same time. A transaction
+ * <p>A live region writes through its supplied boundary cursor into the container.
+ * A transaction on that region commits into the container at the region's place,
+ * and an exclusive one claims only that region's boundary, so regions transact
+ * exclusively at the same time. A transaction
  * on the whole container, by a subclass that implements {@link TransactionalComponent},
- * spans its regions and works on everything they have committed; a region commit
- * landing during an attempt makes it retry on top. An exclusive transaction on the
- * container holds the claim beneath every region's boundary, so region writes wait
- * for it. Work a region keeps in a working copy of its own, such as unsigned edits
- * behind a signing view, is not yet committed: it is not part of a transaction on
- * the container, and it merges with what that committed when the region next
- * syncs. A region's exclusive transaction, and an ordinary one once it has taken the
+ * spans its regions and works on their values published into the container; a region
+ * write landing there during an attempt makes it retry on top. An exclusive
+ * transaction on the container holds the claim beneath every region's boundary, so region writes wait
+ * for it. Work a region keeps in a working copy of its own, including transactions
+ * committed into that fork, has not yet been published into the container. It is
+ * not part of a transaction on the container, and it merges with the container's
+ * current value when the region next syncs. A live region's exclusive transaction,
+ * and an ordinary one once it has taken the
  * claim after two conflicts, holds against writes through its boundary; a
  * transaction on the container that changes the same region meanwhile does not pass
  * through it, so the region's commit merges that change with its own run by the
