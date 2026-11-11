@@ -334,10 +334,11 @@ class RegionTransactionsTest {
 	@Test void aRegionWithNoPublicationMergeFailsRatherThanLoseAContainerChange() {
 		var root=liveRoot();
 		var region=new Unmerged(BoundaryCursor.over(root.<ASet<CVMLong>>path(LIVE)));
-		assertThrows(UnsupportedOperationException.class,() -> region.exclusive().execute(m -> {
+		var failure=assertThrows(IllegalStateException.class,() -> region.exclusive().execute(m -> {
 			root.set(root.get().assoc(LIVE,Sets.of(9)));
 			m.cursor().set(Sets.of(1));
 		}));
+		assertInstanceOf(UnsupportedOperationException.class,failure.getCause(),"the component's own refusal to merge");
 		assertEquals(Sets.of(9),at(root,LIVE),"never overwritten");
 	}
 

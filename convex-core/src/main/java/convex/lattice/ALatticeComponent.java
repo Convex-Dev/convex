@@ -295,12 +295,21 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Returns the publication merge of a transacting component, which reconciles a
 	 * change made under its claim without passing through it, or null if it is not a
-	 * lattice component.
+	 * lattice component. A component with no publication merge fails that commit with
+	 * an {@link IllegalStateException} naming it.
 	 */
 	@SuppressWarnings("unchecked")
 	static <V extends ACell> ThreeWayMerge<V> publicationMerge(TransactionalComponent<V,?> source) {
-		if (source instanceof ALatticeComponent<?> component) return ((ALatticeComponent<V>)component)::mergePublication;
-		return null;
+		if (!(source instanceof ALatticeComponent<?> c)) return null;
+		ALatticeComponent<V> component=(ALatticeComponent<V>)c;
+		return (base,own,other) -> {
+			try {
+				return component.mergePublication(base,own,other);
+			} catch (UnsupportedOperationException e) {
+				throw new IllegalStateException(component.getClass().getSimpleName()
+					+" has no support for commit merges: its value changed under a transaction's claim, by a write that did not pass through the claimed boundary",e);
+			}
+		};
 	}
 
 	/**
