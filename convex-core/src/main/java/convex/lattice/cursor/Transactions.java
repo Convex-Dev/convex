@@ -20,14 +20,20 @@ import convex.core.util.Utils;
  * Typed domain transactions build on this in
  * {@code TransactionalComponent}.</p>
  *
- * <p>{@code transact} returns the callback's result from the run that committed;
- * {@code execute} returns nothing.</p>
+ * <p>{@code transact} returns the callback's result from the execution whose draft
+ * was used for the successful commit; {@code execute} returns nothing. Execution
+ * produces a draft value and a callback result. Reconciliation, where supplied,
+ * is an additional transformation of the draft value and does not recompute the
+ * callback result. Commit atomically installs the value after any reconciliation
+ * and authoring; the draft need not be separately visible in storage. The returned
+ * result records what the execution produced, without promising that its draft's
+ * changes survive reconciliation or later updates.</p>
  *
  * <p>Optimistic execution is the fast path for transactions that do not collide. A
  * change elsewhere under the root never reruns a callback: its finished result is
  * applied to the new root. When the transaction's own value has changed twice, it
  * takes the {@link Claim} beneath its cursor (see {@link ACursor#claim}) and finishes
- * under it, so transactions that collide run one at a time and a callback runs at
+ * under it. Claims on the same boundary run one at a time, and a callback runs at
  * most three times. {@link #transactExclusively} starts with the claim, for work too
  * expensive to repeat or with side effects: its callback runs once.</p>
  *

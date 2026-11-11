@@ -331,9 +331,13 @@ when the editing view supplies a default. Reads and ordinary view sync never aut
 state. A component that manages children in forks of their own syncs them first,
 through `syncChildren()`; applications may also add preparation.
 
-`Transactions` runs a synchronous callback against a private draft and commits by
-CAS, preserving each operation under contention. `transact` returns the result of
-the run that committed; `execute` returns nothing.
+`Transactions` runs a synchronous callback against a private draft and atomically
+commits its value after any reconciliation and authoring. `transact` returns the
+callback result from the execution whose draft was used for the successful commit;
+`execute` returns nothing. Reconciliation is an additional transformation of the
+draft value and does not recompute the callback result. The result records what
+that execution produced; component merge policy determines which draft changes
+survive reconciliation. The draft need not be separately visible in storage.
 
 A transaction starts with a required read of its cursor, so a place that does not
 exist throws `MissingValueException` before the callback runs, also through an
@@ -345,7 +349,7 @@ Optimistic execution is the fast path for transactions that do not collide. Comm
 checks only the transaction's own value: a change elsewhere under the root never
 reruns the callback, and its finished result is applied to the new root. When its own
 value has changed twice, the transaction takes the claim of its nearest boundary and
-finishes under it, so transactions that collide run one at a time and a callback
+finishes under it. Claims on the same boundary run one at a time, and a callback
 runs at most three times. An exclusive transaction starts with that claim and runs
 once, for work too expensive to repeat or with side effects.
 

@@ -21,7 +21,12 @@ import convex.lattice.cursor.Transactions;
  * Complete all draft work before returning from the callback. Retained views and
  * their forks remain independent storage; later edits do not change live state.</p>
  *
- * <p>{@link #transact} returns the callback's result from the run that committed;
+ * <p>{@link #transact} returns the callback's result from the execution whose draft
+ * was used for the successful commit. Any reconciliation at commit is an additional
+ * transformation of the draft value and does not recompute that result. The result
+ * records what the execution produced; it does not promise that the draft's changes
+ * survive reconciliation or later updates. The component's merge policy determines
+ * which changes survive and must preserve any invariants it promises across merges.
  * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
  * callbacks run once under the claim beneath this component's storage.</p>
  *

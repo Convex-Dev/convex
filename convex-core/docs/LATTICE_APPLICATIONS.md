@@ -341,11 +341,22 @@ or preparing a signed batch. The domain operations should remain the same on a
 live view and a private view. Their storage and publication boundaries differ,
 not the meaning of actions such as adding a favourite or editing a file.
 
-A transaction instead groups operations into one local atomic change. If the
-live value changes before commit, the operations run again against current
-state. This matters when both operations must survive: two independent edits to
-a whole-value register may select one result, while retrying transactions can
-apply both operations in sequence.
+A transaction executes operations on a private draft, then commits one local
+atomic change. During optimistic execution, a change to the transaction's input
+makes the operations run again against current state. Under a claim, a change
+that bypasses the claimed boundary is instead reconciled using the component's
+publication merge; a component without a suitable merge refuses that conflicting
+commit. These are different ways of handling a conflict: retrying repeats the
+operations, while merging resolves the resulting versions according to component
+policy.
+
+Execution produces a draft value and a callback result. Reconciliation is an
+additional transformation of that draft and the current value; commit atomically
+installs the value after any reconciliation and required authoring. The draft
+need not be separately visible in storage. Successful completion means that this
+local commit succeeded. A component's merge determines which changes survive and
+must preserve any invariants that component promises across merges. A check made
+only during callback execution does not constrain subsequent merge decisions.
 
 A transaction reads the component's stored value first, so on a component that
 nothing has written yet it throws `MissingValueException` before the callback
@@ -367,10 +378,11 @@ on the parent spans its children. A region container does this for its regions.
 
 A transaction can return a result computed on its private view (`transact`), such
 as the identifier it allocated; `execute` returns nothing. The result comes from
-the run that committed, so it describes that change exactly; where a write that
-bypassed the claimed boundary was merged in at commit, it describes the run's own
-part of the result. It is a local fact,
-not a statement about what replicas will hold after merging. An operation that
+the execution whose draft was used for the successful commit. Reconciliation
+does not recompute that result: it records what the execution produced, without
+promising that its draft's changes survive a merge at commit or later updates.
+For example, an allocation result identifies what the execution allocated even
+if a merge subsequently selects a conflicting version. An operation that
 must not repeat uses the component's `exclusive()` form, whose callback runs once
 while holding the claim of its nearest transactional boundary: a `BoundaryCursor`
 its storage is built over, such as a region of a region container, or else the
