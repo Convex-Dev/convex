@@ -6,6 +6,7 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Timestamp;
 import java.util.Map;
 
+import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import convex.core.data.ABlob;
@@ -125,6 +126,7 @@ public enum ConvexType {
 			}
 			case VARBINARY, BLOB -> {
 				if (value instanceof byte[] b) yield Blob.wrap(b);
+				if (value instanceof ByteString b) yield Blob.wrap(b.getBytes());
 				throw new IllegalArgumentException("Cannot convert " + value.getClass().getSimpleName() + " to " + this);
 			}
 			case TIMESTAMP -> {
@@ -227,6 +229,7 @@ public enum ConvexType {
 		if (value instanceof String s) return Strings.create(s);
 		if (value instanceof Boolean b) return CVMBool.create(b);
 		if (value instanceof byte[] b) return Blob.wrap(b);
+		if (value instanceof ByteString b) return Blob.wrap(b.getBytes());
 		if (value instanceof Map<?,?> m) return mapToAMap(m);
 		if (value instanceof Timestamp ts) return CVMLong.create(ts.getTime());
 		return Strings.create(value.toString());

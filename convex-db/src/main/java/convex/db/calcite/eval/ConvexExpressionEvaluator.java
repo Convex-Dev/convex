@@ -112,6 +112,7 @@ public class ConvexExpressionEvaluator {
 				yield CVMBool.create(b);
 			}
 			case TIMESTAMP -> CVMLong.create(literal.getValueAs(TimestampString.class).getMillisSinceEpoch());
+			case BINARY, VARBINARY -> ConvexType.VARBINARY.toCell(literal.getValue());
 			case DATE -> CVMLong.create(literal.getValueAs(DateString.class).getDaysSinceEpoch());
 			case NULL -> null;
 			default -> {

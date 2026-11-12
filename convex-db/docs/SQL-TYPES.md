@@ -17,6 +17,11 @@ without a declared type, or declared explicitly as `ANY`, remains untyped. Synta
 the parser does not recognise, such as an `INTERVAL` column declaration, still
 reports a syntax error (`42601`). Existing stored schemas are unchanged.
 
+Binary values can be supplied as SQL hex literals, such as `X'CAFE'` (the two
+bytes `CA FE`), or JDBC `PreparedStatement.setBytes` parameters. Both are stored
+as blobs, including in `ANY` columns. `X''` is an empty blob, distinct from SQL
+`NULL`. Binary literals can also be used in filters and updates.
+
 The table entry format, its version, the type identifiers, the stored CVM value of each type
 and the primary key encoding are specified in
 [CAD039](https://docs.convex.world/docs/cad/convex_sql). This document covers the

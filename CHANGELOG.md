@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Accept SQL binary literals and JDBC byte parameters consistently in binary columns, expressions and key lookups.
 - Reject unsupported SQL column declarations instead of silently storing them as untyped columns. ([#793](https://github.com/Convex-Dev/convex/issues/793))
 - Keep prepared SQL reads, writes and batches bound to the current transaction across commits and rollbacks. ([#835](https://github.com/Convex-Dev/convex/issues/835))
 - Correct SQL text and date comparisons, integer division and joined sums and averages. ([#836](https://github.com/Convex-Dev/convex/issues/836))
