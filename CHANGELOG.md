@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Report incoming network-handler and DLFS HTTP failures to application callbacks with their original exceptions.
 - Let embedders receive original GUI cleanup and P2P bootstrap exceptions through per-instance failure handlers.
 - Bind Swing displays to domain getters with automatic refresh and cleanup; includes a local lattice draft example. ([Swing bindings](convex-gui/docs/BINDINGS.md))
 - Provide live read-only database bindings and enforce read-only JDBC and PostgreSQL connections. ([Read-only access](convex-db/docs/JDBC.md#read-only-access), [#803](https://github.com/Convex-Dev/convex/issues/803))
@@ -29,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Isolate upgrade-verification reports and failure counters between concurrent runs.
+- Close and report failed inbound message delivery after a backed-up reply queue drains, instead of stranding the connection.
+- Keep expected SQL rejections and malformed PostgreSQL frames out of operator warning logs while retaining internal-error reporting.
 - Accept SQL binary literals and JDBC byte parameters consistently in binary columns, expressions and key lookups.
 - Reject unsupported SQL column declarations instead of silently storing them as untyped columns. ([#793](https://github.com/Convex-Dev/convex/issues/793))
 - Keep prepared SQL reads, writes and batches bound to the current transaction across commits and rollbacks. ([#835](https://github.com/Convex-Dev/convex/issues/835))

@@ -41,6 +41,15 @@ public interface IncomingHandler extends AutoCloseable {
 	 */
 	Predicate<Message> handle(Message message);
 
+	/**
+	 * Reports a delivery failure before the transport closes this connection.
+	 * Overrides receive the original throwable and must not throw or block; a retry
+	 * failure can be reported off the event loop. The default logs the failure.
+	 */
+	default void onFailure(Throwable failure) {
+		org.slf4j.LoggerFactory.getLogger(IncomingHandler.class).warn("Incoming message handling failed",failure);
+	}
+
 	/** Releases this connection's handler state. Called once by the transport. */
 	@Override
 	default void close() {}

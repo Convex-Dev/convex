@@ -50,6 +50,11 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 * if the message could not be queued (backpressure signal).
 	 */
 	private final Function<Message, Predicate<Message>> deliver;
+	private Consumer<Throwable> failureAction=e -> log.warn("Inbound message handling error",e);
+
+	void setFailureAction(Consumer<Throwable> action) {
+		failureAction=action;
+	}
 
 	/** Per-server maximum encoded message length, checked before full allocation. */
 	private volatile int maxMessageLength;
@@ -265,7 +270,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				// surfaced by the #566 circuit-breaker instead.
 				log.debug("Rejecting malformed inbound message: {}",e.getMessage());
 			} else {
-				log.warn("Inbound message handling error: {}",e.getMessage());
+				failureAction.accept(e);
 			}
 			throw e;
 		}
@@ -295,8 +300,8 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 					}
 				}
 			} catch (RuntimeException | StackOverflowError e) {
-				log.debug("Incoming message retry failed; closing connection",e);
-				ctx.close();
+				try { failureAction.accept(e); }
+				finally { ctx.close(); }
 			} finally {
 				ctx.channel().eventLoop().execute(() -> {
 					backpressured = false;
@@ -320,8 +325,15 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		if (m == null || replies.isBacklogged()) return;
 		ChannelHandlerContext ctx = heldContext;
 		held = null;
-		dispatch(ctx, m);
-		if (!backpressured) resumeReading(ctx);
+		try {
+			dispatch(ctx,m);
+			if (!backpressured) resumeReading(ctx);
+		} catch (RuntimeException | StackOverflowError e) {
+			// Resumed delivery runs as an event-loop task, outside decode's failure path.
+			failed=true;
+			try { failureAction.accept(e); }
+			finally { ctx.close(); }
+		}
 	}
 
 	/**

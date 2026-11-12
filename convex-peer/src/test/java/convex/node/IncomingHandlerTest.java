@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.net.Socket;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -102,10 +103,20 @@ class IncomingHandlerTest {
 	}
 
 	@Test void handlerFailureClosesOnlyItsConnectionAndRunsCleanup() throws Exception {
+		assertHandlerFailure(false);
+	}
+
+	private void assertHandlerFailure(boolean retry) throws Exception {
 		var closed=new CompletableFuture<Void>();
+		var failures=new LinkedBlockingQueue<Throwable>();
+		var expected=new IllegalStateException("handler failure");
 		try (var listener=new LatticeListener(NodeConfig.port(0))) {
 			listener.setConnectionHandler(connection -> new IncomingHandler() {
-				@Override public Predicate<Message> handle(Message message) { throw new IllegalStateException("handler failure"); }
+				@Override public Predicate<Message> handle(Message message) {
+					if (retry) return ignored -> { throw expected; };
+					throw expected;
+				}
+				@Override public void onFailure(Throwable failure) { failures.add(failure); }
 				@Override public void close() { closed.complete(null); }
 			});
 			listener.launch();
@@ -114,6 +125,9 @@ class IncomingHandlerTest {
 				closed.get(5,TimeUnit.SECONDS);
 			}
 			assertTrue(listener.isRunning());
+			assertSame(expected,failures.poll(5,TimeUnit.SECONDS));
+			listener.close();
+			assertTrue(failures.isEmpty(),"No additional delivery failures");
 		}
 	}
 
@@ -248,20 +262,7 @@ class IncomingHandlerTest {
 	}
 
 	@Test void retryFailureClosesAndCleansUpTheConnection() throws Exception {
-		var closed=new CompletableFuture<Void>();
-		try (var listener=new LatticeListener(NodeConfig.port(0))) {
-			listener.setConnectionHandler(connection -> new IncomingHandler() {
-				@Override public Predicate<Message> handle(Message message) {
-					return retry -> { throw new IllegalStateException("retry failure"); };
-				}
-				@Override public void close() { closed.complete(null); }
-			});
-			listener.launch();
-			try (var client=ConvexRemote.connect(listener.getHostAddress())) {
-				assertTrue(client.request(Message.createPing(1)).get(5,TimeUnit.SECONDS).isError());
-				closed.get(5,TimeUnit.SECONDS);
-			}
-		}
+		assertHandlerFailure(true);
 	}
 
 	@Test void backpressureRetriesOnceOffTheEventLoopAndPreservesOrder() throws Exception {

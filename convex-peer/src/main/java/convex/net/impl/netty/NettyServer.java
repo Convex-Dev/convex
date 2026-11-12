@@ -180,6 +180,7 @@ public class NettyServer extends AServer {
 				 Function<Message, Predicate<Message>> deliverFn = (accepted!=null) ? accepted :
 					 ((deliver != null) ? deliver : wrapReceiveAction());
 				 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
+				 if (accepted!=null) inbound.setFailureAction(accepted::reportFailure);
             	 NettyServerConnection conn=new NettyServerConnection(ch,inbound,outbound);
             	 inbound.setConnection(conn);
 				 inbound.setDisconnectAction((accepted==null) ? getDisconnectAction() : accepted);
@@ -381,6 +382,12 @@ public class NettyServer extends AServer {
 				throw new IllegalArgumentException("Malformed response",e);
 			}
 			return handler.handle(message);
+		}
+
+		void reportFailure(Throwable failure) {
+			IncomingHandler target=handler;
+			if (target!=null) target.onFailure(failure);
+			else log.warn("Incoming message handling failed",failure);
 		}
 
 		@Override public void accept(AConnection connection) {

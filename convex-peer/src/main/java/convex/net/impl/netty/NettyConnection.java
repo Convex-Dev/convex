@@ -300,14 +300,14 @@ public class NettyConnection extends AConnection {
 	}
 
 	/**
-	 * Encodes a message for sending and returns its length, or -1 (logged) if the
+	 * Encodes a message for sending and returns its length, or -1 if the
 	 * payload cannot fit one legal frame. Nothing is ever sent truncated.
 	 */
 	static long encodedLength(Message m) {
 		try {
 			return m.getMessageData().count();
 		} catch (IllegalArgumentException e) {
-			log.warn("Not sending {} message: {}",m.getType(),e.getMessage());
+			log.debug("Not sending {} message: {}",m.getType(),e.getMessage());
 			return -1;
 		}
 	}

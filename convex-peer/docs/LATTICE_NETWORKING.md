@@ -185,6 +185,12 @@ having processed the message: reads pause while the transport invokes that
 predicate once on a virtual thread. It may wait for capacity; true means accepted,
 and false reports overload. A retry failure closes the connection. A factory or
 initial handler failure also closes that connection without stopping the listener.
+Delivery and retry failures are passed to `IncomingHandler.onFailure(Throwable)`
+before the transport closes the connection. Its default logs the original
+throwable; an override can report it to the application's supervisor instead.
+The callback must not throw or block and can run on the retry thread. Wrappers
+that need their delegate's reporting policy should forward this callback too.
+
 Accepting work is not an acknowledgement of merge completion or durability;
 those guarantees belong to the application's response protocol.
 

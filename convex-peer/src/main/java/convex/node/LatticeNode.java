@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -21,6 +22,7 @@ import convex.core.data.AString;
 import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.lattice.LatticeHost;
+import convex.net.PeerConnectionException;
 import convex.net.PeerName;
 import convex.net.PeerResolver;
 import convex.net.PeerTarget;
@@ -284,7 +286,15 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 				return due;
 			});
 		keptPeers.put(keeper.kept,propagator);
-		keeper.kept.whenComplete((value,error) -> keptPeers.remove(keeper.kept));
+		keeper.kept.whenComplete((value,error) -> {
+			keptPeers.remove(keeper.kept);
+			if (error==null) return;
+			Throwable cause=PeerConnectionException.unwrap(error);
+			if (!(cause instanceof CancellationException) && !(cause instanceof PeerConnectionException)) {
+				org.slf4j.LoggerFactory.getLogger(LatticeNode.class)
+					.warn("Stopped keeping peer {} after an unexpected failure",name,cause);
+			}
+		});
 		keeper.start(admitted);
 		return keeper.kept;
 	}

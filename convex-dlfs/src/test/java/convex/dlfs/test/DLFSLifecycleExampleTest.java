@@ -10,6 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -62,9 +64,11 @@ class DLFSLifecycleExampleTest {
 
 	@Test void webdavDurableCompletionFailsWhenFlushFailsAndCanBeRetried() throws Exception {
 		var flushes=new AtomicInteger();
+		var expected=new IOException("disk unavailable");
+		var failures=new LinkedBlockingQueue<Exception>();
 		try (var store=new EtchStore(Etch.createTempEtch("dlfs-durable-http")) {
 			@Override public void flush() throws IOException {
-				if (flushes.getAndIncrement()==0) throw new IOException("disk unavailable");
+				if (flushes.getAndIncrement()==0) throw expected;
 				super.flush();
 			}
 		}; var client=HttpClient.newHttpClient()) {
@@ -77,7 +81,7 @@ class DLFSLifecycleExampleTest {
 				try { host.checkpoint(); }
 				catch (IOException e) { throw new UncheckedIOException(e); }
 			});
-			try (var server=DLFSServer.create(routes)) {
+			try (var server=DLFSServer.create(routes).onFailure(failures::add)) {
 				server.start(0);
 				var request=HttpRequest.newBuilder(URI.create("http://localhost:"+server.getPort()+"/dlfs/home/hello.txt"))
 					.PUT(HttpRequest.BodyPublishers.ofString("Hello")).build();
@@ -87,6 +91,10 @@ class DLFSLifecycleExampleTest {
 				int status=client.send(request,HttpResponse.BodyHandlers.ofString()).statusCode();
 				assertTrue(status>=200 && status<300);
 				assertEquals(2,flushes.get());
+				var failure=assertInstanceOf(UncheckedIOException.class,failures.poll(5,TimeUnit.SECONDS));
+				assertSame(expected,failure.getCause());
+				server.close();
+				assertTrue(failures.isEmpty(),"No additional request failures");
 			}
 			var restored=LatticeHost.open(store);
 			var reader=restored.addApplication(new DLFSApplication(restored));

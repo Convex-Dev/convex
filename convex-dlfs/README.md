@@ -170,6 +170,12 @@ server.start(8080); // use 0 for a random port
 // Drives are now served under http://localhost:8080/dlfs/{drive}/{path}
 ```
 
+Before starting, `server.onFailure(handler)` can replace default logging of
+unhandled HTTP exceptions with structured application reporting. The handler
+receives the original exception on a request thread and must not throw. Failed
+requests still receive HTTP 500; normal HTTP and bad-request responses keep
+their existing handling.
+
 The server binds to `127.0.0.1` by default. Calling `setBindHost(...)` is an explicit
 decision to expose it on another interface. `createEphemeralWithAudience(keyPair)`
 adds JWT validation and requires authentication for mutations. Production code

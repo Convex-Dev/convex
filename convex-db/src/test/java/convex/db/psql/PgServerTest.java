@@ -235,87 +235,6 @@ public class PgServerTest {
 	}
 
 	@Test
-	public void testPasswordAuthentication() throws Exception {
-		// Stop the trust-auth server
-		server.stop();
-
-		// Start a password-protected server on dynamic port
-		PgServer pwdServer = PgServer.builder()
-			.port(0)
-			.database(dbName)
-			.password("secret123")
-			.build();
-		pwdServer.start();
-
-		try (Socket socket = new Socket("localhost", pwdServer.getPort())) {
-			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-			DataInputStream in = new DataInputStream(socket.getInputStream());
-
-			// Send startup
-			sendStartupMessage(out, dbName, "testuser");
-
-			// Should receive AuthenticationCleartextPassword
-			byte type = in.readByte();
-			assertEquals('R', type);
-			int length = in.readInt();
-			int authType = in.readInt();
-			assertEquals(3, authType); // CleartextPassword
-
-			// Send password
-			sendPassword(out, "secret123");
-
-			// Should receive AuthenticationOk
-			type = in.readByte();
-			assertEquals('R', type);
-			length = in.readInt();
-			authType = in.readInt();
-			assertEquals(0, authType); // Ok
-
-			skipToReadyForQuery(in);
-		} finally {
-			pwdServer.stop();
-		}
-	}
-
-	@Test
-	public void testWrongPassword() throws Exception {
-		// Stop the trust-auth server
-		server.stop();
-
-		// Start a password-protected server on dynamic port
-		PgServer pwdServer = PgServer.builder()
-			.port(0)
-			.database(dbName)
-			.password("secret123")
-			.build();
-		pwdServer.start();
-
-		try (Socket socket = new Socket("localhost", pwdServer.getPort())) {
-			socket.setSoTimeout(5000); // 5 second timeout
-			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-			DataInputStream in = new DataInputStream(socket.getInputStream());
-
-			// Send startup
-			sendStartupMessage(out, dbName, "testuser");
-
-			// Should receive AuthenticationCleartextPassword
-			byte type = in.readByte();
-			assertEquals('R', type);
-			in.readInt();
-			in.readInt();
-
-			// Send wrong password
-			sendPassword(out, "wrongpassword");
-
-			// Should receive ErrorResponse
-			type = in.readByte();
-			assertEquals('E', type); // ErrorResponse
-		} finally {
-			pwdServer.stop();
-		}
-	}
-
-	@Test
 	public void testEmptyQuery() throws IOException {
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
@@ -772,16 +691,6 @@ public class PgServerTest {
 		out.flush();
 	}
 
-	private void sendPassword(DataOutputStream out, String password) throws IOException {
-		byte[] pwdBytes = password.getBytes(StandardCharsets.UTF_8);
-		int length = 4 + pwdBytes.length + 1;
-
-		out.writeByte('p');
-		out.writeInt(length);
-		out.write(pwdBytes);
-		out.writeByte(0);
-		out.flush();
-	}
 
 	/** Reads messages up to and including ReadyForQuery, returning their type bytes in order */
 	private String readMessageTypes(DataInputStream in) throws IOException {

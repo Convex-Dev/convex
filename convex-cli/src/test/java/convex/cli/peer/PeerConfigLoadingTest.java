@@ -44,6 +44,7 @@ class PeerConfigLoadingTest {
 		Files.writeString(file,"{auth:{publicAccess:false},mcp:{enabled:false}}");
 
 		Main main=new Main();
+		main.commandLine.setErr(new PrintWriter(new StringWriter()));
 		var parseResult=main.commandLine.parseArgs("peer","--config",file.toString());
 		Peer peer=(Peer) parseResult.subcommand().commandSpec().userObject();
 		var launchConfig=peer.loadPeerConfig();
@@ -60,6 +61,7 @@ class PeerConfigLoadingTest {
 		Files.writeString(file,"{peer:{store:'peer.etch',etch:{version:3}}}");
 
 		Main main=new Main();
+		main.commandLine.setErr(new PrintWriter(new StringWriter()));
 		var parseResult=main.commandLine.parseArgs("peer","--config",file.toString());
 		Peer peer=(Peer)parseResult.subcommand().commandSpec().userObject();
 		var launchConfig=peer.loadPeerConfig();

@@ -6,6 +6,7 @@ import convex.db.psql.msg.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -257,7 +258,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 				executeQuery(ctx, sql);
 			} catch (SQLException e) {
-				log.warn("Query error: {}", e.getMessage(), e);
+				reportQueryFailure(e);
 				writeError(ctx, ErrorResponse.fromException(e));
 				// Stop processing on error
 				break;
@@ -562,7 +563,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 			write(ctx, ParseComplete.INSTANCE);
 		} catch (Exception e) {
-			log.warn("Parse error: {}", e.getMessage(), e);
+			reportQueryFailure(e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
@@ -597,7 +598,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 			write(ctx, BindComplete.INSTANCE);
 		} catch (Exception e) {
-			log.warn("Bind error: {}", e.getMessage(), e);
+			reportQueryFailure(e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
@@ -642,7 +643,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				write(ctx, (rows == null) ? NoData.INSTANCE : rows);
 			}
 		} catch (Exception e) {
-			log.warn("Describe error: {}", e.getMessage(), e);
+			reportQueryFailure(e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		} finally {
 			if (describe.type() == 'P') closeDetachedPortalStatement(portals.get(describe.name()));
@@ -687,7 +688,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				.routine("RevalidateCachedQuery")
 				.build());
 		} catch (SQLException e) {
-			log.warn("Execute error: {}", e.getMessage(), e);
+			reportQueryFailure(e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		} catch (RuntimeException e) {
 			// Runtime exceptions from Calcite (type coercion, etc.) are query errors
@@ -1124,6 +1125,27 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		write(ctx, CloseComplete.INSTANCE);
 	}
 
+	/** Query rejections are returned to the client; internal failures still alert operators. */
+	private static void reportQueryFailure(Exception failure) {
+		if (failure instanceof SQLException sql && !isInternalFailure(sql)) {
+			log.debug("Query rejected",failure);
+		} else {
+			log.error("Unexpected query failure",failure);
+		}
+	}
+
+	static boolean isInternalFailure(SQLException failure) {
+		for (Throwable cause=failure;cause!=null;cause=cause.getCause()) {
+			if (cause instanceof SQLException sql && sql.getSQLState()!=null) {
+				String state=sql.getSQLState();
+				// PostgreSQL internal errors and the JDBC boundary's unclassified failures.
+				if (state.startsWith("XX") || state.startsWith("HY")) return true;
+			}
+			if (cause.getCause()==cause) break;
+		}
+		return false;
+	}
+
 	private void sendErrorAndClose(ChannelHandlerContext ctx, String code, String message) {
 		write(ctx, ErrorResponse.builder()
 			.severity("FATAL")
@@ -1198,7 +1220,12 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-		log.error("Protocol error", cause);
+		if (cause instanceof CorruptedFrameException) {
+			// Invalid remote input is a rejected connection, not a server fault.
+			log.debug("Rejected malformed PostgreSQL frame",cause);
+		} else {
+			log.error("Protocol error",cause);
+		}
 		closeConnection();
 		ctx.close();
 	}
