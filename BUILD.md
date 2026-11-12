@@ -74,6 +74,12 @@ for asynchronous commands so failed assertions still stop the worker. Local chil
 process tests also bound startup and shutdown and isolate temporary files for
 cleanup on Windows. These tests run cross-platform; CI remains Linux-based.
 
+Client correctness coverage in `convex-integration` also runs locally in the
+ordinary test phase: JSON, native HTTP and TCP clients share one in-memory peer
+and REST server, with separate clients and accounts per test. Deployment smoke
+checks are a separate opt-in profile; see
+[the integration module](convex-integration/README.md#deployment-smoke-checks).
+
 ### Property tests
 
 Core property tests use the existing `junit-quickcheck` generators and runners,

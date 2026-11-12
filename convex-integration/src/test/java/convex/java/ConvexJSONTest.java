@@ -1,61 +1,42 @@
 package convex.java;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.AccountKey;
-import convex.core.data.Keyword;
 import convex.core.init.Init;
-import convex.peer.API;
-import convex.peer.ConfigException;
-import convex.peer.LaunchException;
-import convex.peer.Server;
-import convex.restapi.RESTServer;
+import convex.test.LocalClientNetwork;
 
 /**
  * Tests for ConvexJSON client functionality
  */
+@ExtendWith(LocalClientNetwork.Extension.class)
+@Timeout(30)
 public class ConvexJSONTest {
+	private String host;
+	private AccountKey peerKey;
 
-	static RESTServer server;
-	static int port;
-	static String host;
-	static AKeyPair skp;
-	static Address genesis=Init.GENESIS_ADDRESS;
-	
-	@BeforeAll
-	public static void init() throws InterruptedException, ConfigException, LaunchException {
-		HashMap<Keyword,Object> config=new HashMap<>();
-		config.put(Keywords.KEYPAIR, AKeyPair.generate());
-		config.put(Keyword.create("faucet"), true);
-		Server s=API.launchPeer(config);
-		RESTServer rs=RESTServer.create(s);
-		rs.start(0);
-		port=rs.getPort();
-		server=rs;
-		skp=s.getKeyPair();
-		host="http://localhost:"+port;
+	@BeforeEach
+	void useNetwork(LocalClientNetwork network) {
+		host=network.uri().toString();
+		peerKey=network.peerKey();
 	}
-	
-	@AfterAll 
-	public static void cleanShutdown() {
-		server.close();
-	}
-	
+
 	@Test 
 	public void testCreateAccount() {
 		ConvexJSON c=ConvexJSON.connect(host);
@@ -83,8 +64,11 @@ public class ConvexJSONTest {
 		// Response should contain amount allocated
 		assertEquals(AMT,resp.get("amount"));
 		
-		// Account should not have requested balance
+		// Account should now have the requested balance
 		assertEquals(AMT,c.queryBalance());
+		Map<String,Object> topUp=c.faucet(addr,999);
+		assertEquals(999L,topUp.get("amount"));
+		assertEquals(AMT+999,c.queryBalance());
 	}
 	
 	@Test 
@@ -100,6 +84,7 @@ public class ConvexJSONTest {
 		Map<String,Object> res=c.query("*address*");
 		assertNotNull(res, "Query result should not be null");
 		assertEquals(addr.toString(),res.get("result"));
+		assertEquals(addr,Address.parse(res.get("value")));
 		
 		// Query *key*
 		res=c.query(Symbols.STAR_KEY.toString());
@@ -110,14 +95,14 @@ public class ConvexJSONTest {
 	@Test 
 	public void testAccountGenesisInfo() {
 		ConvexJSON c=ConvexJSON.connect(host);
-		Address addr=genesis;
+		Address addr=Init.GENESIS_ADDRESS;
 		c.setAddress(addr);
 		
 		// Test values for basic new account
 		Map<String,Object> res=c.queryAccount();
 		assertEquals(addr.longValue(),res.get("address"));
 		assertTrue(res.get("balance") instanceof Long);
-		assertEquals(skp.getAccountKey(),AccountKey.parse(res.get("key")));
+		assertEquals(peerKey,AccountKey.parse(res.get("key")));
 	}
 	
 	@Test 
@@ -134,6 +119,7 @@ public class ConvexJSONTest {
 		assertEquals(addr.longValue(),res.get("address"));
 		assertEquals(1000000L,res.get("balance"));
 		assertEquals(0L,res.get("sequence"));
+		assertTrue(res.containsKey("memorySize"));
 		assertEquals("user",res.get("type"));
 		
 		// Should get null for non-existent account
@@ -142,13 +128,10 @@ public class ConvexJSONTest {
 	}
 	
 	@Test 
-	public void testTransactGenesis() {
+	public void testTransact() {
 		ConvexJSON c=ConvexJSON.connect(host);
-		AKeyPair kp=skp;
-		Address addr=genesis;
-		c.setKeyPair(kp);
-		c.setAddress(addr);
-		
+		c.useNewAccount(1_000_000);
+
 		Map<String,Object> rm=c.transact("(+ 1 2)");
 		assertNotNull(rm, "Transaction result should not be null");
 		assertEquals(3L,rm.get("value"));
@@ -177,5 +160,32 @@ public class ConvexJSONTest {
 		assertEquals("3",rm.get("result"));
 		
 		assertTrue(c.queryBalance()<bal);
+	}
+
+	@Test
+	public void testQueryAsync() throws Exception {
+		ConvexJSON c=ConvexJSON.connect(host);
+		c.useNewAccount();
+		Map<String,Object> result=c.queryAsync("(+ 1 2)").get(10,TimeUnit.SECONDS);
+		assertFalse(result.containsKey("errorCode"),result::toString);
+		assertEquals(3L,result.get("value"));
+		Map<String,Object> account=c.queryAccountAsync(c.getAddress()).get(10,TimeUnit.SECONDS);
+		assertEquals(c.getAddress().longValue(),account.get("address"));
+	}
+
+	@Test
+	public void testNewAccountAndRepeatedTransactions() throws Exception {
+		ConvexJSON c=ConvexJSON.connect(host);
+		Address address=c.useNewAccount(1_000_666);
+		assertNotNull(address);
+		assertEquals(1_000_666L,c.queryBalance());
+		for (int i=0;i<10;i++) {
+			Map<String,Object> result=c.transactAsync("(def a "+i+")").get(10,TimeUnit.SECONDS);
+			assertFalse(result.containsKey("errorCode"),result::toString);
+			assertEquals((long)i,result.get("value"));
+		}
+		assertEquals(9L,c.query("a").get("value"));
+		assertEquals(10L,c.queryAccount().get("sequence"));
+		assertTrue(c.queryBalance()<1_000_666L);
 	}
 }
