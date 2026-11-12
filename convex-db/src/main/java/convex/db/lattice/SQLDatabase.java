@@ -90,6 +90,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	private final BiPredicate<ACell, AccountKey> ownerVerifier;
 	private final BinaryOperator<Index<Keyword, ACell>> policy;
 	private final Supplier<CVMLong> clock;
+	private final boolean readOnly;
 
 	/**
 	 * Binds a database to its cursor. Construction reads and writes nothing.
@@ -105,9 +106,16 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor, AString dbName, AKeyPair keyPair,
 			ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier,
 			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
-		super(cursor);
+		this(cursor,dbName,keyPair,ownerKey,ownerVerifier,policy,clock,false);
+	}
+
+	private SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor, AString dbName, AKeyPair keyPair,
+			ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier,
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock, boolean readOnly) {
+		super(readOnly ? cursor.readOnly() : cursor);
+		this.readOnly = readOnly;
 		this.dbName = dbName;
-		this.keyPair = keyPair;
+		this.keyPair = readOnly ? null : keyPair;
 		this.ownerKey = ownerKey;
 		this.ownerVerifier = ownerVerifier;
 		this.policy = Objects.requireNonNull(policy, "Merge policy must not be null");
@@ -252,6 +260,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * The fork reads from a snapshot at fork time; writes accumulate locally.
 	 * Call {@link #sync()} on the fork to merge changes back into the parent.
 	 * Discard the fork (don't sync) for rollback.
+	 * A read-only binding instead returns a read-only snapshot; its writes and sync
+	 * are refused. Discard it to finish the read-only transaction.
 	 *
 	 * @return Forked SQLDatabase instance
 	 */
@@ -259,11 +269,28 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return rebind(storage.fork());
 	}
 
-	/** Subclasses override this to return their own type, so forks keep their policy and clock. */
+	/**
+	 * Subclasses override this to return their own type, so forks keep their policy
+	 * and clock. Read-only bindings remain read-only on replacement storage.
+	 */
 	@Override
 	public SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier,policy,clock);
+		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier,policy,clock,readOnly);
 	}
+
+	/**
+	 * Returns a live read-only binding to this database, without signing authority.
+	 * Tables and cursors derived from it cannot write. Forks are read-only snapshots;
+	 * rebinding retains the restriction. This does not change other bindings.
+	 *
+	 * @return Read-only database, or this binding if already read-only
+	 */
+	public SQLDatabase readOnly() {
+		return readOnly ? this : new SQLDatabase(storage,dbName,null,ownerKey,ownerVerifier,policy,clock,true);
+	}
+
+	/** Returns whether this binding permanently refuses writes. */
+	public final boolean isReadOnly() { return readOnly; }
 
 	/** Returns this database's merge policy. */
 	public BinaryOperator<Index<Keyword, ACell>> getPolicy() {

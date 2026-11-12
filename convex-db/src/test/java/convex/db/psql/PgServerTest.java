@@ -91,6 +91,26 @@ public class PgServerTest {
 	}
 
 	@Test
+	void readOnlyServerEnforcesModeOnNetworkConnections() throws Exception {
+		server.stop();
+		server = PgServer.builder().port(0).database(dbName).readOnly(true).build();
+		server.start();
+		for (String mode : new String[] {"simple", "extended"}) {
+			try (var c = DriverManager.getConnection("jdbc:postgresql://localhost:" + server.getPort()
+					+ "/" + dbName + "?preferQueryMode=" + mode, "test", ""); var s = c.createStatement()) {
+				var failure = assertThrows(java.sql.SQLException.class, () -> s.executeUpdate("DELETE FROM users"));
+				assertEquals("25006", failure.getSQLState());
+				try (var r = s.executeQuery("SELECT COUNT(*) FROM users")) {
+					assertTrue(r.next()); assertEquals(2, r.getLong(1));
+				}
+				c.setAutoCommit(false);
+				try (var r = s.executeQuery("SELECT COUNT(*) FROM users")) { assertTrue(r.next()); }
+				c.commit();
+			}
+		}
+	}
+
+	@Test
 	public void testSSLRequest() throws IOException {
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());

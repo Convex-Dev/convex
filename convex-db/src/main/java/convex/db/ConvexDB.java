@@ -359,4 +359,17 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	public Connection getConnection(String dbName) throws SQLException {
 		return ConvexDriver.connect(this, dbName);
 	}
+
+	/**
+	 * Opens a live read-only connection to one database, without publishing a name.
+	 * The caller cannot remove the restriction with {@code setReadOnly(false)}.
+	 * Explicit transactions read snapshots; other connections may continue writing.
+	 *
+	 * @param dbName Database name
+	 * @return Permanently read-only JDBC connection
+	 * @throws SQLException if connection creation fails
+	 */
+	public Connection getReadOnlyConnection(String dbName) throws SQLException {
+		return ConvexDriver.connect(database(dbName).readOnly());
+	}
 }

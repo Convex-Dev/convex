@@ -165,6 +165,50 @@ Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
 
 `PgServer` connects this way unless it is given a connection supplier.
 
+## Read-only access
+
+An embedder can hand out a live connection with a permanent read-only restriction:
+
+```java
+try (Connection reader = cdb.getReadOnlyConnection("market")) {
+    // Queries see the current database; this connection cannot write it.
+}
+```
+
+For code holding one `SQLDatabase`, the equivalent is
+`ConvexDriver.connect(database.readOnly())`. The read-only component has no signing
+key, and its tables and cursors refuse writes. Its forks are read-only snapshots;
+rebinding keeps the restriction. Other bindings to the same database may still write.
+
+Outside an explicit transaction, queries use the live database. With
+`setAutoCommit(false)`, queries use a snapshot until commit or rollback. Finishing
+a read-only transaction discards that snapshot; it does not merge or checkpoint.
+If manual-commit mode remains enabled, a fresh snapshot starts immediately.
+Closing a read-only connection does not request a checkpoint either.
+Switching a previously writable file connection to read-only does not cancel its
+existing save obligation: earlier write attempts still cause commit or close to
+checkpoint. This includes partially failed writes.
+
+An ordinary writable connection can temporarily call `setReadOnly(true)` and
+later `setReadOnly(false)`. Changes of mode during an explicit transaction are
+refused with `25001`. A permanently restricted connection refuses
+`setReadOnly(false)` with `25006`; the JDBC setting cannot increase its authority.
+
+The SQL layer rejects DML and DDL with `25006` before evaluation or mutation,
+including writes that would affect no rows. Prepared writes are checked again
+when executed, and queued batches cannot bypass a later mode change. DDL is also
+checked before preparation, since Calcite can execute it there. Independently of
+read-only mode, `executeQuery` refuses non-query statements with `07000` before
+execution. `unwrap` exposes supported JDBC interfaces through the same boundary,
+not the underlying implementation objects.
+
+For a PostgreSQL server, add `.readOnly(true)` to its builder. This applies to all
+connections that server creates, including those from a custom supplier. Such a
+supplier must return fresh connections that enforce JDBC read-only mode. An
+embedder can instead supply connections from `getReadOnlyConnection` to keep the
+restriction permanent even for the Java recipient. This is a local access policy;
+it does not change replication or other connections' permissions.
+
 ## Usage Examples
 
 ### Quick Start (In-Memory)

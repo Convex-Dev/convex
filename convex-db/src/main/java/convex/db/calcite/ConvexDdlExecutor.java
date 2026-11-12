@@ -60,6 +60,7 @@ public class ConvexDdlExecutor extends DdlExecutorImpl {
 	public void execute(SqlCreateTable create, CalcitePrepare.Context context) {
 		final Pair<CalciteSchema, String> pair = schema(context, create.name);
 		CalciteSchema schema = requireNonNull(pair.left, "schema");
+		requireWritable(schema);
 		String tableName = pair.right;
 
 		// Check if table already exists, under whatever case it is stored
@@ -115,6 +116,7 @@ public class ConvexDdlExecutor extends DdlExecutorImpl {
 		final Pair<CalciteSchema, String> pair = schema(context, drop.name);
 		CalciteSchema schema = pair.left;
 		String name = pair.right;
+		if (schema != null) requireWritable(schema);
 
 		if (schema == null) {
 			if (drop.ifExists) return;
@@ -142,6 +144,11 @@ public class ConvexDdlExecutor extends DdlExecutorImpl {
 		default:
 			throw new UnsupportedOperationException("DROP " + drop.getKind() + " not supported");
 		}
+	}
+
+	private static void requireWritable(CalciteSchema schema) {
+		ConvexSchema convex = schema.plus().unwrap(ConvexSchema.class);
+		if (convex != null) convex.requireWritable();
 	}
 
 	private static Pair<CalciteSchema, String> schema(

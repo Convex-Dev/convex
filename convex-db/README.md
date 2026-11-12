@@ -28,6 +28,12 @@ ResultSet rs = stmt.executeQuery("SELECT * FROM users WHERE id = 1");
 
 ## JDBC Usage
 
+Embedders can use `cdb.getReadOnlyConnection("mydb")` for a live connection whose
+read-only restriction cannot be removed, or bind directly with
+`ConvexDriver.connect(database.readOnly())`. SQL writes are refused before
+execution. See [read-only access](docs/JDBC.md#read-only-access) for transaction
+semantics and the PostgreSQL server's `.readOnly(true)` option.
+
 For a durable local installation, open a host over an Etch store. Networking is
 optional and does not control saving:
 

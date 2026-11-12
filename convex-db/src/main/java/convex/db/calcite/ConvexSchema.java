@@ -48,6 +48,13 @@ public class ConvexSchema extends AbstractSchema {
 		return database;
 	}
 
+	/** Refuses SQL writes before evaluating rows or changing the catalogue. */
+	public void requireWritable() {
+		if (database.isReadOnly()) {
+			throw new RuntimeException(new java.sql.SQLException("Database binding is read-only", "25006"));
+		}
+	}
+
 	@Override
 	public boolean isMutable() {
 		return true; // Allow DDL modifications

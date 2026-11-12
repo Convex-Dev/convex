@@ -77,6 +77,27 @@ public class PgExtendedQueryTest {
 		cdb.unregister(dbName);
 	}
 
+	@Test
+	void readOnlyBindingRefusesSimpleAndExtendedWritesAndRecoversAfterRollback() throws Exception {
+		channel.finishAndReleaseAll();
+		channel = new EmbeddedChannel(new PgProtocolHandler(() -> {
+			try { return cdb.getReadOnlyConnection(dbName); }
+			catch (SQLException e) { throw new RuntimeException(e); }
+		}, null));
+		channel.writeInbound(new PgMessageDecoder.StartupMessage(3, 0, Map.of("user", "testuser", "database", dbName)));
+		responses();
+		channel.writeInbound(new PgMessageDecoder.Query("DROP TABLE users"));
+		assertEquals("E(25006)Z", responses());
+		assertEquals("12E(25006)Z", execute("INSERT INTO users VALUES ($1, $2, $3)", new int[] {23, 25, 25}, "3", "Eve", "eve@example.com"));
+		channel.writeInbound(new PgMessageDecoder.Query("BEGIN; DELETE FROM users"));
+		assertEquals("CE(25006)Z", responses());
+		channel.writeInbound(new PgMessageDecoder.Query("SELECT * FROM users"));
+		assertEquals("E(25P02)Z", responses());
+		channel.writeInbound(new PgMessageDecoder.Query("ROLLBACK"));
+		assertEquals("CZ", responses());
+		assertEquals("12D[Alice]CZ", query("SELECT name FROM users WHERE id = $1", 23, "1"));
+	}
+
 	// ========== Text format parameters ==========
 
 	@Test

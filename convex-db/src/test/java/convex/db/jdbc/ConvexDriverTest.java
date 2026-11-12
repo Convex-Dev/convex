@@ -358,6 +358,47 @@ public class ConvexDriverTest {
 		}
 	}
 
+	@Test
+	public void readOnlyCommitAndCloseDoNotCheckpointOtherWriters() throws Exception {
+		File file = File.createTempFile("convex-read-only", ".etch");
+		file.deleteOnExit();
+		String url = "jdbc:convex:file:" + file.getAbsolutePath().replace('\\', '/');
+		try (Connection writer = DriverManager.getConnection(url); Statement write = writer.createStatement()) {
+			write.execute("CREATE TABLE t (id INTEGER)");
+			writer.commit();
+			var instance = ConvexDriver.instances.get("file:" + file.getCanonicalPath());
+			var saved = instance.store.getRootData();
+			write.execute("INSERT INTO t VALUES (1)");
+			try (Connection reader = DriverManager.getConnection(url); Statement read = reader.createStatement()) {
+				reader.setReadOnly(true);
+				reader.setAutoCommit(false);
+				try (ResultSet rows = read.executeQuery("SELECT COUNT(*) FROM t")) {
+					assertTrue(rows.next()); assertEquals(1, rows.getLong(1));
+				}
+				reader.commit();
+				reader.setAutoCommit(true);
+				assertEquals(saved, instance.store.getRootData());
+			}
+			assertEquals(saved, instance.store.getRootData());
+			writer.commit();
+			assertFalse(saved.equals(instance.store.getRootData()));
+		}
+	}
+
+	@Test
+	public void switchingToReadOnlyKeepsEarlierWritesDurableOnClose() throws Exception {
+		File file = File.createTempFile("convex-read-only-save", ".etch");
+		file.deleteOnExit();
+		String url = "jdbc:convex:file:" + file.getAbsolutePath().replace('\\', '/');
+		try (Connection c = DriverManager.getConnection(url); Statement s = c.createStatement()) {
+			s.execute("CREATE TABLE t (id INTEGER)");
+			s.execute("INSERT INTO t VALUES (1)");
+			c.setReadOnly(true);
+		}
+		var instance = ConvexDriver.instances.get("file:" + file.getCanonicalPath());
+		assertEquals(instance.cdb.cursor().get(), instance.store.getRootData());
+	}
+
 	// ========== Direct API ==========
 
 	@Test

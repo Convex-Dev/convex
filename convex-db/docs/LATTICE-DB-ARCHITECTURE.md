@@ -126,6 +126,20 @@ tx2.sync();  // merge into db cursor (both rows now visible)
 server.getHost().checkpoint();
 ```
 
+## Read-only bindings
+
+`SQLDatabase.readOnly()` binds the database to a live read-only cursor and removes
+its signing key. The restriction belongs to this binding, not the stored schema:
+writers using other bindings and incoming replication can continue updating the
+database. Child table views share the restriction, and `fork()` returns a
+read-only snapshot. `rebind()` preserves it on replacement storage.
+
+JDBC binds directly to that component through `ConvexDriver.connect(database)`.
+SQL checks refuse writes before execution; the cursor supplies the underlying
+write boundary. Read-only JDBC transactions finish without publishing their
+snapshot. The connection contracts and examples are in
+[read-only access](JDBC.md#read-only-access).
+
 ## Merge Policy
 
 How a database merges is not built into Convex DB: whatever constructs a database

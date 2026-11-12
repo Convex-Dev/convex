@@ -64,11 +64,10 @@ public class PgServer {
 		this.sslContext = builder.sslContext;
 		this.allowPlaintext = builder.allowPlaintext;
 
-		if (builder.connectionSupplier != null) {
-			this.connectionSupplier = builder.connectionSupplier;
-		} else {
+		Supplier<Connection> source = builder.connectionSupplier;
+		if (source == null) {
 			// Default: connect via Convex JDBC driver
-			this.connectionSupplier = () -> {
+			source = () -> {
 				try {
 					return DriverManager.getConnection("jdbc:convex:database=" + database);
 				} catch (SQLException e) {
@@ -76,6 +75,17 @@ public class PgServer {
 				}
 			};
 		}
+		Supplier<Connection> connections = source;
+		this.connectionSupplier = builder.readOnly ? () -> {
+			Connection connection = connections.get();
+			try {
+				connection.setReadOnly(true);
+				return connection;
+			} catch (SQLException | RuntimeException e) {
+				try { connection.close(); } catch (SQLException close) { e.addSuppressed(close); }
+				throw new RuntimeException("Cannot open read-only database connection", e);
+			}
+		} : source;
 	}
 
 	/**
@@ -239,6 +249,20 @@ public class PgServer {
 		private SSLContext sslContext = null;
 		private boolean allowPlaintext = false;
 		private Supplier<Connection> connectionSupplier = null;
+		private boolean readOnly = false;
+
+		/**
+		 * Serves queries through read-only JDBC connections. Convex JDBC rejects writes
+		 * with SQLSTATE 25006; this does not prevent writes through other bindings.
+		 * A custom supplier must return fresh connections that enforce read-only mode.
+		 *
+		 * @param readOnly Whether this server refuses SQL writes (default false)
+		 * @return This builder
+		 */
+		public Builder readOnly(boolean readOnly) {
+			this.readOnly = readOnly;
+			return this;
+		}
 
 		/**
 		 * Sets the port to listen on. Default is 5432.

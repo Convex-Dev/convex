@@ -215,6 +215,7 @@ public class ConvexTable extends AbstractQueryableTable
 	 * Either way nothing is written.
 	 */
 	public long executeInsert(Enumerable<?> input) {
+		schema.requireWritable();
 		try {
 			List<AVector<ACell>> rows = new java.util.ArrayList<>();
 			for (Object value : input) {
@@ -230,6 +231,7 @@ public class ConvexTable extends AbstractQueryableTable
 	}
 
 	public long executeUpdate(Enumerable<?> input, int columnCount, int[] updateIndices) {
+		schema.requireWritable();
 		try {
 			boolean pkBeingUpdated = false;
 			for (int idx : updateIndices) {
@@ -284,6 +286,7 @@ public class ConvexTable extends AbstractQueryableTable
 	}
 
 	public long executeDelete(Enumerable<?> input) {
+		schema.requireWritable();
 		try {
 			long count = 0;
 			for (Object value : input) {
