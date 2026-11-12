@@ -305,7 +305,7 @@ public abstract class AbstractGUI extends JPanel implements Runnable, AutoClosea
 		}
 	}
 
-	private static void release(AutoCloseable resource) {
+	private void release(AutoCloseable resource) {
 		if ((resource instanceof AbstractGUI gui) && EventQueue.isDispatchThread()) {
 			// Can't wait for a GUI to close on the EDT, so just request it
 			gui.closeGUI();
@@ -315,10 +315,19 @@ public abstract class AbstractGUI extends JPanel implements Runnable, AutoClosea
 			resource.close();
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			log.warn("Interrupted releasing {}",resource);
+			reportReleaseFailure(resource,e);
 		} catch (Exception e) {
-			log.warn("Failed to release {}",resource,e);
+			reportReleaseFailure(resource,e);
 		}
+	}
+
+	/**
+	 * Reports a resource that failed to close, without stopping other cleanup.
+	 * Overrides receive the original exception and must not throw. May run off the EDT.
+	 */
+	protected void reportReleaseFailure(AutoCloseable resource,Exception failure) {
+		if (failure instanceof InterruptedException) log.warn("Interrupted releasing {}",resource);
+		else log.warn("Failed to release {}",resource,failure);
 	}
 
 	private static void checkNotDispatchThread() {

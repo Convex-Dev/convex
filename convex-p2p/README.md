@@ -221,6 +221,12 @@ bob.whenInboundConnectionUpgraded(aliceKey.getAccountKey()).join();
 alice.getApplication().sync();
 ```
 
+Before launch, `onInitialisationFailure((peer, failure) -> ...)` can replace default
+bootstrap-failure logging with structured reporting. The callback receives the
+unwrapped exception and must not throw; it may run on a connection worker.
+Shutdown cancellation is ignored. Failed connection futures retain their causes
+regardless of the reporting handler.
+
 `connect` completes after the bootstrap endpoint is authenticated and has
 acknowledged the path-scoped `[:p2p :nodes]` update, and after the connecting
 node has pulled and merged the bootstrap node's infrastructure regions and current

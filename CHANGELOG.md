@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Let embedders receive original GUI cleanup and P2P bootstrap exceptions through per-instance failure handlers.
 - Bind Swing displays to domain getters with automatic refresh and cleanup; includes a local lattice draft example. ([Swing bindings](convex-gui/docs/BINDINGS.md))
 - Provide live read-only database bindings and enforce read-only JDBC and PostgreSQL connections. ([Read-only access](convex-db/docs/JDBC.md#read-only-access), [#803](https://github.com/Convex-Dev/convex/issues/803))
 - Let embedders handle incoming connections directly or wrap standard lattice delivery, with backpressure and connection cleanup. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers), [#821](https://github.com/Convex-Dev/convex/issues/821))

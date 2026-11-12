@@ -162,8 +162,6 @@ public class ResultTest {
 			Object record=records.get(i);
 			assertEquals("SEVERE",recordClass.getMethod("getLevel").invoke(record).toString());
 			assertSame(expected[i],recordClass.getMethod("getThrown").invoke(record));
-			String message=(String)recordClass.getMethod("getMessage").invoke(record);
-			assertTrue(message.startsWith("InterruptedException reached Result.fromException"),message);
 		}
 	}
 

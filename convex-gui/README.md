@@ -57,6 +57,13 @@ cd convex
 java -jar convex-integration/target/convex.jar desktop
 ```
 
+## Resource cleanup
+
+`AbstractGUI` closes registered resources even when one reports an exception.
+Subclasses may override `reportReleaseFailure(resource, failure)` to receive the
+original exception instead of the default warning log. The handler must not
+throw or assume it runs on the Swing event dispatch thread.
+
 ## Documentation
 
 - [Swing bindings](docs/BINDINGS.md) — incremental domain bindings and a runnable lattice example

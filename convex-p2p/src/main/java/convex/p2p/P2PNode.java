@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
@@ -20,6 +21,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -180,6 +182,7 @@ public class P2PNode implements Closeable {
 	private final NodeConfig config;
 	private final AKeyPair keyPair;
 	private final PointOfPresence pointOfPresence;
+	private BiConsumer<Convex,Throwable> initialisationFailureHandler=P2PNode::reportInitialisationFailure;
 	private final ConcurrentHashMap<Convex,CompletableFuture<Void>> initialisations=
 		new ConcurrentHashMap<>();
 	/** Nodes the operator named, whose records are kept however full the registry is. */
@@ -420,6 +423,18 @@ public class P2PNode implements Closeable {
 			throw new IllegalStateException("Node has no key pair; use p2p(userKey) for a read-only view");
 		}
 		return p2p(keyPair.getAccountKey());
+	}
+
+	/**
+	 * Configures reporting of failed peer bootstrap before launch. The handler receives
+	 * the original, unwrapped failure, may run on a connection worker, and must not throw.
+	 * Cancellation during shutdown is not reported.
+	 * This replaces default logging; connection futures still fail with the same cause.
+	 */
+	public P2PNode onInitialisationFailure(BiConsumer<Convex,Throwable> handler) {
+		requireNew("configure initialisation failure reporting");
+		initialisationFailureHandler=Objects.requireNonNull(handler);
+		return this;
 	}
 
 	/**
@@ -1274,7 +1289,8 @@ public class P2PNode implements Closeable {
 		initialised.whenComplete((ignored,error) -> {
 			if (error==null) return;
 			initialisations.remove(peer,initialised);
-			reportInitialisationFailure(peer,error);
+			Throwable cause=PeerConnectionException.unwrap(error);
+			if (!(cause instanceof CancellationException)) initialisationFailureHandler.accept(peer,cause);
 		});
 		try {
 			propagator.getConnectionManager().withPeer(peer.getVerifiedPeer(),false,
