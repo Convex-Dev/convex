@@ -241,6 +241,8 @@ public class ConvexColumnType {
 	 *
 	 * @param relType Calcite type from DDL parsing
 	 * @return ConvexColumnType
+	 * @throws IllegalArgumentException if the declared type is unsupported, with a
+	 *         SQLFeatureNotSupportedException (SQLSTATE 0A000) as its cause
 	 */
 	public static ConvexColumnType fromRelDataType(RelDataType relType) {
 		ConvexType base = ConvexType.fromSqlTypeName(relType.getSqlTypeName());

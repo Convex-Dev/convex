@@ -1,13 +1,21 @@
 # Convex DB: SQL Column Types
 
 **Status: proposed design, partly implemented.** The table entry's format
-version (see [Format Version](#format-version)), the [Calcite type system](#calcite-type-system)
-and the presentation of version 0 integer columns are in place; tables are still written as
-version 0. The rest, including types not yet supported, is tracked in
+version (see [Format Version](#format-version)), the [Calcite type system](#calcite-type-system),
+the presentation of version 0 integer columns and rejection of unsupported declared types
+are in place; tables are still written as version 0. The rest, including types
+not yet supported, is tracked in
 [#793](https://github.com/Convex-Dev/convex/issues/793).
 
 How Convex DB binds the SQL types users declare to the values stored in the lattice, and
 how it presents them through JDBC and the PostgreSQL wire protocol.
+
+DDL now refuses types that the parser recognises but the column binding cannot
+represent, with SQLSTATE `0A000`, before changing the table. This includes `DATE`,
+`TIME`, time-zone timestamp types, `UUID`, arrays, multisets and row types. A column
+without a declared type, or declared explicitly as `ANY`, remains untyped. Syntax
+the parser does not recognise, such as an `INTERVAL` column declaration, still
+reports a syntax error (`42601`). Existing stored schemas are unchanged.
 
 The table entry format, its version, the type identifiers, the stored CVM value of each type
 and the primary key encoding are specified in

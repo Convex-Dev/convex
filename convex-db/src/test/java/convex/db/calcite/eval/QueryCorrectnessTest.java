@@ -15,6 +15,8 @@ import org.apache.calcite.runtime.Hook;
 import org.junit.jupiter.api.Test;
 
 import convex.db.ConvexDB;
+import convex.db.calcite.ConvexColumnType;
+import convex.db.calcite.ConvexType;
 import convex.db.calcite.rules.ConvexRules;
 import convex.db.lattice.RowLWW;
 
@@ -105,9 +107,12 @@ class QueryCorrectnessTest {
 
 	@Test
 	void dateLiteralsMatchLegacyUntypedColumns() throws Exception {
-		// Version 0 DDL records DATE as ANY (#793), with Calcite's epoch-day values.
-		try (Connection c = ConvexDB.create(RowLWW::merge).getConnection("dates"); Statement s = c.createStatement()) {
-			s.execute("CREATE TABLE t (id INTEGER, d DATE)");
+		// Older DDL recorded DATE as ANY (#793). Construct that stored schema directly:
+		// new DATE declarations are refused, but the old epoch-day values must still read.
+		var db = ConvexDB.create(RowLWW::merge);
+		db.database("dates").tables().createTable("T", new String[] {"ID", "D"},
+				new ConvexColumnType[] {ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.ANY)});
+		try (Connection c = db.getConnection("dates"); Statement s = c.createStatement()) {
 			s.execute("INSERT INTO t VALUES (1, DATE '2025-06-01'), (2, DATE '2025-06-02'), (3, DATE '2025-06-03')");
 			assertEquals(List.of("[1]"), rows(s, "SELECT id FROM t WHERE d = DATE '2025-06-01'"));
 			assertEquals(List.of("[2]", "[3]"), rows(s, "SELECT id FROM t WHERE d >= DATE '2025-06-02' ORDER BY id"));

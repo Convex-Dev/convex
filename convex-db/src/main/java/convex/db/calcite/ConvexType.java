@@ -2,6 +2,7 @@ package convex.db.calcite;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Timestamp;
 import java.util.Map;
 
@@ -262,6 +263,8 @@ public enum ConvexType {
 	 *
 	 * @param sqlTypeName The Calcite type
 	 * @return The ConvexType
+	 * @throws IllegalArgumentException if the SQL type has no column representation;
+	 *         the cause carries SQLSTATE 0A000. Only explicit ANY is untyped.
 	 */
 	public static ConvexType fromSqlTypeName(SqlTypeName sqlTypeName) {
 		return switch (sqlTypeName) {
@@ -274,9 +277,12 @@ public enum ConvexType {
 			case BOOLEAN -> BOOLEAN;
 			case VARBINARY -> VARBINARY;
 			case BINARY -> BLOB;
-			case TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE -> TIMESTAMP;
+			case TIMESTAMP -> TIMESTAMP;
 			case ANY -> ANY;
-			default -> ANY;
+			default -> {
+				String message = "Unsupported SQL column type: " + sqlTypeName;
+				throw new IllegalArgumentException(message, new SQLFeatureNotSupportedException(message, "0A000"));
+			}
 		};
 	}
 
