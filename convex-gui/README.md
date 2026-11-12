@@ -66,7 +66,7 @@ throw or assume it runs on the Swing event dispatch thread.
 
 ## Documentation
 
-- [Swing bindings](docs/BINDINGS.md) — incremental domain bindings and a runnable lattice example
+- [Lattice views](docs/LATTICE_VIEWS.md) — Swing views bound to domain components, with a runnable example
 - [Convex Documentation](https://docs.convex.world)
 - [CLI Reference](../convex-cli/README.md)
 - [GitHub Repository](https://github.com/Convex-Dev/convex)

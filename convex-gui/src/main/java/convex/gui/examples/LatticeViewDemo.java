@@ -7,8 +7,8 @@ import javax.swing.JLabel;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.gui.binding.Bindings;
 import convex.gui.components.AbstractGUI;
+import convex.gui.components.LatticePanel;
 import convex.lattice.LatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
@@ -16,46 +16,61 @@ import convex.lattice.generic.MaxLattice;
 import net.miginfocom.swing.MigLayout;
 
 /**
- * Small local example: widgets follow domain getters, and buttons call domain
- * operations. A fork keeps edits private until Apply. No network or store is used.
+ * Two instances of one view bind a published component and its private draft.
+ * Buttons call domain operations. No network or store is used.
  */
 @SuppressWarnings("serial")
-public class LatticeBindingsDemo extends AbstractGUI {
+public class LatticeViewDemo extends AbstractGUI {
 
-	public LatticeBindingsDemo() {
-		super("Lattice bindings");
+	public LatticeViewDemo() {
+		super("Lattice views");
 		setLayout(new MigLayout("wrap 2","[][grow,fill]"));
 		Counter published=new Counter(Root.create(CVMLong.ZERO));
 		Counter draft=published.fork();
-		Bindings bindings=own(Bindings.on(this));
-
-		JLabel publishedValue=new JLabel();
-		JLabel draftValue=new JLabel();
+		CounterPanel publishedView=new CounterPanel(published);
+		CounterPanel draftView=new CounterPanel(draft);
 		add(new JLabel("Published:"));
-		add(publishedValue);
+		add(publishedView);
 		add(new JLabel("Draft:"));
-		add(draftValue);
-		bindings.text(publishedValue,published::value);
-		bindings.text(draftValue,draft::value);
+		add(draftView);
 
 		JButton increment=new JButton("Increment draft");
 		increment.addActionListener(e -> {
 			draft.increment();
-			bindings.refresh();
+			draftView.refresh();
 		});
 		add(increment);
 		JButton apply=new JButton("Apply");
 		apply.addActionListener(e -> {
 			draft.sync();
-			bindings.refresh();
+			publishedView.refresh();
+			draftView.refresh();
 		});
 		add(apply);
 
-		// Deliberately no binding refresh: sampling also finds changes from other writers.
+		// No explicit refresh: the trigger also finds changes from other writers.
 		JButton external=new JButton("Advance published value");
 		external.addActionListener(e -> published.increment());
 		add(external,"span 2");
 		add(new JLabel("Apply reconciles the draft using the greater value."),"span 2");
+	}
+
+	/** One component binding and one render operation, however many widgets the view contains. */
+	static final class CounterPanel extends LatticePanel<AInteger> {
+		final JLabel value=new JLabel();
+		final JLabel next=new JLabel();
+
+		CounterPanel(Counter counter) {
+			super(counter);
+			setLayout(new MigLayout("insets 0","[grow][]"));
+			add(value,"growx");
+			add(next);
+		}
+
+		@Override protected void render(AInteger snapshot) {
+			value.setText(snapshot.toString());
+			next.setText("Next: "+snapshot.inc());
+		}
 	}
 
 	/** A local high-water mark; max merge does not sum increments from different writers. */
@@ -69,6 +84,6 @@ public class LatticeBindingsDemo extends AbstractGUI {
 	}
 
 	public static void main(String... args) {
-		EventQueue.invokeLater(() -> new LatticeBindingsDemo().run());
+		EventQueue.invokeLater(() -> new LatticeViewDemo().run());
 	}
 }

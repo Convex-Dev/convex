@@ -3,7 +3,6 @@ package convex.gui.actor;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 
-import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
 import convex.auth.did.DID;
@@ -14,17 +13,29 @@ import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.lang.RT;
 import convex.core.text.Text;
-import convex.gui.binding.Bindings;
+import convex.gui.components.LatticePanel;
 import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
+import convex.gui.utils.UpdateTrigger;
+import convex.lattice.ALatticeComponent;
 
 @SuppressWarnings("serial")
-public class AccountInfoPanel extends JPanel {
+public class AccountInfoPanel extends LatticePanel<AccountStatus> {
 
 	protected Address addr;
 	protected JTextArea infoArea;
 
 	public AccountInfoPanel(StateModel<State> manager, Address address) {
+		super(() -> manager.getValue().getAccount(address),UpdateTrigger.changes(manager));
+		initialise(address);
+	}
+
+	public AccountInfoPanel(ALatticeComponent<AccountStatus> account, Address address) {
+		super(account);
+		initialise(address);
+	}
+
+	private void initialise(Address address) {
 		this.addr = address;
 		setLayout(new BorderLayout(0, 0));
 
@@ -34,8 +45,10 @@ public class AccountInfoPanel extends JPanel {
 		add(infoArea, BorderLayout.CENTER);
 		infoArea.setBackground(null);
 		infoArea.setFont(Toolkit.MONO_FONT);
+	}
 
-		Bindings.on(this,manager).text(infoArea,() -> getInfoText(addr,manager.getValue().getAccount(addr)));
+	@Override protected void render(AccountStatus snapshot) {
+		infoArea.setText(getInfoText(addr,snapshot));
 	}
 	
 	public static String getInfoText(Address actor,AccountStatus as) {
