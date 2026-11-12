@@ -93,7 +93,7 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 |---|---|---|
 | `LatticeHost` and its applications | The published root, which applications receive incoming values, and the lattices that merge them | Replication, transport, persistence scheduling |
 | `NodeServer` | Node store root, persistence barriers, attached-group lifecycle and update fan-out for one assembled host | Lattice, merge policy, sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
-| `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
+| `LatticeListener` | Application-owned TCP acceptance, physical limits and one handler per connection; standard routing selects a group | Propagator lifecycle, serving stores, trust or lattice merge |
 | `LatticePropagator` | One propagator group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification, admitted outbound routes and serving `DATA_REQUEST` on them from the group's store | Discovery records, listener assignment, lattice merge or application-owner validation |
@@ -104,6 +104,80 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 `LatticeProtocolEndpoint` remains package-private behind the transport-facing
 methods on `LatticePropagator`, so alternate transports need not access protocol
 internals.
+
+## Incoming connection handlers
+
+`LatticeListener.setConnectionHandler(Function<AConnection, IncomingHandler>)`
+selects a handler once when each connection is accepted, before receiving its
+first message. A handler can serve an application directly, route messages to
+another bounded destination, or wrap the standard lattice handler. No node or
+propagator is required for a custom handler. `NettyServer` exposes the same
+factory for services using the transport directly.
+
+```java
+listener.setConnectionHandler(connection -> {
+    IncomingHandler standard = group.accept(connection);
+    return new IncomingHandler() {
+        public Predicate<Message> handle(Message message) {
+            if (!maySend(connection)) {
+                message.closeConnection();
+                return null;
+            }
+            return standard.handle(message);
+        }
+        public void close() {
+            standard.close();
+        }
+    };
+});
+```
+
+Here `maySend` is the embedder's policy and can inspect the connection's current
+authenticated identity. Connection acceptance itself does not prove that identity.
+`group.accept(connection)` attaches the socket and supplies the standard
+acquisition, merge and reply handling. The caller must start the group first.
+It must assign a connection's lattice traffic to at most one group, preserving
+the serving boundary in [CAD036](https://docs.convex.world/docs/cad/lattice_node).
+
+The factory and the initial `handle` call run on the network event loop and must
+not block. Return null from the factory to refuse the connection. Return null
+from `handle` when the message has been handled, rejected explicitly, or accepted
+for processing. To apply backpressure, return a `Predicate<Message>` without
+having processed the message: reads pause while the transport invokes that
+predicate once on a virtual thread. It may wait for capacity; true means accepted,
+and false reports overload. A retry failure closes the connection. A factory or
+initial handler failure also closes that connection without stopping the listener.
+
+Messages carry their source connection but arrive **undecoded**. The handler
+chooses whether and where to decode; routing alone performs no missing-cell
+acquisition. `getType()` can return `UNKNOWN` before decoding a vector envelope,
+and `getRequestID()` is unavailable until decoded. A custom protocol handler must
+decode its envelope before inspecting the request ID or calling `returnResult`.
+For example, a complete embedded request can use `message.getPayload(null)`.
+Delegating the untouched message to the standard handler lets it decode in its
+serving store and acquire missing cells under the existing trust rules.
+
+Framing and size limits remain in the transport. Replies matching outstanding
+requests on the same connection complete those requests before invoking the
+handler. Handlers must not synchronously wait for a reply on their event loop or
+inside a backpressure retry while that connection's reading is paused.
+
+The transport calls the returned handler's `close()` once on disconnect, including
+listener shutdown and connections that sent no messages. The default is a no-op;
+wrappers must close their delegates. Cleanup must not block the event loop and
+must be safe alongside an outstanding retry on another thread. Retries must be
+bounded and tolerate disconnect; already accepted work may finish after close.
+
+Changing the factory affects new connections only. Setting it to null restores
+the existing selector. `setSelector` also restores standard routing for new
+connections; its existing selection on the first message is retained. The
+selector admits only registered groups. A custom factory chooses its destinations
+explicitly, without that registry restriction. Unregistering a registered group
+also closes this listener's connections attached through wrapped group handlers.
+
+The factory runs once per connection; message delivery reuses that handler and
+adds no per-message handler allocation, future, queue or thread handoff. The
+standard handler retains its existing bounded queue and acquisition behaviour.
 
 ## Application composition
 

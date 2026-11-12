@@ -542,6 +542,28 @@ public class LatticePropagator implements Closeable {
 		requireEndpoint().attachInbound(connection);
 	}
 
+	/**
+	 * Assigns a connection and returns its standard lattice message handler.
+	 * A listener may wrap the handler to inspect or reject messages before any
+	 * acquisition or merge. The wrapper must close this handler on disconnect.
+	 * Assignment does not authenticate the remote; a connection's lattice traffic
+	 * must belong to at most one propagator. No handler is allocated per message.
+	 *
+	 * @param connection physical inbound connection
+	 * @return handler for this connection, owned by the caller
+	 */
+	public convex.net.IncomingHandler accept(AConnection connection) {
+		LatticeProtocolEndpoint protocol=requireEndpoint();
+		protocol.attachInbound(connection);
+		return new convex.net.IncomingHandler() {
+			@Override public Predicate<Message> handle(Message message) {
+				if (message.getConnection()!=connection) throw new IllegalArgumentException("Message belongs to another connection");
+				return protocol.deliver(message);
+			}
+			@Override public void close() { protocol.removeConnection(connection); }
+		};
+	}
+
 	/** Returns whether this group owns the supplied physical inbound connection. */
 	boolean ownsInboundConnection(AConnection connection) {
 		return endpoint!=null && endpoint.ownsInbound(connection);

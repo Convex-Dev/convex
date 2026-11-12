@@ -294,10 +294,13 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 						// best effort
 					}
 				}
+			} catch (RuntimeException | StackOverflowError e) {
+				log.debug("Incoming message retry failed; closing connection",e);
+				ctx.close();
 			} finally {
 				ctx.channel().eventLoop().execute(() -> {
 					backpressured = false;
-					resumeReading(ctx);
+					if (ctx.channel().isActive()) resumeReading(ctx);
 				});
 			}
 		});

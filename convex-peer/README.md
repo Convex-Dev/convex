@@ -164,7 +164,7 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
 | `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagator groups |
 | `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagator groups |
-| `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
+| `LatticeListener` | Application-owned inbound TCP transport with pluggable connection handlers and standard group routing |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
 | `LatticeConnectionManager` | Maintains explicit peers, bounded discovered candidates and authenticated routes for one propagator; discovery schemas live in application modules |
 

@@ -18,16 +18,18 @@ import convex.core.data.Strings;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.net.AServer;
+import convex.net.IncomingHandler;
 import convex.net.impl.netty.NettyServer;
 
 /**
- * Application-owned TCP transport that assigns each physical inbound
- * connection to one {@link LatticePropagator}.
+ * Application-owned TCP transport with one handler per inbound connection.
+ * The standard selector assigns lattice traffic to one {@link LatticePropagator};
+ * a connection handler may instead serve an application without any propagator.
  *
- * <p>The listener owns only socket acceptance and the immutable assignment map.
- * Once selected, the propagator owns every capability and resource associated
- * with the connection: queue admission, trust, acquisition, statistics, serving
- * store and eventual route upgrade. The listener never decodes a lattice value,
+ * <p>The listener owns socket acceptance and handler selection. For standard
+ * lattice routing, the selected propagator owns queue admission, trust,
+ * acquisition, statistics, serving store and eventual route upgrade.
+ * The listener never decodes a lattice value,
  * accesses a serving store or calls {@link NodeServer}; it may inspect only a
  * bounded top-level envelope to return a correlated admission denial.</p>
  *
@@ -54,11 +56,13 @@ public final class LatticeListener implements Closeable {
 	private final boolean nodeGroups;
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
+	private final Set<AConnection> connections=ConcurrentHashMap.newKeySet();
 	private volatile Function<AConnection,LatticePropagator> selector;
+	private volatile Function<AConnection,IncomingHandler> connectionHandler;
 	private volatile AServer server;
 	private volatile Integer port;
 	private boolean launchStarted;
-	private boolean closed;
+	private volatile boolean closed;
 	private volatile boolean running;
 
 	/**
@@ -125,8 +129,8 @@ public final class LatticeListener implements Closeable {
 	 */
 	void revoke(LatticePropagator propagator) {
 		ArrayList<AConnection> connections=new ArrayList<>();
-		assignments.forEach((connection,owner) -> {
-			if (owner==propagator) connections.add(connection);
+		this.connections.forEach(connection -> {
+			if (assignments.get(connection)==propagator || propagator.ownsInboundConnection(connection)) connections.add(connection);
 		});
 		for (AConnection connection:connections) {
 			try {
@@ -157,6 +161,23 @@ public final class LatticeListener implements Closeable {
 	 */
 	public void setSelector(Function<AConnection,LatticePropagator> selector) {
 		this.selector=selector;
+		this.connectionHandler=null;
+	}
+
+	/**
+	 * Chooses a handler once per accepted connection, before receiving messages.
+	 * The non-blocking factory may return null to close the connection. Handlers
+	 * receive messages before lattice decoding or acquisition and may delegate to
+	 * {@link LatticePropagator#accept(AConnection)}. A wrapper owns its delegate and
+	 * must close it. Matching replies complete outstanding requests first.
+	 *
+	 * <p>Changes affect new connections only. A null factory restores the standard
+	 * selector, as does {@link #setSelector(Function)}. Custom factories explicitly
+	 * choose their destinations; the registered-group restriction belongs to the
+	 * standard selector. A socket's lattice traffic must use at most one group.
+	 */
+	public void setConnectionHandler(Function<AConnection,IncomingHandler> factory) {
+		this.connectionHandler=factory;
 	}
 
 	/**
@@ -178,7 +199,7 @@ public final class LatticeListener implements Closeable {
 			return;
 		}
 		NettyServer netty=new NettyServer(port);
-		netty.setMessageDelivery(this::deliver);
+		netty.setConnectionHandler(this::acceptConnection);
 		netty.setDisconnectAction(this::removeConnection);
 		netty.setMaxClientConnections(config.getMaxConnections());
 		netty.setMaxMessageLength(config.getMaxMessageSize());
@@ -200,40 +221,59 @@ public final class LatticeListener implements Closeable {
 		}
 	}
 
-	private Predicate<Message> deliver(Message message) {
-		AConnection connection=message.getConnection();
-		if (connection==null) return reject(message);
-		LatticePropagator propagator=assignments.get(connection);
-		if (propagator==null) {
-			Selection selection=select(connection);
-			propagator=selection.propagator();
-			if (propagator==null) return reject(message,selection.rejection());
+	private IncomingHandler acceptConnection(AConnection connection) {
+		connections.add(connection);
+		if (closed) return null;
+		Function<AConnection,IncomingHandler> factory=connectionHandler;
+		return (factory==null) ? new SelectedHandler(connection) : factory.apply(connection);
+	}
+
+	/** Legacy selection stays lazy; an established connection calls its cached handler. */
+	private final class SelectedHandler implements IncomingHandler {
+		private final AConnection connection;
+		private LatticePropagator propagator;
+		private IncomingHandler target;
+
+		SelectedHandler(AConnection connection) { this.connection=connection; }
+
+		@Override public Predicate<Message> handle(Message message) {
+			if (target==null) {
+				Selection selection=select(connection);
+				propagator=selection.propagator();
+				if (propagator==null) return reject(message,selection.rejection());
+				try {
+					target=propagator.accept(connection);
+				} catch (VirtualMachineError e) {
+					if (!(e instanceof StackOverflowError)) throw e;
+					return containFailure(connection,propagator,e);
+				} catch (Throwable e) {
+					// A group removed meanwhile turns connections away as it closes: no failure
+					if (!allowedPropagators.contains(propagator)) return reject(message,UNAVAILABLE_GROUP);
+					return containFailure(connection,propagator,e);
+				}
+				// A connection's messages arrive one at a time, so nothing else assigns it.
+				// Revoking the group removes it before collecting its sockets, so checking after
+				// assigning turns the connection away here, or revocation releases it.
+				assignments.put(connection,propagator);
+				if (!allowedPropagators.contains(propagator)) {
+					target.close();
+					target=null;
+					removeConnection(connection);
+					return reject(message,UNAVAILABLE_GROUP);
+				}
+			}
 			try {
-				propagator.attachInboundConnection(connection);
+				return target.handle(message);
 			} catch (VirtualMachineError e) {
 				if (!(e instanceof StackOverflowError)) throw e;
 				return containFailure(connection,propagator,e);
 			} catch (Throwable e) {
-				// A group removed meanwhile turns connections away as it closes: no failure
-				if (!allowedPropagators.contains(propagator)) return reject(message,UNAVAILABLE_GROUP);
 				return containFailure(connection,propagator,e);
 			}
-			// A connection's messages arrive one at a time, so nothing else assigns it.
-			// Revoking the group removes it before collecting its sockets, so checking after
-			// assigning turns the connection away here, or revocation releases it.
-			assignments.put(connection,propagator);
-			if (!allowedPropagators.contains(propagator)) {
-				removeConnection(connection);
-				return reject(message,UNAVAILABLE_GROUP);
-			}
 		}
-		try {
-			return propagator.deliverIncomingMessage(message);
-		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
-			return containFailure(connection,propagator,e);
-		} catch (Throwable e) {
-			return containFailure(connection,propagator,e);
+
+		@Override public void close() {
+			if (target!=null) target.close();
 		}
 	}
 
@@ -259,10 +299,6 @@ public final class LatticeListener implements Closeable {
 	}
 
 	/** Best-effort correlated denial; optimistic pushes are simply rejected. */
-	private Predicate<Message> reject(Message message) {
-		return reject(message,"No propagation policy admits this connection");
-	}
-
 	private Predicate<Message> reject(Message message,String reason) {
 		boolean returned=false;
 		try {
@@ -314,6 +350,7 @@ public final class LatticeListener implements Closeable {
 
 	/** Releases the assignment and delegates all connection cleanup to its owner. */
 	private void removeConnection(AConnection connection) {
+		connections.remove(connection);
 		LatticePropagator propagator=assignments.remove(connection);
 		if (propagator==null) return;
 		try {
