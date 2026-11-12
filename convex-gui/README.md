@@ -59,6 +59,7 @@ java -jar convex-integration/target/convex.jar desktop
 
 ## Documentation
 
+- [Swing bindings](docs/BINDINGS.md) — incremental domain bindings and a runnable lattice example
 - [Convex Documentation](https://docs.convex.world)
 - [CLI Reference](../convex-cli/README.md)
 - [GitHub Repository](https://github.com/Convex-Dev/convex)

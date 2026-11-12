@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bind Swing displays to domain getters with automatic refresh and cleanup; includes a local lattice draft example. ([Swing bindings](convex-gui/docs/BINDINGS.md))
 - Provide live read-only database bindings and enforce read-only JDBC and PostgreSQL connections. ([Read-only access](convex-db/docs/JDBC.md#read-only-access), [#803](https://github.com/Convex-Dev/convex/issues/803))
 - Let embedders handle incoming connections directly or wrap standard lattice delivery, with backpressure and connection cleanup. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers), [#821](https://github.com/Convex-Dev/convex/issues/821))
 - Run exclusive lattice transactions in separate regions of a container at the same time, through a `BoundaryCursor` that stops claims while writes pass straight through; a region's claimed commit merges a container change it did not see; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).

@@ -14,6 +14,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.lang.RT;
 import convex.core.text.Text;
+import convex.gui.binding.Bindings;
 import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
 
@@ -34,17 +35,7 @@ public class AccountInfoPanel extends JPanel {
 		infoArea.setBackground(null);
 		infoArea.setFont(Toolkit.MONO_FONT);
 
-		manager.addPropertyChangeListener(e -> {
-			updateInfo((State) e.getNewValue());
-		});
-		updateInfo(manager.getValue());
-	}
-
-	private void updateInfo(State latestState) {
-
-		AccountStatus as = latestState.getAccount(addr);
-		
-		infoArea.setText(getInfoText(addr,as));
+		Bindings.on(this,manager).text(infoArea,() -> getInfoText(addr,manager.getValue().getAccount(addr)));
 	}
 	
 	public static String getInfoText(Address actor,AccountStatus as) {
