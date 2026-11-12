@@ -8,10 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -98,22 +101,69 @@ public class ResultTest {
 		assertSame(a,Result.fromException(new ResultException(a)));
 	}
 
-	@Test public void testFromExceptionLeavesInterruptStatus() {
+	@Test
+	@ResourceLock("java.util.logging:convex.core.Result")
+	public void testFromExceptionLeavesInterruptStatus() throws ReflectiveOperationException {
 		Thread.interrupted();
 		try {
-			// An interrupt passed in may come from another thread: this one stays uninterrupted
-			assertInterrupted(Result.fromException(new InterruptedException()));
-			assertInterrupted(Result.fromException(new ExecutionException(new InterruptedException())));
-			assertInterrupted(Result.fromException(new CompletionException(new InterruptedException())));
-			assertInterrupted(new ResultException(new InterruptedException()).getResult());
-			assertFalse(Thread.currentThread().isInterrupted());
+			InterruptedException direct=new InterruptedException("direct");
+			InterruptedException execution=new InterruptedException("execution");
+			InterruptedException completion=new InterruptedException("completion");
+			InterruptedException wrapped=new InterruptedException("result exception");
+			assertInterruptDiagnostics(()->{
+				// Deliberately exercise the diagnostic for an unrestored or foreign interrupt.
+				assertInterrupted(Result.fromException(direct));
+				assertFalse(Thread.currentThread().isInterrupted());
+				assertInterrupted(Result.fromException(new ExecutionException(execution)));
+				assertFalse(Thread.currentThread().isInterrupted());
+				assertInterrupted(Result.fromException(new CompletionException(completion)));
+				assertFalse(Thread.currentThread().isInterrupted());
+				assertInterrupted(new ResultException(wrapped).getResult());
+				assertFalse(Thread.currentThread().isInterrupted());
+			},direct,execution,completion,wrapped);
 
 			// A status the caller already restored is kept
 			Thread.currentThread().interrupt();
-			assertInterrupted(Result.fromException(new InterruptedException()));
+			assertInterruptDiagnostics(()->assertInterrupted(Result.fromException(new InterruptedException())));
 			assertTrue(Thread.currentThread().isInterrupted());
 		} finally {
 			Thread.interrupted();
+		}
+	}
+
+	/** Capture this test's expected JUL diagnostics without muting other threads or loggers. */
+	private static void assertInterruptDiagnostics(Runnable action, InterruptedException... expected)
+			throws ReflectiveOperationException {
+		// System.Logger uses JUL in the JDK. Access it reflectively so tests patched
+		// into convex.core don't require a production dependency on java.logging,
+		// or Maven/Eclipse-specific --add-reads launch options.
+		Class<?> loggerClass=Class.forName("java.util.logging.Logger");
+		Class<?> filterClass=Class.forName("java.util.logging.Filter");
+		Class<?> recordClass=Class.forName("java.util.logging.LogRecord");
+		Object logger=loggerClass.getMethod("getLogger",String.class).invoke(null,Result.class.getName());
+		Object previous=loggerClass.getMethod("getFilter").invoke(logger);
+		Thread owner=Thread.currentThread();
+		ArrayList<Object> records=new ArrayList<>();
+		Object filter=Proxy.newProxyInstance(filterClass.getClassLoader(),new Class<?>[] {filterClass},(proxy,method,args)->{
+			if (Thread.currentThread()==owner) {
+				records.add(args[0]);
+				return false;
+			}
+			return (previous==null)||((Boolean)method.invoke(previous,args));
+		});
+		loggerClass.getMethod("setFilter",filterClass).invoke(logger,filter);
+		try {
+			action.run();
+		} finally {
+			loggerClass.getMethod("setFilter",filterClass).invoke(logger,previous);
+		}
+		assertEquals(expected.length,records.size(),"Interrupt diagnostics");
+		for (int i=0;i<expected.length;i++) {
+			Object record=records.get(i);
+			assertEquals("SEVERE",recordClass.getMethod("getLevel").invoke(record).toString());
+			assertSame(expected[i],recordClass.getMethod("getThrown").invoke(record));
+			String message=(String)recordClass.getMethod("getMessage").invoke(record);
+			assertTrue(message.startsWith("InterruptedException reached Result.fromException"),message);
 		}
 	}
 
