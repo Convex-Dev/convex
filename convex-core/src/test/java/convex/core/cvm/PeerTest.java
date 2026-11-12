@@ -16,6 +16,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -43,6 +45,7 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class PeerTest {
 
 	public static String seed="1a44bbe097e38d2ba90e9426e9b1ab0ec12444a25e4d23b77fd121da728737f2";

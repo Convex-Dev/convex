@@ -29,11 +29,18 @@ builds do not generate source/Javadoc jars or load Maven Central publishing;
 
 ### Core test execution
 
-Core tests run in one JVM. Jupiter runs classes and methods concurrently with
-separate test instances; classes that need shared setup declare `PER_CLASS`
-explicitly. Vintage runs the existing JUnit 4/quickcheck classes concurrently.
+Core tests run in one JVM using JUnit 6's worker thread pool. Jupiter runs classes
+and methods concurrently with separate test instances by default. Classes that
+share setup use both `@TestInstance(PER_CLASS)` and `@Execution(CONCURRENT)`;
+`PER_CLASS` alone silently serialises their methods. CVM tests inherit both from
+`ACVMTest`, sharing initial setup and forking a context for each test. Keep mutable
+scratch data local to a test. Use a narrow `@ResourceLock` for shared mutable
+resources, or `SAME_THREAD` within a class only when its lifecycle requires it.
+Vintage runs the existing JUnit 4/quickcheck classes concurrently.
 Ordinary persistence tests reuse `Samples.TEST_STORE` and `TEST_STORE2`; private
 stores are reserved for lifecycle, GC, configuration and exact-content tests.
+Ordinary filesystem fixtures can use a static `@TempDir` for one directory per
+class with automatic cleanup; parallel tests must use distinct child paths.
 
 The everyday run covers representative Etch lifecycle configurations and a
 complete rebuild. Exhaustive lifecycle and physical-rebuild format matrices run

@@ -4,6 +4,8 @@ import static convex.test.Assertions.assertNotError;
 
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
@@ -22,8 +24,11 @@ import convex.core.util.Utils;
  * Base class for CVM tests that work from a given initial State and Context.
  *
  * Provides utility functions for CVM code execution.
+ * Setup is shared once per class; tests execute in parallel on forked contexts.
+ * Subclass fields must be read-only after construction or local to each test.
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public abstract class ACVMTest {
 
 	protected final State INITIAL;

@@ -11,6 +11,8 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -34,8 +36,9 @@ import convex.test.Samples;
  * Tests for the State data structure
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class StateTest {
-	State INIT_STATE=InitTest.createState();
+	private static final State INIT_STATE=InitTest.STATE;
 
 	@Test
 	public void testEmptyState() {

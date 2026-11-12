@@ -20,8 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -49,6 +47,7 @@ import convex.lattice.fs.DLFSCondition;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLPath;
+import convex.test.Samples;
 
 /**
  * What a drive keeps in memory as files are written. A drive's cursor may be a root,
@@ -66,15 +65,8 @@ public class DLFSLocalHeldCellsTest {
 	private static final CVMLong TIME=CVMLong.create(1000);
 	private static final Runnable NOTHING=() -> {};
 
-	private EtchStore store;
-
-	@BeforeEach void openStore() throws IOException {
-		store=EtchStore.createTemp("dlfs-held-cells");
-	}
-
-	@AfterEach void closeStore() {
-		store.close();
-	}
+	// Only cells are persisted; each test owns its cursors, not the store's retained root.
+	private static final EtchStore store=Samples.TEST_STORE;
 
 	// ===== Content =====
 

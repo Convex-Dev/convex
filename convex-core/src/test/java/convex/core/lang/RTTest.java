@@ -11,6 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -39,6 +41,7 @@ import static convex.test.Assertions.*;
  * behaviour of the RT class itself.
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class RTTest {
 
 	@Test

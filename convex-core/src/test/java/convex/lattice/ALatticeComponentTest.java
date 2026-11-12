@@ -26,10 +26,10 @@ import convex.core.data.RefDirect;
 import convex.core.data.RefSoft;
 import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
-import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Persister;
+import convex.test.Samples;
 
 public class ALatticeComponentTest {
 
@@ -166,14 +166,12 @@ public class ALatticeComponentTest {
 	/** With an Etch store, persisted working state refers to its stored cells softly, so memory can release them. */
 	@Test
 	public void persistedWorkingStateRefersToStoredCellsSoftly() throws Exception {
-		try (EtchStore store=EtchStore.createTemp()) {
-			var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),store);
-			var component=new TestComponent(host.cursor().fork(),host::persist);
-			component.add(Blobs.createRandom(new Random(4321),1000));
-			assertInstanceOf(RefDirect.class,component.storage().get().getRef(0));
-			component.persist();
-			assertInstanceOf(RefSoft.class,component.storage().get().getRef(0));
-		}
+		var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),Samples.TEST_STORE);
+		var component=new TestComponent(host.cursor().fork(),host::persist);
+		component.add(Blobs.createRandom(new Random(4321),1000));
+		assertInstanceOf(RefDirect.class,component.storage().get().getRef(0));
+		component.persist();
+		assertInstanceOf(RefSoft.class,component.storage().get().getRef(0));
 	}
 
 	/** Only a component given a function persists itself; others are persisted with their parent. */

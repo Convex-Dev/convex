@@ -20,7 +20,6 @@ import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -44,6 +43,7 @@ import convex.lattice.cursor.Persister;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.Transactions;
+import convex.test.Samples;
 
 /**
  * Saved data leaves memory only once whoever holds it has switched to the persisted
@@ -57,14 +57,22 @@ public class PersistedCellsHeldSoftlyTest {
 	private static final Keyword SIGNED=Keyword.intern("signed");
 	private static final Keyword CHILD=Keyword.intern("child");
 
-	private EtchStore store;
+	private EtchStore store=Samples.TEST_STORE;
 
-	@BeforeEach void openStore() throws IOException {
-		store=EtchStore.createTemp("persisted-cells-held-softly");
+	/** Host sync owns the retained root; plain cursor persistence can use the shared store. */
+	private EtchStore hostStore() {
+		if (store==Samples.TEST_STORE) {
+			try {
+				store=EtchStore.createTemp("persisted-cells-held-softly");
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		}
+		return store;
 	}
 
 	@AfterEach void closeStore() {
-		store.close();
+		if (store!=Samples.TEST_STORE) store.close();
 	}
 
 	// ===== Data =====
@@ -99,7 +107,7 @@ public class PersistedCellsHeldSoftlyTest {
 	}
 
 	private LatticeHost<AHashMap<ACell,ACell>> savedHost() {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		host.sync();
 		return host;
 	}
@@ -270,7 +278,7 @@ public class PersistedCellsHeldSoftlyTest {
 	// ===== Host save =====
 
 	@Test void aQuietSaveLeavesTheRootHeldSoftly() {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		var published=host.sync();
 		assertSame(published,host.cursor().get(),"The root holds the persisted value");
 		assertHeldSoftly(store,host.cursor().get());
@@ -278,7 +286,7 @@ public class PersistedCellsHeldSoftlyTest {
 	}
 
 	@Test void aWriteDuringASaveStillLeavesTheRootHeldSoftly() throws IOException {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		var snapshot=host.cursor().get();
 		var published=host.sync(persisted -> {
 			write(host,9000);
@@ -306,7 +314,7 @@ public class PersistedCellsHeldSoftlyTest {
 	}
 
 	@Test void aSaveWithAWriteLandingElsewhereDoesNotWaitForABoundaryClaim() throws Exception {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		AForkableCursor<AHashMap<ACell,ACell>> claimed=BoundaryCursor.over(host.cursor().<AHashMap<ACell,ACell>>path(CVMLong.create(1)));
 		var during=new AtomicReference<AHashMap<ACell,ACell>>();
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
@@ -333,7 +341,7 @@ public class PersistedCellsHeldSoftlyTest {
 	}
 
 	@Test void savedDataIsReadableFromAReopenedStore() throws IOException {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		write(host,8000);
 		var saved=host.checkpoint();
 		File file=store.getFile();
@@ -348,7 +356,7 @@ public class PersistedCellsHeldSoftlyTest {
 	// ===== Forks and persist =====
 
 	@Test void aHostSaveLeavesAForkOnItsOwnCells() {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		var fork=host.cursor().fork();
 		var held=fork.updateAndGet(root -> with(root,9000));
 		host.sync();
@@ -402,7 +410,7 @@ public class PersistedCellsHeldSoftlyTest {
 	}
 
 	@Test void aForkTakenBeforeTheFirstSaveLeavesTheHostSoftAfterTheNextSave() {
-		var host=LatticeHost.create(tree(),store);
+		var host=LatticeHost.create(tree(),hostStore());
 		var component=new Working(host.cursor().fork(),host::persist);
 		host.sync();
 		assertFalse(strongCells(component.held()).isEmpty(),"The fork still holds what it was given");
@@ -460,7 +468,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 	@Test void aSignedForkHoldsItsValueSoftlyInsideTheSignature() {
 		var key=AKeyPair.createSeeded(1234);
-		var host=LatticeHost.<AHashMap<ACell,ACell>>create(Maps.empty(),store);
+		var host=LatticeHost.<AHashMap<ACell,ACell>>create(Maps.empty(),hostStore());
 		AForkableCursor<SignedData<AHashMap<ACell,ACell>>> slot=new MapComponent<>(host.cursor()).path(SIGNED);
 		var signed=SignedCursor.create(slot,key);
 		signed.set(tree());
@@ -481,7 +489,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 	@Test void anApplicationAndItsChildrenAreHeldSoftlyAfterSyncAndSave() {
 		AHashMap<ACell,ACell> start=tree().assoc(CHILD,tree());
-		var host=LatticeHost.create(start,store);
+		var host=LatticeHost.create(start,hostStore());
 		host.sync();
 		var application=new Application(host);
 		application.edit(9000);

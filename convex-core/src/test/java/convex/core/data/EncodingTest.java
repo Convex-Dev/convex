@@ -19,6 +19,8 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
@@ -46,6 +48,7 @@ import convex.test.Samples;
 import convex.test.Testing;
 
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class EncodingTest {
 
 	@Test public void testVLQLongLength() throws BadFormatException, BufferUnderflowException {
@@ -87,8 +90,8 @@ public class EncodingTest {
 		doVLQLongTest(Long.MIN_VALUE);
 	}
 	
-	byte[] buf=new byte[50];
 	private void doVLQCountTest(long x) throws BadFormatException {
+		byte[] buf=new byte[50];
 		int n=Format.getVLQCountLength(x);
 		int offset=(int) (x%10); // variable offset, somewhat pseudorandom
 		
@@ -111,6 +114,7 @@ public class EncodingTest {
 	}
 	
 	private void doVLQLongTest(long x) throws BadFormatException {
+		byte[] buf=new byte[50];
 		int n=Format.getVLQLongLength(x);
 		int offset=(int) ((x+n)&0x0f); // variable offset, somewhat pseudorandom
 		
