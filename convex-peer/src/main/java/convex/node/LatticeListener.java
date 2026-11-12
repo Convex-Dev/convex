@@ -36,10 +36,10 @@ import convex.net.impl.netty.NettyServer;
  * <p>A calling application may register several propagators with one listener,
  * or give different propagators independent listeners. Registration grants
  * only eligibility for the application selector; it does not attach, start or
- * close a propagator. The application must start the authoritative node and its
- * attached groups before opening this listener, then close the listener before
- * closing those groups. Closing is final: a closed listener cannot be launched
- * again.</p>
+ * close a propagator. For lattice routing, the application must start the
+ * authoritative node and its attached groups before opening this listener, then
+ * close the listener before closing those groups. Closing is final: a closed
+ * listener cannot be launched again.</p>
  *
  * <p>The listener takes no lock. Its owner launches and closes it, one after the
  * other. Network threads assign connections while the owner registers and revokes
@@ -152,10 +152,11 @@ public final class LatticeListener implements Closeable {
 	}
 
 	/**
-	 * Configures the application policy used once for each new inbound socket.
+	 * Configures the application policy used on each socket's first message.
 	 * The returned group must have been registered with this listener.
 	 * Changes affect new assignments; established sockets keep their group until
-	 * closed or the group is unregistered.
+	 * closed or the group is unregistered. Restores standard routing for future
+	 * connections if a custom connection handler factory was configured.
 	 *
 	 * @param selector assignment policy, or {@code null} to deny every connection
 	 */
@@ -175,6 +176,15 @@ public final class LatticeListener implements Closeable {
 	 * selector, as does {@link #setSelector(Function)}. Custom factories explicitly
 	 * choose their destinations; the registered-group restriction belongs to the
 	 * standard selector. A socket's lattice traffic must use at most one group.
+	 *
+	 * <p>To use the standard lattice handler directly:
+	 * <pre>{@code listener.setConnectionHandler(group::accept);}</pre>
+	 * The group must be attached and running before connections arrive. An embedder
+	 * using {@link LatticeNode} can retain the default handler by calling
+	 * {@link LatticeNode#serveAllInbound(LatticePropagator)} instead.
+	 *
+	 * @param factory handler factory, or {@code null} to restore selector routing
+	 * @see IncomingHandler
 	 */
 	public void setConnectionHandler(Function<AConnection,IncomingHandler> factory) {
 		this.connectionHandler=factory;

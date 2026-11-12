@@ -548,9 +548,14 @@ public class LatticePropagator implements Closeable {
 	 * acquisition or merge. The wrapper must close this handler on disconnect.
 	 * Assignment does not authenticate the remote; a connection's lattice traffic
 	 * must belong to at most one propagator. No handler is allocated per message.
+	 * The group must be attached to a running node and accepting connections.
 	 *
 	 * @param connection physical inbound connection
 	 * @return handler for this connection, owned by the caller
+	 * @throws IllegalArgumentException if the connection is null
+	 * @throws IllegalStateException if the group is unattached or not accepting
+	 *         connections, or the connection is closed
+	 * @see LatticeListener#setConnectionHandler(java.util.function.Function)
 	 */
 	public convex.net.IncomingHandler accept(AConnection connection) {
 		LatticeProtocolEndpoint protocol=requireEndpoint();

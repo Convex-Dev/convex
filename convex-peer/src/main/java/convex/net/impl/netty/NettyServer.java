@@ -335,6 +335,7 @@ public class NettyServer extends AServer {
 	 * connections only. Matching replies bypass the selected handler.
 	 *
 	 * @param factory connection handler factory, or null for legacy delivery
+	 * @see IncomingHandler
 	 */
 	public void setConnectionHandler(Function<AConnection,IncomingHandler> factory) {
 		connectionHandler=factory;

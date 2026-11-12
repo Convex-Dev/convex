@@ -183,10 +183,11 @@ For ordinary TCP networking, wrap an assembled host in `LatticeNode`:
 
 ```java
 host.addApplication(app);
-try (var network = new LatticeNode<>(host, NodeConfig.localNetwork()).launch()) {
+try (var network = new LatticeNode<>(host, NodeConfig.localNetwork())) {
     network.setIdentity(nodeDID, nodeKey); // configured did:key and its signing key
     var group = network.createPropagator();
     network.serveAllInbound(group); // explicitly make this view available to inbound connections
+    network.launch();
 
     // Use the application, connect peers, or add/remove groups while running.
     app.sync();
@@ -200,6 +201,12 @@ they have no transport key. For an indirect DID, supply the authoriser as the
 third argument to `setIdentity`, which also takes a `ChallengeSigner` in place of
 the key pair. A group can override its own identity. Changing the node default
 affects future groups only.
+
+The default incoming handler needs no custom code. Embedders can optionally
+install one handler per connection to reject messages, wrap the standard lattice
+handler, or serve application traffic directly without a propagator. See
+[incoming connection handlers](docs/LATTICE_NETWORKING.md#incoming-connection-handlers)
+for the defaults, examples and lifecycle contract.
 
 The node closes its listeners, groups and server, leaving the host and its
 caller-owned store usable. A service shuts down with

@@ -22,10 +22,11 @@ For TCP networking with dynamically managed groups,
 `LatticeNode` supplies an optional application assembly:
 
 ```java
-try (var network = new LatticeNode<>(host, config).launch()) {
+try (var network = new LatticeNode<>(host, config)) {
     network.setIdentity(nodeDID, nodeKey, didAuthorizer);
     var group = network.createPropagator();
     network.serveAllInbound(group);
+    network.launch();
     // Applications publish to the existing host; host.sync() publishes to the network.
 }
 ```
@@ -64,12 +65,13 @@ applications' own signers.
 
 `serveAllInbound(group)` is an explicit public serving choice on the node's own
 listener. Otherwise a listener denies inbound access unless the caller installs a
-selector. The selector can change while running; existing sockets keep their assigned
-group until closed or revoked. `addListener(listenerConfig)` adds a listener on another
+selector or connection handler. The selector can change while running; existing
+sockets keep their assigned group until closed or revoked.
+`addListener(listenerConfig)` adds a listener on another
 port, with its own connection and message limits, for groups reached separately, such
 as a trusted or replication port. Any group can be assigned through any listener, and
-a new listener denies every connection until given a selector. It opens with the
-node, or at once if the node is running. The wrapper starts the server before its
+a new listener denies every connection until given a selector or handler. It opens
+with the node, or at once if the node is running. The wrapper starts the server before its
 listeners, closes every listener before draining the server, and cleans up a failed
 launch. Closing a listener is final. Neither the node nor its listeners take a lock:
 the node's identity, serving policy and peer methods never wait, and network
@@ -107,12 +109,48 @@ internals.
 
 ## Incoming connection handlers
 
+### Keeping the defaults
+
+Given an assembled `LatticeHost` named `host`, an embedder can use the standard
+lattice handling without implementing an incoming handler:
+
+```java
+try (var network = new LatticeNode<>(host, NodeConfig.port(18888))) {
+    var group = network.createPropagator();
+    network.serveAllInbound(group);
+    network.launch();
+    // Run the application here, keeping network open for its lifetime.
+}
+```
+
+This explicitly serves the group's view to incoming connections. It does not
+authenticate them or configure outbound peers. The node starts the group before
+opening the listener and closes them in the reverse order. Without a serving
+policy, the listener denies incoming access.
+
+To select the same standard handler at connection acceptance, replace
+`network.serveAllInbound(group)` with:
+
+```java
+network.getListener().setConnectionHandler(group::accept);
+```
+
+The selector used by `serveAllInbound` assigns a group on the first message;
+the handler factory assigns it when the connection is accepted. Both use the
+group's standard decoding, acquisition and delivery to the hosted applications.
+The listener owns the returned handler and closes it on disconnect.
+
+### Custom handling
+
 `LatticeListener.setConnectionHandler(Function<AConnection, IncomingHandler>)`
 selects a handler once when each connection is accepted, before receiving its
 first message. A handler can serve an application directly, route messages to
 another bounded destination, or wrap the standard lattice handler. No node or
 propagator is required for a custom handler. `NettyServer` exposes the same
 factory for services using the transport directly.
+
+For a wrapper, with an existing `listener`, an attached and running `group`, and
+the embedder's non-blocking `maySend(AConnection)` policy:
 
 ```java
 listener.setConnectionHandler(connection -> {
@@ -147,6 +185,8 @@ having processed the message: reads pause while the transport invokes that
 predicate once on a virtual thread. It may wait for capacity; true means accepted,
 and false reports overload. A retry failure closes the connection. A factory or
 initial handler failure also closes that connection without stopping the listener.
+Accepting work is not an acknowledgement of merge completion or durability;
+those guarantees belong to the application's response protocol.
 
 Messages carry their source connection but arrive **undecoded**. The handler
 chooses whether and where to decode; routing alone performs no missing-cell

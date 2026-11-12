@@ -31,7 +31,7 @@ import convex.net.PeerTarget;
  * Inbound connections are denied unless
  * the caller selects a policy through {@link #getListener()} or explicitly calls
  * {@link #serveAllInbound(LatticePropagator)}. Further listeners, from
- * {@link #addListener(NodeConfig)}, deny until given a selector of their own.
+ * {@link #addListener(NodeConfig)}, deny until given a selector or connection handler.
  *
  * <p>The node takes no lock of its own. Its identity, serving policy and peer
  * methods never wait, so network callbacks such as a listener's selector may call
@@ -303,8 +303,11 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 * group; established sockets keep their existing assignment. Private deployments
 	 * can configure the listener's selector instead.
 	 *
+	 * @param propagator group whose view will be served
+	 * @return this node
 	 * @throws IllegalArgumentException if the group was not created by this node, or
 	 *         has been removed
+	 * @see LatticeListener#setConnectionHandler(java.util.function.Function)
 	 */
 	public LatticeNode<V> serveAllInbound(LatticePropagator propagator) {
 		if (propagator==null || !groups.contains(propagator)) {
