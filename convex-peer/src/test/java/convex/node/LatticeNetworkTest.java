@@ -29,6 +29,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -222,12 +223,12 @@ public class LatticeNetworkTest {
 		NodeServer<?> source=nodeServers.get(0);
 		source.getCursor().assoc(data,Index.<Hash,ACell>none().assoc(hash,value));
 		source.getHost().sync();
-		propagators.get(0).whenAnnounced(root -> value.equals(RT.getIn(root,data,hash)))
+		propagators.get(0).whenAnnounced(root -> Cells.equals(value,RT.getIn(root,data,hash)))
 				.get(10,TimeUnit.SECONDS);
 
 		syncNetwork();
 		for (LatticePropagator propagator:propagators) {
-			propagator.whenAnnounced(root -> value.equals(RT.getIn(root,data,hash)))
+			propagator.whenAnnounced(root -> Cells.equals(value,RT.getIn(root,data,hash)))
 					.get(10,TimeUnit.SECONDS);
 		}
 		

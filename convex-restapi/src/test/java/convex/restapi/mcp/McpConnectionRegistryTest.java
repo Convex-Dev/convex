@@ -7,10 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for {@link McpAPI#registerConnection} — atomic SSE connection registration
@@ -54,25 +60,42 @@ public class McpConnectionRegistryTest {
 	}
 
 	@Test
-	public void testConcurrentOpensNeverExceedCap() throws InterruptedException {
+	@Timeout(15)
+	public void testConcurrentOpensNeverExceedCap() throws Exception {
 		ConcurrentHashMap<String, McpConnection> conns = new ConcurrentHashMap<>();
 		int cap = 50, threads = 200;
-		AtomicInteger ok = new AtomicInteger();
-		Thread[] ts = new Thread[threads];
-		for (int i = 0; i < threads; i++) {
-			String id = "c" + i; // distinct session IDs, so only the cap can reject
-			ts[i] = new Thread(() -> {
-				if (McpAPI.registerConnection(conns, id, conn(), cap) == McpAPI.RegisterResult.OK) {
-					ok.incrementAndGet();
+		CountDownLatch ready = new CountDownLatch(threads);
+		CountDownLatch start = new CountDownLatch(1);
+		var executor = Executors.newVirtualThreadPerTaskExecutor();
+		try {
+			List<Future<McpAPI.RegisterResult>> results = new ArrayList<>();
+			for (int i = 0; i < threads; i++) {
+				String id = "c" + i; // distinct session IDs, so only the cap can reject
+				results.add(executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return McpAPI.registerConnection(conns, id, conn(), cap);
+				}));
+			}
+			assertTrue(ready.await(5, TimeUnit.SECONDS), "workers did not reach the start gate");
+			start.countDown();
+			int ok = 0, rejected = 0;
+			for (var result : results) {
+				// get() brings worker exceptions and assertion failures back to JUnit.
+				var outcome = result.get(5, TimeUnit.SECONDS);
+				if (outcome == McpAPI.RegisterResult.OK) ok++;
+				else {
+					assertEquals(McpAPI.RegisterResult.CAP_EXCEEDED, outcome);
+					rejected++;
 				}
-			});
+			}
+			assertEquals(cap, ok, "registrations must fill the available capacity");
+			assertEquals(threads - cap, rejected);
+			assertEquals(ok, conns.size(), "retained connections must equal OK registrations");
+		} finally {
+			executor.shutdownNow();
+			assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "registration workers did not stop");
 		}
-		for (Thread t : ts) t.start();
-		for (Thread t : ts) t.join();
-		// The security invariant: no interleaving can admit more than the cap
-		assertTrue(conns.size() <= cap, "connections exceeded cap: " + conns.size());
-		// Every retained connection is exactly an OK result — no orphans, no double-count
-		assertEquals(conns.size(), ok.get(), "retained connections must equal OK registrations");
 	}
 
 	/** Shutdown ends every stream, so a graceful server stop need not wait for them (#777). */

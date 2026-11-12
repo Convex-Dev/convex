@@ -9,6 +9,7 @@ import java.io.PrintWriter;
 import java.io.Writer;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -26,20 +27,25 @@ class SseConnectionTest {
 			new BlockingWriter(slowWriteStarted,releaseSlowWrite)));
 		SseConnection fast=new SseConnection(new PrintWriter(new LatchingWriter(fastWriteSeen)));
 
-		Thread distributor=Thread.ofVirtual().start(()-> {
-			slow.sendEvent("message","slow");
-			fast.sendEvent("message","fast");
-		});
+		var executor=Executors.newVirtualThreadPerTaskExecutor();
 		try {
+			var distributor=executor.submit(()-> {
+				slow.sendEvent("message","slow");
+				fast.sendEvent("message","fast");
+			});
+			distributor.get(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
 			assertTrue(slowWriteStarted.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
 			assertTrue(fastWriteSeen.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
 		} finally {
 			releaseSlowWrite.countDown();
-			slow.close();
-			fast.close();
-			distributor.join(TIMEOUT.toMillis());
+			try {
+				slow.close();
+				fast.close();
+			} finally {
+				executor.shutdownNow();
+				assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"distributor did not stop");
+			}
 		}
-		assertFalse(distributor.isAlive());
 	}
 
 	@Test
@@ -89,6 +95,7 @@ class SseConnectionTest {
 			assertTrue(written.contains("data: queued-2"));
 			assertFalse(connection.isClosed());
 		} finally {
+			release.countDown();
 			connection.close();
 		}
 	}
@@ -124,9 +131,19 @@ class SseConnectionTest {
 	@Test
 	void closeWakesWaiter() throws Exception {
 		SseConnection connection=new SseConnection(new PrintWriter(Writer.nullWriter()));
-		Thread closer=Thread.ofVirtual().start(connection::close);
-		assertTrue(connection.awaitClosed(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
-		closer.join(TIMEOUT.toMillis());
+		var executor=Executors.newVirtualThreadPerTaskExecutor();
+		try {
+			var closer=executor.submit(connection::close);
+			assertTrue(connection.awaitClosed(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			closer.get(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
+		} finally {
+			try {
+				connection.close();
+			} finally {
+				executor.shutdownNow();
+				assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"closer did not stop");
+			}
+		}
 	}
 
 	private static final class BlockingWriter extends Writer {

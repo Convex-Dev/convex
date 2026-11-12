@@ -8,9 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the per-client admission accounting.
@@ -77,40 +80,37 @@ public class ConcurrentLimitTest {
 	 * case a non-atomic check-then-increment gets wrong.
 	 */
 	@Test
-	public void testConcurrentAcquireNeverExceedsLimit() throws InterruptedException {
+	@Timeout(15)
+	public void testConcurrentAcquireNeverExceedsLimit() throws Exception {
 		int perClient = 8;
 		int threads = 64;
 		ConcurrentLimit limit = new ConcurrentLimit(1000, perClient);
-
-		AtomicInteger granted = new AtomicInteger();
+		CountDownLatch ready = new CountDownLatch(threads);
 		CountDownLatch start = new CountDownLatch(1);
-		CountDownLatch done = new CountDownLatch(threads);
-		List<Thread> workers = new ArrayList<>();
-
-		for (int i = 0; i < threads; i++) {
-			Thread t = new Thread(() -> {
-				try {
+		var executor = Executors.newVirtualThreadPerTaskExecutor();
+		try {
+			List<Future<Boolean>> results = new ArrayList<>();
+			for (int i = 0; i < threads; i++) {
+				results.add(executor.submit(() -> {
+					ready.countDown();
 					start.await();
-					if (limit.acquireClient("busy")) granted.incrementAndGet();
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				} finally {
-					done.countDown();
-				}
-			});
-			workers.add(t);
-			t.start();
+					return limit.acquireClient("busy");
+				}));
+			}
+			assertTrue(ready.await(5, TimeUnit.SECONDS), "workers did not reach the start gate");
+			start.countDown();
+			int granted = 0;
+			for (var result : results) {
+				if (result.get(5, TimeUnit.SECONDS)) granted++;
+			}
+			assertEquals(perClient, granted, "exactly the per-client allowance is granted");
+			assertEquals(perClient, limit.clientCounts.get("busy")[0], "count matches what was granted");
+			for (int i = 0; i < granted; i++) limit.releaseClient("busy");
+			assertTrue(limit.clientCounts.isEmpty(), "releases balance the grants exactly");
+		} finally {
+			executor.shutdownNow();
+			assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "admission workers did not stop");
 		}
-
-		start.countDown();
-		done.await();
-		for (Thread t : workers) t.join();
-
-		assertEquals(perClient, granted.get(), "exactly the per-client allowance is granted");
-		assertEquals(perClient, limit.clientCounts.get("busy")[0], "count matches what was granted");
-
-		for (int i = 0; i < granted.get(); i++) limit.releaseClient("busy");
-		assertTrue(limit.clientCounts.isEmpty(), "releases balance the grants exactly");
 	}
 
 	@Test
