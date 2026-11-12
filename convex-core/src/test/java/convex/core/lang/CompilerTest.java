@@ -529,12 +529,6 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test
-	public void testUnquoteSplicing() {
-		// TODO:
-		// assertEquals(Vectors.of(1,2,3),eval("(let [a [2 3]] `[1 ~@a])"));
-	}
-
-	@Test
 	public void testQuotedMetadata() {
 		// From issue #267
 		assertEquals(eval("'(defn foo ^{:a :b} [])"), eval("`(defn foo ^{:a :b} [])"));

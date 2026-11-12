@@ -11,6 +11,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,8 @@ import convex.node.NodeServer;
  */
 public class ConvexDBPersistenceTest {
 
-	private static final String DB_NAME = "persist_test";
+	private static final AtomicLong DB_COUNTER=new AtomicLong();
+	private final String dbName = "persist_test_"+DB_COUNTER.incrementAndGet();
 	private static final String TABLE_NAME = "T";
 
 	private NodeServer<AHashMap<AString,Index<Keyword,ACell>>> server;
@@ -50,8 +52,8 @@ public class ConvexDBPersistenceTest {
 
 	@AfterEach
 	public void tearDown() throws IOException {
-		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
-		if (cdb != null) cdb.unregister(DB_NAME);
+		ConvexDB cdb = ConvexDB.lookup(dbName);
+		if (cdb != null) cdb.unregister(dbName);
 		if (server != null) { server.close(); server = null; }
 		if (store != null) { store.close(); store = null; }
 	}
@@ -74,7 +76,7 @@ public class ConvexDBPersistenceTest {
 		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 		server = new NodeServer<>(host);
 		server.launch();
-		cdb.register(DB_NAME);
+		cdb.register(dbName);
 		return cdb;
 	}
 
@@ -85,8 +87,8 @@ public class ConvexDBPersistenceTest {
 
 	/** Unregisters, closes the host to save, then the server, then the store. */
 	private void persistAndClose() throws Exception {
-		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
-		if (cdb != null) cdb.unregister(DB_NAME);
+		ConvexDB cdb = ConvexDB.lookup(dbName);
+		if (cdb != null) cdb.unregister(dbName);
 		server.getHost().close();
 		server.close(); server = null;
 		store.close(); store = null;
@@ -101,7 +103,7 @@ public class ConvexDBPersistenceTest {
 
 	/** Inserts rows [start, end) via JDBC PreparedStatement batch. */
 	private void insertViaJdbc(int start, int end) throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + dbName);
 			 PreparedStatement ps = conn.prepareStatement(
 					 "INSERT INTO " + TABLE_NAME + " VALUES (?, ?, ?)")) {
 			for (int i = start; i < end; i++) {
@@ -123,7 +125,7 @@ public class ConvexDBPersistenceTest {
 
 	/** Verifies row count via JDBC SELECT COUNT(*). */
 	private void verifyJdbcCount(long expected) throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + dbName);
 			 Statement stmt = conn.createStatement();
 			 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM " + TABLE_NAME)) {
 			assertTrue(rs.next());
@@ -133,7 +135,7 @@ public class ConvexDBPersistenceTest {
 
 	/** Verifies a specific row via JDBC PK lookup. */
 	private void verifyJdbcRow(int id) throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + dbName);
 			 Statement stmt = conn.createStatement();
 			 ResultSet rs = stmt.executeQuery(
 					 "SELECT LEID FROM " + TABLE_NAME + " WHERE ID = " + id)) {
@@ -151,15 +153,15 @@ public class ConvexDBPersistenceTest {
 		try (var localStore=EtchStore.createTemp("db-local-host"); var host=open(localStore)) {
 			file=localStore.getFile();
 			var db=host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
-			createTable(db.database(DB_NAME));
-			insertViaLattice(db.database(DB_NAME).tables(),0,10);
+			createTable(db.database(dbName));
+			insertViaLattice(db.database(dbName).tables(),0,10);
 		}
 		try (var reopenedStore=EtchStore.create(file)) {
 			var host=open(reopenedStore);
 			var db=host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
-			db.register(DB_NAME);
+			db.register(dbName);
 			try { verifyJdbcCount(10); verifyJdbcRow(9); }
-			finally { db.unregister(DB_NAME); }
+			finally { db.unregister(dbName); }
 		}
 	}
 
@@ -169,7 +171,7 @@ public class ConvexDBPersistenceTest {
 	@Test
 	public void testJdbcPersistAndRestore() throws Exception {
 		ConvexDB cdb = openNew();
-		createTable(cdb.database(DB_NAME));
+		createTable(cdb.database(dbName));
 
 		insertViaJdbc(0, 100);
 		verifyJdbcCount(100);
@@ -192,7 +194,7 @@ public class ConvexDBPersistenceTest {
 	@Test
 	public void testMultiplePersistCycles() throws Exception {
 		ConvexDB cdb = openNew();
-		createTable(cdb.database(DB_NAME));
+		createTable(cdb.database(dbName));
 
 		// Cycle 1: insert 50
 		insertViaJdbc(0, 50);
@@ -222,7 +224,7 @@ public class ConvexDBPersistenceTest {
 	@Test
 	public void testLatticePersistAndRestore() throws Exception {
 		ConvexDB cdb = openNew();
-		SQLDatabase db = cdb.database(DB_NAME);
+		SQLDatabase db = cdb.database(dbName);
 		createTable(db);
 
 		insertViaLattice(db.tables(), 0, 200);
@@ -236,7 +238,7 @@ public class ConvexDBPersistenceTest {
 
 		// Reopen and verify via lattice API
 		cdb = openExisting();
-		db = cdb.database(DB_NAME);
+		db = cdb.database(dbName);
 		assertEquals(200, db.tables().getRowCount(TABLE_NAME),
 				"liveCount should survive persist/restore");
 		assertNotNull(db.tables().selectByKey(TABLE_NAME, CVMLong.create(0)));
@@ -249,7 +251,7 @@ public class ConvexDBPersistenceTest {
 	@Test
 	public void testLatticeAndJdbcCountConsistency() throws Exception {
 		ConvexDB cdb = openNew();
-		SQLDatabase db = cdb.database(DB_NAME);
+		SQLDatabase db = cdb.database(dbName);
 		createTable(db);
 
 		insertViaLattice(db.tables(), 0, 75);
@@ -260,7 +262,7 @@ public class ConvexDBPersistenceTest {
 
 		persistAndClose();
 		cdb = openExisting();
-		db = cdb.database(DB_NAME);
+		db = cdb.database(dbName);
 
 		assertEquals(latticeCount, db.tables().getRowCount(TABLE_NAME),
 				"Lattice count should match after restore");

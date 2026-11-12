@@ -67,11 +67,6 @@ public class CharacterTest {
 
 	}
 	
-	@Test
-	public void testSamples() {
-		
-	}
-	
 	public void doValidCharTests(CVMChar a) throws BadFormatException {
 		assertNotNull(a);
 		Blob b=a.getEncoding();

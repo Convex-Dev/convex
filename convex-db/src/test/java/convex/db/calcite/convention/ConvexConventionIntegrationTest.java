@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,9 @@ import convex.db.lattice.SQLDatabase;
  */
 class ConvexConventionIntegrationTest {
 
+	private static final AtomicLong DB_COUNTER=new AtomicLong();
+	private final String dbName="convex_conv_test_"+DB_COUNTER.incrementAndGet();
+
 	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
@@ -38,8 +42,8 @@ class ConvexConventionIntegrationTest {
 	void setUp() throws Exception {
 		// Create test database
 		cdb = ConvexDB.create(RowLWW::merge);
-		db = cdb.database("convex_conv_test");
-		cdb.register("convex_conv_test");
+		db = cdb.database(dbName);
+		cdb.register(dbName);
 
 		// Create table with typed columns, named as the default (standard) identifier
 		// policy resolves unquoted SQL names
@@ -56,13 +60,13 @@ class ConvexConventionIntegrationTest {
 		db.tables().insert("SCORES", 3L, "Carol", 92.3);
 
 		// Connect via JDBC
-		conn = DriverManager.getConnection("jdbc:convex:database=convex_conv_test");
+		conn = DriverManager.getConnection("jdbc:convex:database="+dbName);
 	}
 
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		if (cdb != null) cdb.unregister("convex_conv_test");
+		if (cdb != null) cdb.unregister(dbName);
 	}
 
 	@Test

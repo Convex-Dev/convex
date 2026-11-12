@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.io.TempDir;
 
 import convex.cli.CLTester;
@@ -147,6 +148,7 @@ class EtchEncryptionCLITest {
 	}
 
 	@Test
+	@ResourceLock("java.lang.System.in")
 	void hintedKeystoreAndStdinResolutionDoNotLeakSecrets() throws Exception {
 		char[] storePassword="store-secret".toCharArray();
 		char[] keyPassword="entry-secret".toCharArray();

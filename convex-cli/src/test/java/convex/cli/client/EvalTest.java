@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
@@ -51,6 +52,7 @@ public class EvalTest {
 	}
 
 	@Test
+	@ResourceLock("java.lang.System.in")
 	public void testStdinEval() {
 		CLTester tester=CLTester.runWithInput("(def a 3) (+ a a)\n","eval","-");
 		tester.assertExitCode(ExitCodes.SUCCESS);

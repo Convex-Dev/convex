@@ -1,5 +1,7 @@
 package convex.actors;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Context;
@@ -20,8 +22,8 @@ public class CurationMarketTest extends ACVMTest {
 		return ctx;
 	}
 	
-	@Test public void testCreate() {
-		
+	@Test public void testImport() {
+		assertNotNull(evalA("cm"));
 	}
 
 }

@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,9 @@ import convex.db.lattice.SQLDatabase;
  */
 class SortAggregateTest {
 
+	private static final AtomicLong DB_COUNTER=new AtomicLong();
+	private final String dbName="sort_agg_test_"+DB_COUNTER.incrementAndGet();
+
 	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
@@ -32,9 +36,9 @@ class SortAggregateTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		cdb = ConvexDB.create(RowLWW::merge);
-		db = cdb.database("sort_agg_test");
+		db = cdb.database(dbName);
 		IdentifierPolicy.LOWER.applyTo(db);
-		cdb.register("sort_agg_test");
+		cdb.register(dbName);
 
 		// Create table with test data
 		ConvexColumnType[] types = {
@@ -52,13 +56,13 @@ class SortAggregateTest {
 		db.tables().insert("items", 4L, "donut", 3L, 2.00);
 		db.tables().insert("items", 5L, "eggs", 2L, 3.00);
 
-		conn = DriverManager.getConnection("jdbc:convex:database=sort_agg_test");
+		conn = DriverManager.getConnection("jdbc:convex:database="+dbName);
 	}
 
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		if (cdb != null) cdb.unregister("sort_agg_test");
+		if (cdb != null) cdb.unregister(dbName);
 	}
 
 	// ========== Sort Tests ==========

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
@@ -28,6 +29,7 @@ import convex.core.lang.RT;
  * instance. Sessions are driven by piping newline-delimited JSON-RPC into
  * stdin and parsing the response lines from stdout.
  */
+@ResourceLock("java.lang.System.in")
 public class McpTest {
 
 	static final String INIT="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\"}}\n"

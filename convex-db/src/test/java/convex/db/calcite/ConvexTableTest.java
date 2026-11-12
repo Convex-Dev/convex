@@ -31,7 +31,7 @@ import convex.db.lattice.SQLDatabase;
  */
 public class ConvexTableTest {
 
-	private static int testCounter = 0;
+	private static final AtomicLong DB_COUNTER = new AtomicLong();
 
 	private ConvexDB cdb;
 	private SQLDatabase db;
@@ -41,7 +41,7 @@ public class ConvexTableTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		// Use unique database name for each test to avoid schema cache conflicts
-		dbName = "testdb_" + (++testCounter) + "_" + System.currentTimeMillis();
+		dbName = "testdb_" + DB_COUNTER.incrementAndGet();
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
 		IdentifierPolicy.LOWER.applyTo(db);

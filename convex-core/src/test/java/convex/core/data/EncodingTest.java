@@ -213,13 +213,6 @@ public class EncodingTest {
 		assertEquals(l,l2);
 	}
 	
-	@Test public void testMalformedStrings() {
-		// TODO: confirm we are OK with bad UTF-8 bytes?
-		// bad examples constructed using info from https://www.w3.org/2001/06/utf-8-wrong/UTF-8-test.html
-		// assertThrows(BadFormatException.class,()->Format.read("300180")); // continuation only
-		//assertThrows(BadFormatException.class,()->Format.read("3001FF")); 
-	}
-	
 	@Test public void testCanonical() {
 		assertTrue(Cells.isCanonical(Vectors.empty()));
 		assertTrue(Cells.isCanonical(null));
@@ -284,14 +277,6 @@ public class EncodingTest {
 		
 		Format.writeHexDigits(bs, 3, src, 0, 3);
 		assertEquals(Blobs.fromHex("0000020003caf000"),Blob.wrap(bs));
-	}
-	
-	@Test 
-	public void testWriteRef() {
-		// TODO: consider whether this is valid
-		// shouldn't be allowed to write a Ref directly as a top-level message
-		// ByteBuffer b=ByteBuffer.allocate(10);
-		// assertThrows(IllegalArgumentException.class,()->Format.write(b, Ref.create("foo")));
 	}
 	
 	@Test
@@ -372,13 +357,6 @@ public class EncodingTest {
 
 		SignedData<ATransaction> dtrans = doMultiEncodingTest(strans);
 		assertEquals(strans.getValue(),dtrans.getValue());
-	}
-	
-	@SuppressWarnings("unused")
-	@Test 
-	public void testFailedMissingEncoding() throws BadFormatException {
-		ABlob bigBlob=Blob.createRandom(new Random(123), 5000).toCanonical();
-		
 	}
 	
 	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException, IOException {

@@ -35,10 +35,6 @@ import convex.java.ConvexHTTP;
 
 public class RESTAPITest extends ARESTTest {
 	
-	@Test public void testDataAPI() {
-		
-	}
-	
 //  Not obvious how to make this work given self signed certificates?
 //	@Test public void testHTTPS() throws IOException {
 //		Content c = Request.get("https://localhost").execute().returnContent();

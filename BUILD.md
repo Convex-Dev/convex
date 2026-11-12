@@ -54,6 +54,26 @@ In Eclipse, add `-Dconvex.test.extended=true` to the JUnit launch's VM arguments
 for the exhaustive run; omit it for everyday testing. No tests are forked into
 separate processes to obtain concurrency.
 
+### CLI, database and local integration tests
+
+CLI and database Jupiter tests also use the worker thread pool, with concurrent
+classes and methods in a single test JVM. The properties live in each module's
+`src/test/resources/junit-platform.properties`, so Eclipse uses the same defaults.
+CLI tests replacing standard input take `@ResourceLock("java.lang.System.in")`.
+Keystore tests share one file per class and lock its mutations. Local network
+fixtures share their servers across methods and use OS-assigned ports.
+
+Database tests use distinct registry names per invocation and close only the
+managed instances they own; suite-wide driver cleanup would close other tests'
+active connections. Private stores remain appropriate for persistence lifecycle
+tests. Keep command state and JDBC connections local to each test.
+
+`CLTester` bounds asynchronous completion and cancellation, reports worker errors
+to JUnit, and includes captured output in failed assertions. Use try-with-resources
+for asynchronous commands so failed assertions still stop the worker. Local child
+process tests also bound startup and shutdown and isolate temporary files for
+cleanup on Windows. These tests run cross-platform; CI remains Linux-based.
+
 ### Property tests
 
 Core property tests use the existing `junit-quickcheck` generators and runners,

@@ -20,11 +20,19 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Hash;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
@@ -39,6 +47,7 @@ import convex.lattice.Lattice;
  * complete.
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class LatticeNetworkTest {
 
 	/**
@@ -206,8 +215,21 @@ public class LatticeNetworkTest {
 	 */
 	@Test
 	public void testSyncNetwork() throws InterruptedException, ExecutionException, TimeoutException {
-		// Sync the entire network
+		// Publish actual content: equal empty roots would pass even if pulls did nothing.
+		Blob value=Blobs.createRandom(512);
+		Hash hash=value.getHash();
+		Keyword data=Keyword.intern("data");
+		NodeServer<?> source=nodeServers.get(0);
+		source.getCursor().assoc(data,Index.<Hash,ACell>none().assoc(hash,value));
+		source.getHost().sync();
+		propagators.get(0).whenAnnounced(root -> value.equals(RT.getIn(root,data,hash)))
+				.get(10,TimeUnit.SECONDS);
+
 		syncNetwork();
+		for (LatticePropagator propagator:propagators) {
+			propagator.whenAnnounced(root -> value.equals(RT.getIn(root,data,hash)))
+					.get(10,TimeUnit.SECONDS);
+		}
 		
 		// Get the lattice value from the first server as the reference
 		NodeServer<?> firstServer = nodeServers.get(0);
