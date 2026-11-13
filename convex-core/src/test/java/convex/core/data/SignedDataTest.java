@@ -17,8 +17,10 @@ import convex.core.cvm.Address;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.store.MemoryStore;
 import convex.test.Samples;
 
 public class SignedDataTest {
@@ -101,6 +103,20 @@ public class SignedDataTest {
 		doSignedDataTest(sd1);
 	}
 	
+	@Test
+	public void testCellChecksNeedNoSignedValue() throws Exception {
+		SignedData<?> sd=InitTest.HERO_KEYPAIR.signData(Samples.INT_VECTOR_300);
+		assertFalse(sd.getValueRef().isEmbedded());
+
+		try (MemoryStore empty=new MemoryStore()) {
+			SignedData<?> decoded=empty.decode(sd.getEncoding());
+			assertThrows(MissingDataException.class,()->decoded.getValue());
+
+			Cells.validateCell(decoded);
+			assertTrue(decoded.checkSignature());
+		}
+	}
+
 	@Test
 	public void testRefs() {
 		AKeyPair kp = InitTest.HERO_KEYPAIR;

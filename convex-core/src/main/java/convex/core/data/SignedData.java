@@ -337,9 +337,9 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (pubKey!=null) pubKey.validate();
-		signature.validate();
-		valueRef.validate();
+		// Nothing to check: the key and signature are fixed-length byte fields that hold
+		// any value, and the signed value is a separate cell. Signature verification is
+		// checkSignature, not cell validity.
 	}
 
 	public Ref<T> getValueRef() {

@@ -105,10 +105,10 @@ final class EtchRecordVerifier {
 		// may be a view over a reusable maintenance buffer.
 		storedHash=actualHash;
 
-		// A record is checked on its own: hash, CAD3 decoding and canonical form. Cell
-		// validation is deliberately not part of it: validateStructure, and validateCell
-		// for some types such as SignedData, read child cells, which repair may not have
-		// copied yet and validation never loads, so the verdict would depend on record order.
+		// A record is checked on its own: hash, CAD3 decoding and canonical form, as CAD047
+		// specifies for repair. Cell validation is deliberately not part of it:
+		// validateStructure reads child cells, which repair may not have copied yet and
+		// validation never loads, so the verdict would depend on record order.
 		ACell cell;
 		try {
 			cell=decoder.decode(encoding);
