@@ -387,10 +387,14 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized <T extends ACell> Ref<T> write(AArrayBlob key, Ref<T> value) throws IOException {
-		prepareMutation();
 		return write(key, 0, value, indexStart);
 	}
 
+	// Publishes the v3 OPEN marker before the first change after a clean checkpoint.
+	// Every helper that changes file bytes calls this just before its change, and the
+	// root setter calls it when the root differs, so a write or root store that changes
+	// nothing leaves a clean checkpoint clean and a kill then needs no repair. A failed
+	// transition throws before any byte has changed.
 	private void prepareMutation() throws IOException {
 		if (!requiresOpenTransition)
 			return;
@@ -808,6 +812,7 @@ public class Etch {
 
 		int ix = POINTER_SIZE * digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix, dataPointer); // single node
+		prepareMutation();
 		return mapper.append(temp, 0, indexBlockLength, POINTER_SIZE, indexCipher);
 	}
 
@@ -1008,6 +1013,7 @@ public class Etch {
 		if ((currentSize == 0L) && ((newFlags & Ref.STATUS_MASK) >= Ref.PERSISTED)) {
 			Utils.writeLong(label, Byte.BYTES, ref.getValue().getMemorySize());
 		}
+		prepareMutation();
 		mapper.write(labelPosition, label, 0, LABEL_SIZE, dataCipher);
 
 		return ref.withFlags(newFlags); // reflect merged flags
@@ -1023,6 +1029,7 @@ public class Etch {
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position = indexPosition + digit * POINTER_SIZE;
+		prepareMutation();
 		mapper.writeLongRelease(position, slotValue, indexCipher);
 	}
 
@@ -1151,6 +1158,7 @@ public class Etch {
 
 		// The v1 root deliberately starts at byte 44; all child indexes are aligned.
 		int alignment = (level == 0) ? 1 : POINTER_SIZE;
+		prepareMutation();
 		return mapper.appendZeros(sizeBytes, alignment, indexCipher);
 	}
 
@@ -1190,6 +1198,7 @@ public class Etch {
 		Utils.writeLong(recordHeader, Byte.BYTES, memorySize);
 		Utils.writeShort(recordHeader, LABEL_SIZE, length);
 
+		prepareMutation();
 		return mapper.append(key, recordHeader, LABEL_SIZE + ENCODING_LENGTH_SIZE, encoding, dataCipher);
 	}
 
@@ -1206,12 +1215,14 @@ public class Etch {
 	}
 
 	/**
-	 * Writes the root data hash to the Store
-	 * 
+	 * Writes the root data hash to the Store. Writing the hash already recorded
+	 * changes nothing: a clean checkpoint stays clean.
+	 *
 	 * @param h Hash value to write
 	 * @throws IOException If IO Error occurs
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
+		if (h.equals(header.getRootHash())) return;
 		prepareMutation();
 		header.setRootHash(this, h);
 	}

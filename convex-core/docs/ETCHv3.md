@@ -148,10 +148,15 @@ The state must be invalidated durably before mutation:
    resource cleanup continues even if a force or header commit fails; such a close
    is dirty by definition and is logged as a warning.
 
-Each sync interval therefore costs one extra forced header transition, never one per
-record, and every completed durability boundary is directly reopenable. A crash
-during either transition selects a complete old or new generation; an `OPEN` result
-is conservative and requires backup restoration or explicit repair.
+A write that changes nothing (storing a value already held with the same status, or
+the root already recorded) is not a mutation and leaves `CLEAN_CLOSED` in place, so a
+store at rest stays directly reopenable however often its owner publishes.
+
+Each sync interval in which something changes therefore costs one extra forced header
+transition, never one per record, and every completed durability boundary is directly
+reopenable. A crash during either transition selects a complete old or new
+generation; an `OPEN` result is conservative and requires backup restoration or
+explicit repair.
 
 ### Header verification and selection
 

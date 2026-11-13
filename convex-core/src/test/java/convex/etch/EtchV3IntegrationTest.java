@@ -14,9 +14,14 @@ import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeHost;
 
 public class EtchV3IntegrationTest {
 	private static final byte[] SECRET=sequence(0x20,32);
@@ -66,6 +71,46 @@ public class EtchV3IntegrationTest {
 			assertEquals(second,reopened.getRootData());
 		} finally {
 			reopened.close();
+		}
+	}
+
+	@Test
+	public void testUnchangedRootLeavesCleanCheckpoint() throws Exception {
+		AVector<ACell> tree=Vectors.empty();
+		for (int i=0;i<1000;i++) tree=tree.conj(CVMLong.create(i));
+		// An inline root reaches Etch.write on every store; a tree root does not.
+		for (ACell root:new ACell[] {Vectors.of(1,2,3),tree}) {
+			File file=tempFile("etch-v3-unchanged-root");
+			EtchStore store=new EtchStore(Etch.create(file,EtchConfig.create(EtchConstants.VERSION_3)));
+			try {
+				store.setRootData(root);
+				store.flush();
+				store.setRootData(store.getRootData());
+				assertTrue(readHeader(file,null).isCleanClosed(),
+						"storing the recorded root again must leave the checkpoint clean");
+
+				store.setRootData(Vectors.of(root,CVMLong.ONE));
+				assertFalse(readHeader(file,null).isCleanClosed(),
+						"a real change must reopen the checkpoint before writing");
+			} finally {
+				store.close();
+			}
+		}
+	}
+
+	@Test
+	public void testIdleLatticeHostSyncLeavesCleanCheckpoint() throws Exception {
+		File file=tempFile("etch-v3-idle-host");
+		EtchStore store=new EtchStore(Etch.create(file,EtchConfig.create(EtchConstants.VERSION_3)));
+		try {
+			LatticeHost<AString> host=LatticeHost.create(value("idle host"),store);
+			host.checkpoint();
+			host.sync();
+			host.sync();
+			assertTrue(readHeader(file,null).isCleanClosed(),
+					"an idle sync must not reopen the last checkpoint");
+		} finally {
+			store.close();
 		}
 	}
 
