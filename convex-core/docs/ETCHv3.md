@@ -293,7 +293,8 @@ file. Under the exclusive lock it:
    valid records and reporting bad slots or subtrees;
 3. scans the whole body sequentially through physical EOF, decrypting at absolute
    offsets where necessary, accepting a candidate only after bounds, canonical CAD3
-   and content-hash validation and ignoring mutable labels;
+   and content-hash validation, none of which reads another record, and ignoring
+   mutable labels;
 4. writes every accepted hash-and-encoding pair into the new file, building a new
    index without trusting the source index, and rejects conflicting encodings for
    one hash;

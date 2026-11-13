@@ -10,13 +10,17 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.List;
 import java.util.HashSet;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AString;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Ref;
+import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
@@ -88,6 +92,37 @@ public class EtchVerifierTest {
 			assertEquals(0L,report.failureCount(),config.toString());
 			assertTrue(report.records()>=2L,config.toString());
 		}
+	}
+
+	@Test
+	public void testCleanStoreWithBranchingCellsIsValid() throws Exception {
+		File file=tempFile("etch-strict-branching");
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		EtchStore store=new EtchStore(Etch.create(file,config));
+		store.setRootData(branchingRoot());
+		store.flush();
+		store.close();
+
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
+		assertEquals(List.of(),report.problems());
+		assertTrue(report.isValid(),report.toString());
+	}
+
+	/**
+	 * A root holding cells whose structure checks read their children: a vector tree,
+	 * a blob tree and a signed value stored apart from its signature.
+	 */
+	static ACell branchingRoot() {
+		byte[] bytes=new byte[256*1024];
+		new Random(1).nextBytes(bytes);
+		return Vectors.of(Blob.wrap(bytes),longs(0,20000),
+				SignedData.sign(AKeyPair.createSeeded(1),longs(20000,25000)));
+	}
+
+	private static AVector<ACell> longs(int start, int end) {
+		AVector<ACell> result=Vectors.empty();
+		for (int i=start;i<end;i++) result=result.conj(CVMLong.create(i));
+		return result;
 	}
 
 	@Test

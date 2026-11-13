@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -80,6 +81,22 @@ public class EtchRebuilderTest {
 		} finally {
 			rebuilt.close();
 		}
+	}
+
+	/** The index walk meets parents before their children, in hash order. */
+	@Test
+	public void testCleanStoreWithBranchingCellsRebuildsWithoutProblems() throws Exception {
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		File source=tempFile("etch-rebuild-branching");
+		File destination=tempFile("etch-rebuild-branching-destination");
+		EtchStore store=new EtchStore(Etch.create(source,config));
+		store.setRootData(EtchVerifierTest.branchingRoot());
+		store.flush();
+		store.close();
+
+		EtchRebuilder.Result result=EtchRebuilder.rebuild(source,config,destination,null);
+		assertEquals(List.of(),result.problems());
+		assertEquals(EtchRebuilder.Status.COMPLETE,result.status());
 	}
 
 	@Test
