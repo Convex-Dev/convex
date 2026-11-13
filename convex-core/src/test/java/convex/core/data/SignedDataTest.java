@@ -13,9 +13,11 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
@@ -114,6 +116,29 @@ public class SignedDataTest {
 
 			Cells.validateCell(decoded);
 			assertTrue(decoded.checkSignature());
+		}
+	}
+
+	@Test
+	public void testEmbeddedSmallVectorIsCheckedByDecoding() throws Exception {
+		AVector<CVMLong> valid=Vectors.of(1,2,3);
+		SignedData<?> sd=InitTest.HERO_KEYPAIR.signData(valid);
+		assertTrue(sd.getValueRef().isEmbedded());
+		Blob encoding=sd.getEncoding();
+		int valueStart=1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH;
+		assertEquals(valid.getEncoding(),encoding.slice(valueStart));
+
+		try (MemoryStore store=new MemoryStore()) {
+			SignedData<?> decoded=store.decode(encoding);
+			Cells.validate(decoded);
+			assertEquals(valid,decoded.getValue());
+
+			// [1 2 3] with a count of 4, then with its first element given a redundant
+			// leading zero byte
+			String header=encoding.slice(0,valueStart).toHexString();
+			for (String invalid:new String[] {"8004110111021103","800312000111021103"}) {
+				assertThrows(BadFormatException.class,()->store.decode(Blob.fromHex(header+invalid)));
+			}
 		}
 	}
 
