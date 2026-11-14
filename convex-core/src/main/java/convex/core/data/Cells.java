@@ -9,6 +9,8 @@ import java.util.function.Consumer;
 import convex.core.Result;
 import convex.core.data.impl.DummyCell;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.InvalidStructureException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
@@ -366,6 +368,25 @@ public class Cells {
 			// Cells.markValidated(cell);
 		} catch (Exception e) {
 			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
+		}
+	}
+
+	/**
+	 * Checks a cell against each of its direct children, as structural correctness
+	 * requires (CAD003). The children themselves are not checked.
+	 *
+	 * @param cell Cell to check, may be null
+	 * @throws InvalidStructureException If the cell is inconsistent with a child
+	 * @throws MissingDataException If a child needed for the check is not available
+	 */
+	public static void checkStructure(ACell cell) {
+		if (cell==null) return;
+		try {
+			cell.validateStructure();
+		} catch (MissingDataException e) {
+			throw e;
+		} catch (InvalidDataException | RuntimeException e) {
+			throw new InvalidStructureException(e.getMessage(),e);
 		}
 	}
 

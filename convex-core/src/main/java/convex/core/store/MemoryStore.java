@@ -9,6 +9,7 @@ import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -77,8 +78,16 @@ public class MemoryStore extends AStore {
 		return encoder;
 	}
 	
-	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel) {
+		return persistRef(ref, noveltyHandler, requiredStatus, topLevel, false);
+	}
+
+	/**
+	 * @param checked True if the cell is inside a tree already recorded as persisted
+	 *        in this store, so its structure has been checked
+	 */
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel, boolean checked) {
 		// Convert to direct Ref if possible
 		try {
 			ref = ref.toDirect();
@@ -101,13 +110,15 @@ public class MemoryStore extends AStore {
 			if ((existing != null)) {
 				if (existing.getStatus()>=requiredStatus) return existing;
 				ref=existing;
+				if (existing.getStatus()>=Ref.PERSISTED) checked=true;
 			}
 		}
 
 		// Recursively persist children, tracking if all were fully resolved
 		final int[] minChildStatus = {requiredStatus};
+		final boolean childrenChecked=checked;
 		cell  = cell.updateRefs(r -> {
-			Ref<ACell> result = persistRef(r,noveltyHandler,requiredStatus,false);
+			Ref<ACell> result = persistRef(r,noveltyHandler,requiredStatus,false,childrenChecked);
 			if (result.getStatus()<requiredStatus) {
 				minChildStatus[0]=Math.min(minChildStatus[0], result.getStatus());
 			}
@@ -119,6 +130,9 @@ public class MemoryStore extends AStore {
 		// Only claim full status if all children achieved it;
 		// otherwise cap at STORED (this cell is stored but descendants may be incomplete)
 		int achievedStatus = (minChildStatus[0]>=requiredStatus) ? requiredStatus : Math.max(Ref.STORED, minChildStatus[0]);
+		// Children are now persisted: check this cell against them before it is
+		// recorded as persisted for the first time
+		if (!checked && (achievedStatus>=Ref.PERSISTED) && (cell.getRefCount()>0)) Cells.checkStructure(cell);
 		ref=ref.withMinimumStatus(achievedStatus);
 		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
 		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore

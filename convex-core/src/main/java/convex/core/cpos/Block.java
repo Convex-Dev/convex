@@ -162,13 +162,16 @@ public final class Block extends ARecordGeneric {
 	
 	@Override
 	public void validateStructure() throws InvalidDataException {
-		AVector<SignedData<ATransaction>> txs=getTransactions();
-		if (txs==null) throw new InvalidDataException("No transactions",this);
-		if (txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK) {
-			throw new InvalidDataException("Too many transactions: "+txs.count(),this);
+		if (getTransactions()==null) throw new InvalidDataException("Transactions should be a vector",this);
+	}
+
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
+		long n=getTransactions().count();
+		if (n>Constants.MAX_TRANSACTIONS_PER_BLOCK) {
+			throw new InvalidDataException("Too many transactions: "+n,this);
 		}
-		// We don't validate individual transactions here
-		// This gets enforced latter when transactions are applied
 	}
 	
 	@Override 

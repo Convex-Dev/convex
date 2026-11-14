@@ -11,6 +11,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -319,9 +320,18 @@ public class EtchStore extends ACachedStore {
 		return gc.persist(this,ref,requiredStatus,noveltyHandler,topLevel);
 	}
 
-	@SuppressWarnings("unchecked")
 	<T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
 			boolean topLevel, EtchGC.State state) throws IOException {
+		return storeRef(ref, requiredStatus, noveltyHandler, topLevel, state, false);
+	}
+
+	/**
+	 * @param checked True if the cell is inside a tree already recorded as persisted
+	 *        in this store, so its structure has been checked
+	 */
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
+			boolean topLevel, EtchGC.State state, boolean checked) throws IOException {
 		Etch writeEtch=state.writeEtch();
 
 		// Get the value. If we are persisting, should be there!
@@ -349,6 +359,7 @@ public class EtchStore extends ACachedStore {
 				if (existing.getStatus() >= requiredStatus) {
 					return existing;
 				}
+				if (existing.getStatus() >= Ref.PERSISTED) checked=true;
 			}
 		}
 
@@ -367,7 +378,9 @@ public class EtchStore extends ACachedStore {
 			// status is evidence; status carried by an incoming ref is not. Do this
 			// on every copy, so a later parent prune cannot hide a demoted child.
 			if (hash == null) hash = ref.getHash();
-			writeStatus=Math.max(writeStatus,gc.retainedStatus(this,state,writeEtch,hash));
+			int retainedStatus=gc.retainedStatus(this,state,writeEtch,hash);
+			writeStatus=Math.max(writeStatus,retainedStatus);
+			if (retainedStatus >= Ref.PERSISTED) checked=true;
 		}
 		// Retaining a PERSISTED/ANNOUNCED entry also requires its tree in the
 		// target, even for a STORED-only request. Its old ANNOUNCED status must
@@ -377,10 +390,11 @@ public class EtchStore extends ACachedStore {
 
 		// beyond STORED level, need to recursively persist child refs if they exist
 		if ((childStatus > Ref.STORED) && (cell.getRefCount() > 0)) {
+			final boolean childrenChecked = checked;
 			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
 				try {
-					return storeRef((Ref<ACell>) r, childStatus, noveltyHandler, false, state);
+					return storeRef((Ref<ACell>) r, childStatus, noveltyHandler, false, state, childrenChecked);
 				} catch (IOException e) {
 					// OK because overall function throws IOException
 					throw Utils.sneakyThrow(e);
@@ -396,6 +410,10 @@ public class EtchStore extends ACachedStore {
 				ref = ref.withValue((T) newObject);
 				cell = newObject;
 			}
+
+			// Children are now persisted: check this cell against them before it is
+			// recorded as persisted for the first time
+			if (!checked) Cells.checkStructure(cell);
 		}
 
 		// Actually write top level an non-embedded cells only
