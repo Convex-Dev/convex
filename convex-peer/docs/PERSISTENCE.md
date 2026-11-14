@@ -174,8 +174,10 @@ Propagation failures are isolated:
   timeout; and
 - `NodeServer.close()` still reaches `STOPPED` unless its own resource fails.
 
-Fatal JVM conditions such as out-of-memory remain process failures. Recoverable
-stack overflow at untrusted decode or policy boundaries is contained and logged.
+Running out of memory or stack while handling one connection, one message or one
+group's publication fails that work alone, and is contained and logged. Other JVM
+failures remain process failures; one that stops a group's inbound processing is
+recorded as that group's failure, and the group then refuses inbound messages.
 
 ## Lifecycle
 
