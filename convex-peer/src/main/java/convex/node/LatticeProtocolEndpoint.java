@@ -760,6 +760,11 @@ final class LatticeProtocolEndpoint implements Closeable {
 					log.warn("Unexpected propagation ingress failure",e);
 				}
 			}
+		} catch (Error e) {
+			// No message can be blamed: stop taking messages, and say so
+			acceptingInbound=false;
+			log.error("Propagation group stopped processing inbound messages",e);
+			propagator.recordFailure("inbound processing",e);
 		} finally {
 			acceptingInbound=false;
 			inboundRunning=false;
@@ -771,6 +776,10 @@ final class LatticeProtocolEndpoint implements Closeable {
 			handle(message);
 		} catch (StackOverflowError e) {
 			log.warn("Rejected propagation message after stack overflow");
+			closeFaultingConnection(message);
+		} catch (OutOfMemoryError e) {
+			// Only this message's work held the memory, and it is released by here
+			log.warn("Rejected propagation message after running out of memory");
 			closeFaultingConnection(message);
 		} catch (VirtualMachineError e) {
 			throw e;

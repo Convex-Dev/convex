@@ -588,6 +588,62 @@ public class NodeServerTest {
 		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
 	}
 
+	/** A lattice whose merge of one chosen value throws a chosen Error, and otherwise keeps the larger value. */
+	static final class PoisonedLattice extends ALattice<AInteger> {
+		private final ACell poison;
+		private final Error error;
+		PoisonedLattice(ACell poison, Error error) { this.poison=poison; this.error=error; }
+		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
+			if (poison.equals(otherValue)) throw error;
+			return MaxLattice.create().merge(ownValue,otherValue);
+		}
+		@Override public AInteger zero() { return CVMLong.ZERO; }
+		@Override public boolean checkForeign(AInteger value) { return true; }
+		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
+	}
+
+	/** A correlated LATTICE_VALUE of a value at the root. */
+	private static Message rootValue(long id, ACell value, AConnection conn) {
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(id),Vectors.empty(),value);
+		return Message.create(MessageType.LATTICE_VALUE,payload).withConnection(conn);
+	}
+
+	/**
+	 * Running out of memory on one lattice message fails that message alone: its
+	 * connection is closed and later messages are still handled.
+	 */
+	@Test
+	public void testOutOfMemoryFailsOnlyItsMessage() throws Exception {
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new OutOfMemoryError("simulated")),
+			store,NodeConfig.port(-1));
+		LatticePropagator group=propagator(maxNodeServer);
+		maxNodeServer.launch();
+		ScriptedPeer poisoned=new ScriptedPeer();
+		ScriptedPeer honest=new ScriptedPeer();
+
+		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),poisoned)));
+		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
+		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
+		assertTrue(poisoned.isClosed(),"the connection whose message ran out of memory is closed");
+		assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
+	}
+
+	/** An Error that no message can be blamed for stops the group's inbound processing visibly. */
+	@Test
+	public void testFatalErrorStopsInboundVisibly() throws Exception {
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new InternalError("simulated")),
+			store,NodeConfig.port(-1));
+		LatticePropagator group=propagator(maxNodeServer);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+		ScriptedPeer peer=new ScriptedPeer();
+
+		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),peer)));
+		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof InternalError);
+		assertNotNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),peer)),
+			"a group whose inbound processing stopped refuses further messages");
+	}
+
 	/** Fatal VM errors must reach the dispatcher's fail-closed boundary. */
 	@Test
 	public void testFatalMergeErrorPropagates() {
