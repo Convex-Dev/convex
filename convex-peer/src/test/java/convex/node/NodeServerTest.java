@@ -60,6 +60,7 @@ import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
@@ -2009,6 +2010,49 @@ public class NodeServerTest {
 	}
 
 	/**
+	 * A vector that decodes, being correctly encoded cell by cell, but whose tree
+	 * claims 256 elements while its last leaf holds 15: 547 bytes, so a branch.
+	 */
+	static AVector<?> invalidVectorTree() throws BadFormatException {
+		StringBuilder sb=new StringBuilder("808200");
+		for (int i=0; i<16; i++) {
+			int n=(i<15)?16:15;
+			sb.append("80").append(String.format("%02x",n));
+			for (int j=1; j<=n; j++) sb.append("11").append(String.format("%02x",j));
+		}
+		return new MemoryStore().decode(Blob.fromHex(sb.toString()));
+	}
+
+	/** A complete value that fails the structure check is the sender's fault. */
+	@Test
+	public void testInvalidStructureCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(1),Vectors.empty(),invalidVectorTree());
+		endpoint.handleIncomingMessage(Message.create(MessageType.LATTICE_VALUE,payload).withConnection(peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an invalid structure is the sender's fault, for the second reject");
+	}
+
+	/** Data acquired from a trusted sender that fails the structure check is that sender's fault. */
+	@Test
+	public void testAcquiredInvalidStructureCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		// Only the payload's own cell is sent: the tree is a branch the receiver must acquire
+		AVector<?> tree=invalidVectorTree();
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(1),Vectors.empty(),tree);
+		endpoint.handleIncomingMessage(Message.create(MessageType.LATTICE_VALUE,null,payload.getEncoding()).withConnection(peer));
+		peer.answerNextRequest(Result.value(Vectors.of(tree)));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an invalid structure is the sender's fault, for the second reject");
+	}
+
+	/**
 	 * #566: closed connections drain from the stats map via the periodic sweep (so an idle
 	 * node cleans up without inbound traffic), and removeConnection is the explicit single-sink
 	 * teardown.
@@ -2434,6 +2478,20 @@ public class NodeServerTest {
 				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
 			assertTrue(e.getCause() instanceof ResultException,String.valueOf(e.getCause()));
 			assertEquals(ErrorCodes.TIMEOUT,((ResultException)e.getCause()).getResult().getErrorCode());
+		}
+	}
+
+	/** A pull answered with a value that fails the structure check fails checked, as a bad reply. */
+	@Test
+	public void testPullAnsweredWithInvalidStructureFailsChecked() throws Exception {
+		ControlledVerificationConvex peer=new ControlledVerificationConvex();
+		peer.answer=Result.value(invalidVectorTree());
+		try (NodeServer<AInteger> target=new TestNode<>(MaxLattice.create(),new MemoryStore())) {
+			LatticePropagator group=propagator(target);
+			target.launch();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
+			assertTrue(e.getCause() instanceof BadFormatException,String.valueOf(e.getCause()));
 		}
 	}
 

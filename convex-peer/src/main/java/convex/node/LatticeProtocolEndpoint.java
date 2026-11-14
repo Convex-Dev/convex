@@ -32,6 +32,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -532,7 +533,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		Ref.get(value).findMissing(missing,1);
 		if (!missing.isEmpty()) throw new MissingDataException(store,missing.iterator().next());
 		// What the host's applications take from the value is theirs to decide
-		ACell complete=Cells.persist(value,store);
+		ACell complete;
+		try {
+			complete=Cells.persist(value,store);
+		} catch (InvalidStructureException e) {
+			throw new BadFormatException("Invalid lattice value structure: "+e.getMessage(),e);
+		}
 		AVector<?> completePayload=Vectors.create(
 			MessageTag.LATTICE_VALUE,payload.id(),payload.path(),complete);
 		return Message.create(MessageType.LATTICE_VALUE,completePayload)

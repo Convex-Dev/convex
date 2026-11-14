@@ -27,6 +27,8 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
@@ -1347,8 +1349,9 @@ public class LatticePropagator implements Closeable {
 	 * {@link PeerConnectionException} if the peer is not connected,
 	 * {@link ResultException} if the peer answers with an error or the request fails,
 	 * as when the connection closes or the reply does not arrive within the client's
-	 * timeout, and {@link java.util.concurrent.TimeoutException} if missing cells are
-	 * not acquired in time. It fails with an unchecked exception only for a fault, and
+	 * timeout, {@link BadFormatException} if the peer's value or the cells it supplies
+	 * are not valid, and {@link java.util.concurrent.TimeoutException} if missing cells
+	 * are not acquired in time. It fails with an unchecked exception only for a fault, and
 	 * is cancelled if the work is abandoned. No thread waits for the peer.</p>
 	 */
 	public CompletableFuture<ACell> pullPath(Convex peer,boolean background,ACell... path) {
@@ -1402,6 +1405,10 @@ public class LatticePropagator implements Closeable {
 			// announcing it would mark its cells as already shared, leaving them out of
 			// the novelty of this node's next publication.
 			return CompletableFuture.completedFuture(Cells.persist(receivedValue, store));
+		} catch (InvalidStructureException e) {
+			// The peer's reply is not a valid value: an outcome of the pull, not a fault
+			return CompletableFuture.failedFuture(
+				new BadFormatException("Pulled value has invalid structure: "+e.getMessage(),e));
 		} catch (IOException e) {
 			// This node's own store failed: a fault, not an outcome of the pull
 			return CompletableFuture.failedFuture(new StoreException("Unable to store a pulled lattice value", e));

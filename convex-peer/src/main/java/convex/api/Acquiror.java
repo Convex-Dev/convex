@@ -21,6 +21,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -186,7 +187,11 @@ public final class Acquiror implements AutoCloseable {
 			} else {
 				ref.findMissing(missing, CPoSConstants.MISSING_LIMIT);
 				if (missing.isEmpty()) {
-					return Cells.persist(ref.getValue(), store);
+					try {
+						return Cells.persist(ref.getValue(), store);
+					} catch (InvalidStructureException e) {
+						throw new BadFormatException("Acquired value has invalid structure: " + e.getMessage(), e);
+					}
 				}
 			}
 
