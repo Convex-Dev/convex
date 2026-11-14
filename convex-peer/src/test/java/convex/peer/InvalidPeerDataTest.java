@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -31,13 +32,18 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
+import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -245,9 +251,10 @@ public class InvalidPeerDataTest {
 		try {
 			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 			ArrayList<ACell> branches=new ArrayList<>();
-			ACell top=nested(DEEP,branches);
+			nested(DEEP,branches);
 			// Outermost first, so storing it stores everything beneath it in one call
 			Collections.reverse(branches);
+			ACell outermost=branches.get(0);
 			Message data=Message.createDataMessage(branches,(int)CPoSConstants.MAX_MESSAGE_LENGTH);
 
 			LocalConnection senderEnd=connect(peer);
@@ -258,7 +265,72 @@ public class InvalidPeerDataTest {
 			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
-			assertNull(peer.getStore().refForHash(top.getHash()));
+			assertNull(peer.getStore().refForHash(outermost.getHash()));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** The cells beneath a value that are not embedded, except one, found without recursion. */
+	static ArrayList<ACell> branchCells(ACell root, Hash leaveOut) {
+		ArrayList<ACell> result=new ArrayList<>();
+		HashSet<Hash> seen=new HashSet<>();
+		ArrayList<Ref<?>> stack=new ArrayList<>();
+		Cells.visitBranchRefs(root,stack::add);
+		while (!stack.isEmpty()) {
+			Ref<?> r=stack.remove(stack.size()-1);
+			Hash h=r.getHash();
+			if (h.equals(leaveOut)||!seen.add(h)) continue;
+			ACell c=r.getValue();
+			result.add(c);
+			Cells.visitBranchRefs(c,stack::add);
+		}
+		return result;
+	}
+
+	/**
+	 * A staked peer's Order that leaves out part of a Block, beside another staked peer's
+	 * Order holding deeply nested data, does not stop the merge of a good Order sent
+	 * after them, on a peer with an in-memory store.
+	 */
+	@Test
+	public void anIncompleteOrderBesideDeeplyNestedData() throws Exception {
+		AKeyPair remoteC=AKeyPair.createSeeded(143);
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B,remoteC);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			long ts=blockTime(peer);
+			List<SignedData<ATransaction>> txs=new ArrayList<>();
+			for (int i=1; i<=8; i++) txs.add(REMOTE_A.signData(Invoke.create(Init.GENESIS_ADDRESS,i,"*address*")));
+			Block incomplete=Block.create(ts,txs);
+			Hash leftOut=incomplete.getTransactions().getHash();
+			SignedData<Order> orderA=order(REMOTE_A,1,REMOTE_A.signData(incomplete));
+			ACell deep=nested(DEEP,new ArrayList<>());
+			SignedData<ATransaction> deepTx=REMOTE_B.signData(Invoke.create(Init.GENESIS_ADDRESS,1,deep));
+			SignedData<Order> orderB=order(REMOTE_B,1,REMOTE_B.signData(Block.create(ts,List.of(deepTx))));
+			Belief belief=Belief.create(orderA,orderB);
+			ArrayList<ACell> cells=branchCells(belief,leftOut);
+			cells.add(belief); // top cell last
+			Message update=Message.create(MessageType.BELIEF,belief,Format.encodeDelta(cells));
+
+			connect(peer).sendMessage(wire(update));
+
+			// A good Order that also leaves out part of a Block merges once fetched
+			MemoryStore senderStore=new MemoryStore();
+			List<SignedData<ATransaction>> txsC=new ArrayList<>();
+			for (int i=1; i<=8; i++) txsC.add(remoteC.signData(Invoke.create(Init.GENESIS_ADDRESS,i,"*address*")));
+			Block blockC=Block.create(ts,txsC);
+			MissingBeliefDataTest.update(blockC.getTransactions(),senderStore);
+			SignedData<Order> good=order(remoteC,1,remoteC.signData(blockC));
+			LocalConnection answering=MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore));
+			for (Message m: MissingBeliefDataTest.update(Belief.create(good),senderStore)) answering.sendMessage(wire(m));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			while ((merged!=null)&&!good.equals(merged.getOrders().get(remoteC.getAccountKey()))) {
+				merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			}
+			assertNotNull(merged,"the good Order is merged");
+			assertTrue(peer.isRunning());
 		} finally {
 			peer.close();
 		}

@@ -605,7 +605,8 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 					return null;
 				});
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError e) {
+			// A stack overflow is data nested too deeply for this peer to store
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}
