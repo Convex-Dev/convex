@@ -795,7 +795,10 @@ public class LatticePropagator implements Closeable {
 			try {
 				matched=condition.test(value);
 			} catch (VirtualMachineError e) {
-				throw e;
+				// Only the caller's condition held the stack or memory: it fails that caller's wait
+				if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
+				future.completeExceptionally(e);
+				return;
 			} catch (Throwable e) {
 				future.completeExceptionally(e);
 				return;
@@ -1113,9 +1116,10 @@ public class LatticePropagator implements Closeable {
 		try {
 			processSnapshot(value);
 		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
+			// Only this publication held the stack or memory
+			if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
 			recordFailure("publication",e);
-			log.warn("Contained stack overflow in propagator group",e);
+			log.warn("Contained {} in propagator group",e.getClass().getSimpleName(),e);
 		} catch (Throwable e) {
 			// A broken filter, store cache or connection implementation belongs to
 			// this policy group. It must never terminate NodeServer publication or

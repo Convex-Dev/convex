@@ -153,6 +153,21 @@ public class AcquirorTest {
 		}
 	}
 
+	/** A fetch that runs out of memory fails this acquisition alone, and its worker ends. */
+	@Test
+	public void testOutOfMemoryFailsOnlyThisAcquisition() throws Exception {
+		Blob expected = Blobs.createRandom(400);
+		try (MemoryStore store = new MemoryStore();
+				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> {
+					throw new OutOfMemoryError("simulated fetch");
+				})) {
+			ExecutionException error = org.junit.jupiter.api.Assertions.assertThrows(
+				ExecutionException.class, () -> acquiror.getFuture().get(5, TimeUnit.SECONDS));
+			assertInstanceOf(OutOfMemoryError.class, error.getCause());
+			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+		}
+	}
+
 	@Test
 	public void testResponseCardinalityMustMatchRequest() throws Exception {
 		assertMalformedResponse(Vectors.empty());

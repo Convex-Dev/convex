@@ -268,6 +268,52 @@ public class NodeServerTest {
 		assertEquals(NodeServer.LifecycleState.STOPPED,maxNodeServer.getLifecycleState());
 	}
 
+	/** Running out of memory notifying one group fails that group's notification alone. */
+	@Test
+	public void testGroupOutOfMemoryOnNotificationIsIsolated() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator broken=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public void triggerBroadcast(ACell value) {
+				throw new OutOfMemoryError("simulated notification");
+			}
+		};
+		LatticePropagator healthy=new LatticePropagator(store,LatticePropagatorConfig.create());
+		maxNodeServer.addPropagator(broken);
+		maxNodeServer.addPropagator(healthy);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=broken.nextFailure();
+		CompletableFuture<ACell> announced=healthy.nextAnnounce();
+
+		maxNodeServer.getCursor().set(CVMLong.create(23));
+		maxNodeServer.getHost().sync();
+		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
+		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+		assertTrue(maxNodeServer.isRunning());
+	}
+
+	/** Running out of memory publishing one value fails that publication alone: later values are published. */
+	@Test
+	public void testGroupOutOfMemoryOnPublicationIsIsolated() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public ACell processSnapshot(ACell value) throws IOException {
+				if (CVMLong.create(13).equals(value)) throw new OutOfMemoryError("simulated publication");
+				return super.processSnapshot(value);
+			}
+		};
+		maxNodeServer.addPropagator(group);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+
+		maxNodeServer.getCursor().set(CVMLong.create(13));
+		maxNodeServer.getHost().sync();
+		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+		CompletableFuture<ACell> announced=group.nextAnnounce();
+		maxNodeServer.getCursor().set(CVMLong.create(23));
+		maxNodeServer.getHost().sync();
+		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
+	}
+
 	/** Every propagation-group callback is optional, isolated fan-out. */
 	@Test
 	public void testPropagatorFailuresCannotBreakAuthoritativeLoop() throws Exception {

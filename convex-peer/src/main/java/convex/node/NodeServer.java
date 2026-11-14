@@ -546,11 +546,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		try {
 			action.run();
 		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
+			// Only this group's work held the stack or memory
+			if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
 			propagator.recordFailure(operation,e);
-			log.warn("Contained propagation-group stack overflow during {}; isolated {}",
-				operation,propagator);
-			log.debug("Contained propagation-group stack overflow",e);
+			log.warn("Contained propagation-group {} during {}; isolated {}",
+				e.getClass().getSimpleName(),operation,propagator);
+			log.debug("Contained propagation-group error",e);
 		} catch (Throwable e) {
 			propagator.recordFailure(operation,e);
 			log.warn("Propagator group failed during {}; isolated {}: {}: {}",
