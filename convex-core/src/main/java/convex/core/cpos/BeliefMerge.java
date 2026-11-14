@@ -120,6 +120,7 @@ public class BeliefMerge {
 			SignedData<Order> b=be.getValue();
 			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
 			Order bc = RT.ensureCVM(b.getValue(),Order.class);
+			if (bc == null) continue; // a signed value that is not an Order
 			if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
 			
 			SignedData<Order> a=result.get(key);
