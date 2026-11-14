@@ -1378,11 +1378,13 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Stores a pull reply's value locally. A complete reply is announced directly. A
+	 * Stores a pull reply's value locally. A complete reply is persisted directly. A
 	 * partial reply (root only, or root after DATA chunks) is completed by acquiring
 	 * from the peer: any cells the reply or its chunks staged in the store are found
 	 * there and not fetched again. Completeness is checked explicitly, since a store
 	 * may hold a partial value without throwing.
+	 *
+	 * <p>Either way the value ends persisted, never announced.</p>
 	 */
 	private CompletableFuture<ACell> acquireReply(Convex peer,Result result) {
 		if (result.isError()) return CompletableFuture.failedFuture(new ResultException(result));
@@ -1396,7 +1398,10 @@ public class LatticePropagator implements Closeable {
 				.orTimeout(PULL_ACQUIRE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 		}
 		try {
-			return CompletableFuture.completedFuture(Cells.announce(receivedValue, r -> {}, store));
+			// Not announced: the value has not been through this node's merge, and
+			// announcing it would mark its cells as already shared, leaving them out of
+			// the novelty of this node's next publication.
+			return CompletableFuture.completedFuture(Cells.persist(receivedValue, store));
 		} catch (IOException e) {
 			// This node's own store failed: a fault, not an outcome of the pull
 			return CompletableFuture.failedFuture(new StoreException("Unable to store a pulled lattice value", e));

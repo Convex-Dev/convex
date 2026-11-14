@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
+- Store a value a lattice node pulls from a peer without announcing it before the node has merged it, so the node's next update carries those cells to its other peers.
 - Isolate upgrade-verification reports and failure counters between concurrent runs.
 - Close and report failed inbound message delivery after a backed-up reply queue drains, instead of stranding the connection.
 - Keep expected SQL rejections and malformed PostgreSQL frames out of operator warning logs while retaining internal-error reporting.

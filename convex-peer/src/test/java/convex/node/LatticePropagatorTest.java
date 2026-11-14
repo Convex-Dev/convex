@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -240,6 +241,31 @@ public class LatticePropagatorTest {
 		// Verify server1 received the value from server2
 		assertEquals(testValue, RT.getIn(server1.getLocalValue(), dataKeyword, valueHash),
 			"Server1 should have received the value broadcast from server2");
+	}
+
+	/**
+	 * A pulled value has not been through this node's merge, so it reaches the store
+	 * persisted, never announced.
+	 */
+	@Test
+	public void testPulledValueIsPersistedNotAnnounced() throws Exception {
+		// Server2 must not push to server1, so server1 only ever holds the value by pulling
+		propagator2.removePeer(propagator1.getTransportKey());
+
+		Keyword dataKeyword = Keyword.intern("data");
+		ACell testValue = CVMLong.create(424242);
+		Hash valueHash = Hash.get(testValue);
+		server2.getCursor().assoc(dataKeyword, Index.of(valueHash, testValue));
+		CompletableFuture<ACell> published=propagator2.whenAnnounced(
+			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
+		server2.getHost().sync();
+		published.get(5,TimeUnit.SECONDS);
+
+		List<ACell> pulled=propagator1.pullAll().get(5,TimeUnit.SECONDS);
+		assertEquals(1,pulled.size());
+		ACell value=pulled.get(0);
+		assertEquals(testValue,RT.getIn(value,dataKeyword,valueHash));
+		assertEquals(Ref.PERSISTED,store1.refForHash(Hash.get(value)).getStatus());
 	}
 
 	/** Delta broadcast retains the protocol envelope and drives a real push merge. */
