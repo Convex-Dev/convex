@@ -1,5 +1,6 @@
 package convex.core.cpos;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cvm.ARecordGeneric;
@@ -162,7 +163,8 @@ public class BlockResult extends ARecordGeneric {
 	}
 
 	/**
-	 * Creates a BlockResult for an invalid Block (e.g. no peer in Global State)
+	 * Creates a BlockResult for an invalid Block (e.g. no peer in Global State). Each
+	 * transaction gets the error, up to the most transactions a Block may hold.
 	 * @param state State at time of creation
 	 * @param block Invalid block
 	 * @param message Message to report to clients
@@ -174,7 +176,8 @@ public class BlockResult extends ARecordGeneric {
 		if (block==null) {
 			rs=null;
 		} else {
-			rs=Vectors.repeat(r, block.getTransactions().size());
+			long n=Math.min(block.getTransactions().count(), Constants.MAX_TRANSACTIONS_PER_BLOCK);
+			rs=Vectors.repeat(r, (int)n);
 		}
 		
 		return new BlockResult(state,rs);
