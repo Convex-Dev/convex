@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -446,6 +447,34 @@ public class StructureCheckTest {
 		ABlob tree=store.decode(Blob.fromHex(header+children));
 		assertEquals(12288,tree.count());
 		assertNotPersisted(tree,store);
+	}
+
+	/** Checking a tree that refers to the same cells many times visits each once */
+	@Test
+	public void testCheckTreeVisitsSharedCellsOnce() {
+		ACell v=Vectors.of(1);
+		for (int i=0; i<64; i++) v=Vectors.of(v,v);
+		Cells.checkTree(v);
+	}
+
+	/**
+	 * Checking a received value stops at a branch its store holds as persisted, which
+	 * has been checked, rather than walking the stored tree again
+	 */
+	@Test
+	public void testCheckTreeStopsAtPersistedBranch() throws Exception {
+		try (EtchStore store=EtchStore.createTemp("structure-check")) {
+			// An invalid tree recorded as persisted directly, as a store written before
+			// these checks may hold one
+			ACell full=Cells.persist(store.decode(Blob.fromHex(bigLeaf(16))),store);
+			ACell short15=Cells.persist(store.decode(Blob.fromHex(bigLeaf(15))),store);
+			ACell bad=store.decode(Blob.fromHex("8020"+ref(full)+ref(short15)));
+			store.getEtch().write(bad.getHash(),bad.getRef().withStatus(Ref.PERSISTED));
+
+			ACell received=store.decode(Blob.fromHex("8001"+ref(bad)));
+			Cells.checkTree(received);
+			assertThrows(InvalidStructureException.class,()->Cells.checkTree(bad));
+		}
 	}
 
 	/** Decodes a cell as a peer receives it, so CVM records are specialised */

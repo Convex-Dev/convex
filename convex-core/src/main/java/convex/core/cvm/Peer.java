@@ -25,6 +25,7 @@ import convex.core.data.AString;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -34,6 +35,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -355,6 +357,13 @@ public class Peer {
 		form=CVMEncoder.specialise(form);
 		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
+
+		// The query is received data this Peer does not keep: check it before use
+		try {
+			Cells.checkTree(form);
+		} catch (InvalidStructureException e) {
+			return ResultContext.error(state,ErrorCodes.FORMAT,"Invalid query structure: "+e.getMessage());
+		}
 
 		if (form instanceof ATransaction tx) {
 			return executeDetached(tx,maxJuice);

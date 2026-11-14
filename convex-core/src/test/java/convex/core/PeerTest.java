@@ -28,6 +28,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
@@ -66,6 +67,27 @@ public class PeerTest {
 		// Run a query
 		assertEquals(RT.cvm(3L), (p.executeQuery(Reader.read("(+ 1 2)")).getResult()));
 		
+	}
+
+	/**
+	 * A query is received data the peer does not keep, so its structure is checked
+	 * before it runs
+	 */
+	@Test
+	public void testQueryWithInvalidStructure() {
+		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
+		// A vector tree claiming 256 elements whose last embedded leaf holds 15
+		StringBuilder sb=new StringBuilder("808200");
+		for (int i=0; i<16; i++) {
+			int n=(i<15)?16:15;
+			sb.append("80").append(String.format("%02x",n));
+			for (int j=1; j<=n; j++) sb.append("11").append(String.format("%02x",j));
+		}
+		ResultContext rc=p.executeQuery(Reader.read("(count (quote #["+sb+"]))"));
+		assertEquals(ErrorCodes.FORMAT,rc.getErrorCode());
+
+		// The same query over a valid vector runs
+		assertEquals(CVMLong.create(256),p.executeQuery(Reader.read("(count (quote "+Vectors.repeat(CVMLong.ONE,256)+"))")).getResult());
 	}
 
 	@Test

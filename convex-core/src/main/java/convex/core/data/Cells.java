@@ -2,8 +2,12 @@ package convex.core.data;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import convex.core.Result;
@@ -387,6 +391,39 @@ public class Cells {
 			throw e;
 		} catch (InvalidDataException | RuntimeException e) {
 			throw new InvalidStructureException(e.getMessage(),e);
+		}
+	}
+
+	/**
+	 * Checks the structure of a value's whole tree, as persisting it would, without
+	 * storing anything: each cell against its direct children. A branch that its store
+	 * holds as persisted has been checked, and is not visited.
+	 *
+	 * @param value Value to check, may be null
+	 * @throws InvalidStructureException If a cell is inconsistent with a child
+	 * @throws MissingDataException If a branch of the tree is not available
+	 */
+	public static void checkTree(ACell value) {
+		if (value==null) return;
+		ArrayList<ACell> stack=new ArrayList<>();
+		// Each cell once, however often the tree refers to it
+		Set<ACell> seen=Collections.newSetFromMap(new IdentityHashMap<>());
+		stack.add(value);
+		while (!stack.isEmpty()) {
+			ACell cell=stack.remove(stack.size()-1);
+			int n=cell.getRefCount();
+			if ((n==0)||!seen.add(cell)) continue;
+			checkStructure(cell);
+			for (int i=0; i<n; i++) {
+				Ref<ACell> ref=cell.getRef(i);
+				if (ref instanceof RefSoft<ACell> soft) {
+					AStore store=soft.getStore();
+					Ref<ACell> stored=(store==null)?null:store.refForHash(soft.getHash());
+					if ((stored!=null)&&(stored.getStatus()>=Ref.PERSISTED)) continue;
+				}
+				ACell child=ref.getValue();
+				if (child!=null) stack.add(child);
+			}
 		}
 	}
 
