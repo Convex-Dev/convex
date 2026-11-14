@@ -124,13 +124,14 @@ public class BeliefMerge {
 			if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
 			
 			SignedData<Order> a=result.get(key);
+			if (b.equals(a)) continue; // PERF: fast path for no changes
+			if (!hasReadableBlocks(bc)) continue; // an Order the merge cannot read
+
 			if (a == null) {
 				// This is a new order to us, so include if valid
-				result=result.assocEntry(be); 
+				result=result.assocEntry(be);
 				continue;
 			}
-			
-			if (a.equals(b)) continue; // PERF: fast path for no changes
 
 			Order ac = RT.ensureCVM(a.getValue(),Order.class);
 
@@ -144,7 +145,31 @@ public class BeliefMerge {
 	}
 	
 	/**
-	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for 
+	 * Checks that the merge can read an Order's Blocks: they are a vector, and each Block
+	 * beyond those it shares with this peer's Order is a signed Block whose transactions
+	 * are a vector.
+	 *
+	 * @param order Order to check
+	 * @return true if the merge can read the Order's Blocks, false otherwise
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	private boolean hasReadableBlocks(Order order) {
+		if (!(order.values().get(Order.IX_BLOCKS) instanceof AVector blocks)) return false;
+		// The merge reads Blocks only from this peer's consensus point on, and Blocks
+		// shared with this peer's Order were read when that Order took them
+		Order myOrder=getMyOrder();
+		long start=(myOrder==null)?0:blocks.commonPrefixLength(myOrder.getBlocks());
+		long n=blocks.count();
+		for (long i=start; i<n; i++) {
+			if (!(blocks.get(i) instanceof SignedData signed)) return false;
+			Block block=RT.ensureCVM(signed.getValue(),Block.class);
+			if ((block==null)||(block.getTransactions()==null)) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for
 	 * minimum effective stake.
 	 * 
 	 * @param key Peer Key to test
