@@ -667,8 +667,9 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 					return null;
 				});
-		} catch (Exception | StackOverflowError e) {
-			// A StackOverflowError has unwound by here, so the update is simply unusable
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Only this fetch's work held the stack or memory, and it has unwound by here,
+			// so the update is simply unusable; the next update may fetch again
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}

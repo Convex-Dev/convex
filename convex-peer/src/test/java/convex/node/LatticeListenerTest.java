@@ -296,6 +296,7 @@ public class LatticeListenerTest {
 				group.onRemove=new OutOfMemoryError("simulated release");
 				listener.close();
 				assertFalse(listener.isRunning());
+				assertNull(group.onRemove,"releasing a connection ran out of memory");
 			}
 			assertTrue(node.isRunning());
 		}

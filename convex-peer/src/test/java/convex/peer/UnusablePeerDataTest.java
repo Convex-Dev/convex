@@ -352,8 +352,26 @@ public class UnusablePeerDataTest {
 	}
 
 	/**
+	 * An update from a staked peer whose Order lacks part of a Block, sent with a good
+	 * Order from another peer.
+	 */
+	private static List<Message> updateMissingABlock(long ts, int firstSequence, SignedData<Order> good,
+			MemoryStore senderStore) throws Exception {
+		List<SignedData<ATransaction>> txs=new ArrayList<>();
+		for (int i=0; i<8; i++) {
+			txs.add(REMOTE_A.signData(Invoke.create(Init.GENESIS_ADDRESS,firstSequence+i,"*address*")));
+		}
+		Block block=Block.create(ts,txs);
+		// Announced before, so the next update leaves it out and the peer must fetch it
+		MissingBeliefDataTest.update(block.getTransactions(),senderStore);
+		SignedData<Order> incomplete=order(REMOTE_A,ts,REMOTE_A.signData(block));
+		return MissingBeliefDataTest.update(Belief.create(incomplete,good),senderStore);
+	}
+
+	/**
 	 * Fetching a staked peer's missing Order data that runs out of memory drops that
-	 * fetch: a good Order from another peer in the same update is still merged.
+	 * fetch alone: a good Order from another peer in the same update is still merged,
+	 * and missing data in a later update is fetched.
 	 */
 	@Test
 	public void aFetchThatRunsOutOfMemoryIsDropped() throws Exception {
@@ -363,20 +381,12 @@ public class UnusablePeerDataTest {
 			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 			MemoryStore senderStore=new MemoryStore();
 			long ts=blockTime(peer);
-			List<SignedData<ATransaction>> txs=new ArrayList<>();
-			for (int i=1; i<=8; i++) txs.add(REMOTE_A.signData(Invoke.create(Init.GENESIS_ADDRESS,i,"*address*")));
-			Block block=Block.create(ts,txs);
-			SignedData<Block> signed=REMOTE_A.signData(block);
-			// Announced before, so the next update leaves it out and the peer must fetch it
-			MissingBeliefDataTest.update(block.getTransactions(),senderStore);
-			SignedData<Order> incomplete=order(REMOTE_A,1,signed);
-			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
-			List<Message> sent=MissingBeliefDataTest.update(Belief.create(incomplete,good),senderStore);
+			SignedData<Order> good=order(REMOTE_B,ts,block(REMOTE_B,ts));
+			List<Message> sent=updateMissingABlock(ts,1,good,senderStore);
 			for (Message m: sent) {
 				// Staging the update for its fetch is the first time the peer stores it
 				if (m.getType()==MessageType.BELIEF) store.failOnce(m.getPayload().getHash(),new OutOfMemoryError("simulated"));
 			}
-
 			LocalConnection senderEnd=connect(peer);
 			for (Message m: sent) senderEnd.sendMessage(wire(m));
 
@@ -384,6 +394,14 @@ public class UnusablePeerDataTest {
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 			assertNull(store.failing,"the fetch ran out of memory");
+			assertNull(peer.getBeliefPropagator().getMissingDataFetch(),"no fetch started");
+
+			SignedData<Order> later=order(REMOTE_B,ts+1,block(REMOTE_B,ts),block(REMOTE_B,ts+1));
+			LocalConnection laterEnd=connect(peer);
+			for (Message m: updateMissingABlock(ts+1,9,later,senderStore)) laterEnd.sendMessage(wire(m));
+			merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the later good Order is merged");
+			assertNotNull(peer.getBeliefPropagator().getMissingDataFetch(),"later missing data is fetched");
 			assertTrue(peer.isLive());
 		} finally {
 			peer.close();
