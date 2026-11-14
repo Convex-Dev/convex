@@ -27,6 +27,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.Index;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -430,6 +431,9 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
+				} catch (StackOverflowError e) {
+					// Nested too deeply for this peer to store
+					server.getConnectionManager().alertBadMessage(m,"DATA too deeply nested");
 				} catch (Exception e) {
 					log.warn("Unable to stage peer DATA message",e);
 					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
@@ -521,7 +525,28 @@ public class BeliefPropagator extends AThreadedComponent {
 					break;
 				}
 
-				so=Cells.persist(so,server.getStore());
+				Ref<SignedData<Order>> stored;
+				try {
+					stored=server.getStore().storeTopRef(Ref.get(so),Ref.PERSISTED,null);
+				} catch (StackOverflowError e) {
+					// Nested too deeply for this peer to store
+					if (source!=null) {
+						server.getConnectionManager().alertBadMessage(source,"Order too deeply nested");
+					} else {
+						log.warn("Order too deeply nested in locally acquired Belief");
+					}
+					continue;
+				}
+				if (stored.getStatus()<Ref.PERSISTED) {
+					// A store can keep an Order without all of its parts, as an in-memory store does
+					if (source!=null) {
+						fetchMissing(source);
+					} else {
+						log.warn("Locally acquired Belief is incomplete");
+					}
+					continue;
+				}
+				so=stored.getValue();
 				observeOrderUpdate(so);
 				orders.put(key,so);
 				changed=true;
