@@ -254,7 +254,8 @@ public final class LatticeListener implements Closeable {
 				try {
 					target=propagator.accept(connection);
 				} catch (VirtualMachineError e) {
-					if (!(e instanceof StackOverflowError)) throw e;
+					// Only this connection's work held the stack or memory
+					if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
 					return containFailure(connection,propagator,e);
 				} catch (Throwable e) {
 					// A group removed meanwhile turns connections away as it closes: no failure
@@ -275,7 +276,8 @@ public final class LatticeListener implements Closeable {
 			try {
 				return target.handle(message);
 			} catch (VirtualMachineError e) {
-				if (!(e instanceof StackOverflowError)) throw e;
+				// Only this message's work held the stack or memory
+				if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
 				return containFailure(connection,propagator,e);
 			} catch (Throwable e) {
 				return containFailure(connection,propagator,e);
@@ -344,18 +346,25 @@ public final class LatticeListener implements Closeable {
 				return new Selection(null,UNAVAILABLE_GROUP);
 			}
 			return new Selection(selected,null);
-		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
+		} catch (StackOverflowError e) {
 			log.warn("Inbound propagation policy overflowed for {}; connection denied",
 				connection.getRemoteAddress());
 			log.debug("Inbound propagation policy overflow",e);
 			return new Selection(null,"Inbound propagation policy exceeded its execution stack");
+		} catch (VirtualMachineError e) {
+			// Only this connection's selection held the memory
+			if (!(e instanceof OutOfMemoryError)) throw e;
+			return policyFailed(connection,e);
 		} catch (Throwable e) {
-			log.warn("Inbound propagation policy failed for {}; connection denied: {}: {}",
-				connection.getRemoteAddress(),e.getClass().getSimpleName(),e.getMessage());
-			log.debug("Inbound propagation policy failure",e);
-			return new Selection(null,"Inbound propagation policy failed");
+			return policyFailed(connection,e);
 		}
+	}
+
+	private Selection policyFailed(AConnection connection,Throwable e) {
+		log.warn("Inbound propagation policy failed for {}; connection denied: {}: {}",
+			connection.getRemoteAddress(),e.getClass().getSimpleName(),e.getMessage());
+		log.debug("Inbound propagation policy failure",e);
+		return new Selection(null,"Inbound propagation policy failed");
 	}
 
 	/** Releases the assignment and delegates all connection cleanup to its owner. */
