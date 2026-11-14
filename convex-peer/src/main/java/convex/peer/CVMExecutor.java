@@ -81,7 +81,7 @@ public class CVMExecutor extends AThreadedComponent {
 				}
 
 				// Trigger State update (if any new Blocks are confirmed)
-				Peer updatedPeer=peer.updateState();
+				Peer updatedPeer=computeState(peer);
 				if (updatedPeer!=peer) {
 					peer=updatedPeer;
 					persistPeerData();
@@ -106,10 +106,35 @@ public class CVMExecutor extends AThreadedComponent {
 				// propagator both cease) until the operator updates and restarts.
 				server.haltConsensus(e);
 			}
-		} catch (Exception e) {
-			// This is some fatal failure
+		} catch (IOException e) {
+			// The peer cannot persist its state: fatal
 			log.error("Fatal exception encountered in CVM Executor",e);
 			server.close();
+		}
+	}
+
+	/** State position at which computing the State last failed, or -1 */
+	private long failedPosition=-1;
+
+	/**
+	 * Computes the State up to the Peer's finality point. Failing to compute it is not
+	 * fatal: the State stays where it is and the next loop tries again.
+	 *
+	 * @param p Peer whose State to compute
+	 * @return Peer with its State computed, or the same Peer if computing it failed
+	 */
+	private Peer computeState(Peer p) {
+		try {
+			Peer updated=p.updateState();
+			failedPosition=-1;
+			return updated;
+		} catch (RuntimeException e) {
+			long position=p.getStatePosition();
+			if (position!=failedPosition) {
+				log.error("Unable to compute State beyond position {}; will retry",position,e);
+				failedPosition=position;
+			}
+			return p;
 		}
 	}
 

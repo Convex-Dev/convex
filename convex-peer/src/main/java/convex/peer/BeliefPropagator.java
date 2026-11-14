@@ -26,7 +26,10 @@ import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.core.data.Index;
+import convex.core.data.MapEntry;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -336,47 +339,80 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
-	 * belief.
-	 * @param newBeliefs New beliefs to merge 
+	 * belief. A newly received Order that cannot be merged is dropped, and the
+	 * others are merged without it.
+	 * @param newBeliefs New beliefs to merge
 	 *
 	 * @return True if Peer Belief Order was changed, false otherwise.
 	 */
 	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
 		if ((newBeliefs==null)||(newBeliefs.length==0)) return false;
-		try {
-			long ts=server.getTimestamp();
-			AKeyPair kp=server.getKeyPair();
-			BeliefMerge mc = BeliefMerge.create(belief,kp, ts, server.getPeer().getConsensusState());
-			Belief newBelief = mc.merge(newBeliefs);
-
-			AccountKey key=mc.getAccountKey();
-			Order oldOrder=belief.getOrder(key);
-			Order newOrder=newBelief.getOrder(key);
-			
-			boolean ownChanged=false;
-			if (oldOrder==null) {
-				ownChanged=newOrder!=null;
-			} else {
-				if (newOrder==null) {
-					ownChanged=true; // old order must have been removed
-				} else {
-					ownChanged=!newOrder.consensusEquals(oldOrder);
-				}
-			}
-			// Any change to the Belief, including other peers' Orders, is worth relaying
-			if (newBelief!=belief) beliefChanged=true;
-			belief=newBelief;
-
-			return ownChanged;
-		} catch (MissingDataException e) {
-			// Shouldn't happen if beliefs are correctly persisted
-			// e.printStackTrace();
-			throw new Error("Missing data in belief merge: " + e.getMissingHash().toHexString(), e);
-		} catch (InvalidDataException e) {
-			// Shouldn't happen if Beliefs are already validated
-			// e.printStackTrace();
-			throw new Error("Invalid data in belief merge!", e);
+		long ts=server.getTimestamp();
+		AKeyPair kp=server.getKeyPair();
+		State state=server.getPeer().getConsensusState();
+		Belief newBelief=tryMerge(ts,kp,state,newBeliefs);
+		if (newBelief==null) {
+			newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
+			if (newBelief==null) return false;
 		}
+
+		AccountKey key=kp.getAccountKey();
+		Order oldOrder=belief.getOrder(key);
+		Order newOrder=newBelief.getOrder(key);
+
+		boolean ownChanged=false;
+		if (oldOrder==null) {
+			ownChanged=newOrder!=null;
+		} else {
+			if (newOrder==null) {
+				ownChanged=true; // old order must have been removed
+			} else {
+				ownChanged=!newOrder.consensusEquals(oldOrder);
+			}
+		}
+		// Any change to the Belief, including other peers' Orders, is worth relaying
+		if (newBelief!=belief) beliefChanged=true;
+		belief=newBelief;
+
+		return ownChanged;
+	}
+
+	/**
+	 * Merges Beliefs into this peer's Belief.
+	 *
+	 * @return Merged Belief, or null if the merge fails on the data it was given
+	 */
+	private Belief tryMerge(long ts, AKeyPair kp, State state, Belief... beliefs) {
+		try {
+			return BeliefMerge.create(belief,kp,ts,state).merge(beliefs);
+		} catch (InvalidDataException | RuntimeException | StackOverflowError e) {
+			log.debug("Belief merge failed",e);
+			return null;
+		}
+	}
+
+	/**
+	 * Gets a Belief with this peer's Orders and those received Orders that can each be
+	 * merged into this peer's Belief on their own.
+	 */
+	private Belief withoutUnmergeableOrders(long ts, AKeyPair kp, State state, Belief[] beliefs) {
+		Index<AccountKey, SignedData<Order>> current=belief.getOrders();
+		Index<AccountKey, SignedData<Order>> usable=current;
+		for (Belief b: beliefs) {
+			if (b==null) continue;
+			Index<AccountKey, SignedData<Order>> orders=b.getOrders();
+			long n=orders.count();
+			for (long i=0; i<n; i++) {
+				MapEntry<AccountKey, SignedData<Order>> e=orders.entryAt(i);
+				if (Cells.equals(e.getValue(),current.get(e.getKey()))) continue;
+				if (tryMerge(ts,kp,state,Belief.create(current.assocEntry(e)))==null) {
+					log.warn("Dropped an Order from peer {} that cannot be merged",e.getKey());
+					continue;
+				}
+				usable=usable.assocEntry(e);
+			}
+		}
+		return Belief.create(usable);
 	}
 	
 	/**
@@ -430,8 +466,10 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
-				} catch (Exception e) {
-					log.warn("Unable to stage peer DATA message",e);
+				} catch (Exception | StackOverflowError e) {
+					// A StackOverflowError has unwound by here, so the DATA is simply unusable
+					log.warn("Unable to stage peer DATA message: {}",e.toString());
+					log.debug("DATA staging failure",e);
 					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
 				}
 				continue;
@@ -506,8 +544,12 @@ public class BeliefPropagator extends AThreadedComponent {
 				// The merge ignores Orders from unstaked keys, which anyone can make:
 				// drop them before the costly signature check and store write
 				if (!BeliefMerge.isValidPeer(state,key)) continue;
+				Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
+				if (newOrder==null) {
+					reject(source,"Signed value in a Belief is not an Order");
+					continue;
+				}
 				if (orders.containsKey(key)) {
-					Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 					Order oldOrder=RT.ensureCVM(orders.get(key).getValue(),Order.class);
 					if (!BeliefMerge.compareOrders(oldOrder,newOrder)) continue;
 				}
@@ -521,16 +563,19 @@ public class BeliefPropagator extends AThreadedComponent {
 					break;
 				}
 
-				so=Cells.persist(so,server.getStore());
+				SignedData<Order> persisted=persistOrder(so);
+				if (persisted==null) {
+					awaitMissing(source,so.getHash());
+					continue;
+				}
+				so=persisted;
 				observeOrderUpdate(so);
 				orders.put(key,so);
 				changed=true;
 			} catch (MissingDataException e) {
-				if (source!=null) {
-					fetchMissing(source);
-				} else {
-					log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
-				}
+				awaitMissing(source,e.getMissingHash());
+			} catch (StackOverflowError e) {
+				reject(source,"Unusable Order");
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
@@ -538,7 +583,40 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 		return changed;
 	}
-	
+
+	/**
+	 * Persists a received signed Order with everything it refers to.
+	 *
+	 * @return Persisted Order, or null if part of it is not held yet
+	 * @throws MissingDataException if part of it is not held yet
+	 */
+	private SignedData<Order> persistOrder(SignedData<Order> so) throws IOException {
+		Ref<SignedData<Order>> ref=getStore().storeTopRef(Ref.get(so),Ref.PERSISTED,null);
+		if (ref.getStatus()<Ref.PERSISTED) return null;
+		return ref.getValue();
+	}
+
+	/**
+	 * Handles a received value that refers to data not held yet: fetches it from the
+	 * sender of a wire value, or reports a locally acquired value as incomplete.
+	 */
+	private void awaitMissing(Message source, Hash missing) {
+		if (source!=null) {
+			fetchMissing(source);
+		} else {
+			log.warn("Locally acquired Belief is incomplete at {}",missing);
+		}
+	}
+
+	/** Reports a received Order this peer cannot use, from a wire message or a local acquisition. */
+	private void reject(Message source, String reason) {
+		if (source!=null) {
+			server.getConnectionManager().alertBadMessage(source,reason);
+		} else {
+			log.warn("{} in locally acquired Belief",reason);
+		}
+	}
+
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
 	private final AtomicBoolean fetching=new AtomicBoolean();
 
@@ -580,7 +658,8 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 					return null;
 				});
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError e) {
+			// A StackOverflowError has unwound by here, so the update is simply unusable
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}

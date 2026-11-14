@@ -35,6 +35,11 @@ public abstract class AThreadedComponent {
 					break;
 				} catch (Exception e) {
 					log.error("Unexpected error in component loop: {}",thread,e);
+				} catch (Error e) {
+					// Fatal: stop the peer rather than leave it running without this component
+					log.error("Fatal error in component loop, closing server: {}",thread,e);
+					server.close();
+					break;
 				}
 			}
 			
