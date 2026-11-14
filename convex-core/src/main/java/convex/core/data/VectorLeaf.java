@@ -700,6 +700,17 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
+	public void validateStructure() throws InvalidDataException {
+		if (prefix == null) return;
+		ACell p=prefix.getValue();
+		if (!(p instanceof AVector)) throw new InvalidDataException("Prefix is not a vector", this);
+		long n=((AVector<?>)p).count();
+		if (n != prefixLength()) {
+			throw new InvalidDataException("Expected prefix length: " + prefixLength() + " but found " + n, this);
+		}
+	}
+
+	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((count > 0) && (items.length == 0)) throw new InvalidDataException("Should be items present!", this);
 	}

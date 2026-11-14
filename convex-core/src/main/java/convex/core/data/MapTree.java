@@ -864,6 +864,43 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		Hash firstHash=getFirstHash();
+		long childCount=0;
+		for (int i = 0; i < children.length; i++) {
+			ACell o = children[i].getValue();
+			if (!(o instanceof AHashMap)) throw new InvalidDataException("Child "+i+" is not a hash map",this);
+			AHashMap<K, V> child=(AHashMap<K, V>) o;
+			if (child.isEmpty()) throw new InvalidDataException("Empty child "+i,this);
+			int d = digitForIndex(i, mask);
+			if (child instanceof MapTree<K, V> tree) {
+				if (tree.shift<=shift) throw new InvalidDataException("Child "+i+" shift not greater than "+shift,this);
+				checkChildHash(tree.getFirstHash(),firstHash,d,i);
+			} else {
+				MapLeaf<K, V> leaf=(MapLeaf<K, V>) child;
+				long n=leaf.count();
+				for (long j=0; j<n; j++) {
+					checkChildHash(leaf.entryAt(j).getKeyHash(),firstHash,d,i);
+				}
+			}
+			childCount += child.count();
+		}
+		if (count != childCount) {
+			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
+		}
+	}
+
+	/**
+	 * Checks that a key hash in child i shares this tree's prefix and has the child's digit
+	 */
+	private void checkChildHash(Hash h, Hash firstHash, int digit, int i) throws InvalidDataException {
+		if ((h.commonHexPrefixLength(firstHash, shift) < shift) || (h.getHexDigit(shift) != digit)) {
+			throw new InvalidDataException("Child "+i+" holds a key outside its digit",this);
+		}
+	}
+
 	/**
 	 * Check for top level structural integrity. Does not traverse branch refs.
 	 * @return

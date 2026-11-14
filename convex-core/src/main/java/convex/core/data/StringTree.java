@@ -45,6 +45,12 @@ public class StringTree extends AString {
 	}
 
 	@Override
+	public void validateStructure() throws InvalidDataException {
+		// This cell's children are those of the blob tree it wraps
+		data.validateStructure();
+	}
+
+	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		return data.encodeRaw(bs, pos);
 	}

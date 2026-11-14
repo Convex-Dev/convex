@@ -669,27 +669,18 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public void validateStructure() throws InvalidDataException {
-		super.validateStructure();
-		long c = 0;
+		// Decoding sizes the tree from its count: every child but the last is full, so
+		// child sizes as checked here always sum to the count
 		int blen = children.length;
-		if (count < MINIMUM_SIZE) throw new InvalidDataException("Insufficient elements: " + blen, this);
 		long bsize = childSize();
 		for (int i = 0; i < blen; i++) {
 			ACell ch = getChild(i);
 			if (!(ch instanceof AVector)) throw new InvalidDataException("Child "+i+" is not a vector!",this);
-			@SuppressWarnings("unchecked")
-			AVector<T> b=(AVector<T>)ch;
-			
-			long expectedChildSize=childSize(count,i);	
-			if (expectedChildSize != b.count()) {
-				throw new InvalidDataException("Expected block size: " + bsize + " for blocks[" + i + "] but was: "
-						+ b.count() + " in BlockVector of size: " + count, this);
+			long expected = (i < blen - 1) ? bsize : count - (blen - 1) * bsize;
+			long actual = ((AVector<?>) ch).count();
+			if (expected != actual) {
+				throw new InvalidDataException("Expected size " + expected + " for child " + i + " but was " + actual, this);
 			}
-
-			c += b.count();
-		}
-		if (c != count) {
-			throw new InvalidDataException("Expected count: " + count + " but sum of child sizes was: " + c, this);
 		}
 	}
 

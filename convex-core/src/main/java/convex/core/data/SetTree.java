@@ -665,6 +665,43 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		Hash firstHash=getFirstHash();
+		long childCount=0;
+		for (int i = 0; i < children.length; i++) {
+			ACell o = children[i].getValue();
+			if (!(o instanceof AHashSet)) throw new InvalidDataException("Child "+i+" is not a hash set",this);
+			AHashSet<T> child=(AHashSet<T>) o;
+			if (child.isEmpty()) throw new InvalidDataException("Empty child "+i,this);
+			int d = digitForIndex(i, mask);
+			if (child instanceof SetTree<T> tree) {
+				if (tree.shift<=shift) throw new InvalidDataException("Child "+i+" shift not greater than "+shift,this);
+				checkChildHash(tree.getFirstHash(),firstHash,d,i);
+			} else {
+				SetLeaf<T> leaf=(SetLeaf<T>) child;
+				long n=leaf.count();
+				for (long j=0; j<n; j++) {
+					checkChildHash(leaf.getElementRef(j).getHash(),firstHash,d,i);
+				}
+			}
+			childCount += child.count();
+		}
+		if (count != childCount) {
+			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
+		}
+	}
+
+	/**
+	 * Checks that an element hash in child i shares this tree's prefix and has the child's digit
+	 */
+	private void checkChildHash(Hash h, Hash firstHash, int digit, int i) throws InvalidDataException {
+		if ((h.commonHexPrefixLength(firstHash, shift) < shift) || (h.getHexDigit(shift) != digit)) {
+			throw new InvalidDataException("Child "+i+" holds an element outside its digit",this);
+		}
+	}
+
 	boolean isValidStructure() {
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		int n=children.length;

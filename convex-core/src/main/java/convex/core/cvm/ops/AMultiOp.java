@@ -79,6 +79,12 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
+	public void validateStructure() throws InvalidDataException {
+		// This cell's children are those of its vector of ops
+		ops.validateStructure();
+	}
+
+	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
 		long n=ops.count();
