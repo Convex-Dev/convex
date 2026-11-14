@@ -3,9 +3,7 @@ package convex.core.data;
 import java.util.HashMap;
 
 /**
- * Vectors that claim large counts through shared nodes, as a vector received from
- * another peer can: every node below the top repeats one child, so the vector takes
- * little memory whatever count it claims.
+ * Test vectors of one repeated value, built from shared nodes.
  */
 public class SharedVectors {
 
