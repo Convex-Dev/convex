@@ -43,6 +43,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -426,6 +427,42 @@ public class UnusablePeerDataTest {
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 			assertTrue(peer.isLive());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A Belief merge that overflows or runs out of memory reading a received Order drops
+	 * that Order alone: the merge returns, and a good Order from another peer in the same
+	 * Belief is still merged.
+	 */
+	@Test
+	public void aMergeThatFailsDropsOnlyTheOrderItFailsOn() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			long ts=blockTime(peer);
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
+			SignedData<Order> signed=order(REMOTE_A,1,block(REMOTE_A,ts));
+			for (Error error: List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"))) {
+				// The merge reads this Order's content from a store that fails
+				AStore failing=new MemoryStore() {
+					@Override
+					public <T extends ACell> Ref<T> refForHash(Hash hash) {
+						throw error;
+					}
+				};
+				Ref<Order> unreadableRef=RefSoft.createForHash(signed.getValueRef().getHash(),failing);
+				SignedData<Order> unreadable=SignedData.create(REMOTE_A.getAccountKey(),signed.getSignature(),unreadableRef);
+
+				// Not started: this test thread runs the merge
+				BeliefPropagator merger=new BeliefPropagator(peer);
+				merger.belief=peer.getBelief();
+				merger.maybeMergeBeliefs(Belief.create(unreadable,good));
+
+				assertEquals(good,merger.belief.getOrders().get(REMOTE_B.getAccountKey()),error.toString());
+				assertFalse(merger.belief.getOrders().containsKey(REMOTE_A.getAccountKey()),error.toString());
+			}
 		} finally {
 			peer.close();
 		}

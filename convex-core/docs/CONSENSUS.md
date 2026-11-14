@@ -177,9 +177,10 @@ trust in a specific peer for submission is a separate, explicit choice.
   (`Peer.updateState`): the State is unchanged and execution moves on. A Block
   entry missing from the local store is not invalidity: the executor tries again
   rather than skip it. Running out of memory or stack while storing or answering one
-  received query, transaction, Order or DATA message fails that message alone. Only
+  received query, transaction, Order or DATA message fails that message alone, and
+  while merging received Orders drops them like any Order the merge cannot use. Only
   fatal conditions stop a peer: a failed store write, or a JVM failure in work on
-  the peer's own state, such as the Belief merge or executing agreed Blocks.
+  the peer's own state, such as executing agreed Blocks.
 - **Upgrade boundary.** A peer that cannot apply a scheduled upgrade withdraws
   deterministically rather than diverging; the trigger is unforgeable on-chain
   state, so withdrawal is not selectively targetable. See `UPGRADE.md`.

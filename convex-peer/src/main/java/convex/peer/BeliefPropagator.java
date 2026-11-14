@@ -383,12 +383,14 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Merges Beliefs into this peer's Belief.
 	 *
-	 * @return Merged Belief, or null if the merge fails on the data it was given
+	 * @return Merged Belief, or null if the merge fails
 	 */
 	private Belief tryMerge(long ts, AKeyPair kp, State state, Belief... beliefs) {
 		try {
 			return BeliefMerge.create(belief,kp,ts,state).merge(beliefs);
-		} catch (InvalidDataException | RuntimeException | StackOverflowError e) {
+		} catch (InvalidDataException | RuntimeException | StackOverflowError | OutOfMemoryError e) {
+			// The merge builds a new Belief and changes nothing else, and only its work
+			// held the stack or memory, so this peer's Belief is as it was
 			log.debug("Belief merge failed",e);
 			return null;
 		}
