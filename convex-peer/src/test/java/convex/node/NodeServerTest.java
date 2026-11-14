@@ -2013,7 +2013,7 @@ public class NodeServerTest {
 	 * A vector that decodes, being correctly encoded cell by cell, but whose tree
 	 * claims 256 elements while its last leaf holds 15: 547 bytes, so a branch.
 	 */
-	static AVector<?> invalidVectorTree() throws BadFormatException {
+	public static AVector<?> invalidVectorTree() throws BadFormatException {
 		StringBuilder sb=new StringBuilder("808200");
 		for (int i=0; i<16; i++) {
 			int n=(i<15)?16:15;

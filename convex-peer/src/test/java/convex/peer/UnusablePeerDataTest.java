@@ -44,6 +44,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
+import convex.node.NodeServerTest;
 
 /**
  * A peer that receives data it cannot use, from a staked peer or any connection,
@@ -160,6 +161,55 @@ public class UnusablePeerDataTest {
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 			assertFalse(merged.getOrders().containsKey(REMOTE_A.getAccountKey()));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A staked peer's Order that fails the structure check, here because a Block's
+	 * transactions are a vector tree whose last leaf is short, is dropped. A good Order
+	 * from another peer in the same Belief is still merged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void anOrderWithInvalidStructureIsDropped() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			long ts=blockTime(peer);
+			Block invalid=Block.create(ts,(AVector)NodeServerTest.invalidVectorTree());
+			SignedData<Order> unusable=order(REMOTE_A,1,REMOTE_A.signData(invalid));
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
+
+			connect(peer).sendMessage(wire(Message.createBelief(Belief.create(unusable,good))));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the good Order is merged");
+			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			assertFalse(merged.getOrders().containsKey(REMOTE_A.getAccountKey()));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A transaction that fails the structure check is rejected as malformed, and later
+	 * transactions are still processed.
+	 */
+	@Test
+	public void aTransactionWithInvalidStructureIsRejected() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+			SignedData<ATransaction> tx=LOCAL.signData(
+				Invoke.create(Init.GENESIS_ADDRESS,1,NodeServerTest.invalidVectorTree()));
+			Result rejected=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
+			assertEquals(ErrorCodes.FORMAT,rejected.getErrorCode());
+
+			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
+			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
 		} finally {
 			peer.close();
 		}
