@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
@@ -344,6 +345,45 @@ public class UnusablePeerDataTest {
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 			assertFalse(merged.getOrders().containsKey(REMOTE_A.getAccountKey()));
+			assertTrue(peer.isLive());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * Fetching a staked peer's missing Order data that runs out of memory drops that
+	 * fetch: a good Order from another peer in the same update is still merged.
+	 */
+	@Test
+	public void aFetchThatRunsOutOfMemoryIsDropped() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			MemoryStore senderStore=new MemoryStore();
+			long ts=blockTime(peer);
+			List<SignedData<ATransaction>> txs=new ArrayList<>();
+			for (int i=1; i<=8; i++) txs.add(REMOTE_A.signData(Invoke.create(Init.GENESIS_ADDRESS,i,"*address*")));
+			Block block=Block.create(ts,txs);
+			SignedData<Block> signed=REMOTE_A.signData(block);
+			// Announced before, so the next update leaves it out and the peer must fetch it
+			MissingBeliefDataTest.update(block.getTransactions(),senderStore);
+			SignedData<Order> incomplete=order(REMOTE_A,1,signed);
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
+			List<Message> sent=MissingBeliefDataTest.update(Belief.create(incomplete,good),senderStore);
+			for (Message m: sent) {
+				// Staging the update for its fetch is the first time the peer stores it
+				if (m.getType()==MessageType.BELIEF) store.failOnce(m.getPayload().getHash(),new OutOfMemoryError("simulated"));
+			}
+
+			LocalConnection senderEnd=connect(peer);
+			for (Message m: sent) senderEnd.sendMessage(wire(m));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the good Order is merged");
+			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			assertNull(store.failing,"the fetch ran out of memory");
 			assertTrue(peer.isLive());
 		} finally {
 			peer.close();
