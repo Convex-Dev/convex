@@ -193,6 +193,25 @@ public class IndexTest {
 		assertEquals(m,Samples.TEST_STORE.decode(enc));
 	}
 
+	/**
+	 * Decoding rejects an Index node whose own encoding breaks the canonical shape: a
+	 * node holding more than its entry needs children, and a node without an entry
+	 * needs two or more children. A single entry's key must be a blob.
+	 */
+	@Test public void testDecodeRejectsNonCanonicalShape() throws BadFormatException {
+		// Count 2: an entry for key 0x12, and no children
+		assertThrows(BadFormatException.class,()->CVMEncoder.INSTANCE.decode(Blob.fromHex("8402"+"80"+"310112"+"1101"+"02"+"0000")));
+
+		// Count 2: no entry, and one child holding both entries, keys 0x10 and 0x11
+		Index<ABlob,CVMLong> both=Index.of(Blob.fromHex("10"),1,Blob.fromHex("11"),2);
+		assertTrue(both.isEmbedded());
+		String oneChild="8402"+"00"+"00"+"0002"+both.getEncoding().toHexString();
+		assertThrows(BadFormatException.class,()->CVMEncoder.INSTANCE.decode(Blob.fromHex(oneChild)));
+
+		// A single entry whose key is an integer
+		assertThrows(BadFormatException.class,()->CVMEncoder.INSTANCE.decode(Blob.fromHex("8401"+"1101"+"1101")));
+	}
+
 	@Test
 	public void testIndexRandomConstruction() throws InvalidDataException {
 		Index<ABlob, CVMLong> m = Index.none();
