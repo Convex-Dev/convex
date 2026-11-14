@@ -2053,6 +2053,100 @@ public class NodeServerTest {
 	}
 
 	/**
+	 * A vector leaf of fifteen small integers with an empty vector as its prefix, so
+	 * correctly encoded but disagreeing with the count it claims.
+	 *
+	 * @param countVLQ Claimed count, VLQ-encoded, leaving 15 mod 16
+	 */
+	static AVector<?> pathClaiming(String countVLQ) throws BadFormatException {
+		StringBuilder sb=new StringBuilder("80").append(countVLQ);
+		for (int i=1; i<=15; i++) sb.append("11").append(String.format("%02x",i));
+		sb.append("8000");
+		return new MemoryStore().decode(Blob.fromHex(sb.toString()));
+	}
+
+	/** Sends a correlated LATTICE_VALUE of 42 at a path. */
+	private static Message latticeValueAt(long id, AVector<?> path, AConnection conn) {
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(id),path,CVMLong.create(42));
+		return Message.create(MessageType.LATTICE_VALUE,payload).withConnection(conn);
+	}
+
+	/** Sends a correlated LATTICE_QUERY for a path. */
+	private static Message latticeQueryAt(long id, AVector<?> path, AConnection conn) {
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_QUERY,CVMLong.create(id),path);
+		return Message.create(MessageType.LATTICE_QUERY,payload).withConnection(conn);
+	}
+
+	/** A path claiming far more keys than its message holds is the sender's fault. */
+	@Test
+	public void testOverlongPathCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		AVector<?> path=pathClaiming("87ffffff7f");
+		assertEquals(Integer.MAX_VALUE,path.count());
+		endpoint.handleIncomingMessage(latticeValueAt(1,path,peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an overlong path is the sender's fault, for the second reject");
+	}
+
+	/** A well formed path longer than the group accepts is the sender's fault. */
+	@Test
+	public void testLongPathCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		endpoint.handleIncomingMessage(latticeValueAt(1,Vectors.repeat(CVMLong.ONE,1<<20),peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"a path over the limit is the sender's fault, for the second reject");
+	}
+
+	/** A short path whose structure is invalid is the sender's fault. */
+	@Test
+	public void testInvalidPathStructureCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		AVector<?> path=pathClaiming("1f");
+		assertEquals(31,path.count());
+		endpoint.handleIncomingMessage(latticeValueAt(1,path,peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an invalid path is the sender's fault, for the second reject");
+	}
+
+	/** A query for a path longer than the group accepts is refused. */
+	@Test
+	public void testLatticeQueryRejectsLongPath() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		int limit=LatticePropagatorConfig.DEFAULT_MAX_PATH_LENGTH;
+		endpoint.handleIncomingMessage(latticeQueryAt(1,Vectors.repeat(CVMLong.ONE,limit+1),peer));
+		assertEquals(ErrorCodes.ARGUMENT,peer.awaitResult(1).getErrorCode());
+		endpoint.handleIncomingMessage(latticeQueryAt(2,Vectors.repeat(CVMLong.ONE,limit),peer));
+		assertFalse(peer.awaitResult(2).isError(),"a path at the limit is read");
+	}
+
+	/** An operator's path limit decides which paths a group accepts. */
+	@Test
+	public void testConfiguredPathLength() throws Exception {
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_PATH_LENGTH,CVMLong.create(2)));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
+		maxNodeServer.addPropagator(new LatticePropagator(store,groupConfig));
+		maxNodeServer.launch();
+		LatticePropagator endpoint=propagator(maxNodeServer);
+		ScriptedPeer peer=new ScriptedPeer();
+
+		endpoint.handleIncomingMessage(latticeQueryAt(1,Vectors.of(CVMLong.ONE,CVMLong.ONE,CVMLong.ONE),peer));
+		assertEquals(ErrorCodes.ARGUMENT,peer.awaitResult(1).getErrorCode());
+		endpoint.handleIncomingMessage(latticeQueryAt(2,Vectors.of(CVMLong.ONE,CVMLong.ONE),peer));
+		assertFalse(peer.awaitResult(2).isError(),"a path at the configured limit is read");
+	}
+
+	/**
 	 * #566: closed connections drain from the stats map via the periodic sweep (so an idle
 	 * node cleans up without inbound traffic), and removeConnection is the explicit single-sink
 	 * teardown.

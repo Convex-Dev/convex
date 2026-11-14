@@ -357,6 +357,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 				ErrorCodes.ARGUMENT));
 			return;
 		}
+		try {
+			checkPath(path);
+		} catch (BadFormatException e) {
+			message.returnResult(Result.create(id,Strings.create(e.getMessage()),ErrorCodes.ARGUMENT));
+			return;
+		}
 		Root<ACell> announced=propagator.getAnnouncedCursor();
 		ACell value=(path.count()==0) ? announced.get()
 			: convex.core.lang.RT.getIn(announced.get(),path.toCellArray());
@@ -526,8 +532,26 @@ final class LatticeProtocolEndpoint implements Closeable {
 		}
 	}
 
+	/**
+	 * Checks a received lattice path before it is read: its length within this
+	 * group's limit, then its structure.
+	 *
+	 * @param path Path from a received message
+	 * @throws BadFormatException if the path is too long or its structure is invalid
+	 */
+	private void checkPath(AVector<?> path) throws BadFormatException {
+		long limit=config.getMaxPathLength();
+		if (path.count()>limit) throw new BadFormatException("Lattice path longer than "+limit+" keys");
+		try {
+			Cells.checkTree(path);
+		} catch (InvalidStructureException e) {
+			throw new BadFormatException("Invalid lattice path structure: "+e.getMessage(),e);
+		}
+	}
+
 	private Message completeLatticeMessage(Message message) throws BadFormatException,IOException {
 		LatticeValuePayload payload=parseLatticeValuePayload(message);
+		checkPath(payload.path());
 		ACell value=payload.value();
 		HashSet<Hash> missing=new HashSet<>();
 		Ref.get(value).findMissing(missing,1);
