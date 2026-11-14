@@ -10,8 +10,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +41,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
+import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.etch.EtchStore;
 
 /**
  * A peer that receives data it cannot use, from a staked peer or any connection,
@@ -60,6 +65,11 @@ public class UnusablePeerDataTest {
 	 * connections of its own, so it never polls.
 	 */
 	static Server launchPeer(AKeyPair kp, AKeyPair... others) throws Exception {
+		return launchPeer(new MemoryStore(),kp,others);
+	}
+
+	/** Launches a peer as {@link #launchPeer(AKeyPair, AKeyPair...)} does, on the given store. */
+	static Server launchPeer(AStore store, AKeyPair kp, AKeyPair... others) throws Exception {
 		ArrayList<AccountKey> keys=new ArrayList<>();
 		keys.add(kp.getAccountKey());
 		for (AKeyPair o: others) keys.add(o.getAccountKey());
@@ -68,7 +78,7 @@ public class UnusablePeerDataTest {
 		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.STATE,genesis);
 		config.put(Keywords.PORT,0);
-		config.put(Keywords.STORE,new MemoryStore());
+		config.put(Keywords.STORE,store);
 		config.put(Keywords.POLL_DELAY,LONG_POLL_DELAY);
 		return API.launchPeer(config);
 	}
@@ -254,7 +264,18 @@ public class UnusablePeerDataTest {
 	 */
 	@Test
 	public void deeplyNestedDataIsDropped() throws Exception {
-		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		deeplyNestedDataIsDropped(new MemoryStore());
+	}
+
+	@Test
+	public void deeplyNestedDataIsDroppedOnEtch() throws Exception {
+		try (EtchStore store=EtchStore.createTemp()) {
+			deeplyNestedDataIsDropped(store);
+		}
+	}
+
+	private void deeplyNestedDataIsDropped(AStore store) throws Exception {
+		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 			ArrayList<ACell> branches=new ArrayList<>();
@@ -284,7 +305,18 @@ public class UnusablePeerDataTest {
 	 */
 	@Test
 	public void aDeeplyNestedTransactionIsRejected() throws Exception {
-		Server peer=launchPeer(LOCAL);
+		aDeeplyNestedTransactionIsRejected(new MemoryStore());
+	}
+
+	@Test
+	public void aDeeplyNestedTransactionIsRejectedOnEtch() throws Exception {
+		try (EtchStore store=EtchStore.createTemp()) {
+			aDeeplyNestedTransactionIsRejected(store);
+		}
+	}
+
+	private void aDeeplyNestedTransactionIsRejected(AStore store) throws Exception {
+		Server peer=launchPeer(store,LOCAL);
 		try {
 			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
 			ACell deep=nested(DEEP,new ArrayList<>());
@@ -295,6 +327,81 @@ public class UnusablePeerDataTest {
 			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
 			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
 			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A deeply nested query gets a result, and the peer still answers queries after it.
+	 */
+	@Test
+	public void aDeeplyNestedQueryIsAnswered() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+			ACell deep=nested(DEEP,new ArrayList<>());
+			assertNotNull(client.query(deep).get(WAIT,TimeUnit.SECONDS));
+			assertEquals(CVMLong.create(3),client.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS).getValue());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A component whose first loop throws an Error, and whose later loops wait to be closed. */
+	static AThreadedComponent throwingOnce(Server server, Error error, CompletableFuture<Void> secondLoop) {
+		AtomicBoolean thrown=new AtomicBoolean();
+		return new AThreadedComponent(server) {
+			@Override
+			protected void loop() throws InterruptedException {
+				if (!thrown.getAndSet(true)) throw error;
+				secondLoop.complete(null);
+				new LinkedBlockingQueue<>().take();
+			}
+
+			@Override
+			protected String getThreadName() {
+				return "Test component";
+			}
+		};
+	}
+
+	/**
+	 * An Error that is not fatal to the JVM, such as a stack overflow that has unwound,
+	 * leaves a component and its peer running.
+	 */
+	@Test
+	public void aComponentRunsOnAfterANonFatalError() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			for (Error error: List.of(new StackOverflowError(),new Error("Unexpected"))) {
+				CompletableFuture<Void> secondLoop=new CompletableFuture<>();
+				AThreadedComponent component=throwingOnce(peer,error,secondLoop);
+				component.start();
+				secondLoop.get(WAIT,TimeUnit.SECONDS);
+				component.close();
+			}
+			assertTrue(peer.isRunning());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A JVM failure such as running out of memory in a component closes the peer. */
+	@Test
+	public void aFatalErrorClosesThePeer() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			throwingOnce(peer,new OutOfMemoryError("Test"),new CompletableFuture<>()).start();
+			CompletableFuture<Void> shutdown=CompletableFuture.runAsync(() -> {
+				try {
+					peer.waitForShutdown();
+				} catch (InterruptedException e) {
+					throw new CompletionException(e);
+				}
+			});
+			shutdown.get(WAIT,TimeUnit.SECONDS);
+			assertFalse(peer.isRunning());
 		} finally {
 			peer.close();
 		}

@@ -174,10 +174,10 @@ trust in a specific peer for submission is a separate, explicit choice.
   tree is in the store, and drops an Order the merge cannot use while merging the
   others. A finalised Block that is not a signed Block with at most
   `MAX_TRANSACTIONS_PER_BLOCK` signed transactions is invalid like any other
-  (`Peer.updateState`): the State is unchanged and execution moves on. Data
-  missing from the local store is not invalidity: the executor tries again rather
-  than skip the Block. Only fatal conditions, a failed store write or a JVM
-  error, stop a peer.
+  (`Peer.updateState`): the State is unchanged and execution moves on. A Block
+  entry missing from the local store is not invalidity: the executor tries again
+  rather than skip it. Only fatal conditions stop a peer: a failed store write, or
+  a JVM failure such as running out of memory.
 - **Upgrade boundary.** A peer that cannot apply a scheduled upgrade withdraws
   deterministically rather than diverging; the trigger is unforgeable on-chain
   state, so withdrawal is not selectively targetable. See `UPGRADE.md`.

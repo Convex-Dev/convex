@@ -405,6 +405,7 @@ public class PeerTest {
 		assertTrue(p.getBlockResult(0).isError(0));
 		// None of its transactions took effect, so lookups do not find them
 		assertNull(p.getTransactionLocation(goodTx.getHash()));
+		assertEquals(block, p.getOwnBlock(0));
 
 		doPeerTest(p);
 	}
@@ -425,6 +426,7 @@ public class PeerTest {
 		assertEquals(1, p.getStatePosition());
 		assertEquals(GENESIS, p.getConsensusState());
 		assertNull(p.getTransactionLocation(Hash.NULL_HASH));
+		assertNull(p.getOwnBlock(0));
 
 		doPeerTest(p);
 	}

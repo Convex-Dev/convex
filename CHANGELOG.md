@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Keep peers running and in consensus when other peers send Orders, Blocks or data they cannot use: drop what is unusable, merge the rest, and execute an unusable finalised Block as an invalid Block. ([Consensus](convex-core/docs/CONSENSUS.md))
+- Keep peers running and in consensus when they receive Orders, Blocks, transactions or data they cannot use: drop what is unusable, merge the rest, and execute an unusable finalised Block as an invalid Block. ([Consensus](convex-core/docs/CONSENSUS.md))
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
 - Store a value a lattice node pulls from a peer without announcing it before the node has merged it, so the node's next update carries those cells to its other peers.

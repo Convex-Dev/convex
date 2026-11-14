@@ -843,6 +843,19 @@ public class Peer {
 	}
 
 	/**
+	 * Gets a Block this Peer signed, at a position of its own Order
+	 * @param i Position of the Block
+	 * @return Block, or null if the entry there is not a Block signed by this Peer
+	 * @throws MissingDataException if the entry is not held in the local store
+	 */
+	public Block getOwnBlock(long i) {
+		ACell entry=readEntry(getIndexedBlocks(),i);
+		if (!(entry instanceof SignedData<?> signed)) return null;
+		if (!peerKey.equals(signed.getAccountKey())) return null;
+		return RT.ensureCVM(signed.getValue(),Block.class);
+	}
+
+	/**
 	 * Gets the BlockResult of a specific block index
 	 * @param i Index of Block
 	 * @return BlockResult, or null if the BlockResult is not ready
