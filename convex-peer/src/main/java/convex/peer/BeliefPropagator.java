@@ -569,17 +569,21 @@ public class BeliefPropagator extends AThreadedComponent {
 					continue;
 				}
 				so=persisted;
-				observeOrderUpdate(so);
-				orders.put(key,so);
-				changed=true;
 			} catch (MissingDataException e) {
 				awaitMissing(source,e.getMissingHash());
-			} catch (StackOverflowError e) {
-				reject(source,"Unusable Order");
+				continue;
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
+			} catch (RuntimeException | StackOverflowError e) {
+				// Reading or storing this Order failed: drop it, and keep the others
+				log.debug("Unusable Order from peer {}",key,e);
+				reject(source,"Unusable Order");
+				continue;
 			}
+			observeOrderUpdate(so);
+			orders.put(key,so);
+			changed=true;
 		}
 		return changed;
 	}

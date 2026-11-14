@@ -166,6 +166,35 @@ public class UnusablePeerDataTest {
 	}
 
 	/**
+	 * A staked peer's Order that cannot be read is dropped on its own: another peer's
+	 * good Order in the same Belief is still merged.
+	 */
+	@Test
+	public void anUnreadableOrderIsDroppedOnItsOwn() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			long ts=blockTime(peer);
+			LocalConnection senderEnd=connect(peer);
+			SignedData<Order> first=order(REMOTE_A,1,block(REMOTE_A,ts));
+			senderEnd.sendMessage(wire(Message.createBelief(Belief.create(first))));
+			assertNotNull(updates.poll(WAIT,TimeUnit.SECONDS),"the first Order is merged");
+
+			// Same timestamp, so comparing it with the first reads its Blocks, which are not a vector
+			Order unreadable=Order.create(Vectors.of(CVMLong.create(1),Vectors.createLongs(1,0,0,0),CVMLong.ONE));
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
+			senderEnd.sendMessage(wire(Message.createBelief(Belief.create(REMOTE_A.signData(unreadable),good))));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the good Order is merged");
+			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			assertEquals(first,merged.getOrders().get(REMOTE_A.getAccountKey()));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
 	 * A staked peer's Order with part of a Block never sent is not merged until that
 	 * part is fetched, on a peer with an in-memory store. A good Order from another
 	 * peer in the same update is still merged.
