@@ -105,6 +105,23 @@ class LatticeHostAutoSyncTest {
 		}
 	}
 
+	@Test void fatalApplicationSyncFailureIsReportedAndStopsTheSchedule() throws Exception {
+		var store=new RecordingStore();
+		var host=LatticeHost.create(CVMLong.ONE,store);
+		var attempts=new AtomicInteger();
+		var sync=host.autoSync(Duration.ofMillis(1),() -> {
+			attempts.incrementAndGet();
+			throw new OutOfMemoryError("simulated");
+		});
+		try {
+			Throwable failure=sync.failure().toCompletableFuture().get(10,TimeUnit.SECONDS);
+			assertTrue(failure instanceof OutOfMemoryError,"a fatal failure is reported, not left silent");
+			assertEquals(1,attempts.get(),"a fatal failure stops the schedule");
+		} finally {
+			assertThrows(OutOfMemoryError.class,sync::close,"closing runs the failing application sync once more");
+		}
+	}
+
 	@Test void closingTheHostSavesWhenTheLastApplicationSyncFails() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);

@@ -32,7 +32,7 @@ final class HostWorker {
 		executor.scheduleWithFixedDelay(() -> run(step),nanos,nanos,TimeUnit.NANOSECONDS);
 	}
 
-	/** Whether a failure is one no service can carry on from, so it is thrown rather than reported. */
+	/** Whether a failure is one no service can carry on from, so it ends the schedule as well as being reported. */
 	static boolean isFatal(Throwable e) {
 		return (e instanceof VirtualMachineError) && !(e instanceof StackOverflowError);
 	}
@@ -58,8 +58,9 @@ final class HostWorker {
 		} catch (Throwable e) {
 			// Includes EtchCorruptionError. A periodic task that throws is never run
 			// again, so every recoverable failure is reported and the schedule continues.
-			if (isFatal(e)) throw (Error)e;
+			// A fatal one is reported too, so the stop is visible, then ends the schedule.
 			report(e);
+			if (isFatal(e)) throw (Error)e;
 		}
 	}
 
