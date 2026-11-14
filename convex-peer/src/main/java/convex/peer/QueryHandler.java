@@ -106,7 +106,8 @@ public class QueryHandler extends AThreadedComponent {
 			}
 		} catch (BadFormatException e) {
 			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Only this request's work held the stack or memory, and it has unwound
 			log.warn("Unable to deliver missing data due to exception:", e);
 		}
 	}
@@ -135,7 +136,8 @@ public class QueryHandler extends AThreadedComponent {
 			if (!resultReturned) {
 				log.debug("Dropped query result {} for connection {}", id, m.getConnection());
 			}
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Only this query's work held the stack or memory, and it has unwound
 			log.debug("Terminated client: "+e.getMessage());
 			m.closeConnection();
 		}

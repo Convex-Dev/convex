@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,9 +13,11 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,13 +37,19 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
+import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -188,6 +197,177 @@ public class UnusablePeerDataTest {
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 			assertFalse(merged.getOrders().containsKey(REMOTE_A.getAccountKey()));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A store that throws a chosen Error once, the first time it is asked to store a chosen cell. */
+	static final class FaultingStore extends MemoryStore {
+		volatile Hash failing;
+		volatile Error error;
+
+		void failOnce(Hash hash, Error e) {
+			error=e;
+			failing=hash;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+			Hash target=failing;
+			if ((target!=null)&&target.equals(ref.getHash())) {
+				failing=null;
+				throw error;
+			}
+			return super.storeTopRef(ref,status,noveltyHandler);
+		}
+	}
+
+	/** A client connection that records results, or throws a chosen Error on every reply. */
+	static final class ReplyConnection extends AConnection {
+		final Error error;
+		final ConcurrentHashMap<ACell,Result> results=new ConcurrentHashMap<>();
+		volatile boolean closed;
+
+		ReplyConnection(Error error) {
+			this.error=error;
+		}
+
+		Result result(long id) {
+			return results.get(CVMLong.create(id));
+		}
+
+		@Override public boolean sendMessage(Message msg) {
+			return trySendMessage(msg);
+		}
+
+		@Override public boolean trySendMessage(Message msg) {
+			if (error!=null) throw error;
+			if (msg.getType()==MessageType.RESULT) {
+				Result r=msg.toResult();
+				results.put(r.getID(),r);
+			}
+			return true;
+		}
+
+		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.3",30000); }
+		@Override public boolean isClosed() { return closed; }
+		@Override public void close() { closed=true; }
+		@Override public long getReceivedCount() { return 0; }
+	}
+
+	/**
+	 * A query whose handling overflows or runs out of memory fails alone: its
+	 * connection is closed and the next query in the same batch is answered.
+	 */
+	@Test
+	public void aQueryThatFailsLeavesTheRestOfItsBatch() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			for (Error error: List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"))) {
+				QueryHandler handler=new QueryHandler(peer);
+				ReplyConnection failing=new ReplyConnection(error);
+				ReplyConnection healthy=new ReplyConnection(null);
+				assertTrue(handler.offerQuery(Message.createQuery(1,"(+ 1 2)",Init.GENESIS_ADDRESS).withConnection(failing)));
+				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",Init.GENESIS_ADDRESS).withConnection(healthy)));
+				handler.loop();
+				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
+				assertTrue(failing.isClosed(),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A data request whose handling overflows or runs out of memory fails alone: the
+	 * next request in the same batch is answered.
+	 */
+	@Test
+	public void aDataRequestThatFailsLeavesTheRestOfItsBatch() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			for (Error error: List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"))) {
+				QueryHandler handler=new QueryHandler(peer);
+				ReplyConnection failing=new ReplyConnection(error);
+				ReplyConnection healthy=new ReplyConnection(null);
+				Hash held=peer.getBelief().getHash();
+				assertTrue(handler.offerQuery(Message.createDataRequest(CVMLong.create(1),held).withConnection(failing)));
+				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",Init.GENESIS_ADDRESS).withConnection(healthy)));
+				handler.loop();
+				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A transaction that runs out of memory as it is stored is rejected, and later transactions are processed. */
+	@Test
+	public void aTransactionThatRunsOutOfMemoryIsRejected() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=launchPeer(store,LOCAL);
+		try {
+			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
+			store.failOnce(tx.getHash(),new OutOfMemoryError("simulated"));
+			Result rejected=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
+			assertTrue(rejected.isError(),rejected.toString());
+
+			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 2 3)"));
+			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
+			assertTrue(peer.isLive());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A staked peer's Order that runs out of memory as it is stored is dropped. A good
+	 * Order from another peer in the same Belief is still merged.
+	 */
+	@Test
+	public void anOrderThatRunsOutOfMemoryIsDropped() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			long ts=blockTime(peer);
+			SignedData<Order> unusable=order(REMOTE_A,1,block(REMOTE_A,ts));
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
+			store.failOnce(unusable.getHash(),new OutOfMemoryError("simulated"));
+
+			connect(peer).sendMessage(wire(Message.createBelief(Belief.create(unusable,good))));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the good Order is merged");
+			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			assertFalse(merged.getOrders().containsKey(REMOTE_A.getAccountKey()));
+			assertTrue(peer.isLive());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** DATA that runs out of memory as it is staged is dropped, and a good Order sent after it is merged. */
+	@Test
+	public void dataThatRunsOutOfMemoryIsDropped() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			Blob cell=Blobs.createRandom(400);
+			store.failOnce(cell.getHash(),new OutOfMemoryError("simulated"));
+			LocalConnection senderEnd=connect(peer);
+			senderEnd.sendMessage(wire(Message.createDataMessage(List.of(cell),(int)CPoSConstants.MAX_MESSAGE_LENGTH)));
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+			senderEnd.sendMessage(wire(Message.createBelief(Belief.create(good))));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the good Order is merged");
+			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			assertTrue(peer.isLive());
 		} finally {
 			peer.close();
 		}

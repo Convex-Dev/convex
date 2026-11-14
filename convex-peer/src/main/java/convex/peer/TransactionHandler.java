@@ -271,8 +271,9 @@ public class TransactionHandler extends AThreadedComponent {
 			} catch (IOException e) {
 				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
 				continue;
-			} catch (Exception | StackOverflowError e) {
-				// A StackOverflowError has unwound by here, so the transaction is simply unusable
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Only this transaction's work held the stack or memory, and it has unwound,
+				// so the transaction is simply unusable
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
 			}

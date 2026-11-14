@@ -469,8 +469,9 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
-				} catch (Exception | StackOverflowError e) {
-					// A StackOverflowError has unwound by here, so the DATA is simply unusable
+				} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+					// Only this DATA's work held the stack or memory, and it has unwound by
+					// here, so the DATA is simply unusable
 					log.warn("Unable to stage peer DATA message: {}",e.toString());
 					log.debug("DATA staging failure",e);
 					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
@@ -578,8 +579,9 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
-			} catch (RuntimeException | StackOverflowError e) {
-				// Reading or storing this Order failed: drop it, and keep the others
+			} catch (RuntimeException | StackOverflowError | OutOfMemoryError e) {
+				// Reading or storing this Order failed, and only its work held the stack or
+				// memory: drop it, and keep the others
 				log.debug("Unusable Order from peer {}",key,e);
 				reject(source,"Unusable Order");
 				continue;
