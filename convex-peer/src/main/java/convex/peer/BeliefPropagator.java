@@ -353,7 +353,10 @@ public class BeliefPropagator extends AThreadedComponent {
 		Belief newBelief=tryMerge(ts,kp,state,newBeliefs);
 		if (newBelief==null) {
 			newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
-			if (newBelief==null) return false;
+			if (newBelief==null) {
+				log.error("Belief merge failed even without the Orders that cannot be merged on their own");
+				return false;
+			}
 		}
 
 		AccountKey key=kp.getAccountKey();

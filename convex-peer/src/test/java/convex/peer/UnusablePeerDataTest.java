@@ -377,6 +377,32 @@ public class UnusablePeerDataTest {
 		}
 	}
 
+	/**
+	 * Transaction results are reported only for Blocks the peer has executed, so a peer
+	 * whose State lags its finality point reports nothing for the Blocks in between.
+	 */
+	@Test
+	public void resultsAreReportedOnlyForExecutedBlocks() throws Exception {
+		Server server=launchPeer(LOCAL);
+		try {
+			Peer p=Peer.create(LOCAL,server.getPeer().getGenesisState());
+			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
+			p=p.proposeBlock(Block.of(p.getTimestamp(),tx));
+			p=p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs();
+			assertEquals(1,p.getFinalityPoint());
+			assertEquals(0,p.getStatePosition());
+
+			// Not started, so only this test reports through it
+			TransactionHandler handler=new TransactionHandler(server);
+			handler.maybeReportTransactions(p);
+			assertEquals(0,handler.reportedConsensusPoint);
+			handler.maybeReportTransactions(p.updateState());
+			assertEquals(1,handler.reportedConsensusPoint);
+		} finally {
+			server.close();
+		}
+	}
+
 	/** A component whose first loop throws an Error, and whose later loops wait to be closed. */
 	static AThreadedComponent throwingOnce(Server server, Error error, CompletableFuture<Void> secondLoop) {
 		AtomicBoolean thrown=new AtomicBoolean();
