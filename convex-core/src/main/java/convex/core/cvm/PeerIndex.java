@@ -5,6 +5,7 @@ import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
 import convex.core.data.Index;
@@ -70,7 +71,9 @@ final class PeerIndex {
 	boolean agrees(AVector<SignedData<Block>> blocks, long limit) {
 		long last=Math.min(position,limit)-1;
 		if (last<0) return true;
-		CVMLong indexed=blockLocations.get(blocks.get(last).getHash());
+		ACell entry=Peer.readEntry(blocks,last);
+		if (entry==null) return false;
+		CVMLong indexed=blockLocations.get(entry.getHash());
 		return (indexed!=null)&&(indexed.longValue()==last);
 	}
 
@@ -85,9 +88,11 @@ final class PeerIndex {
 		Index<Hash,AVector<AVector<CVMLong>>> repeatLocs=repeatLocations;
 		Index<Hash,CVMLong> blockLocs=blockLocations;
 		for (long b=position; b<limit; b++) {
-			SignedData<Block> signedBlock=blocks.get(b);
-			blockLocs=blockLocs.assoc(signedBlock.getHash(),CVMLong.create(b));
-			AVector<SignedData<ATransaction>> txs=RT.ensureCVM(signedBlock.getValue(),Block.class).getTransactions();
+			ACell entry=Peer.readEntry(blocks,b);
+			if (entry==null) continue; // not held by the Order's structure
+			blockLocs=blockLocs.assoc(entry.getHash(),CVMLong.create(b));
+			AVector<SignedData<ATransaction>> txs=Peer.readTransactions(entry);
+			if (txs==null) continue; // an invalid Block: none of its transactions took effect
 			long n=txs.count();
 			for (long i=0; i<n; i++) {
 				Hash txID=txs.get(i).getHash();

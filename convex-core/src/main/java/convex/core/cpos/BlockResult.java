@@ -1,5 +1,6 @@
 package convex.core.cpos;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cvm.ARecordGeneric;
@@ -96,7 +97,7 @@ public class BlockResult extends ARecordGeneric {
 	 */
 	public Result getResult(long i) {
 		AVector<Result> results=getResults();
-		if ((i<0)||(i>=results.count())) return null;
+		if ((results==null)||(i<0)||(i>=results.count())) return null;
 		return RT.ensureCVM(results.get(i),Result.class);
 	}
 
@@ -162,21 +163,26 @@ public class BlockResult extends ARecordGeneric {
 	}
 
 	/**
-	 * Creates a BlockResult for an invalid Block (e.g. no peer in Global State)
+	 * Creates a BlockResult for an invalid Block (e.g. no peer in Global State). Each
+	 * transaction gets the error, unless the Block has no transaction vector or more
+	 * transactions than a Block may hold, in which case there are no per-transaction
+	 * results.
+	 *
 	 * @param state State at time of creation
-	 * @param block Invalid block
+	 * @param block Invalid block, or null if there is no readable Block
 	 * @param message Message to report to clients
 	 * @return BlockResult instance
 	 */
 	public static BlockResult createInvalidBlock(State state, Block block, AString message) {
 		Result r=Result.create(null, message,ErrorCodes.PEER);
+		AVector<?> txs=(block==null)?null:block.getTransactions();
 		AVector<Result> rs;
-		if (block==null) {
+		if ((txs==null)||(txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK)) {
 			rs=null;
 		} else {
-			rs=Vectors.repeat(r, block.getTransactions().size());
+			rs=Vectors.repeat(r, (int)txs.count());
 		}
-		
+
 		return new BlockResult(state,rs);
 	}
 

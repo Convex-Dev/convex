@@ -3,6 +3,7 @@ package convex.core.cpos;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
@@ -203,6 +204,26 @@ public class BeliefMergeTest {
 		Peer bm2 = b0.mergeBeliefs(b1a.getBelief());
 		bm2=bm2.updateState();
 		assertEquals(b1a.getPeerOrder().getBlocks(), bm2.getPeerOrder().getBlocks());
+	}
+
+	/**
+	 * A staked peer's signed value that is not an Order is ignored by the merge, and
+	 * other Orders in the same Belief are merged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testMergeIgnoresSignedNonOrder() throws InvalidDataException {
+		Peer b0 = initialPeerState(0);
+		Peer b2 = initialPeerState(2);
+		b2 = b2.updateTimestamp(b2.getTimestamp() + 200);
+		b2 = b2.proposeBlock(Block.of(b2.getTimestamp()));
+
+		SignedData notAnOrder = KEY_PAIRS[1].signData(RT.cvm(1L));
+		Belief received = Belief.create(b2.getBelief().getOrders().get(KEYS[2]), notAnOrder);
+		Peer merged = b0.mergeBeliefs(received);
+
+		assertNull(merged.getBelief().getOrders().get(KEYS[1]));
+		assertEquals(b2.getPeerOrder().getBlocks(), merged.getPeerOrder().getBlocks());
 	}
 
 	/**

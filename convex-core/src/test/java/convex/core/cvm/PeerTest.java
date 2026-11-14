@@ -19,11 +19,14 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
@@ -377,6 +380,73 @@ public class PeerTest {
 
 		// First tx in block 1 is good (index 0, not 0%7==3)
 		assertFalse(results1.get(0).isError(), "First good tx should succeed");
+
+		doPeerTest(p);
+	}
+
+	/**
+	 * A finalised Block whose transactions are not all signed transactions is applied
+	 * as an invalid Block, leaving the State unchanged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testUnsignedTransactionInBlock() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		long ts=p.getTimestamp();
+		SignedData<ATransaction> goodTx = KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "*address*"));
+		Block block = Block.create(ts, (AVector)Vectors.of(goodTx, CVMLong.ONE));
+		p = p.proposeBlock(block);
+		p = p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs();
+		assertEquals(1, p.getFinalityPoint());
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertTrue(p.getBlockResult(0).isError(0));
+		// None of its transactions took effect, so lookups do not find them
+		assertNull(p.getTransactionLocation(goodTx.getHash()));
+
+		doPeerTest(p);
+	}
+
+	/**
+	 * A finalised Order entry that is not a signed Block is applied as an invalid
+	 * Block, leaving the State unchanged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testUnsignedBlockInOrder() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		Order order=Order.create().withBlocks((AVector)Vectors.of(CVMLong.ONE)).withConsensusPoints(new long[] {1,1,1,1});
+		p = p.updateBelief(Belief.create(KP.signData(order)));
+		assertEquals(1, p.getFinalityPoint());
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertNull(p.getTransactionLocation(Hash.NULL_HASH));
+
+		doPeerTest(p);
+	}
+
+	/**
+	 * A Block with more transactions than a Block may hold is invalid, and its result
+	 * has no per-transaction results.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testOversizedBlock() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		SignedData<ATransaction> tx = KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "*address*"));
+		Block block = Block.create(p.getTimestamp(), (AVector)Vectors.repeat(tx, Constants.MAX_TRANSACTIONS_PER_BLOCK+1));
+		p = p.proposeBlock(block);
+		p = p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs();
+		assertEquals(1, p.getFinalityPoint());
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertNull(p.getBlockResult(0).getResult(0));
 
 		doPeerTest(p);
 	}

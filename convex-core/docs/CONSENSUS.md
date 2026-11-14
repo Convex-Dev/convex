@@ -170,6 +170,14 @@ trust in a specific peer for submission is a separate, explicit choice.
 - **Message-level denial of service.** `MAX_MESSAGE_LENGTH`, `MISSING_LIMIT`,
   bounded transactions per Block, and juice metering on all execution including
   compile and expand. Malformed data from untrusted peers must fail closed.
+- **Unusable input.** Belief merge admits a received Order only once its whole
+  tree is in the store, and drops an Order the merge cannot use while merging the
+  others. A finalised Block that is not a signed Block with at most
+  `MAX_TRANSACTIONS_PER_BLOCK` signed transactions is invalid like any other
+  (`Peer.updateState`): the State is unchanged and execution moves on. Data
+  missing from the local store is not invalidity: the executor tries again rather
+  than skip the Block. Only fatal conditions, a failed store write or a JVM
+  error, stop a peer.
 - **Upgrade boundary.** A peer that cannot apply a scheduled upgrade withdraws
   deterministically rather than diverging; the trigger is unforgeable on-chain
   state, so withdrawal is not selectively targetable. See `UPGRADE.md`.
