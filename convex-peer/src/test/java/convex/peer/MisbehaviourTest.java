@@ -392,8 +392,9 @@ public class MisbehaviourTest {
 				ConvexRemote polled=ConvexRemote.connect(remote.getHostAddress())) {
 			polled.setStore(new MemoryStore());
 			peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),polled);
-			assertFalse(polled.isConnected());
+			// First, as the client's own state may lag its close
 			disconnected.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			assertFalse(polled.isConnected());
 		} finally {
 			peer.close();
 		}
