@@ -58,8 +58,8 @@ class ApplicationIngressTest {
 			Index<Keyword,ACell> reduced=LatticeOps.reduce(rule,value,path);
 			return reduced==null?cursor().get():merge(reduced);
 		}
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.mergePublication(rule,LatticeContext.EMPTY,own,other);
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.reconcile(rule,LatticeContext.EMPTY,own,other);
 		}
 		<T extends ACell> AForkableCursor<T> resolve(ACell... path) {
 			return LatticeComponent.resolve(cursor(),rule,path);

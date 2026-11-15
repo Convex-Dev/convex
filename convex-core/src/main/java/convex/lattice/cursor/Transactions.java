@@ -3,9 +3,12 @@ package convex.lattice.cursor;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
+import convex.lattice.LatticeOps;
+import convex.lattice.MergeConflictException;
 
 /**
  * Atomic subtree transactions over a cursor: run a callback against a private draft
@@ -32,7 +35,10 @@ import convex.core.util.Utils;
  *
  * <p>Optimistic execution is the fast path for transactions that do not collide. A
  * change elsewhere under the root never reruns a callback: its finished result is
- * applied to the new root. When the transaction's own value has changed, it takes the
+ * applied to the new root. A commit is a strict three-way merge: the run's changes are
+ * carried onto its value as held, which may be persisted since, if that value is
+ * unchanged; a run that changed nothing commits whatever changed meanwhile, as of the
+ * value it read. When the transaction's own value has changed, it takes the
  * {@link Claim} beneath its cursor (see {@link ACursor#claim}) and finishes under it.
  * Claims on the same boundary run one at a time, and a callback runs at most twice.
  * {@link #transactExclusively} starts with the claim, for work too expensive to
@@ -177,15 +183,34 @@ public final class Transactions {
 		},merge);
 	}
 
-	private static final class Transaction<V extends ACell,R> {
+	/**
+	 * Commits a run only if nothing else changed its value, because its reads hold only
+	 * then. Where its value is held in other cells, such as persisted ones, the run's
+	 * changes are carried onto them.
+	 */
+	private static <V extends ACell> V strict(V base,V own,V other) {
+		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		throw new MergeConflictException();
+	}
+
+	/** As {@link #strict}, for a change under the claim that there is no merge to reconcile. */
+	private static <V extends ACell> V refuse(V base,V own,V other) {
+		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		throw new IllegalStateException("Value changed under a transaction's claim, by this thread or by a write that did not pass through the claimed boundary");
+	}
+
+	/** One transaction, and the update function that commits it. */
+	private static final class Transaction<V extends ACell,R> implements UnaryOperator<V> {
 		private final AForkableCursor<V> cursor;
 		private final Function<? super AForkableCursor<V>,? extends R> action;
 		/** Reconciles a change under the claim with the computed run, or null to refuse it. */
 		private final ThreeWayMerge<V> merge;
+		/** Merge of the commit in progress. */
+		private ThreeWayMerge<V> merging;
 		private boolean computed;
-		/** Value the computed run started from. */
+		/** Value the computed run started from, then the last value its commit merged with. */
 		private V base;
-		/** Value the computed run leaves in its draft. */
+		/** Value the computed run leaves in its draft, then the last value its commit made. */
 		private V own;
 		/** Result of the computed run, which is the committed run once commit succeeds. */
 		private R output;
@@ -206,12 +231,23 @@ public final class Transactions {
 			computed=true;
 		}
 
+		@Override public V apply(V other) {
+			own=Reconciler.reconcile(base,own,other,merging);
+			base=other;
+			return own;
+		}
+
 		/** The one optimistic attempt. False leaves the caller to take the claim. */
 		boolean commit() {
 			run(cursor.get());
-			// By value, so an equal value in other cells is no change. A run that changed
-			// nothing still commits as a write, so a cursor that cannot be written refuses it.
-			return cursor.compareAndSet(base,own);
+			merging=Transactions::strict;
+			try {
+				// A run that changed nothing still commits as a write, so a cursor that cannot be written refuses it
+				cursor.updateAndGet(this);
+				return true;
+			} catch (MergeConflictException e) {
+				return false;
+			}
 		}
 
 		/**
@@ -222,17 +258,9 @@ public final class Transactions {
 			try (Claim claim=cursor.claim()) {
 				V other=cursor.get();
 				if (!computed || !Utils.equals(other,base)) run(other);
-				if (merge!=null) {
-					cursor.updateAndGet(new Reconciler<>(base,own,merge));
-					return output;
-				}
-				for (;;) {
-					other=cursor.get();
-					if (!Utils.equals(other,base)) {
-						throw new IllegalStateException("Value changed under a transaction's claim, by this thread or by a write that did not pass through the claimed boundary");
-					}
-					if (cursor.compareAndSet(other,own)) return output;
-				}
+				merging=(merge!=null)?merge:Transactions::refuse;
+				cursor.updateAndGet(this);
+				return output;
 			}
 		}
 	}

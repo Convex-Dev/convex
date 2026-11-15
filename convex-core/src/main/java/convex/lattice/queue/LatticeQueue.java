@@ -338,7 +338,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AVector<ACell> mergePublication(AVector<ACell> own,AVector<ACell> other) {
+	protected AVector<ACell> reconcile(AVector<ACell> own,AVector<ACell> other) {
 		return QueueLattice.INSTANCE.merge(own,other);
 	}
 }

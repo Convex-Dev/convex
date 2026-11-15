@@ -142,7 +142,7 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<Blob, ACell> mergePublication(Index<Blob, ACell> own,Index<Blob, ACell> other) {
+	protected Index<Blob, ACell> reconcile(Index<Blob, ACell> own,Index<Blob, ACell> other) {
 		return SocialLattice.FEED_LATTICE.merge(own,other);
 	}
 

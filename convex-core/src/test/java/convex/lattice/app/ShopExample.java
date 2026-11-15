@@ -143,7 +143,7 @@ public final class ShopExample {
 		}
 
 		/** Merges each part that both sides changed with that part's own rule. */
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			Index<Keyword,ACell> merged=(other==null)?Index.none():other;
 			merged=mergePart(merged,CATALOGUE,base,own,other,(ASet<Keyword> b,ASet<Keyword> o,ASet<Keyword> t) -> Catalogue.merge(o,t));
 			merged=mergePart(merged,STOCK,base,own,other,(Index<Keyword,CVMLong> b,Index<Keyword,CVMLong> o,Index<Keyword,CVMLong> t) -> Stock.merge(b,o,t));

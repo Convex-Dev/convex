@@ -56,7 +56,7 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	}
 
 	/** Reconciles unsigned drafts using the payload policy bound to their owner. */
-	@Override protected V mergePublication(V own,V other) {
+	@Override protected V reconcile(V own,V other) {
 		return lattice.getValueLattice().merge(own,other);
 	}
 

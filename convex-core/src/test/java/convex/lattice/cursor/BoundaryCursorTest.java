@@ -178,13 +178,20 @@ class BoundaryCursorTest {
 		assertSame(written,a.get(),"a merge result equal to the destination's value is a write of an equal value");
 	}
 
-	@Test void aBypassingWriteThatMatchesTheRunNeedsNoMerge() {
+	/** A merge is total, so whether equal changes on both sides agree is its decision. */
+	@Test void aBypassingWriteThatMatchesTheRunIsGivenToTheMerge() {
 		var root=tree();
 		var a=boundary(root,A);
+		var given=new ArrayList<ACell>();
 		Transactions.executeExclusively(a,draft -> {
 			root.set(root.get().assoc(A,CVMLong.ONE));
 			draft.set(CVMLong.ONE);
-		},(base,own,other) -> fail("both sides agree"));
+		},(base,own,other) -> {
+			given.add(own);
+			given.add(other);
+			return other;
+		});
+		assertEquals(List.of(CVMLong.ONE,CVMLong.ONE),given);
 		assertEquals(CVMLong.ONE,a.get());
 	}
 

@@ -173,7 +173,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<ABlob,SignedData<ACell>> mergePublication(
+	protected Index<ABlob,SignedData<ACell>> reconcile(
 			Index<ABlob,SignedData<ACell>> own,
 			Index<ABlob,SignedData<ACell>> other) {
 		return lattice.merge(own,other);

@@ -374,8 +374,8 @@ A transaction executes operations on a private draft, then commits one local
 atomic change. During optimistic execution, a change to the transaction's input
 makes the operations run again against current state. Under a claim, a change
 that bypasses the claimed boundary is instead reconciled using the component's
-publication merge; a component without a suitable merge refuses that conflicting
-commit. These are different ways of handling a conflict: retrying repeats the
+`reconcile`; a component that cannot reconcile changes on both sides refuses that
+conflicting commit. These are different ways of handling a conflict: retrying repeats the
 operations, while merging resolves the resulting versions according to component
 policy.
 

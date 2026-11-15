@@ -3,7 +3,6 @@ package convex.lattice.cursor;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.core.util.Utils;
 
 /**
  * One side's change, carried onto a destination that may have changed since the
@@ -31,15 +30,19 @@ final class Reconciler<V extends ACell> implements UnaryOperator<V> {
 	}
 
 	@Override public V apply(V other) {
-		// Where only this side changed, own replaces other even if other is the
-		// persisted form of the base: unless this side was persisted too, that puts
-		// strong cells back over soft ones (see Persister).
-		if (Utils.equals(own,base) || Utils.equals(own,other)) {
-			own=other;
-		} else if (!Utils.equals(other,base)) {
-			own=merge.merge(base,own,other);
-		}
+		own=reconcile(base,own,other,merge);
 		base=other;
 		return own;
+	}
+
+	/**
+	 * Reconciles by the merge, skipping it where the result is known by reference, which
+	 * costs nothing. Own was built from base, so while base is still held, own's unchanged
+	 * parts are already the held cells.
+	 */
+	static <V extends ACell> V reconcile(V base,V own,V other,ThreeWayMerge<V> merge) {
+		if (other==base) return own;
+		if (own==base) return other;
+		return merge.merge(base,own,other);
 	}
 }

@@ -288,7 +288,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<AString, AVector<ACell>> mergePublication(
+	protected AHashMap<AString, AVector<ACell>> reconcile(
 			AHashMap<AString, AVector<ACell>> own,
 			AHashMap<AString, AVector<ACell>> other) {
 		return values.merge(own,other);

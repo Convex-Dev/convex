@@ -325,7 +325,7 @@ public class LatticeCursorTest {
 
 		forkComponent.sync();
 
-		assertSame(edited, root.get(),
+		assertEquals(edited, root.get(),
 			"the fork's local edit must win a timestamp tie against a concurrent parent advance");
 	}
 

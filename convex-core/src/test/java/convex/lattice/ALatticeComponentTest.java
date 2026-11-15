@@ -52,7 +52,7 @@ public class ALatticeComponentTest {
 		@Override public TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
 
 		@Override
-		protected ASet<ACell> mergePublication(ASet<ACell> own,ASet<ACell> other) {
+		protected ASet<ACell> reconcile(ASet<ACell> own,ASet<ACell> other) {
 			return own.includeAll(other);
 		}
 

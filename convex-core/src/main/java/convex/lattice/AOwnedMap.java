@@ -77,7 +77,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 
 	/** Publication conflicts use the same merge policy as incoming deliveries. */
 	@Override
-	protected M mergePublication(M own,M other) {
+	protected M reconcile(M own,M other) {
 		return mergeWorkingValues(own,other);
 	}
 

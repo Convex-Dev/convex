@@ -502,7 +502,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * still present in the draft's stale snapshot.
 	 */
 	@Override
-	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+	protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
 		var merged = mergeValues(own, other);
 		if (other == null) return merged;
 		ACell tables = (merged == null) ? null : merged.get(ConvexDB.KEY_TABLES);

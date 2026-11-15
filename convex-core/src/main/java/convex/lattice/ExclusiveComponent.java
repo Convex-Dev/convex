@@ -34,9 +34,9 @@ import convex.lattice.cursor.Transactions;
  * wait, including incoming merges, and exclusive transactions under the same
  * boundary run one after another whatever they touch, while those under separate
  * boundaries run at the same time. A write reaching the value without passing
- * through the boundary is merged with the callback's run by the source component's
- * publication merge, as {@link TransactionalComponent} describes, or makes the
- * transaction fail if it has none. For a
+ * through the boundary is reconciled with the callback's run by the source component's
+ * {@link ALatticeComponent#reconcile(ACell,ACell,ACell)}, as {@link TransactionalComponent}
+ * describes, or makes the transaction fail if it cannot reconcile changes on both sides. For a
  * staged component the root is that component's working copy, so the fork's sync
  * waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a

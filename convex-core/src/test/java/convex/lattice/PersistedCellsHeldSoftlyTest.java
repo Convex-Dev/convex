@@ -43,6 +43,8 @@ import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.Transactions;
+import convex.lattice.generic.FunctionLattice;
+import convex.lattice.generic.MapLattice;
 import convex.test.Persisters;
 import convex.test.Samples;
 
@@ -187,6 +189,11 @@ public class PersistedCellsHeldSoftlyTest {
 			}))));
 	}
 
+	/** Edits by a transaction, whose commit carries the run's changes onto the cells held then. */
+	static Stream<Edit> transactions() {
+		return edits().filter(edit -> edit.name().contains("transaction"));
+	}
+
 	/** One way of writing a whole value. */
 	private record Write(String name,BiConsumer<AForkableCursor<AHashMap<ACell,ACell>>,AHashMap<ACell,ACell>> action) {
 		@Override public String toString() { return name; }
@@ -224,7 +231,7 @@ public class PersistedCellsHeldSoftlyTest {
 			return storage().get();
 		}
 
-		@Override protected AHashMap<ACell,ACell> mergePublication(
+		@Override protected AHashMap<ACell,ACell> reconcile(
 				AHashMap<ACell,ACell> base,AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
 			mergedBase=base;
 			mergedOwn=own;
@@ -258,11 +265,22 @@ public class PersistedCellsHeldSoftlyTest {
 			child.sync();
 		}
 
-		@Override protected AHashMap<ACell,ACell> mergePublication(
+		@Override protected AHashMap<ACell,ACell> reconcile(
 				AHashMap<ACell,ACell> base,AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
 			return LatticeOps.mergeChanges(base,own,other);
 		}
 	}
+
+	/** A component that keeps the default reconciliation. */
+	private static class Plain extends ALatticeComponent<AHashMap<ACell,ACell>> {
+		Plain(AForkableCursor<AHashMap<ACell,ACell>> cursor) {
+			super(cursor);
+		}
+	}
+
+	/** Nested maps whose entries keep this side's value where both sides changed one. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	private static final ALattice<AHashMap<ACell,ACell>> NESTED=(ALattice)MapLattice.create(MapLattice.create(FunctionLattice.create((a,b) -> a)));
 
 	// ===== The checks themselves =====
 
@@ -418,6 +436,34 @@ public class PersistedCellsHeldSoftlyTest {
 		host.sync();
 		assertHeldSoftly(store,host.cursor().get());
 		assertTrue(holds(host.cursor().get(),9000));
+	}
+
+	/** A fork taken before the destination's save brings only its own change back to it. */
+	@Test void aSyncWhereOnlyTheForkChangedKeepsTheDestinationsSavedCells() {
+		var host=LatticeHost.create(tree(),hostStore());
+		var component=new Plain(host.cursor().fork());
+		host.sync();
+		component.cursor().updateAndGet(root -> with(root,9000));
+
+		component.sync();
+
+		assertTrue(holds(host.cursor().get(),9000));
+		assertOnlyStrongAround(host.cursor().get(),blob(9000));
+	}
+
+	/** A lattice join where both sides changed is built on the fork's cells, then carried onto the destination's. */
+	@Test void aLatticeJoinKeepsTheDestinationsSavedCells() {
+		var host=LatticeHost.create(tree(),hostStore());
+		var component=new LatticeComponent<>(NESTED,host.cursor().fork());
+		component.cursor().updateAndGet(root -> with(root,9000));
+		write(host,9001);
+		host.sync();
+
+		component.sync();
+
+		assertTrue(holds(host.cursor().get(),9000));
+		assertTrue(holds(host.cursor().get(),9001));
+		assertOnlyStrongAround(host.cursor().get(),blob(9000));
 	}
 
 	@Test void cellsBuiltByAMergeAreHeldSoftlyAfterTheSameSync() {
@@ -625,10 +671,20 @@ public class PersistedCellsHeldSoftlyTest {
 		assertOnlyStrongAround(root.get(),blob(9000));
 	}
 
+	@ParameterizedTest(name="{0}")
+	@MethodSource("transactions")
+	void aPersistLandingDuringATransactionLeavesOnlyTheEditStrong(Edit edit) {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+
+		edit.apply(root,9000,once(() -> persist(root)));
+
+		assertTrue(holds(root.get(),9000),"The edit is kept");
+		assertOnlyStrongAround(root.get(),blob(9000));
+	}
+
 	/**
-	 * A finished value, from a compare-and-set or a transaction, is built on the cells
-	 * read before the persist and goes in as it is, so those cells are held again
-	 * until the next persist.
+	 * A finished value, from a compare-and-set, is built on the cells read before the
+	 * persist and goes in as it is, so those cells are held again until the next persist.
 	 */
 	@ParameterizedTest(name="{0}")
 	@MethodSource("edits")

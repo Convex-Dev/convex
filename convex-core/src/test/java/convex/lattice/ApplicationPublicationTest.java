@@ -86,7 +86,7 @@ public class ApplicationPublicationTest {
 
 		/** Called only when both this root and the host changed: the owned subtree is
 		 *  the owner component's to publish, so it is taken from the destination. */
-		@Override protected Index<Keyword,ACell> mergePublication(
+		@Override protected Index<Keyword,ACell> reconcile(
 				Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			CVMLong local=(CVMLong)own.get(REGISTER);
 			CVMLong remote=(CVMLong)other.get(REGISTER);

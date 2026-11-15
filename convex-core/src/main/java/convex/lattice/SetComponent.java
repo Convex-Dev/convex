@@ -16,7 +16,7 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>No replication rule is supplied. Ordinary views share their cursor and
  * have a read-only sync. A subclass can implement {@link #rebind} and
- * {@link #mergePublication} to support independent working copies. Sync publishes
+ * {@link #reconcile} to support independent working copies. Sync publishes
  * a bound fork at its destination only.</p>
  *
  * @param <V> Set element type

@@ -91,7 +91,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 
 	/** When the slot's record also changed, the newer record wins. */
 	@Override
-	protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
+	protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 		return record.getLattice().merge(own,other);
 	}
 }
