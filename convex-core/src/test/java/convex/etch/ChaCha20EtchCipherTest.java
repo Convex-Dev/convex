@@ -1,11 +1,14 @@
 package convex.etch;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import org.bouncycastle.crypto.engines.ChaChaEngine;
 import org.junit.jupiter.api.Test;
 
 import convex.core.util.Utils;
@@ -67,6 +70,28 @@ public class ChaCha20EtchCipherTest {
 			long decrypted=cipher.transformLong(offset,encrypted);
 			org.junit.jupiter.api.Assertions.assertEquals(value,decrypted);
 		}
+	}
+
+	@Test
+	public void testBlockCutOffByErrorIsComputedAgain() throws Exception {
+		byte[] key=new byte[32];
+		key[0]=7;
+		boolean[] failNext= {false};
+		ChaCha20EtchCipher cipher=ChaCha20EtchCipher.fromKey(key,(input,output)-> {
+			if (failNext[0]) {
+				failNext[0]=false;
+				throw new StackOverflowError("Simulated");
+			}
+			ChaChaEngine.chachaCore(20,input,output);
+		});
+		ChaCha20EtchCipher reference=ChaCha20EtchCipher.fromKey(key);
+		long value=0x0123456789abcdefL;
+
+		// Load the first block, then cut off loading the second
+		assertEquals(reference.transformLong(0L,value),cipher.transformLong(0L,value));
+		failNext[0]=true;
+		assertThrows(StackOverflowError.class,()->cipher.transformLong(64L,value));
+		assertEquals(reference.transformLong(64L,value),cipher.transformLong(64L,value));
 	}
 
 	private static byte[] transform(EtchFileCipher cipher, long offset, byte[] input)
