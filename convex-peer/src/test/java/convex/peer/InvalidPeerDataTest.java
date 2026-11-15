@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
@@ -484,6 +485,35 @@ public class InvalidPeerDataTest {
 	public void aDeeplyNestedTransactionIsExecutedOnEtch() throws Exception {
 		try (EtchStore store=EtchStore.createTemp()) {
 			aDeeplyNestedTransactionIsExecuted(store);
+		}
+	}
+
+	/**
+	 * A transaction whose processing runs the peer out of memory is rejected as
+	 * exceeding a resource limit, and later transactions are still processed.
+	 */
+	@Test
+	public void aTransactionThatRunsThePeerOutOfMemory() throws Exception {
+		SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
+		Hash failing=tx.getHash();
+		MemoryStore store=new MemoryStore() {
+			@Override
+			public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+				if (ref.getHash().equals(failing)) throw new OutOfMemoryError("Test: out of memory storing a transaction");
+				return super.storeTopRef(ref,status,noveltyHandler);
+			}
+		};
+		Server peer=launchPeer(store,LOCAL);
+		try {
+			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+			Result failed=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
+			assertEquals(ErrorCodes.LIMIT,failed.getErrorCode(),failed.toString());
+
+			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 2 3)"));
+			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
 		}
 	}
 
