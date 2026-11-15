@@ -37,6 +37,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.RequestFailureLog;
 import convex.net.Transports;
 
 /**
@@ -85,6 +86,10 @@ public class ConnectionManager extends AConnectionManager {
 
 	/** Manager-owned sockets currently awaiting remote peer identification. */
 	private final Set<Convex> pendingConnections=ConcurrentHashMap.newKeySet();
+
+	/** One per site, so each warns once of each kind of failure that warrants it. */
+	private final RequestFailureLog pollFailures=new RequestFailureLog(log);
+	private final RequestFailureLog connectFailures=new RequestFailureLog(log);
 
 	/** Background thread for connection maintenance and belief polling. */
 	private Thread thread;
@@ -299,7 +304,7 @@ public class ConnectionManager extends AConnectionManager {
 		if (target != null) {
 			URI connectTarget = target;
 			connectToPeer(target,targetKey).exceptionally(e -> {
-				log.debug("Failed to connect to Peer at {}: {}", connectTarget, e.getMessage());
+				connectFailures.log(e,"Failed to connect to Peer at {}",connectTarget);
 				return null;
 			});
 		}
@@ -370,11 +375,12 @@ public class ConnectionManager extends AConnectionManager {
 				log.debug("Discarding acquired Belief because the local queue filled during polling");
 			}
 		} catch (InterruptedException e) {
+			// Before the catch-all: an interrupt stops the manager, it is not a failed poll
 			throw e;
-		} catch (Exception t) {
-			if (server.isLive()) {
-				log.info("Belief Polling failed: {}", t.getClass().toString() + " : " + t.getMessage());
-			}
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			// Failures while closing are expected
+			if (server.isLive()) pollFailures.log(e,"Belief poll of {} failed",peerKey);
 		}
 	}
 
@@ -471,12 +477,13 @@ public class ConnectionManager extends AConnectionManager {
 				if (existing != convex) convex.close();
 				result.complete(existing);
 			});
-		} catch (Exception e) {
+		} catch (Throwable e) {
+			// First, so the connection is not left open even for a JVM failure
 			if (opened!=null) pendingConnections.remove(opened);
 			closeSilently(opened);
+			// Also restores an interrupt, which throwing cleared, for the caller
+			Utils.checkRequestFailure(e);
 			result.completeExceptionally(e);
-			// Throwing an interrupt cleared this thread's status: restore it for the caller
-			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 		}
 		return result;
 	}

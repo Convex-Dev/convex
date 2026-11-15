@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -24,6 +25,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
@@ -36,6 +38,7 @@ import convex.core.crypto.ASignature;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.AArrayBlob;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.cvm.transactions.ATransaction;
@@ -275,22 +278,24 @@ public class PeerRequestFailureTest {
 	}
 
 	/**
-	 * A key pair that fails once with a chosen failure the next time it signs an Order,
-	 * and otherwise signs as another. A proposal signs its Order through signData and a
-	 * merge through sign; Blocks are signed through signData, which passes them on.
+	 * A key pair that fails once with a chosen failure the next time it signs a chosen
+	 * value, and otherwise signs as another. A proposal signs its Order through signData
+	 * and a merge through sign.
 	 */
-	static final class OrderFailingKeyPair extends AKeyPair {
+	static final class FailingKeyPair extends AKeyPair {
 		final AKeyPair kp;
+		final Predicate<ACell> which;
 		final AtomicReference<Throwable> failure=new AtomicReference<>();
 
-		OrderFailingKeyPair(AKeyPair kp) {
+		FailingKeyPair(AKeyPair kp, Predicate<ACell> which) {
 			this.kp=kp;
+			this.which=which;
 		}
 
 		@Override
 		public <R extends ACell> SignedData<R> signData(R value) {
-			// Only an Order: Block production signs Blocks with the same key pair
-			Throwable t=(value instanceof Order)?failure.getAndSet(null):null;
+			// Only the chosen values: the peer signs other values with the same key pair
+			Throwable t=which.test(value)?failure.getAndSet(null):null;
 			if (t!=null) throw Utils.<RuntimeException>sneakyThrow(t);
 			return kp.signData(value);
 		}
@@ -299,7 +304,7 @@ public class PeerRequestFailureTest {
 		@Override public boolean equals(AKeyPair other) { return kp.equals(other); }
 		@Override
 		public ASignature sign(AArrayBlob message) {
-			// Only Orders reach this key pair's own sign: see signData
+			// Whatever the value: in these tests only the merge's own Order reaches this
 			Throwable t=failure.getAndSet(null);
 			if (t!=null) throw Utils.<RuntimeException>sneakyThrow(t);
 			return kp.sign(message);
@@ -333,7 +338,7 @@ public class PeerRequestFailureTest {
 	 */
 	@Test
 	public void aBlockThatCannotBeProposedFailsItsTransactions() throws Exception {
-		OrderFailingKeyPair kp=new OrderFailingKeyPair(LOCAL);
+		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof Order);
 		Server peer=launchHaltedPeer(kp);
 		try {
 			LinkedBlockingQueue<SignedData<ATransaction>> queued=new LinkedBlockingQueue<>();
@@ -534,7 +539,7 @@ public class PeerRequestFailureTest {
 	 */
 	@Test
 	public void aMergeThatFailsDropsItsBatch() throws Exception {
-		OrderFailingKeyPair kp=new OrderFailingKeyPair(LOCAL);
+		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof Order);
 		Server peer=launchHaltedPeer(kp);
 		try {
 			// Signed with the key itself, so the failure is left for the merge
@@ -607,6 +612,50 @@ public class PeerRequestFailureTest {
 			} finally {
 				peer.close();
 			}
+		}
+	}
+
+	/** A Belief poll that fails is dropped alone, and nothing is thrown into the manager's loop. */
+	@Test
+	public void aBeliefPollThatFailsIsDroppedAlone() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			for (Error error: CONTAINED) {
+				AtomicInteger polls=new AtomicInteger();
+				Convex failing=new ConvexLocal(peer,ORIGIN,LOCAL) {
+					@Override
+					public Result requestStatusSync(long timeout) {
+						polls.incrementAndGet();
+						throw error;
+					}
+				};
+				peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),failing);
+				assertEquals(1,polls.get(),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A connection attempt that fails fails its future alone: nothing is thrown to the
+	 * caller, such as the connection manager's loop.
+	 */
+	@Test
+	public void aConnectionThatFailsFailsItsFuture() throws Exception {
+		// Once connected, verification signs a challenge vector with the peer's key pair
+		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof AVector);
+		Server peer=launchHaltedPeer(kp);
+		try {
+			for (Error error: CONTAINED) {
+				kp.failure.set(error);
+				CompletableFuture<Convex> connecting=peer.getConnectionManager().connectToPeer(peer.getHostAddress());
+				// Already complete: the failure is in the caller's thread
+				assertTrue(connecting.isCompletedExceptionally(),error.toString());
+				assertSame(error,connecting.exceptionNow());
+			}
+		} finally {
+			peer.close();
 		}
 	}
 
