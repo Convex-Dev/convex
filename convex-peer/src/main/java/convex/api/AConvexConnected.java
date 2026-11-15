@@ -151,7 +151,12 @@ public abstract class AConvexConnected extends Convex {
 				if (signer != null) {
 					m.respondToChallenge(signer);
 				} else if (kp != null) {
-					m.respondToChallenge(kp, null);
+					AccountKey dialled = dialledPeer;
+					if (dialled != null) {
+						m.respondToBoundChallenge(kp, dialled);
+					} else {
+						m.respondToChallenge(kp, null);
+					}
 				}
 				return null;
 			}

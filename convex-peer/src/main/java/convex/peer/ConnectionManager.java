@@ -441,6 +441,9 @@ public class ConnectionManager extends AConnectionManager {
 			}
 			convex.setStore(server.getStore());
 			convex.setKeyPair(server.getKeyPair());
+			// The peer this link answers challenges for: the key chosen before dialling,
+			// set before anything is sent on it
+			convex.setDialledPeer(expectedPeer);
 
 			boolean requireExpectedPeer=expectedPeer!=null && "tls".equalsIgnoreCase(hostAddress.getScheme());
 			CompletableFuture<AccountKey> identity=requireExpectedPeer
@@ -453,6 +456,9 @@ public class ConnectionManager extends AConnectionManager {
 						: new IOException("Unable to identify peer at " + hostAddress));
 					return;
 				}
+				// Dialled without a key: answer for the key verification found, if any.
+				// Set before the link is filed, so before any Belief is sent on it.
+				if (expectedPeer == null) convex.setDialledPeer(convex.getVerifiedPeer());
 
 				Convex existing=null;
 				synchronized (ConnectionManager.this) {

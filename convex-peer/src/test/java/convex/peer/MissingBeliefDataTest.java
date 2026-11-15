@@ -183,6 +183,8 @@ public class MissingBeliefDataTest {
 				if (m.getType()==MessageType.DATA_REQUEST) requests.add(m);
 				return true;
 			});
+			// Trusted as a staked peer's, so that its DATA is staged
+			senderEnd.getPaired().setTrustedKey(REMOTE_A.getAccountKey());
 			CompletableFuture<Message> staged=new CompletableFuture<>();
 			propagator.setDataStageObserver(m -> {
 				if (data.getMessageData().equals(m.getMessageData())) staged.complete(m);

@@ -147,6 +147,12 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected AccountKey verifiedPeer = null;
 
+	/**
+	 * Key of the peer this client was opened to reach, or null. Set before the client
+	 * sends anything, and read when answering a challenge on the receive thread.
+	 */
+	protected volatile AccountKey dialledPeer = null;
+
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
@@ -169,6 +175,17 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected void setVerifiedPeer(AccountKey key) {
 		verifiedPeer = key;
+	}
+
+	/**
+	 * Records the key of the peer this client was opened to reach. While set, the
+	 * client answers a challenge in the bound form naming this key
+	 * ({@link Message#answerBoundChallenge}) instead of the plain form.
+	 *
+	 * @param key Peer key, or null to answer plainly
+	 */
+	public void setDialledPeer(AccountKey key) {
+		dialledPeer = key;
 	}
 
 	/**

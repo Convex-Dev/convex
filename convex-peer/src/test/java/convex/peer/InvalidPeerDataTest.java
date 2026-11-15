@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -120,6 +121,13 @@ public class InvalidPeerDataTest {
 		return MissingBeliefDataTest.connect(peer,m -> true);
 	}
 
+	/** A connection the peer trusts as a staked peer's, as verification leaves it: DATA from it is stored. */
+	static LocalConnection connectAs(Server peer, AKeyPair kp) {
+		LocalConnection senderEnd=connect(peer);
+		senderEnd.getPaired().setTrustedKey(kp.getAccountKey());
+		return senderEnd;
+	}
+
 	static Message wire(Message m) {
 		return MissingBeliefDataTest.wire(m);
 	}
@@ -204,13 +212,16 @@ public class InvalidPeerDataTest {
 	public void anErrorStagingDataDropsOnlyThatMessage() throws Exception {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
+			CompletableFuture<Message> failed=new CompletableFuture<>();
 			peer.getBeliefPropagator().setDataStageObserver(m -> {
+				failed.complete(m);
 				throw new OutOfMemoryError("test");
 			});
 			Message data=Message.createDataMessage(List.of(Blob.wrap(new byte[200])),(int)CPoSConstants.MAX_MESSAGE_LENGTH);
-			connect(peer).sendMessage(wire(data));
+			connectAs(peer,REMOTE_A).sendMessage(wire(data));
 			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 			checkGoodOrderMerges(peer,good,Belief.create(good));
+			assertTrue(failed.isDone(),"the DATA was staged, and failed, before the Order merged");
 		} finally {
 			peer.close();
 		}
@@ -313,7 +324,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * Deeply nested DATA is stored, and a good Order sent after it is merged.
+	 * Deeply nested DATA from a trusted connection is stored, and a good Order sent after
+	 * it is merged.
 	 */
 	@Test
 	public void deeplyNestedDataIsStored() throws Exception {
@@ -327,7 +339,7 @@ public class InvalidPeerDataTest {
 			ACell outermost=branches.get(0);
 			Message data=Message.createDataMessage(branches,(int)CPoSConstants.MAX_MESSAGE_LENGTH);
 
-			LocalConnection senderEnd=connect(peer);
+			LocalConnection senderEnd=connectAs(peer,REMOTE_A);
 			senderEnd.sendMessage(wire(data));
 			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 			senderEnd.sendMessage(wire(Message.createBelief(Belief.create(good))));

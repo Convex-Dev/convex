@@ -27,6 +27,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
+import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
@@ -163,6 +164,11 @@ public class Server implements Closeable {
 	protected final QueryHandler queryHandler=new QueryHandler(this);
 
 	/**
+	 * Verifies connections opened to this peer, so that DATA from staked peers is stored
+	 */
+	private final InboundVerifier verifier=new InboundVerifier(this);
+
+	/**
 	 * Pre-allocated retry predicates for backpressure. These are returned by
 	 * processMessage when a queue is full, and block until space is available.
 	 * Zero allocation on the reject path — method references are bound once.
@@ -217,7 +223,8 @@ public class Server implements Closeable {
 		} else {
 			this.nio= NIOServer.create(this);
 		}
-		
+		nio.setDisconnectAction(verifier::forget);
+
 	}
 
 	private Peer establishPeer() throws ConfigException, LaunchException, InterruptedException {
@@ -516,6 +523,7 @@ public class Server implements Closeable {
 				int securePort=Utils.toInt(tlsPort);
 				if (securePort<0 || securePort>65535) throw new ConfigException("Invalid TLS port");
 				tls=NettyServer.create(this);
+				tls.setDisconnectAction(verifier::forget);
 				tls.setPort(securePort);
 				Object context=config.get(Config.TLS_CONTEXT);
 				if (context!=null && !(context instanceof SSLContext)) {
@@ -635,16 +643,35 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Offers DATA to the propagation queue so it retains wire order off the I/O thread.
-	 * Accepted from any connection: DATA is staging only, and nothing it holds counts
-	 * until a valid Belief refers to it.
+	 * Offers DATA from a trusted connection to the propagation queue, so it retains wire
+	 * order off the I/O thread. DATA from any other connection is ignored, and starts
+	 * verification of that connection: an update it preceded completes through the
+	 * missing-data fetch.
 	 */
 	private boolean processData(Message message) {
+		AConnection connection=message.getConnection();
+		if (connection==null || !connection.isTrusted()) {
+			verifier.maybeStart(connection);
+			return false;
+		}
 		return propagator.queuePropagation(message);
 	}
 
-	/** Stages a previously authorised DATA message on the Belief propagator thread. */
+	/** The verifier of connections opened to this peer. For tests. */
+	InboundVerifier getInboundVerifier() {
+		return verifier;
+	}
+
+	/**
+	 * Stores the cells of a DATA message from a trusted connection, on the Belief
+	 * propagator thread. Ignores it if the connection's key no longer has the minimum
+	 * stake.
+	 */
 	void stageData(Message message) throws IOException, BadFormatException {
+		AConnection connection=message.getConnection();
+		AccountKey sender=(connection==null)?null:connection.getTrustedKey();
+		// Here, not on the I/O thread: the State lookup may load cells from the store
+		if (sender==null || !BeliefMerge.isValidPeer(getState(),sender)) return;
 		AVector<?> payload=RT.ensureVector(message.getPayload());
 		// Bounded by the inbound message length only: novelty has no cell-count limit
 		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
@@ -858,12 +885,15 @@ public class Server implements Closeable {
 	/**
 	 * Process an incoming message that represents a Belief. Whoever sent it, each
 	 * Order it carries is judged on its own (signature, stake and age), so it joins the
-	 * ordered propagation queue behind any DATA from the same connection.
+	 * ordered propagation queue behind any DATA from the same connection. A Belief from
+	 * an untrusted connection also starts verification of that connection.
 	 * @param m Belief message to process
 	 * @return true if queued, false if the queue is full and the Belief was dropped
 	 */
 	protected boolean processBelief(Message m) {
-		return propagator.queuePropagation(m);
+		boolean queued=propagator.queuePropagation(m);
+		verifier.maybeStart(m.getConnection());
+		return queued;
 	}
 
 	/**
@@ -936,6 +966,7 @@ public class Server implements Closeable {
 			manager.close();
 			nio.close();
 			if (tls!=null) tls.close();
+			verifier.close();
 			closeOwnedStore();
 			shutdownFuture.complete(Utils.getCurrentTimestamp());
 			return;
@@ -952,6 +983,8 @@ public class Server implements Closeable {
 		// Stop ingress before worker/store shutdown.
 		nio.close();
 		if (tls!=null) tls.close();
+		// After ingress, so that no new verification starts
+		verifier.close();
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
