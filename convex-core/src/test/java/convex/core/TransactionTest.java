@@ -45,8 +45,10 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Transaction;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
+import convex.core.store.MemoryStore;
 import convex.test.LogCapture;
 import convex.test.Samples;
 
@@ -549,5 +551,27 @@ public class TransactionTest extends ACVMTest {
 		assertEquals("SEVERE",e.level());
 		assertSame(failure,e.thrown());
 		assertTrue(e.message().contains(signedFailing.getHash().toString()));
+	}
+
+	/**
+	 * Data missing from this peer's store fails applying a Block instead of making the
+	 * Block invalid: a peer holds all of every Block in its Order
+	 */
+	@Test
+	public void testMissingDataInBlock() throws Exception {
+		State s=state();
+		Invoke tx=Invoke.create(VILLAIN, s.getAccount(VILLAIN).getSequence()+1, Samples.INT_VECTOR_300);
+		assertFalse(tx.getCommand().isEmbedded());
+		Block block=Block.of(s.getTimestamp().longValue()+1000, VILLAIN_KP.signData(tx));
+		try (MemoryStore empty=new MemoryStore()) {
+			// A Block decoded alone lacks its transaction; a transaction decoded alone lacks its command
+			Block noTransaction=empty.decode(block.getEncoding());
+			Invoke noCommand=empty.decode(tx.getEncoding());
+			Block withNoCommand=Block.of(block.getTimeStamp(), VILLAIN_KP.signData(noCommand));
+			for (Block b: List.of(noTransaction,withNoCommand)) {
+				SignedData<Block> signed=InitTest.FIRST_PEER_KEYPAIR.signData(b);
+				assertThrows(MissingDataException.class,()->s.applyBlock(signed));
+			}
+		}
 	}
 }

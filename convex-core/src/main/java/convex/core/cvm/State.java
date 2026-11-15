@@ -33,6 +33,7 @@ import convex.core.data.Vectors;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -174,6 +175,7 @@ public class State extends ARecordGeneric {
 	 * 
 	 * @param signedBlock Signed Block to apply
 	 * @return The BlockResult from applying the given Block to this State
+	 * @throws MissingDataException If the Block or this State is not wholly held
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
 		Block block=null;
@@ -200,6 +202,10 @@ public class State extends ARecordGeneric {
 		} catch (InvalidBlockException e) {
 			// Invalid block, so no state updates
 			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
+		} catch (MissingDataException e) {
+			// Before the catch-all: this peer failed to hold what it must, a fault of the
+			// peer and never a result of the block
+			throw e;
 		} catch (Exception e) {
 			// Unexpected, but still an invalid block: a peer that does not fail the same
 			// way forks, so this must be loud
