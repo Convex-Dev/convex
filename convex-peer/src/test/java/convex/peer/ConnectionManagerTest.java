@@ -688,6 +688,33 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/** A verified link that never replies is polled on its back-off and closed after a minute. */
+	@Test
+	public void testSilentVerifiedLinkClosedAfterMinute() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(266));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(267).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.markVerified(key);
+			link.statusResult=Result.error(ErrorCodes.TIMEOUT,"no reply");
+			manager.addConnection(key,link);
+
+			long firstMiss=clock.get();
+			while (link.isConnected() && link.statusCount<20) {
+				advanceUntilDue(manager,clock,key);
+				manager.maybePollBelief();
+				boolean minutePassed=clock.get()-firstMiss>=ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS;
+				assertEquals(!minutePassed,link.isConnected());
+			}
+			assertEquals(6,link.statusCount,"polled at 0, 2, 6, 14, 30 and 62 s");
+		} finally {
+			server.close();
+		}
+	}
+
 	@Test
 	public void testLinkClosedWhenFailuresReachCap() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(254));
