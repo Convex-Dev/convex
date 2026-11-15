@@ -17,6 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 import convex.lattice.fs.impl.DLFSLocal;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.RefDirect;
 import convex.core.data.RefSoft;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.Cursors;
@@ -25,6 +26,26 @@ import java.util.function.UnaryOperator;
 
 public class DLFSTransferTest {
 	@TempDir Path temporary;
+
+	/** A copy is saved through the destination's persister, even when it shares the source's store. */
+	@Test
+	public void testCopyIsSavedThroughTheDestinationPersister() throws Exception {
+		byte[] bytes=new byte[100000];
+		new java.util.Random(731).nextBytes(bytes);
+		try (var store=EtchStore.createTemp("dlfs-shared");
+				var source=DLFSLocal.create(DLFS.provider(),"source",Cursors.root(DLFSLattice.INSTANCE.zero()),store);
+				var target=DLFSLocal.create(DLFS.provider(),"target",Cursors.root(DLFSLattice.INSTANCE.zero()),store)) {
+			var file=source.getPath("/file");
+			Files.write(file,bytes);
+			assertInstanceOf(RefDirect.class,DLFSNode.getData(source.getNode(file)).getRef(0),"the test needs content not yet saved");
+
+			Files.copy(file,target.getPath("/file"));
+
+			var data=DLFSNode.getData(target.getNode(target.getPath("/file")));
+			assertSame(store,assertInstanceOf(RefSoft.class,data.getRef(0)).getStore());
+			assertArrayEquals(bytes,Files.readAllBytes(target.getPath("/file")));
+		}
+	}
 
 	@Test
 	public void testCrossStoreCopySurvivesSourceCloseAndDestinationReopen() throws Exception {

@@ -467,11 +467,13 @@ public class DLFSLocal extends DLFileSystem {
 		if (DLFSNode.isDirectory(copied) && !recursive) {
 			copied=DLFSNode.withoutChildren(copied);
 		}
-		// A drive with another persister may save to another store, so bind the copied
-		// branches to the destination's before publication. Heap-only destinations
-		// need direct refs so closing the source store cannot lose data.
-		if (persister!=destination.persister) {
-			copied=((destination.persister==null)?new MemoryStore():destination.persister).persist(copied);
+		// Bind the copy to the destination's store before publication; cells already
+		// there are found, not written again. A heap-only destination needs direct refs,
+		// so closing the source's store cannot lose data.
+		if (destination.persister!=null) {
+			copied=destination.persister.persist(copied);
+		} else if (persister!=null) {
+			copied=new MemoryStore().persist(copied);
 		}
 		AVector<ACell> prepared=copied;
 		try {
