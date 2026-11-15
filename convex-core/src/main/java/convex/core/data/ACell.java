@@ -58,13 +58,12 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Validates the local structure and invariants of this cell.
-	 * 
-	 * Should validate directly contained data, but should not validate all other structure of this cell. 
-	 * 
-	 * In particular, should not traverse potentially missing child Refs.
-	 * 
-	 * @throws InvalidDataException  If the Cell is invalid
+	 * Validates this cell's own data, using nothing outside its encoding. It may check
+	 * objects the cell holds directly, the hash of any ref {@link #getRef(int)} returns
+	 * and the value of an embedded one, but never the value of a branch ref: a rule that
+	 * needs a child's value belongs in {@link #validateStructure()}.
+	 *
+	 * @throws InvalidDataException If the cell is invalid
 	 */
 	protected abstract void validateCell() throws InvalidDataException;
 	

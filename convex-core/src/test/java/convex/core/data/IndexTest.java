@@ -43,6 +43,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
@@ -966,6 +967,27 @@ public class IndexTest {
 				reopened.close();
 			}
 		}
+	}
+
+	/**
+	 * validateCell uses nothing outside the cell's encoding, so it passes on a node
+	 * whose own entry key is a branch that is not available
+	 */
+	@Test
+	public void testValidateCellLeavesBranchKeyUnread() throws Exception {
+		byte[] bytes=new byte[150];
+		Arrays.fill(bytes,(byte)0x42);
+		Blob key=Blob.wrap(bytes);
+		Blob extended=key.append(Blob.fromHex("01")).toFlatBlob();
+		Index<ABlob,CVMLong> index=Index.of(key,CVMLong.ONE,extended,CVMLong.ZERO);
+
+		// Decoded on its own, so neither key is available
+		Index<ABlob,CVMLong> decoded=new MemoryStore().decode(index.getEncoding());
+		assertEquals(2,decoded.count());
+		Ref<ACell> keyRef=decoded.getRef(0);
+		assertFalse(keyRef.isEmbedded());
+		assertThrows(MissingDataException.class, ()->keyRef.getValue());
+		Cells.validateCell(decoded);
 	}
 
 	/**

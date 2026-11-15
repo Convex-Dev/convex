@@ -1029,13 +1029,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 		if (entry != null) {
 			entry.validateCell();
-			ACell ek=entry.getKey();
-			if (!(ek instanceof ABlobLike)) throw new InvalidDataException("Entry key not blob-like: "+Utils.getClassName(ek),this);
-			long entryKeyLength=((ABlobLike<?>)ek).hexLength();
-			if (entryKeyLength<pDepth) throw new InvalidDataException("Key too short for prefix depth",this);
-			if (entryKeyLength>MAX_DEPTH) {
-				if (pDepth!=MAX_DEPTH) throw new InvalidDataException("Key too long at this prefix depth",this);
-			}
 			if (cn == 0)
 				throw new InvalidDataException("Index with entry and count=" + count + " must have children", this);
 		} else {
