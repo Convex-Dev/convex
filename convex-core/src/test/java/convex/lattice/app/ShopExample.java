@@ -8,12 +8,12 @@ import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.AKeyedRegions.RegionFactory;
 import convex.lattice.IndexComponent;
-import convex.lattice.LatticeHost;
 import convex.lattice.MapComponent;
 import convex.lattice.Regions;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.UnionSet;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 
 /**
  * A shop assembled from three regions that know nothing of the shop or of each
@@ -32,7 +32,9 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>{@link Shop} extends {@link Regions}. Its operations are transactions across
  * the regions they touch, and compose into larger transactions; each region also
- * transacts on its own, exclusively or not.</p>
+ * transacts on its own, exclusively or not. {@link #open} builds one over a plain
+ * root. A service that stores or replicates the shop registers it with a host
+ * instead, {@code host.addApplication(new Shop(host.cursor(),LIVE_ORDERS))}.</p>
  */
 public final class ShopExample {
 
@@ -51,28 +53,27 @@ public final class ShopExample {
 
 	private ShopExample() {}
 
-	/** Lists, orders and restocks in a shop on a fresh host, printing the root after each step. */
+	/** Lists, orders and restocks in a fresh shop, printing its value after each step. */
 	public static void main(String[] args) {
-		var host=LatticeHost.create();
-		var shop=open(host,STAGED_ORDERS);
+		var shop=open(STAGED_ORDERS);
 		shop.list(TEA,2);
-		System.out.println("Listed:     "+host.cursor().get());
+		System.out.println("Listed:     "+shop.value());
 		shop.order(1,TEA);
-		System.out.println("Ordered:    "+host.cursor().get());
+		System.out.println("Ordered:    "+shop.value());
 		shop.stock().exclusive().execute(stock -> {
 			shop.order(2,TEA);
 			stock.restock(TEA,10);
 		});
-		System.out.println("Restocked:  "+host.cursor().get());
+		System.out.println("Restocked:  "+shop.value());
 		shop.orders().record(3,TEA);
-		System.out.println("Staged:     "+host.cursor().get());
+		System.out.println("Staged:     "+shop.value());
 		shop.sync();
-		System.out.println("Synced:     "+host.cursor().get());
+		System.out.println("Synced:     "+shop.value());
 	}
 
-	/** Builds a shop over a host's root, with its order book from the given factory, and registers it. */
-	public static Shop open(LatticeHost<Index<Keyword,ACell>> host,RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders) {
-		return host.addApplication(new Shop(host.cursor(),orders));
+	/** Builds a shop over a fresh in-memory root, with its order book from the given factory. */
+	public static Shop open(RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders) {
+		return new Shop(new Root<>(Index.<Keyword,ACell>none()),orders);
 	}
 
 	/** The application: three regions, and operations that span them. */

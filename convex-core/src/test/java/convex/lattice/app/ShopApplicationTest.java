@@ -18,8 +18,8 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.AKeyedRegions.RegionFactory;
-import convex.lattice.LatticeHost;
 import convex.lattice.app.ShopExample.Orders;
+import convex.lattice.app.ShopExample.Shop;
 import convex.lattice.app.ShopExample.Stock;
 import convex.lattice.cursor.Root;
 
@@ -35,8 +35,8 @@ class ShopApplicationTest {
 		return staged?STAGED_ORDERS:LIVE_ORDERS;
 	}
 
-	private static ACell at(LatticeHost<Index<Keyword,ACell>> host,Keyword region) {
-		return host.cursor().get().get(region);
+	private static ACell at(Shop shop,Keyword region) {
+		return shop.value().get(region);
 	}
 
 	private static Index<Keyword,CVMLong> stock(Keyword item,long count) {
@@ -46,50 +46,47 @@ class ShopApplicationTest {
 	@ParameterizedTest(name="staged orders: {0}")
 	@ValueSource(booleans={false,true})
 	void anOrderChangesEveryRegionItTouchesTogether(boolean staged) {
-		var host=LatticeHost.create();
-		var shop=open(host,orders(staged));
+		var shop=open(orders(staged));
 		shop.list(TEA,2);
-		assertEquals(Sets.of(TEA),at(host,CATALOGUE));
-		assertEquals(stock(TEA,2),at(host,STOCK));
+		assertEquals(Sets.of(TEA),at(shop,CATALOGUE));
+		assertEquals(stock(TEA,2),at(shop,STOCK));
 		shop.order(1,TEA);
-		assertEquals(stock(TEA,1),at(host,STOCK));
-		assertEquals(Maps.of(CVMLong.ONE,TEA),at(host,ORDERS),"committed with the stock, however the order book is built");
+		assertEquals(stock(TEA,1),at(shop,STOCK));
+		assertEquals(Maps.of(CVMLong.ONE,TEA),at(shop,ORDERS),"committed with the stock, however the order book is built");
 	}
 
 	@ParameterizedTest(name="staged orders: {0}")
 	@ValueSource(booleans={false,true})
 	void anOrderThatCannotBeFilledChangesNothing(boolean staged) {
-		var host=LatticeHost.create();
-		var shop=open(host,orders(staged));
+		var shop=open(orders(staged));
 		shop.list(TEA,1);
 		shop.order(1,TEA);
-		var before=host.cursor().get();
+		var before=shop.value();
 		assertThrows(IllegalStateException.class,() -> shop.order(2,TEA),"out of stock");
 		assertThrows(IllegalArgumentException.class,() -> shop.order(3,COFFEE),"not listed");
-		assertSame(before,host.cursor().get());
+		assertSame(before,shop.value());
 	}
 
 	@ParameterizedTest(name="staged orders: {0}")
 	@ValueSource(booleans={false,true})
 	void operationsComposeIntoOneTransactionThatCommitsAllOrNothing(boolean staged) {
-		var host=LatticeHost.create();
-		var shop=open(host,orders(staged));
+		var shop=open(orders(staged));
 		shop.list(TEA,1);
-		var before=host.cursor().get();
+		var before=shop.value();
 		assertThrows(IllegalStateException.class,() -> shop.execute(s -> {
 			s.list(COFFEE,1);
 			s.order(1,COFFEE);
 			s.order(2,COFFEE);
 		}));
-		assertSame(before,host.cursor().get(),"no listing and no first order");
+		assertSame(before,shop.value(),"no listing and no first order");
 
 		shop.execute(s -> {
 			s.list(COFFEE,1);
 			s.order(1,COFFEE);
 		});
-		assertEquals(Sets.of(TEA,COFFEE),at(host,CATALOGUE));
-		assertEquals(Index.of(COFFEE,CVMLong.ZERO,TEA,CVMLong.ONE),at(host,STOCK));
-		assertEquals(Maps.of(CVMLong.ONE,COFFEE),at(host,ORDERS));
+		assertEquals(Sets.of(TEA,COFFEE),at(shop,CATALOGUE));
+		assertEquals(Index.of(COFFEE,CVMLong.ZERO,TEA,CVMLong.ONE),at(shop,STOCK));
+		assertEquals(Maps.of(CVMLong.ONE,COFFEE),at(shop,ORDERS));
 	}
 
 	@Test void aRegionWorksTheSameOnItsOwnAsInTheShop() {
@@ -98,39 +95,35 @@ class ShopApplicationTest {
 		alone.take(TEA);
 		alone.exclusive().execute(s -> s.restock(TEA,1));
 
-		var host=LatticeHost.create();
-		var shop=open(host,LIVE_ORDERS);
+		var shop=open(LIVE_ORDERS);
 		shop.list(COFFEE,1);
 		shop.order(1,COFFEE);
-		var catalogue=at(host,CATALOGUE);
-		var orders=at(host,ORDERS);
+		var catalogue=at(shop,CATALOGUE);
+		var orders=at(shop,ORDERS);
 		shop.stock().restock(TEA,3);
 		shop.stock().take(TEA);
 		shop.stock().exclusive().execute(s -> s.restock(TEA,1));
 
 		assertEquals(3,alone.count(TEA));
 		assertEquals(3,shop.stock().count(TEA));
-		assertSame(catalogue,at(host,CATALOGUE),"the stock's own work leaves the other regions alone");
-		assertSame(orders,at(host,ORDERS));
+		assertSame(catalogue,at(shop,CATALOGUE),"the stock's own work leaves the other regions alone");
+		assertSame(orders,at(shop,ORDERS));
 	}
 
 	@Test void orderBooksBuiltLiveOrStagedPublishTheirOwnEditsDifferently() {
-		var liveHost=LatticeHost.create();
-		var live=open(liveHost,LIVE_ORDERS);
+		var live=open(LIVE_ORDERS);
 		live.orders().record(7,TEA);
-		assertEquals(Maps.of(CVMLong.create(7),TEA),at(liveHost,ORDERS),"in the shop at once");
+		assertEquals(Maps.of(CVMLong.create(7),TEA),at(live,ORDERS),"in the shop at once");
 
-		var stagedHost=LatticeHost.create();
-		var staged=open(stagedHost,STAGED_ORDERS);
+		var staged=open(STAGED_ORDERS);
 		staged.orders().record(7,TEA);
-		assertNull(at(stagedHost,ORDERS),"kept until the shop syncs");
+		assertNull(at(staged,ORDERS),"kept until the shop syncs");
 		staged.sync();
-		assertEquals(Maps.of(CVMLong.create(7),TEA),at(stagedHost,ORDERS));
+		assertEquals(Maps.of(CVMLong.create(7),TEA),at(staged,ORDERS));
 	}
 
 	@Test void aShopTransactionRetriesOnTopOfAStockCommit() {
-		var host=LatticeHost.create();
-		var shop=open(host,LIVE_ORDERS);
+		var shop=open(LIVE_ORDERS);
 		shop.list(TEA,1);
 		var runs=new AtomicInteger();
 		shop.execute(s -> {
@@ -138,12 +131,11 @@ class ShopApplicationTest {
 			s.order(1,TEA);
 		});
 		assertEquals(2,runs.get(),"the restock landed during the first run");
-		assertEquals(stock(TEA,5),at(host,STOCK),"one plus five, less the order");
+		assertEquals(stock(TEA,5),at(shop,STOCK),"one plus five, less the order");
 	}
 
 	@Test void anExclusiveRestockLeavesTheOtherRegionsFree() {
-		var host=LatticeHost.create();
-		var shop=open(host,LIVE_ORDERS);
+		var shop=open(LIVE_ORDERS);
 		shop.list(TEA,1);
 		shop.order(1,TEA);
 		shop.stock().exclusive().execute(s -> {
@@ -154,37 +146,35 @@ class ShopApplicationTest {
 			});
 			join(elsewhere);
 		});
-		assertEquals(stock(TEA,10),at(host,STOCK));
-		assertEquals(Maps.of(CVMLong.ONE,TEA,CVMLong.create(2),TEA),at(host,ORDERS));
-		assertEquals(Sets.of(TEA,COFFEE),at(host,CATALOGUE));
+		assertEquals(stock(TEA,10),at(shop,STOCK));
+		assertEquals(Maps.of(CVMLong.ONE,TEA,CVMLong.create(2),TEA),at(shop,ORDERS));
+		assertEquals(Sets.of(TEA,COFFEE),at(shop,CATALOGUE));
 	}
 
 	@Test void anOrderDuringAnExclusiveRestockIsMergedIntoIt() {
-		var host=LatticeHost.create();
-		var shop=open(host,LIVE_ORDERS);
+		var shop=open(LIVE_ORDERS);
 		shop.list(TEA,2);
 		shop.stock().exclusive().execute(s -> {
 			// The shop commits at its root, not through the stock's boundary
 			shop.order(1,TEA);
 			s.restock(TEA,10);
 		});
-		assertEquals(stock(TEA,11),at(host,STOCK),"two, less the order, plus the restock");
-		assertEquals(Maps.of(CVMLong.ONE,TEA),at(host,ORDERS));
+		assertEquals(stock(TEA,11),at(shop,STOCK),"two, less the order, plus the restock");
+		assertEquals(Maps.of(CVMLong.ONE,TEA),at(shop,ORDERS));
 	}
 
 	@Test void anExclusiveShopTransactionHoldsUpRegionWritesUntilItCommits() {
-		var host=LatticeHost.create();
-		var shop=open(host,LIVE_ORDERS);
+		var shop=open(LIVE_ORDERS);
 		shop.list(TEA,1);
 		var restock=new AtomicReference<Thread>();
 		shop.exclusive().execute(s -> {
 			restock.set(Thread.ofPlatform().start(() -> shop.stock().restock(TEA,5)));
 			awaitParked(restock.get());
-			assertEquals(stock(TEA,1),at(host,STOCK),"the restock waits for the shop");
+			assertEquals(stock(TEA,1),at(shop,STOCK),"the restock waits for the shop");
 			s.order(1,TEA);
 		});
 		join(restock.get());
-		assertEquals(stock(TEA,5),at(host,STOCK),"the order, then the restock on top");
+		assertEquals(stock(TEA,5),at(shop,STOCK),"the order, then the restock on top");
 	}
 
 	@Test void theExampleRuns() {
