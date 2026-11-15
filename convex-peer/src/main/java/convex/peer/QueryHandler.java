@@ -18,6 +18,8 @@ import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
+import convex.core.util.Utils;
+import convex.net.RequestFailureLog;
 
 public class QueryHandler extends AThreadedComponent {
 
@@ -57,6 +59,8 @@ public class QueryHandler extends AThreadedComponent {
 	/** Reusable drain buffer — only accessed from the handler thread */
 	private final ArrayList<Message> batch = new ArrayList<>();
 
+	private final RequestFailureLog failures = new RequestFailureLog(log);
+
 	@Override
 	protected void loop() throws InterruptedException {
 		// Block until at least one message arrives
@@ -74,9 +78,9 @@ public class QueryHandler extends AThreadedComponent {
 			Message m = batch.get(i);
 			MessageType type = m.getType();
 			// The one guard for every request this thread handles. Anyone can send
-			// queries, at a high rate, so a request that fails in any way, including
-			// running out of memory or stack, is dropped here: it must never cost the
-			// other queued requests or end this thread. A failed query also closes its
+			// queries, at a high rate, so a request that fails in any way is dropped
+			// here unless the JVM itself has failed: it must never cost the other
+			// queued requests or end this thread. A failed query also closes its
 			// connection.
 			try {
 				switch (type) {
@@ -89,8 +93,9 @@ public class QueryHandler extends AThreadedComponent {
 				default:
 					log.warn("Unexpected Message type on query queue: " + type);
 				}
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-				log.debug("Dropped {} request: {}", type, e.toString());
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
+				failures.log(e, "Dropped {} request", type);
 				if (type == MessageType.QUERY) m.closeConnection();
 			}
 		}
