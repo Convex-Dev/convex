@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Poll the peers a peer has verified first, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
 - Let operators limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
 - Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run exclusive lattice transactions on any component, holding up writes through the nearest transactional boundary, a `BoundaryCursor` or else the root; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
