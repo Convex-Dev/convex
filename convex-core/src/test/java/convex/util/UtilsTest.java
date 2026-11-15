@@ -506,4 +506,14 @@ public class UtilsTest {
 		assertTrue(Thread.interrupted());
 	}
 
+	@Test public void testIsProbableDefect() {
+		for (Throwable e: List.of(new NoClassDefFoundError(),new AssertionError(),new InternalError())) {
+			assertTrue(Utils.isProbableDefect(e),e.toString());
+		}
+		for (Throwable e: List.of(new StackOverflowError(),new OutOfMemoryError(),
+				new IllegalStateException(),new IOException())) {
+			assertFalse(Utils.isProbableDefect(e),e.toString());
+		}
+	}
+
 }

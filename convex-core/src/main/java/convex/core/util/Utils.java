@@ -1039,6 +1039,18 @@ public class Utils {
 		if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 	}
 
+	/**
+	 * Tests whether a failure is probably a defect rather than a result of the input
+	 * or the load: an {@link Error} other than {@link StackOverflowError} or
+	 * {@link OutOfMemoryError}.
+	 *
+	 * @param e Failure to test
+	 * @return True if the failure is probably a defect
+	 */
+	public static boolean isProbableDefect(Throwable e) {
+		return (e instanceof Error) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError);
+	}
+
 	@SuppressWarnings("unchecked")
 	public static <T> T[] copyOfRangeExcludeNulls(T[] entries, int offset, int length) {
 		int newLen = length;

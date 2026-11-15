@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 
+import convex.core.util.Utils;
+
 /**
  * Logs the failures of requests that one handling site contains. Running out of
  * memory, and a failure that is probably a defect rather than bad input (an
@@ -58,7 +60,7 @@ public final class RequestFailureLog {
 
 	private AtomicBoolean warnedFlag(Throwable e) {
 		if (e instanceof OutOfMemoryError) return warnedMemory;
-		if ((e instanceof Error)&&!(e instanceof StackOverflowError)) return warnedDefect;
+		if (Utils.isProbableDefect(e)) return warnedDefect;
 		return null;
 	}
 }
