@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Arrays;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.function.BiFunction;
@@ -630,6 +631,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	@Override
 	public AVector<T> slice(long start, long end) {
 		if (!checkRange(start, end)) return null;
+		if (start==0) return prefix(end);
 		long length=end-start;
 		if ((start & Vectors.BITMASK) == 0) {
 			// Starting at a chunk boundary, so this can be fast by re-using existing chunks
@@ -652,6 +654,46 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			}
 			return (AVector<T>) Vectors.create(arr);
 		}
+	}
+
+	/**
+	 * Gets the first n elements of this vector, sharing every complete subtree
+	 * before the n-th element.
+	 *
+	 * @param n Number of elements, at most the count of this vector
+	 * @return Canonical vector of the first n elements
+	 */
+	private AVector<T> prefix(long n) {
+		if (n==count) return this;
+		if (n==0) return Vectors.empty();
+		long cs=childSize();
+		int kept=(int)(n/cs);
+		long rest=n-kept*cs;
+		if (rest==0) return (kept==1)?getChild(0):new VectorTree<T>(Arrays.copyOf(children,kept),n);
+
+		// The rest is a prefix of the next child
+		AVector<T> next=getChild(kept).slice(0,rest);
+		if (kept==0) return next;
+		long whole=rest&~(long)Vectors.BITMASK;
+		if (whole==rest) return new VectorTree<T>(withLastChild(kept,next),n);
+
+		// A partial chunk can only end a canonical vector as a VectorLeaf on top, so
+		// it moves up onto the complete children and the next child's whole chunks
+		AVector<T> head=(whole==0)?prefix(kept*cs):new VectorTree<T>(withLastChild(kept,next.slice(0,whole)),kept*cs+whole);
+		return ((VectorLeaf<T>)next).withPrefix(head);
+	}
+
+	/**
+	 * Gets the first given number of this vector's children, followed by another
+	 *
+	 * @param kept Number of children to keep
+	 * @param last Child to follow them
+	 * @return Child refs for a new VectorTree
+	 */
+	private Ref<AVector<T>>[] withLastChild(int kept, AVector<T> last) {
+		Ref<AVector<T>>[] newChildren=Arrays.copyOf(children,kept+1);
+		newChildren[kept]=last.getRef();
+		return newChildren;
 	}
 
 	@Override
