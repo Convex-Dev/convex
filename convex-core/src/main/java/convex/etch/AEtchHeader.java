@@ -40,36 +40,36 @@ abstract class AEtchHeader {
 	}
 
 	/** Resolves an encrypted v3 master key from plaintext header fields. */
-	static byte[] resolveKey(AFileMapper mapper, String fileName, EtchConfig config)
+	static byte[] resolveKey(EtchHeaderSource source, String fileName, EtchConfig config)
 			throws IOException {
-		byte[] probe=readProbe(mapper,0L);
+		byte[] probe=readProbe(source,0L);
 		int magic=readUnsignedShort(probe,0);
 		short version=(short)readUnsignedShort(probe,Short.BYTES);
 		boolean v3=(magic==MAGIC_NUMBER)&&(version==VERSION_3);
-		if (!v3) v3=hasV3Probe(mapper,V3_HEADER_B_OFFSET);
+		if (!v3) v3=hasV3Probe(source,V3_HEADER_B_OFFSET);
 		if (!v3) return null;
-		byte[] copyA=readCopy(mapper,0L);
-		byte[] copyB=readCopy(mapper,V3_HEADER_B_OFFSET);
+		byte[] copyA=readCopy(source,0L);
+		byte[] copyB=readCopy(source,V3_HEADER_B_OFFSET);
 		return EtchV3Header.resolveKey(copyA,copyB,config,fileName);
 	}
 
-	static AEtchHeader open(AFileMapper mapper, String fileName, byte[] masterKey)
+	static AEtchHeader open(EtchHeaderSource source, String fileName, byte[] masterKey)
 			throws IOException {
-		byte[] probe=readProbe(mapper,0L);
+		byte[] probe=readProbe(source,0L);
 		int magic=readUnsignedShort(probe,0);
 		short version=(short)readUnsignedShort(probe,Short.BYTES);
 		if (magic==MAGIC_NUMBER) {
-			if (version==VERSION_3) return openV3(mapper,fileName,masterKey);
+			if (version==VERSION_3) return openV3(source,fileName,masterKey);
 		}
 
 		// A damaged v3 copy A must not hide a valid independent copy B, even
 		// when the damaged probe happens to resemble a supported legacy version.
-		if (hasV3Probe(mapper,V3_HEADER_B_OFFSET)) {
-			return openV3(mapper,fileName,masterKey);
+		if (hasV3Probe(source,V3_HEADER_B_OFFSET)) {
+			return openV3(source,fileName,masterKey);
 		}
 
 		if ((magic==MAGIC_NUMBER)&&((version==VERSION_1)||(version==VERSION_2))) {
-			return LegacyEtchHeader.open(mapper,fileName);
+			return LegacyEtchHeader.open(source,fileName);
 		}
 
 		if (magic!=MAGIC_NUMBER) {
@@ -78,33 +78,33 @@ abstract class AEtchHeader {
 		throw unsupported(version);
 	}
 
-	private static boolean hasV3Probe(AFileMapper mapper, long position) throws IOException {
-		if (mapper.length()<position+Short.BYTES*2L) return false;
-		byte[] probe=readProbe(mapper,position);
+	private static boolean hasV3Probe(EtchHeaderSource source, long position) throws IOException {
+		if (source.length()<position+Short.BYTES*2L) return false;
+		byte[] probe=readProbe(source,position);
 		return (readUnsignedShort(probe,0)==MAGIC_NUMBER)
 				&&((short)readUnsignedShort(probe,Short.BYTES)==VERSION_3);
 	}
 
-	private static EtchV3Header openV3(AFileMapper mapper, String fileName,
+	private static EtchV3Header openV3(EtchHeaderSource source, String fileName,
 			byte[] masterKey) throws IOException {
-		byte[] copyA=readCopy(mapper,0L);
-		byte[] copyB=readCopy(mapper,V3_HEADER_B_OFFSET);
+		byte[] copyA=readCopy(source,0L);
+		byte[] copyB=readCopy(source,V3_HEADER_B_OFFSET);
 		return EtchV3Header.select(copyA,copyB,masterKey,fileName);
 	}
 
-	private static byte[] readCopy(AFileMapper mapper, long position) throws IOException {
-		long available=Math.max(0L,Math.min(V3_HEADER_COPY_SIZE,mapper.length()-position));
+	private static byte[] readCopy(EtchHeaderSource source, long position) throws IOException {
+		long available=Math.max(0L,Math.min(V3_HEADER_COPY_SIZE,source.length()-position));
 		byte[] copy=new byte[Math.toIntExact(available)];
-		mapper.read(position,copy,0,copy.length,null);
+		source.read(position,copy,0,copy.length);
 		return copy;
 	}
 
-	private static byte[] readProbe(AFileMapper mapper, long position) throws IOException {
-		if (mapper.length()<position+Short.BYTES*2L) {
+	private static byte[] readProbe(EtchHeaderSource source, long position) throws IOException {
+		if (source.length()<position+Short.BYTES*2L) {
 			throw new IOException("Truncated Etch format probe at "+position);
 		}
 		byte[] probe=new byte[Short.BYTES*2];
-		mapper.read(position,probe,0,probe.length,null);
+		source.read(position,probe,0,probe.length);
 		return probe;
 	}
 

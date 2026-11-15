@@ -348,13 +348,14 @@ public class EtchUtils {
 		}
 		for (File candidate:files) {
 			if (candidate.length()==0L) continue;
-			try (RandomAccessFile data=new RandomAccessFile(candidate,"r");
-					AFileMapper mapper=EtchFileMapperFactory.createExisting(data.getChannel(),config,
-							candidate.getName(),true)) {
-				byte[] masterKey=AEtchHeader.resolveKey(mapper,candidate.getName(),config);
+			// Positional reads, not a mapper: a MappedByteBuffer mapping outlives
+			// close, and on Windows would stop recovery deleting or renaming the file
+			try (RandomAccessFile data=new RandomAccessFile(candidate,"r")) {
+				EtchHeaderSource source=EtchHeaderSource.of(data.getChannel());
+				byte[] masterKey=AEtchHeader.resolveKey(source,candidate.getName(),config);
 				AEtchHeader header=null;
 				try {
-					header=AEtchHeader.open(mapper,candidate.getName(),masterKey);
+					header=AEtchHeader.open(source,candidate.getName(),masterKey);
 					masterKey=null; // borrowed caller-owned array is not retained
 					Etch.resolveExistingConfig(header,config);
 					versions.add(header.version());
