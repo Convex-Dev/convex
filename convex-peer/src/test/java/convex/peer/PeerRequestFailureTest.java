@@ -823,6 +823,35 @@ public class PeerRequestFailureTest {
 	}
 
 	/**
+	 * When the peer cannot take transactions, a client whose rejection fails as it is
+	 * sent fails alone: the next client in the same batch still gets its rejection.
+	 */
+	@Test
+	public void aRejectionThatFailsWhileThePeerCannotTakeTransactionsLeavesTheRest() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,LOCAL);
+		config.put(Keywords.STATE,Init.createState(List.of(LOCAL.getAccountKey())));
+		config.put(Keywords.PORT,0);
+		config.put(Keywords.STORE,new MemoryStore());
+		// Created but not launched, so not live: every transaction is rejected
+		Server peer=Server.create(config);
+		try {
+			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 2)"));
+			for (Error error: CONTAINED) {
+				// Not started: this test thread runs it
+				TransactionHandler handler=new TransactionHandler(peer);
+				ReplyConnection healthy=new ReplyConnection(null);
+				assertTrue(handler.offerTransaction(Message.createTransaction(1,tx).withConnection(new ReplyConnection(error))));
+				assertTrue(handler.offerTransaction(Message.createTransaction(2,tx).withConnection(healthy)));
+				handler.loop();
+				assertEquals(ErrorCodes.STATE,healthy.result(2).getErrorCode(),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
 	 * A duplicate submission whose reply fails as it is sent fails alone: the first
 	 * submission and a later transaction in the same batch are still queued.
 	 */

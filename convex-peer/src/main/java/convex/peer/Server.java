@@ -959,8 +959,16 @@ public class Server implements Closeable {
 	void requestShutdown(String reason, Throwable cause, boolean checkpoint) {
 		log.error("Shutting down peer: {}",reason,cause);
 		// Not on the caller's thread: close joins the components, the caller's among them,
-		// and it holds this Server while it does, which a second close would wait on
-		Thread.ofVirtual().name("Peer shutdown").start(() -> close(checkpoint));
+		// and it holds this Server while it does, which a second close would wait on.
+		// A platform thread: holding this Server while it joins would pin a virtual
+		// thread's carrier
+		Thread.ofPlatform().name("Peer shutdown").start(() -> {
+			try {
+				close(checkpoint);
+			} catch (Throwable e) {
+				log.error("Peer shutdown failed",e);
+			}
+		});
 	}
 
 	/** Performs normal shutdown, optionally writing a final peer checkpoint. */

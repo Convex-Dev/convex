@@ -242,7 +242,8 @@ public class TransactionHandler extends AThreadedComponent {
 		Result problem=checkPeerState();
 		if (problem!=null) {
 			for (Message msg: messages) {
-				msg.returnResult(problem);
+				// Each reply guarded: one client's failing reply must not cost the others theirs
+				sendRejection(msg,problem);
 			}
 			return;
 		}
