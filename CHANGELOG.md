@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Make `etch validate` and `etch repair` read the collected file after an Etch GC whose installation under the store's name is still pending, instead of failing or using the superseded data. ([File lifecycle](convex-core/docs/ETCH_GC.md#file-lifecycle-and-recovery))
 - Keep an Etch store usable, verifiable and safe to reopen after a write or sync stops part-way. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))

@@ -296,7 +296,9 @@ Repair is distinct from garbage collection: GC starts from a normally readable i
 and discards what the root does not reach; repair assumes the index may be unusable,
 rediscovers cells from immutable records and proves the selected synced root
 complete. It is offline, read-only on the source and always directed into a fresh
-file. Under the exclusive lock it:
+file. The source is the store's current file, which after a completed GC cutover is
+the file its completion marker names ([ETCH_GC.md](ETCH_GC.md#file-lifecycle-and-recovery)).
+Under the exclusive lock it:
 
 1. validates and selects a header (root, `syncedFileEnd`, cipher parameters) and
    snapshots physical EOF;

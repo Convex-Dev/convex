@@ -165,4 +165,38 @@ public class EtchGCRecoveryTest {
 			store.cancelGC();
 		}
 	}
+
+	@Test
+	public void testCurrentStoreFileFollowsPendingAdoption() throws IOException {
+		File base=base();
+		File canonical=base.getCanonicalFile();
+		assertEquals(canonical,EtchUtils.currentStoreFile(base));
+
+		File target=new File(base.getPath()+"~");
+		target.deleteOnExit();
+		try (EtchStore store=EtchStore.create(target)) {
+			store.setRootData(EtchGCLifecycleTest.tree(8900));
+		}
+		File marker=EtchUtils.markerFile(base);
+		marker.deleteOnExit();
+		EtchUtils.writeMarker(base,target);
+
+		// Completed cutover, superseded base not yet deleted: resolution only reads
+		assertEquals(target.getCanonicalFile(),EtchUtils.currentStoreFile(base));
+		assertTrue(base.exists());
+		assertTrue(marker.exists());
+
+		// Superseded base deleted, collected file not yet renamed
+		assertTrue(base.delete());
+		assertEquals(target.getCanonicalFile(),EtchUtils.currentStoreFile(base));
+		assertTrue(marker.exists());
+
+		// A malformed marker leaves the base file current, as recovery treats it
+		Files.writeString(marker.toPath(),"");
+		assertEquals(canonical,EtchUtils.currentStoreFile(base));
+
+		// A marker naming a lost file, with the base file also missing, is refused
+		Files.writeString(marker.toPath(),base.getName()+"~7\n");
+		assertThrows(IOException.class,()->EtchUtils.currentStoreFile(base));
+	}
 }

@@ -162,6 +162,53 @@ public class EtchCLITest {
 	}
 
 	@Test
+	public void testRepairAndValidateFollowPendingGCAdoption() throws IOException {
+		File f=Helpers.createTempFile("gcPendingEtch", ".db");
+		File target=new File(f.getCanonicalPath()+"~");
+		File marker=new File(f.getCanonicalPath()+".gc-complete");
+		target.deleteOnExit();
+		marker.deleteOnExit();
+		new File(f.getCanonicalPath()+".gc-defunct").deleteOnExit();
+		ACell beforeGC=convex.core.data.Vectors.of(
+				convex.core.data.Strings.create("Root before GC cutover. ".repeat(10)), CVMLong.create(1));
+		ACell afterGC=convex.core.data.Vectors.of(
+				convex.core.data.Strings.create("Root after GC cutover. ".repeat(10)), CVMLong.create(2));
+
+		// A completed cutover that no open has adopted yet: the marker names the
+		// collected file, the only one holding the root written after cutover.
+		// The superseded original is deleted, or left defunct where still mapped.
+		{
+			EtchStore s=EtchStore.create(f);
+			s.setRootData(beforeGC);
+			s.startGC();
+			s.transferGC();
+			EtchStore successor=s.completeGC();
+			s.close();
+			successor.setRootData(afterGC);
+			successor.close();
+		}
+		assertTrue(marker.exists());
+
+		File repaired=Helpers.createTempFile("gcPendingRepair", ".db");
+		CLTester t=CLTester.run("etch", "repair", "--etch", f.getCanonicalPath(),
+				"--into", repaired.getCanonicalPath());
+		t.assertExitCode(ExitCodes.SUCCESS);
+		{
+			EtchStore r=EtchStore.create(repaired);
+			assertEquals(afterGC.getHash(), r.getRootHash());
+			r.close();
+		}
+
+		t=CLTester.run("etch", "validate", "--etch", f.getCanonicalPath());
+		t.assertExitCode(ExitCodes.SUCCESS);
+		assertTrue(t.getOutput().contains(target.getCanonicalPath()));
+
+		// Both commands leave the pending adoption to recovery
+		assertTrue(marker.exists());
+		assertTrue(target.exists());
+	}
+
+	@Test
 	public void testEtch() throws IOException {
 		assertNotNull(TEMP_ETCH);
 		

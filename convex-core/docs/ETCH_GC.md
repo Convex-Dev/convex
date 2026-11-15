@@ -370,7 +370,11 @@ holds the last committed root.
 `completeGC()` syncs the target before writing the tombstone and marker, so a
 cycle with no writes after cutover is clean at every crash point from then on.
 A refused open changes nothing on disk; the operator then deliberately selects the
-maintenance and repair workflow described in [ETCHv3.md](ETCHv3.md). V1 and v2
+maintenance and repair workflow described in [ETCHv3.md](ETCHv3.md). Maintenance
+takes the same store filename as a normal open: `EtchUtils.currentStoreFile`
+resolves it without changing anything on disk, so validation and repair read the
+marker-named file of a completed cutover, whether adoption is pending or was
+refused, and never the superseded original. Adoption stays with recovery. V1 and v2
 files have no clean-close state and keep the best-effort rollback behaviour above.
 
 If recovery cannot identify an existing live store, it fails before changing the
