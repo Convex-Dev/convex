@@ -506,6 +506,15 @@ public class UtilsTest {
 		assertTrue(Thread.interrupted());
 	}
 
+	@Test public void testIsJvmFailure() {
+		assertTrue(Utils.isJvmFailure(new InternalError()));
+		assertTrue(Utils.isJvmFailure(new UnknownError()));
+		for (Throwable e: List.of(new StackOverflowError(),new OutOfMemoryError(),
+				new NoClassDefFoundError(),new AssertionError(),new IllegalStateException())) {
+			assertFalse(Utils.isJvmFailure(e),e.toString());
+		}
+	}
+
 	@Test public void testIsProbableDefect() {
 		for (Throwable e: List.of(new NoClassDefFoundError(),new AssertionError(),new InternalError())) {
 			assertTrue(Utils.isProbableDefect(e),e.toString());

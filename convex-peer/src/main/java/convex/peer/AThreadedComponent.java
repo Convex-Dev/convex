@@ -24,6 +24,9 @@ public abstract class AThreadedComponent {
 	private class ComponentTask implements Runnable {
 		@Override
 		public void run() {
+			// Here, not in the constructor: the thread is named when it starts
+			LoopFailures failures=new LoopFailures(log,server,getThreadName());
+
 			// Run main component loop
 			while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 				try {
@@ -33,8 +36,8 @@ public abstract class AThreadedComponent {
 					log.trace("Component thread interrupted: {}",thread);
 					Thread.currentThread().interrupt();
 					break;
-				} catch (Exception e) {
-					log.error("Unexpected error in component loop: {}",thread,e);
+				} catch (Throwable e) {
+					if (!failures.handle(e)) break;
 				}
 			}
 			

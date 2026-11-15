@@ -114,6 +114,7 @@ public class ConnectionManager extends AConnectionManager {
 		lastPollTime = server.getTimestamp();
 
 		thread = Thread.ofVirtual().name("Connection Manager thread at " + server.getPort()).start(() -> {
+			LoopFailures failures=new LoopFailures(log,server,"connection manager");
 			while (server.isRunning() && !Thread.currentThread().isInterrupted()) {
 				try {
 					LoadMonitor.down();
@@ -124,8 +125,8 @@ public class ConnectionManager extends AConnectionManager {
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
 					break;
-				} catch (Exception e) {
-					log.error("Unexpected error in connection manager loop", e);
+				} catch (Throwable e) {
+					if (!failures.handle(e)) break;
 				}
 			}
 		});

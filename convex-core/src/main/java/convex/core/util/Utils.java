@@ -1040,6 +1040,17 @@ public class Utils {
 	}
 
 	/**
+	 * Tests whether a failure is a failure of the JVM itself: a {@link VirtualMachineError}
+	 * other than {@link StackOverflowError} or {@link OutOfMemoryError}.
+	 *
+	 * @param e Failure to test
+	 * @return True if the JVM itself has failed
+	 */
+	public static boolean isJvmFailure(Throwable e) {
+		return (e instanceof VirtualMachineError) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError);
+	}
+
+	/**
 	 * Tests whether a failure is probably a defect rather than a result of the input
 	 * or the load: an {@link Error} other than {@link StackOverflowError} or
 	 * {@link OutOfMemoryError}.

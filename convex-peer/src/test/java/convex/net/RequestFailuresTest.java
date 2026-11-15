@@ -28,9 +28,9 @@ public class RequestFailuresTest {
 
 	/** A logger that records the level and cause of each call. */
 	@SuppressWarnings("serial")
-	static final class RecordingLogger extends LegacyAbstractLogger {
-		final List<Level> levels=new ArrayList<>();
-		final List<Throwable> causes=new ArrayList<>();
+	public static final class RecordingLogger extends LegacyAbstractLogger {
+		public final List<Level> levels=new ArrayList<>();
+		public final List<Throwable> causes=new ArrayList<>();
 
 		@Override
 		protected void handleNormalizedLoggingCall(Level level, Marker marker, String pattern, Object[] args, Throwable t) {
