@@ -568,8 +568,13 @@ final class LatticeProtocolEndpoint implements Closeable {
 		ACell[] path=payload.path().toCellArray();
 		NodeServer.MergeOutcome outcome=node.mergeInbound(path,value);
 		if (!outcome.accepted()) {
-			recordMergeReject(message.getConnection(),stats);
-			returnLatticeResult(message,Result.error(ErrorCodes.ARGUMENT,"Lattice merge rejected"));
+			if (outcome.senderFault()) {
+				recordMergeReject(message.getConnection(),stats);
+				returnLatticeResult(message,Result.error(ErrorCodes.ARGUMENT,"Lattice merge rejected"));
+			} else {
+				// This node could not take the work: the sender may try again
+				returnLatticeResult(message,Result.SERVER_LOADED);
+			}
 			return;
 		}
 		recordAccept(stats);

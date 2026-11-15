@@ -562,8 +562,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/** Completed delivery; changed describes host state, not private application edits.
 	 * An ignored value is still a completed delivery. Exceptions reject the delivery. */
-	static record MergeOutcome(boolean accepted,boolean changed) {
-		static final MergeOutcome REJECTED=new MergeOutcome(false,false);
+	/** The outcome of merging a received value. */
+	static record MergeOutcome(boolean accepted,boolean changed,boolean senderFault) {
+		/** The value cannot be merged, which is its sender's fault */
+		static final MergeOutcome REJECTED=new MergeOutcome(false,false,true);
+		/** This node ran out of memory merging the value, which is not its sender's fault */
+		static final MergeOutcome FAILED=new MergeOutcome(false,false,false);
 	}
 
 	/**
@@ -572,26 +576,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	MergeOutcome mergeInbound(ACell[] path,ACell value) {
 		ACell before=cursor.get();
-		if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
+		MergeOutcome failure=merge(value,path);
+		if (failure!=null) return failure;
 		ACell after=cursor.get();
 		boolean changed=before!=after && (before==null || !before.equals(after));
 		if (changed) host.sync();
-		return new MergeOutcome(true,changed);
+		return new MergeOutcome(true,changed,false);
 	}
 
 	boolean mergeIncoming(ACell value,ACell... path) {
+		return merge(value,path)==null;
+	}
+
+	/**
+	 * Merges a received value into the host.
+	 *
+	 * @return null if the value was merged, otherwise the outcome
+	 */
+	private MergeOutcome merge(ACell value,ACell[] path) {
 		try {
 			host.mergeAt(value,path);
-			return true;
+			return null;
 		} catch (ClassCastException e) {
 			log.warn("Rejected inbound lattice value of wrong type: {}",
 				(value==null) ? "null" : value.getClass().getSimpleName());
-			return false;
+			return MergeOutcome.REJECTED;
+		} catch (OutOfMemoryError e) {
+			// The memory may be held by other work, so this says nothing about the sender
+			log.warn("Unable to merge inbound lattice value: out of memory");
+			log.debug("Inbound lattice value failure",e);
+			return MergeOutcome.FAILED;
 		} catch (Throwable e) {
 			Utils.checkRequestFailure(e);
 			log.warn("Rejected inbound lattice value after {}",e.getClass().getSimpleName());
 			log.debug("Inbound lattice value failure",e);
-			return false;
+			return MergeOutcome.REJECTED;
 		}
 	}
 

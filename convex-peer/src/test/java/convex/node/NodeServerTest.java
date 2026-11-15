@@ -670,22 +670,27 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Running out of memory merging one lattice message rejects that message alone, as
-	 * any failed merge does, and later messages are still handled.
+	 * Running out of memory merging one lattice message fails that message alone, with a
+	 * load error that does not count against its sender, and later messages are still
+	 * handled.
 	 */
 	@Test
-	public void testOutOfMemoryInMergeRejectsOnlyItsMessage() throws Exception {
+	public void testOutOfMemoryInMergeFailsOnlyItsMessage() throws Exception {
 		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new OutOfMemoryError("simulated")),
 			store,NodeConfig.port(-1));
-		LatticePropagator group=propagator(maxNodeServer);
+		maxNodeServer.addPropagator(new LatticePropagator(store,LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(2)))));
 		maxNodeServer.launch();
-		ScriptedPeer poisoned=new ScriptedPeer();
+		LatticePropagator group=propagator(maxNodeServer);
+		ScriptedPeer sender=new ScriptedPeer();
 		ScriptedPeer honest=new ScriptedPeer();
 
-		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),poisoned)));
-		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
-		assertEquals(ErrorCodes.ARGUMENT,poisoned.awaitResult(1).getErrorCode(),
-			"the message whose merge ran out of memory is rejected");
+		group.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),sender)); // reject 1
+		group.handleIncomingMessage(rootValue(1,CVMLong.create(13),sender));
+		group.handleIncomingMessage(rootValue(2,CVMLong.create(42),honest));
+		assertEquals(ErrorCodes.LOAD,sender.awaitResult(1).getErrorCode(),
+			"the message whose merge ran out of memory fails with a load error");
+		assertFalse(sender.isClosed(),"running out of memory is not the sender's fault, so not a second reject");
 		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
 		assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
 	}

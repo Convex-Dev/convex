@@ -175,11 +175,13 @@ Propagation failures are isolated:
 - `NodeServer.close()` still reaches `STOPPED` unless its own resource fails.
 
 A failure while handling one connection, one message or one group's publication,
-including running out of memory or stack, fails that work alone and is logged. Only
-a failure of the JVM itself (`InternalError`, `UnknownError`) is not contained there.
-It stops the group's inbound processing or publication, whichever it struck, and is
-recorded as that group's failure; a group whose inbound processing has stopped
-refuses inbound messages.
+including running out of memory or stack, fails that work alone and is logged.
+Running out of memory merging a received value says nothing about its sender, so the
+value fails with a `:LOAD` result that does not count towards closing the sender's
+connection. Only a failure of the JVM itself (`InternalError`, `UnknownError`) is
+not contained there. It stops the group's inbound processing or publication,
+whichever it struck, and is recorded as that group's failure; a group whose inbound
+processing has stopped refuses inbound messages.
 
 ## Lifecycle
 
