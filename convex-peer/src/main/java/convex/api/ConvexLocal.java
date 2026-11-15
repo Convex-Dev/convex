@@ -1,7 +1,6 @@
 package convex.api;
 
 import java.net.InetSocketAddress;
-import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
@@ -88,9 +87,9 @@ public class ConvexLocal extends AConvexConnected {
 	}
 
 	/**
-	 * Acquires a value the peer holds in full, copying it into the given store if that
+	 * Acquires a value the peer has persisted, copying it into the given store if that
 	 * is not the peer's own. The future fails with {@link MissingDataException} if the
-	 * peer does not hold all of the value.
+	 * peer has not persisted the value.
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
@@ -100,12 +99,9 @@ public class ConvexLocal extends AConvexConnected {
 			try {
 				AStore peerStore=server.getStore();
 				Ref<ACell> ref=peerStore.refForHash(hash);
-				if (ref==null) throw new MissingDataException(peerStore,hash);
-				// Checked before anything is written: a value held only in part, as DATA
-				// from any connection leaves it, is refused rather than completed or stored
-				HashSet<Hash> missing=new HashSet<>();
-				ref.findMissing(missing,1);
-				if (!missing.isEmpty()) throw new MissingDataException(peerStore,missing.iterator().next());
+				// Persisted means held in full. Anything less, such as DATA staged from a
+				// connection, is refused before any write rather than completed or stored
+				if ((ref==null)||(ref.getStatus()<Ref.PERSISTED)) throw new MissingDataException(peerStore,hash);
 				ACell value=ref.getValue();
 				if (store!=peerStore) value=Cells.persist(value,store);
 				f.complete((T) value);

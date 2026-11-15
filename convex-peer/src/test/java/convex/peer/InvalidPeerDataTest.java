@@ -477,40 +477,47 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * A local client, as the REST API uses, acquires a value the peer holds in full
-	 * without storing it again, and is refused at once a value the peer holds only in
-	 * part, as DATA from any connection leaves it.
+	 * A local client, as the REST API uses, acquires a value the peer has persisted,
+	 * and is refused at once, with nothing written, a value the peer has only stored,
+	 * as DATA from any connection leaves it.
 	 */
 	@Test
-	public void acquiringAValueHeldInPart() throws Exception {
-		checkAcquireHeldInPart(new MemoryStore());
+	public void acquiringAValueNotPersisted() throws Exception {
+		checkAcquireNotPersisted(new MemoryStore());
 		try (EtchStore store=EtchStore.createTemp()) {
-			checkAcquireHeldInPart(store);
+			checkAcquireNotPersisted(store);
 		}
 	}
 
-	private void checkAcquireHeldInPart(AStore store) throws Exception {
+	private void checkAcquireNotPersisted(AStore store) throws Exception {
 		Server peer=launchPeer(store,LOCAL);
 		try {
 			Convex client=Convex.connect(peer);
-
-			// Held in full, at STORED above a persisted branch
 			Blob part=Blob.createRandom(new Random(1234),200);
 			Cells.persist(part,store);
-			AVector<ACell> whole=Vectors.of(part);
-			Cells.store(whole,store);
-			assertEquals(whole,client.acquire(whole.getHash()).get(WAIT,TimeUnit.SECONDS));
-			assertEquals(Ref.STORED,store.refForHash(whole.getHash()).getStatus());
 
-			// Held in part: its branch is in no store
+			AVector<ACell> persisted=Cells.persist(Vectors.of(part),store);
+			assertEquals(persisted,client.acquire(persisted.getHash()).get(WAIT,TimeUnit.SECONDS));
+
+			// Only stored, although here the peer happens to hold all of it
+			AVector<ACell> stored=Vectors.of(part,CVMLong.ONE);
+			Cells.store(stored,store);
+			checkAcquireRefused(client,stored.getHash());
+			assertEquals(Ref.STORED,store.refForHash(stored.getHash()).getStatus());
+
+			// Only stored, with a branch in no store
 			Blob branch=Blob.createRandom(new Random(5678),200);
 			AVector<ACell> partial=Vectors.of(branch).updateRefs(r->Ref.forHash(r.getHash(),store).markEmbedded(false));
 			Cells.store(partial,store);
-			ExecutionException e=assertThrows(ExecutionException.class,()->client.acquire(partial.getHash()).get(WAIT,TimeUnit.SECONDS));
-			assertEquals(branch.getHash(),assertInstanceOf(MissingDataException.class,e.getCause()).getMissingHash());
+			checkAcquireRefused(client,partial.getHash());
 		} finally {
 			peer.close();
 		}
+	}
+
+	private static void checkAcquireRefused(Convex client, Hash hash) {
+		ExecutionException e=assertThrows(ExecutionException.class,()->client.acquire(hash).get(WAIT,TimeUnit.SECONDS));
+		assertEquals(hash,assertInstanceOf(MissingDataException.class,e.getCause()).getMissingHash());
 	}
 
 	/**
