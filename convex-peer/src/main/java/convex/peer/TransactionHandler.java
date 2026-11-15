@@ -170,6 +170,9 @@ public class TransactionHandler extends AThreadedComponent {
 
 	private final RequestFailureLog failures=new RequestFailureLog(log);
 
+	/** Separate from intake's log, so an observer's defect does not use up intake's one warning. */
+	private final RequestFailureLog observerFailures=new RequestFailureLog(log);
+
 	/**
 	 * Gets the signed value a transaction message carries, or null if the message does
 	 * not have that shape.
@@ -261,7 +264,8 @@ public class TransactionHandler extends AThreadedComponent {
 			try {
 				SignedData<ATransaction> sd=transactionOf(m);
 				if (sd==null) {
-					// Not the shape of a transaction message
+					// Not the shape of a transaction message. Checked here, so that FORMAT
+					// is never inferred from an arbitrary failure below.
 					sendRejection(m,ERR_BAD_FORMAT);
 					continue;
 				}
@@ -311,6 +315,7 @@ public class TransactionHandler extends AThreadedComponent {
 			SignedData<ATransaction> sd=sigs[i];
 			if (sd==null) continue; // already rejected in Phase 1
 			Message m=messages.get(i);
+			Hash h=null; // set once this message may have registered an interest
 			try {
 				if (!sd.checkSignature()) {
 					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
@@ -326,7 +331,12 @@ public class TransactionHandler extends AThreadedComponent {
 				// cell is not present in the store (dangling Ref from a faulty or partial
 				// message) this throws MissingDataException before we queue the tx.
 				sd=Cells.persist(sd, store);
+				// Inside the guard: the reply to a duplicate can fail, and must cost
+				// only this transaction
+				h=sd.getHash();
+				if (!registerInterest(h, m)) continue;
 			} catch (MissingDataException e) {
+				// sendRejection: a reply that fails must not escape the guard from here
 				sendRejection(m,Result.error(ErrorCodes.MISSING, Strings.create("Transaction data not available: "+e.getMissingHash())).withSource(SourceCodes.PEER));
 				continue;
 			} catch (IOException e) {
@@ -336,10 +346,14 @@ public class TransactionHandler extends AThreadedComponent {
 				// Guard for each received transaction, with the one in Phase 1: any failure
 				// rejects only this transaction, unless the JVM itself has failed
 				Utils.checkRequestFailure(e);
+				// Only this message's interest: one left behind would refuse the
+				// client's resubmission as already pending
+				if (h!=null) interests.remove(h,m);
 				reject(m,e);
 				continue;
 			}
-			if (!registerInterest(sd.getHash(), m)) continue;
+			// Outside the guard: an ArrayBlockingQueue allocates nothing here, and an
+			// interrupt must reach the loop so the peer can shut down
 			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
 			this.clientTransactionCount++;
@@ -360,7 +374,13 @@ public class TransactionHandler extends AThreadedComponent {
 	private void observeTransactionRequest(SignedData<ATransaction> sd) {
 		Consumer<SignedData<ATransaction>> observer=this.requestObserver;
 		if (observer!=null) {
-			observer.accept(sd);
+			try {
+				observer.accept(sd);
+			} catch (Throwable e) {
+				// The transaction is already queued: the observer's failure costs nothing else
+				Utils.checkRequestFailure(e);
+				observerFailures.log(e,"Transaction request observer failed");
+			}
 		}
 	}
 

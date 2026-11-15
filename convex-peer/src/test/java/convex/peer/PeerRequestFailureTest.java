@@ -235,6 +235,63 @@ public class PeerRequestFailureTest {
 		}
 	}
 
+	/**
+	 * A duplicate submission whose reply fails as it is sent fails alone: the first
+	 * submission and a later transaction in the same batch are still queued.
+	 */
+	@Test
+	public void aDuplicateTransactionWhoseReplyFailsLeavesTheRestOfItsBatch() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			SignedData<ATransaction> a=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 2)"));
+			SignedData<ATransaction> b=LOCAL.signData(Invoke.create(ORIGIN,2,"(+ 2 3)"));
+			for (Error error: CONTAINED) {
+				// Not started: this test thread runs it
+				TransactionHandler handler=new TransactionHandler(peer);
+				ReplyConnection first=new ReplyConnection(null);
+				ReplyConnection other=new ReplyConnection(null);
+				assertTrue(handler.offerTransaction(Message.createTransaction(1,a).withConnection(first)));
+				assertTrue(handler.offerTransaction(Message.createTransaction(2,a).withConnection(new ReplyConnection(error))));
+				assertTrue(handler.offerTransaction(Message.createTransaction(3,b).withConnection(other)));
+				handler.loop();
+				assertEquals(List.of(a,b),List.copyOf(handler.transactionQueue),error.toString());
+				assertTrue(first.results.isEmpty(),error+": "+first.results);
+				assertTrue(other.results.isEmpty(),error+": "+other.results);
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A request observer that fails costs nothing else: the transaction it observed and
+	 * a later one in the same batch are both queued, and neither client gets an error.
+	 */
+	@Test
+	public void aFailingRequestObserverLeavesTheRestOfItsBatch() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			SignedData<ATransaction> a=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 2)"));
+			SignedData<ATransaction> b=LOCAL.signData(Invoke.create(ORIGIN,2,"(+ 2 3)"));
+			for (Error error: CONTAINED) {
+				TransactionHandler handler=new TransactionHandler(peer);
+				handler.setRequestObserver(sd -> {
+					if (sd.equals(a)) throw error;
+				});
+				ReplyConnection first=new ReplyConnection(null);
+				ReplyConnection other=new ReplyConnection(null);
+				assertTrue(handler.offerTransaction(Message.createTransaction(1,a).withConnection(first)));
+				assertTrue(handler.offerTransaction(Message.createTransaction(2,b).withConnection(other)));
+				handler.loop();
+				assertEquals(List.of(a,b),List.copyOf(handler.transactionQueue),error.toString());
+				assertTrue(first.results.isEmpty(),error+": "+first.results);
+				assertTrue(other.results.isEmpty(),error+": "+other.results);
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
 	/** A failure of the JVM itself during transaction intake is not contained. */
 	@Test
 	public void aJvmFailureDuringIntakeIsNotContained() throws Exception {

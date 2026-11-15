@@ -59,6 +59,7 @@ public class QueryHandler extends AThreadedComponent {
 	/** Reusable drain buffer — only accessed from the handler thread */
 	private final ArrayList<Message> batch = new ArrayList<>();
 
+	/** One per handler, so this site warns once of each kind of failure that warrants it. */
 	private final RequestFailureLog failures = new RequestFailureLog(log);
 
 	@Override
