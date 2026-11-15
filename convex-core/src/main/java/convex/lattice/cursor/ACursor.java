@@ -7,6 +7,7 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.LatticeOps;
 
@@ -269,7 +270,7 @@ public abstract class ACursor<V extends ACell> {
 	 * @return Value now held: persisted unless the attempts ran out; null if the cursor holds none
 	 * @throws IOException If the persister fails
 	 */
-	public V persist(Persister<V> persister) throws IOException {
+	public V persist(Persister persister) throws IOException {
 		int[] attempts={0};
 		try {
 			return updateAndGet(value -> (attempts[0]++<PERSIST_ATTEMPTS)?persistValue(persister,value):value);
@@ -279,7 +280,7 @@ public abstract class ACursor<V extends ACell> {
 		}
 	}
 
-	private static <V extends ACell> V persistValue(Persister<V> persister,V value) {
+	private static <V extends ACell> V persistValue(Persister persister,V value) {
 		if (value==null) return null;
 		try {
 			return persister.persist(value);

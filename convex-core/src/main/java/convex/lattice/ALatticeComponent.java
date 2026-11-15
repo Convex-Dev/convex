@@ -8,10 +8,10 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Path;
 import convex.core.exceptions.StoreException;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
-import convex.lattice.cursor.Persister;
 import convex.lattice.cursor.ThreeWayMerge;
 
 /**
@@ -46,7 +46,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	protected final AForkableCursor<V> storage;
 
 	/** Persists this component's own working state, or null when its parent persists it. */
-	private final Persister<V> persister;
+	private final Persister persister;
 
 	/** Binds the supplied storage directly, without creating another fork. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
@@ -54,7 +54,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/** Binds the supplied storage with the function that persists it, for working state of its own. */
-	protected ALatticeComponent(AForkableCursor<V> cursor,Persister<V> persister) {
+	protected ALatticeComponent(AForkableCursor<V> cursor,Persister persister) {
 		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
 		this.persister=persister;
 	}

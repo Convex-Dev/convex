@@ -22,7 +22,7 @@ import convex.core.exceptions.MissingDataException;
  * made" ― Robert C. Martin
  *
  */
-public abstract class AStore implements Closeable {
+public abstract class AStore implements Closeable, Persister {
 	
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
@@ -62,6 +62,19 @@ public abstract class AStore implements Closeable {
 	 * @throws IOException in case of IO error during persistence
 	 */
 	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
+
+	/**
+	 * Persists a value in this store, including an embedded top-level value.
+	 *
+	 * @param <T> Value type
+	 * @param value Value to persist
+	 * @return Equal value whose cells are retained in this store
+	 * @throws IOException in case of IO error during persistence
+	 */
+	@Override
+	public <T extends ACell> T persist(T value) throws IOException {
+		return storeTopRef(Ref.get(value),Ref.PERSISTED,null).getValue();
+	}
 
 	
 	/**

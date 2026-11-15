@@ -29,9 +29,9 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.Persister;
 import convex.lattice.ALocalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Persister;
 
 /**
  * Encrypted key store for a peer's signing service, kept as the peer's local state at
@@ -106,7 +106,7 @@ public class SigningService extends ALocalComponent {
 	 * @param persister Persists the private copy, such as {@code host::persist}, or null if it is never persisted
 	 */
 	public SigningService(AForkableCursor<Index<Keyword,ACell>> root, AKeyPair peerKeyPair, Supplier<CVMLong> clock,
-			Persister<AHashMap<Keyword,ACell>> persister) {
+			Persister persister) {
 		super(root, KEY_SIGNING, Objects.requireNonNull(peerKeyPair, "Peer key pair required").getAccountKey(),
 			peerKeyPair::signData, clock, persister);
 		this.peerKeyPair = peerKeyPair;

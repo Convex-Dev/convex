@@ -7,6 +7,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.store.Persister;
 
 /**
  * Independent working storage which reconciles with a destination on sync.
@@ -97,7 +98,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * only if no sync has moved it meanwhile; a moved baseline waits for the next persist.
 	 */
 	@Override
-	public V persist(Persister<V> persister) throws IOException {
+	public V persist(Persister persister) throws IOException {
 		V persisted=working.persist(persister);
 		V previous=baseline.get();
 		if (previous!=null) baseline.compareAndSet(previous,persister.persist(previous));

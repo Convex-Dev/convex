@@ -35,6 +35,7 @@ import convex.core.message.MessageType;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
@@ -1182,7 +1183,13 @@ public class LatticePropagator implements Closeable {
 			// again is not a write, so the cursor switches to its cells as a persist does.
 			ACell announced=value;
 			announcedCursor.set(announced);
-			announcedCursor.persist(held -> Cells.equals(held,announced)?announced:held);
+			announcedCursor.persist(new Persister() {
+				@SuppressWarnings("unchecked")
+				@Override
+				public <T extends ACell> T persist(T held) {
+					return Cells.equals(held,announced)?(T)announced:held;
+				}
+			});
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
 			sequence = ++announceSequence;

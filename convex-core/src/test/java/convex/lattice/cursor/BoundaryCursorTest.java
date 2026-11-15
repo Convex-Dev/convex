@@ -16,6 +16,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.test.Persisters;
 
 /** Claims stopping at a boundary, while writes go straight through it. */
 class BoundaryCursorTest {
@@ -201,7 +202,7 @@ class BoundaryCursorTest {
 		var a=boundary(root,A);
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
 			Transactions.executeExclusively(a,draft -> {
-				complete(other.submit(() -> { a.persist(value -> value); return null; }));
+				complete(other.submit(() -> { a.persist(Persisters.UNCHANGED); return null; }));
 				draft.set(CVMLong.ONE);
 			});
 		}

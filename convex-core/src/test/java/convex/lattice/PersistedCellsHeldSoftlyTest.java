@@ -35,14 +35,15 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
+import convex.core.store.Persister;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.BoundaryCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Persister;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.Transactions;
+import convex.test.Persisters;
 import convex.test.Samples;
 
 /**
@@ -123,12 +124,8 @@ public class PersistedCellsHeldSoftlyTest {
 
 	// ===== Cursors under test =====
 
-	private AHashMap<ACell,ACell> save(AHashMap<ACell,ACell> value) throws IOException {
-		return Cells.persist(value,store);
-	}
-
 	private void persist(AForkableCursor<AHashMap<ACell,ACell>> cursor) {
-		try { cursor.persist(this::save); }
+		try { cursor.persist(store); }
 		catch (IOException e) { throw new UncheckedIOException(e); }
 	}
 
@@ -215,7 +212,7 @@ public class PersistedCellsHeldSoftlyTest {
 			super(cursor);
 		}
 
-		Working(AForkableCursor<AHashMap<ACell,ACell>> cursor,Persister<AHashMap<ACell,ACell>> persister) {
+		Working(AForkableCursor<AHashMap<ACell,ACell>> cursor,Persister persister) {
 			super(cursor,persister);
 		}
 
@@ -367,13 +364,12 @@ public class PersistedCellsHeldSoftlyTest {
 	@Test void writesThatNeverStopCannotHoldUpAPersist() throws IOException {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 		List<Long> written=new ArrayList<>();
-		root.persist(value -> {
+		root.persist(Persisters.after(value -> {
 			assertTrue(written.size()<3,"Still persisting after three attempts");
 			long seed=9000+written.size();
 			written.add(seed);
 			root.updateAndGet(current -> with(current,seed));
-			return Cells.persist(value,store);
-		});
+		},store));
 		assertEquals(List.of(9000L,9001L,9002L),written,"Three attempts, then it stops");
 		for (long seed:written) assertTrue(holds(root.get(),seed),"Every write is kept");
 	}
@@ -442,10 +438,9 @@ public class PersistedCellsHeldSoftlyTest {
 		var host=savedHost();
 		var component=new AtomicReference<Working>();
 		var edited=new AtomicReference<Boolean>(false);
-		component.set(new Working(host.cursor().fork(),value -> {
+		component.set(new Working(host.cursor().fork(),Persisters.after(value -> {
 			if (edited.compareAndSet(false,true)) component.get().edit(9001);
-			return host.persist(value);
-		}));
+		},host::persist)));
 		component.get().edit(9000);
 
 		component.get().sync();
@@ -532,7 +527,7 @@ public class PersistedCellsHeldSoftlyTest {
 	@Test void whenPersistingFailsThePublishStandsAndTheErrorIsReported() {
 		var host=savedHost();
 		var failure=new IOException("store failed");
-		var component=new Working(host.cursor().fork(),value -> { throw failure; });
+		var component=new Working(host.cursor().fork(),Persisters.failing(failure));
 		component.edit(9000);
 		var held=component.held();
 
@@ -549,7 +544,7 @@ public class PersistedCellsHeldSoftlyTest {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 		var before=root.get();
 
-		var saved=root.persist(this::save);
+		var saved=root.persist(store);
 
 		assertSame(saved,root.get());
 		assertNotSame(before,root.get(),"The saved cells are other objects");
@@ -613,10 +608,7 @@ public class PersistedCellsHeldSoftlyTest {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 		Runnable landing=once(() -> edit.apply(root,9000,NOTHING));
 
-		root.persist(value -> {
-			landing.run();
-			return save(value);
-		});
+		root.persist(Persisters.after(value -> landing.run(),store));
 
 		assertTrue(holds(root.get(),9000),"The edit is kept");
 		assertHeldSoftly(store,root.get());

@@ -20,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.lattice.JSONValueComponent;
 import convex.lattice.ValueComponent;
+import convex.test.Persisters;
 
 class ReadOnlyCursorTest {
 
@@ -75,7 +76,7 @@ class ReadOnlyCursorTest {
 		assertRefused(() -> view.accumulateAndGet(value,(own,x) -> own));
 		assertRefused(() -> view.assoc(A,CVMLong.TWO));
 		assertRefused(() -> view.assocIn(CVMLong.TWO,A));
-		assertRefused(() -> view.persist(v -> v));
+		assertRefused(() -> view.persist(Persisters.UNCHANGED));
 		assertRefused(() -> view.path(A).set(CVMLong.ONE));
 		assertRefused(() -> view.path(A).set(CVMLong.TWO));
 		assertRefused(() -> view.withDefault(Maps.empty()).path(B).set(CVMLong.TWO));

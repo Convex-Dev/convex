@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.store.Persister;
 
 /**
  * A transactional boundary over another cursor. Reads and writes go straight
@@ -92,5 +93,5 @@ public final class BoundaryCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override public V sync(BinaryOperator<V> merge) { return write(() -> source.sync(merge)); }
 	@Override public V reconcile(ThreeWayMerge<V> merge) { return write(() -> source.reconcile(merge)); }
 
-	@Override public V persist(Persister<V> persister) throws IOException { return source.persist(persister); }
+	@Override public V persist(Persister persister) throws IOException { return source.persist(persister); }
 }

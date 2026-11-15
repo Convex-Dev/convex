@@ -175,6 +175,8 @@ The two values are equal, so only memory use tells them apart. Stored data is
 released only once whoever holds the value has switched to the new cells: a holder
 left on the original keeps the whole tree in memory, however much of it is stored.
 
+A `Persister` persists any value, not only a cursor's: every store is one, and a
+builder such as `BlobOutputStream` takes one to save content as it is written.
 `persist(persister)` makes that switch for a cursor, replacing the cells it holds
 with the equal ones a `Persister` returns, such as `LatticeHost::persist`, in one
 atomic step. The cursor holds no store. An edit landing meanwhile repeats the
