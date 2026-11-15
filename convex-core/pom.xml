@@ -145,20 +145,19 @@
 				</executions>
 			</plugin>
 
-			<!-- This plugin ensures we get a test-jar which is used as a
-			dependency for some other tests. Not needed any more?
-           <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            -->
+			<!-- Test classes as a test-jar, so convex-integration tests can build on
+			     convex-core's examples -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>test-jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 		<resources>
 			<resource>
