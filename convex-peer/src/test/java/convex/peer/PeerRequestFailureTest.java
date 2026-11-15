@@ -4,12 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -23,8 +26,10 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
@@ -37,8 +42,11 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.MapEntry;
 import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -48,6 +56,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 
@@ -58,6 +67,21 @@ import convex.core.util.Utils;
  */
 public class PeerRequestFailureTest {
 	static final AKeyPair LOCAL=InvalidPeerDataTest.LOCAL;
+	static final AKeyPair REMOTE_A=InvalidPeerDataTest.REMOTE_A;
+	static final AKeyPair REMOTE_B=InvalidPeerDataTest.REMOTE_B;
+
+	static SignedData<Block> block(AKeyPair kp, long timestamp) {
+		return InvalidPeerDataTest.block(kp,timestamp);
+	}
+
+	@SafeVarargs
+	static SignedData<Order> order(AKeyPair kp, long timestamp, SignedData<Block>... blocks) {
+		return InvalidPeerDataTest.order(kp,timestamp,blocks);
+	}
+
+	static long blockTime(Server peer) {
+		return InvalidPeerDataTest.blockTime(peer);
+	}
 	static final Address ORIGIN=Init.GENESIS_ADDRESS;
 
 	/** Failures of one request that a peer contains: the JVM itself has not failed. */
@@ -250,7 +274,11 @@ public class PeerRequestFailureTest {
 		}
 	}
 
-	/** A key pair that fails once with a chosen failure the next time it signs an Order, and otherwise signs as another. */
+	/**
+	 * A key pair that fails once with a chosen failure the next time it signs an Order,
+	 * and otherwise signs as another. A proposal signs its Order through signData and a
+	 * merge through sign; Blocks are signed through signData, which passes them on.
+	 */
 	static final class OrderFailingKeyPair extends AKeyPair {
 		final AKeyPair kp;
 		final AtomicReference<Throwable> failure=new AtomicReference<>();
@@ -269,8 +297,33 @@ public class PeerRequestFailureTest {
 
 		@Override public AccountKey getAccountKey() { return kp.getAccountKey(); }
 		@Override public boolean equals(AKeyPair other) { return kp.equals(other); }
-		@Override public ASignature sign(AArrayBlob message) { return kp.sign(message); }
+		@Override
+		public ASignature sign(AArrayBlob message) {
+			// Only Orders reach this key pair's own sign: see signData
+			Throwable t=failure.getAndSet(null);
+			if (t!=null) throw Utils.<RuntimeException>sneakyThrow(t);
+			return kp.sign(message);
+		}
 		@Override public Blob getSeed() { return kp.getSeed(); }
+	}
+
+	/**
+	 * Launches a single peer with the given key pair and its consensus halted before
+	 * launch, so its own propagator never merges or takes a transaction from the queue:
+	 * that work is left to the test thread.
+	 */
+	static Server launchHaltedPeer(AKeyPair kp) throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,kp);
+		config.put(Keywords.STATE,Init.createState(List.of(kp.getAccountKey())));
+		config.put(Keywords.PORT,0);
+		config.put(Keywords.STORE,new MemoryStore());
+		// Each round produces a Block at once, however soon after the last
+		config.put(Keywords.MIN_BLOCK_TIME,0);
+		Server peer=Server.create(config);
+		peer.haltConsensus(UpgradeError.missing(99));
+		peer.launch();
+		return peer;
 	}
 
 	/**
@@ -281,18 +334,7 @@ public class PeerRequestFailureTest {
 	@Test
 	public void aBlockThatCannotBeProposedFailsItsTransactions() throws Exception {
 		OrderFailingKeyPair kp=new OrderFailingKeyPair(LOCAL);
-		HashMap<Keyword,Object> config=new HashMap<>();
-		config.put(Keywords.KEYPAIR,kp);
-		config.put(Keywords.STATE,Init.createState(List.of(LOCAL.getAccountKey())));
-		config.put(Keywords.PORT,0);
-		config.put(Keywords.STORE,new MemoryStore());
-		// Each round produces a Block at once, however soon after the last
-		config.put(Keywords.MIN_BLOCK_TIME,0);
-		Server peer=Server.create(config);
-		// Halted before launch, so the peer's own propagator never takes a transaction
-		// from the queue: Block production is left to this test thread
-		peer.haltConsensus(UpgradeError.missing(99));
-		peer.launch();
+		Server peer=launchHaltedPeer(kp);
 		try {
 			LinkedBlockingQueue<SignedData<ATransaction>> queued=new LinkedBlockingQueue<>();
 			peer.getTransactionHandler().setRequestObserver(queued::add);
@@ -399,6 +441,172 @@ public class PeerRequestFailureTest {
 			}
 		} finally {
 			peer.close();
+		}
+	}
+
+	/** DATA whose staging fails is dropped alone: a good Order sent after it is still merged. */
+	@Test
+	public void dataThatFailsToStageIsDroppedAlone() throws Exception {
+		for (Error error: CONTAINED) {
+			Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+			try {
+				peer.getBeliefPropagator().setDataStageObserver(m -> {
+					throw error;
+				});
+				Message data=Message.createDataMessage(List.of(Blob.wrap(new byte[200])),(int)CPoSConstants.MAX_MESSAGE_LENGTH);
+				InvalidPeerDataTest.connect(peer).sendMessage(InvalidPeerDataTest.wire(data));
+				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+				InvalidPeerDataTest.checkGoodOrderMerges(peer,good,Belief.create(good));
+			} finally {
+				peer.close();
+			}
+		}
+	}
+
+	/** A Belief whose one entry, for a staked peer, is bound to a store that throws the given Error when read. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	static Belief unreadableBelief(Error error) {
+		SignedData<Order> signed=order(REMOTE_A,1,block(REMOTE_A,1));
+		AStore failing=new MemoryStore() {
+			@Override
+			public <T extends ACell> Ref<T> refForHash(Hash hash) {
+				throw error;
+			}
+		};
+		Ref<SignedData<Order>> unreadable=RefSoft.createForHash(signed.getHash(),failing);
+		return Belief.create((Index)Index.create(MapEntry.fromRefs(REMOTE_A.getAccountKey().getRef(),unreadable)));
+	}
+
+	/** A Belief message whose Orders cannot be read is rejected alone, and nothing is thrown. */
+	@Test
+	public void aBeliefMessageThatFailsIsRejectedAlone() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			for (Error error: CONTAINED) {
+				// Not started: this test thread runs it
+				BeliefPropagator propagator=new BeliefPropagator(peer);
+				Message m=Message.createBelief(unreadableBelief(error)).withConnection(new ReplyConnection(null));
+				assertFalse(propagator.mergeBeliefMessage(new HashMap<>(),m),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A polled Belief whose Orders cannot be read is dropped alone: a good Order is still merged. */
+	@Test
+	public void aPolledBeliefThatFailsIsDroppedAlone() throws Exception {
+		for (Error error: CONTAINED) {
+			Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+			try {
+				assertTrue(peer.queueBelief(unreadableBelief(error)));
+				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+				InvalidPeerDataTest.checkGoodOrderMerges(peer,good,Belief.create(good));
+			} finally {
+				peer.close();
+			}
+		}
+	}
+
+	/** An Order whose processing fails is rejected alone: the other Order in the same Belief is merged. */
+	@Test
+	public void anOrderThatFailsIsRejectedAlone() throws Exception {
+		for (Error error: CONTAINED) {
+			Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+			try {
+				peer.getBeliefPropagator().setOrderUpdateObserver(so -> {
+					if (REMOTE_A.getAccountKey().equals(so.getAccountKey())) throw error;
+				});
+				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+				SignedData<Order> failing=order(REMOTE_A,1,block(REMOTE_A,blockTime(peer)));
+				Belief merged=InvalidPeerDataTest.checkGoodOrderMerges(peer,good,Belief.create(good,failing));
+				assertNull(merged.getOrders().get(REMOTE_A.getAccountKey()),error.toString());
+			} finally {
+				peer.close();
+			}
+		}
+	}
+
+	/**
+	 * A merge that fails drops its batch and keeps the peer's Belief, and nothing is
+	 * thrown. Here it fails signing the peer's own Order, which a merge does once a
+	 * proposed Block moves consensus on.
+	 */
+	@Test
+	public void aMergeThatFailsDropsItsBatch() throws Exception {
+		OrderFailingKeyPair kp=new OrderFailingKeyPair(LOCAL);
+		Server peer=launchHaltedPeer(kp);
+		try {
+			// Signed with the key itself, so the failure is left for the merge
+			Belief proposed=peer.getBelief().proposeBlock(LOCAL,LOCAL.signData(Block.of(blockTime(peer))));
+			for (Error error: CONTAINED) {
+				// Not started: this test thread runs it
+				BeliefPropagator merger=new BeliefPropagator(peer);
+				merger.belief=proposed;
+				kp.failure.set(error);
+				assertFalse(merger.maybeMergeBeliefs(proposed),error.toString());
+				assertNull(kp.failure.get(),error+" fired");
+				assertSame(proposed,merger.belief,error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * An update from a staked peer whose Order lacks part of a Block, sent with a good
+	 * Order from another peer.
+	 */
+	@SuppressWarnings("unchecked")
+	static List<Message> updateMissingABlock(long ts, int firstSequence, SignedData<Order> good,
+			MemoryStore senderStore) throws Exception {
+		List<SignedData<ATransaction>> txs=new ArrayList<>();
+		for (int i=0; i<8; i++) {
+			txs.add(REMOTE_A.signData(Invoke.create(ORIGIN,firstSequence+i,"*address*")));
+		}
+		Block block=Block.create(ts,txs);
+		// Announced before, so the next update leaves it out and the peer must fetch it
+		MissingBeliefDataTest.update(block.getTransactions(),senderStore);
+		SignedData<Order> incomplete=order(REMOTE_A,ts,REMOTE_A.signData(block));
+		return MissingBeliefDataTest.update(Belief.create(incomplete,good),senderStore);
+	}
+
+	/**
+	 * A fetch of missing Order data that fails is dropped alone: a good Order in the same
+	 * update is still merged, and missing data in a later update is fetched.
+	 */
+	@Test
+	public void aFetchThatFailsIsDroppedAlone() throws Exception {
+		for (Error error: CONTAINED) {
+			FaultingStore store=new FaultingStore();
+			Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
+			try {
+				BlockingQueue<Belief> updates=InvalidPeerDataTest.ownOrderUpdates(peer);
+				MemoryStore senderStore=new MemoryStore();
+				long ts=blockTime(peer);
+				SignedData<Order> good=order(REMOTE_B,ts,block(REMOTE_B,ts));
+				List<Message> sent=updateMissingABlock(ts,1,good,senderStore);
+				for (Message m: sent) {
+					// Storing the update for its fetch is the first time the peer stores it
+					if (m.getType()==MessageType.BELIEF) store.failOnce(m.getPayload().getHash(),error);
+				}
+				var senderEnd=InvalidPeerDataTest.connect(peer);
+				for (Message m: sent) senderEnd.sendMessage(InvalidPeerDataTest.wire(m));
+
+				Belief merged=updates.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertNotNull(merged,error+": the good Order is merged");
+				assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()),error.toString());
+				assertTrue(store.fired(),error+" fired");
+				assertNull(peer.getBeliefPropagator().getMissingDataFetch(),error+": no fetch started");
+
+				SignedData<Order> later=order(REMOTE_B,ts+1,block(REMOTE_B,ts),block(REMOTE_B,ts+1));
+				var laterEnd=InvalidPeerDataTest.connect(peer);
+				for (Message m: updateMissingABlock(ts+1,9,later,senderStore)) laterEnd.sendMessage(InvalidPeerDataTest.wire(m));
+				assertNotNull(updates.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),error+": the later good Order is merged");
+				assertNotNull(peer.getBeliefPropagator().getMissingDataFetch(),error+": later missing data is fetched");
+			} finally {
+				peer.close();
+			}
 		}
 	}
 

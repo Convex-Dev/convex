@@ -39,6 +39,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.RequestFailureLog;
 
 /**
  * Component class to handle propagation of new Beliefs from a Peer
@@ -384,9 +385,11 @@ public class BeliefPropagator extends AThreadedComponent {
 			// Shouldn't happen if Beliefs are already validated
 			// e.printStackTrace();
 			throw new Error("Invalid data in belief merge!", e);
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// Merging the received Orders failed: drop them and keep this peer's Belief
-			log.warn("Belief merge failed, received Orders dropped",e);
+		} catch (Throwable e) {
+			// Merging the received Orders failed: drop them and keep this peer's Belief,
+			// unless the JVM itself has failed
+			Utils.checkRequestFailure(e);
+			mergeFailures.log(e,"Belief merge failed, received Orders dropped");
 			return false;
 		}
 	}
@@ -442,9 +445,11 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
-				} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-					log.warn("Unable to stage peer DATA message",e);
-					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
+				} catch (Throwable e) {
+					// Guard for each DATA message: a failure drops only this message, unless
+					// the JVM itself has failed
+					Utils.checkRequestFailure(e);
+					rejectReceived(m,e,"Invalid DATA message");
 				}
 				continue;
 			}
@@ -479,9 +484,11 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (BadFormatException e1) {
 				log.debug("Malformed Belief message");
 			}
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// Any other failure processing the message: reject the whole message
-			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
+		} catch (Throwable e) {
+			// Any other failure processing the message: reject the whole message, unless
+			// the JVM itself has failed
+			Utils.checkRequestFailure(e);
+			rejectReceived(m,e,"Unusable Belief message");
 		}
 		return false;
 	}
@@ -492,8 +499,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			return mergeBeliefValue(orders,acquired,null);
 		} catch (MissingDataException e) {
 			log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			log.warn("Unable to merge locally acquired Belief: {}",Utils.getClassName(e));
+		} catch (Throwable e) {
+			// Guard for each polled Belief, unless the JVM itself has failed
+			Utils.checkRequestFailure(e);
+			rejectReceived(null,e,"Unusable polled Belief");
 		}
 		return false;
 	}
@@ -546,25 +555,33 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-				// Any other failure processing this Order: reject it and carry on with the rest
-				rejectOrder(source,"Unusable Order: "+Utils.getClassName(e));
+			} catch (Throwable e) {
+				// Any other failure processing this Order: reject it and carry on with the
+				// rest, unless the JVM itself has failed
+				Utils.checkRequestFailure(e);
+				rejectReceived(source,e,"Unusable Order");
 			}
 		}
 		return changed;
 	}
 
 	/**
-	 * Rejects one received Order, alerting the connection it arrived on, or logging if
-	 * it came from a locally acquired Belief.
+	 * Rejects one received message or Order whose processing failed. It is reported as
+	 * a bad message only if the data may have caused the failure; a polled Belief, with
+	 * no message, is only logged.
 	 */
-	private void rejectOrder(Message source, String reason) {
-		if (source!=null) {
+	private void rejectReceived(Message source, Throwable e, String reason) {
+		receiveFailures.log(e,"{}: {}",reason,(source==null)?"polled Belief":source.getConnection());
+		// Running out of memory, or a defect of this peer, says nothing about the sender
+		if ((source!=null)&&RequestFailureLog.mayBeCausedByRequest(e)) {
 			server.getConnectionManager().alertBadMessage(source,reason);
-		} else {
-			log.warn("{} in locally acquired Belief",reason);
 		}
 	}
+
+	/** Separate logs, so each site warns once of each kind of failure. */
+	private final RequestFailureLog receiveFailures=new RequestFailureLog(log);
+	private final RequestFailureLog mergeFailures=new RequestFailureLog(log);
+	private final RequestFailureLog fetchFailures=new RequestFailureLog(log);
 	
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
 	private final AtomicBoolean fetching=new AtomicBoolean();
@@ -607,11 +624,12 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 					return null;
 				});
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+		} catch (Throwable e) {
 			// Any failure starting this update's fetch drops it, and must clear the flag
-			// or no later fetch could start
+			// or no later fetch could start. First, so that holds even for a JVM failure
 			fetching.set(false);
-			log.debug("Unable to fetch missing update data",e);
+			Utils.checkRequestFailure(e);
+			fetchFailures.log(e,"Unable to fetch missing update data");
 		}
 	}
 

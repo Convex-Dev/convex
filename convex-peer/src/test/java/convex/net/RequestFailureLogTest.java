@@ -1,7 +1,9 @@
 package convex.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +58,16 @@ public class RequestFailureLogTest {
 		failures.log(new AssertionError("simulated"),"Dropped {} request","QUERY");
 		assertEquals(List.of(Level.WARN,Level.DEBUG,Level.WARN),logger.levels);
 		assertSame(oom,logger.causes.get(0));
+	}
+
+	@Test
+	public void onlyExceptionsAndStackOverflowsMayBeCausedByTheRequest() {
+		assertTrue(RequestFailureLog.mayBeCausedByRequest(new BadFormatException("simulated")));
+		assertTrue(RequestFailureLog.mayBeCausedByRequest(new IllegalStateException()));
+		assertTrue(RequestFailureLog.mayBeCausedByRequest(new StackOverflowError()));
+		assertFalse(RequestFailureLog.mayBeCausedByRequest(new OutOfMemoryError()));
+		assertFalse(RequestFailureLog.mayBeCausedByRequest(new NoClassDefFoundError()));
+		assertFalse(RequestFailureLog.mayBeCausedByRequest(new AssertionError()));
 	}
 
 	@Test

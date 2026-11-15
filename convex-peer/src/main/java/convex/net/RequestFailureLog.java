@@ -44,6 +44,18 @@ public final class RequestFailureLog {
 		}
 	}
 
+	/**
+	 * Tests whether a failure may have been caused by the request being handled: an
+	 * exception or a stack overflow, which the request's own data can cause. Running out
+	 * of memory and any other Error say nothing about the request.
+	 *
+	 * @param e Failure of the request
+	 * @return True if the request may have caused the failure
+	 */
+	public static boolean mayBeCausedByRequest(Throwable e) {
+		return (e instanceof Exception)||(e instanceof StackOverflowError);
+	}
+
 	private AtomicBoolean warnedFlag(Throwable e) {
 		if (e instanceof OutOfMemoryError) return warnedMemory;
 		if ((e instanceof Error)&&!(e instanceof StackOverflowError)) return warnedDefect;
