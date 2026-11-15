@@ -434,7 +434,37 @@ public class InvalidPeerDataTest {
 			// Completes, normally or not, once the peer has dealt with the query
 			remote.query(buildDeep).handle((r,e)->r).get(WAIT,TimeUnit.SECONDS);
 
-			Result ok=Convex.connect(peer).query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS);
+			// From the network, so it takes the peer's query handler as the deep query did
+			try (Convex other=Convex.connect(peer.getHostAddress())) {
+				Result ok=other.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS);
+				assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A data request whose handling fails is dropped, and the peer goes on answering the
+	 * queries queued after it.
+	 */
+	@Test
+	public void anErrorAnsweringADataRequestDropsOnlyThatRequest() throws Exception {
+		Hash failing=Blob.fromHex("cafe").getHash(); // never stored
+		MemoryStore store=new MemoryStore() {
+			@Override
+			public <T extends ACell> Ref<T> refForHash(Hash hash) {
+				if ((hash!=null)&&hash.equals(failing)) throw new OutOfMemoryError("Test: out of memory reading requested data");
+				return super.refForHash(hash);
+			}
+		};
+		Server peer=launchPeer(store,LOCAL);
+		try (Convex other=Convex.connect(peer.getHostAddress())) {
+			// Queued before the query, on the same handler
+			connect(peer).sendMessage(wire(Message.createDataRequest(CVMLong.ONE,failing)));
+
+			// From the network, so it takes the peer's query handler as the request did
+			Result ok=other.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS);
 			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
 		} finally {
 			peer.close();
