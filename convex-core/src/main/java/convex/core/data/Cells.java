@@ -365,17 +365,15 @@ public class Cells {
 		return value;
 	}
 
+	/**
+	 * Validates a cell as {@link ACell#validate()} does.
+	 *
+	 * @param cell Cell to validate, may be null
+	 * @throws InvalidDataException If a cell checked is invalid
+	 */
 	public static void validate(ACell cell) throws InvalidDataException {
 		if (cell==null) return; // OK, this is the null value
-		Ref<?> ref=cell.getRef();
-		if (ref.isValidated()) return;
-		try {
-			cell.validateCell();
-			cell.validateStructure();
-			// Cells.markValidated(cell);
-		} catch (Exception e) {
-			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
-		}
+		cell.validate();
 	}
 
 	/**

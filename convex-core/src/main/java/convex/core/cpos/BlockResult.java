@@ -126,9 +126,6 @@ public class BlockResult extends ARecordGeneric {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
-		results.validate();
-		state.validate();
-		
 		long n=results.count();
 		for (long i=0; i<n; i++) {
 			ACell r=results.get(i);

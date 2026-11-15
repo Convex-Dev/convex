@@ -32,9 +32,29 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	protected Ref<ACell> cachedRef=null;
 
+	/**
+	 * Validates this cell and every cell below it that is not already validated or
+	 * persisted: this cell's own data first, then each child, then this cell against
+	 * its children. A cell already validated or persisted is trusted with its whole
+	 * tree. Subclasses may add rules beyond structure after calling this.
+	 *
+	 * @throws InvalidDataException If a cell checked is invalid
+	 */
 	@Override
 	public void validate() throws InvalidDataException {
-		Cells.validate(this);
+		if (getRef().isValidated()) return;
+		try {
+			validateCell();
+			int n=getRefCount();
+			for (int i=0; i<n; i++) {
+				getRef(i).validate();
+			}
+			validateStructure();
+		} catch (InvalidDataException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),this);
+		}
 	}
 	
 	/**

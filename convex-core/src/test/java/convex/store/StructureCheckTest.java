@@ -39,6 +39,7 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.InvalidStructureException;
 import convex.core.init.InitTest;
 import convex.core.store.AStore;
@@ -455,6 +456,46 @@ public class StructureCheckTest {
 			ACell received=store.decode(Blob.fromHex("8001"+ref(bad)));
 			Cells.checkTree(received);
 			assertThrows(InvalidStructureException.class,()->Cells.checkTree(bad));
+		}
+	}
+
+	/** validate() checks every cell below one that is not validated or persisted */
+	@Test
+	public void testValidateChecksElements() throws Exception {
+		AVector<?> badTree=new MemoryStore().decode(Blob.fromHex("80"+badTreeBody()));
+		AVector<?> holder=Vectors.of(badTree);
+		assertThrows(InvalidDataException.class,holder::validate);
+	}
+
+	/** validate() checks a cell's children before checking the cell against them */
+	@Test
+	public void testValidateChecksChildrenFirst() throws Exception {
+		MemoryStore store=new MemoryStore();
+		// Stored without being persisted, so never checked
+		AVector<?> badTree=Cells.store(store.decode(Blob.fromHex("80"+badTreeBody())),store);
+		// A leaf of 17 elements over that tree as its prefix: the tree is invalid, and so
+		// is the leaf against it, since the tree claims 256 elements
+		AVector<?> leaf=store.decode(Blob.fromHex("8011"+"1101"+ref(badTree)));
+		InvalidDataException e=assertThrows(InvalidDataException.class,leaf::validate);
+		assertEquals(badTree.getHash(),((ACell)e.getData()).getHash(),"the invalid child is found first");
+	}
+
+	/** validate() trusts a cell recorded as persisted, with its whole tree */
+	@Test
+	public void testValidateTrustsPersisted() throws Exception {
+		try (EtchStore store=EtchStore.createTemp("structure-check")) {
+			Index<ABlob,ACell> small=Index.none();
+			for (int i=1; i<=20; i++) small=small.assoc(Blob.fromHex(String.format("%02x",i)),CVMLong.create(i));
+			Index<ABlob,ACell> persisted=Cells.persist(small,store);
+			// A depth the children do not exceed
+			ACell bad=store.decode(patch(persisted.getEncoding(),3,1));
+			assertThrows(InvalidDataException.class,bad::validate);
+
+			// Recorded as persisted directly, as a store written before these checks may hold one
+			store.getEtch().write(bad.getHash(),bad.getRef().withStatus(Ref.PERSISTED));
+			Ref<ACell> stored=store.readStoreRef(bad.getHash());
+			assertTrue(stored.getStatus()>=Ref.PERSISTED);
+			stored.getValue().validate();
 		}
 	}
 

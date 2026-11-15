@@ -1044,12 +1044,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 	}
 	
-	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		validateStructure();
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public void validateStructure() throws InvalidDataException {

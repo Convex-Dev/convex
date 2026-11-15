@@ -13,7 +13,6 @@ import java.util.function.Function;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.RT;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -805,65 +804,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return create(newChildren, shift, mask, computeCount(newChildren));
 	}
 
-	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		
-		try {
-			Hash firstHash=getFirstHash();
-			// Perform child validation
-			validateWithPrefix(firstHash,shift);
-		} catch (ClassCastException e) {
-			throw new InvalidDataException("Can't get first hash of map: "+e.getMessage(),this,e);
-		}
-	}
-
-	@Override
-	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
-		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		int bsize = children.length;
-		if (bsize<2) {
-			throw new InvalidDataException("Non-canonical MapTree with child count "+bsize,this);
-		}
-
-		long childCount=0;;
-		for (int i = 0; i < bsize; i++) {
-			if (children[i] == null)
-				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
-			ACell o = children[i].getValue();
-			if (!(o instanceof AHashMap)) {
-				throw new InvalidDataException(
-						"Expected AHashMap child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
-			}
-			AHashMap<K, V> child = RT.ensureHashMap(o);
-			if (child==null) {
-				throw new InvalidDataException("Non-hashmap child at position "+i,this);
-			}
-			if (child.isEmpty())
-				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
-			int d = digitForIndex(i, mask);
-			Hash ch=child.getFirstHash();
-			if (ch.getHexDigit(shift)!=d) {
-				throw new InvalidDataException("Wrong child digit at position "+i,this);
-			}
-			if (prefix.commonHexPrefixLength(ch, Hash.HEX_LENGTH)<shift) {
-				throw new InvalidDataException("Inconsistent child at position "+i,this);
-			}
-			// TODO: remove recursion here?
-			if (child instanceof MapLeaf) {
-				child.validateWithPrefix(ch, shift+1);
-			}
-			
-			childCount += child.count();
-		}
-		
-		if (count != childCount) {
-			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
-		}
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public void validateStructure() throws InvalidDataException {
@@ -919,6 +859,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
+		if (children.length<2) throw new InvalidDataException("Non-canonical MapTree with child count "+children.length,this);
 	}
 
 	@SuppressWarnings("unchecked")
