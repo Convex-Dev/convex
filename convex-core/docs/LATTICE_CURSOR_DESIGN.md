@@ -365,14 +365,19 @@ place first. A default view is present wherever it is read, so a transaction
 through one starts from the default and its commit is a write like any other.
 
 Optimistic execution is the fast path for transactions that do not collide. Commit
-is a strict three-way merge on the transaction's own value: a change elsewhere under
-the root never reruns the callback, and its finished result is applied to the new
-root. If its own value is unchanged, the run's changes are carried onto that value's
-cells, which may have been persisted during the run. A run that changed nothing
-commits whatever changed meanwhile, as of the value it read. When its own
-value has changed, the transaction takes the claim of its nearest boundary and
-finishes under it. Claims on the same boundary run one at a time, and a callback
-runs at most twice. An exclusive transaction starts with that claim and runs
+is a three-way merge on the transaction's own value: the value the run started
+from, the run's value and the value as held. A change elsewhere under the root never
+reruns the callback, and its finished result is applied to the new root. A
+component's transaction commits by the component's own merge, so a concurrent change
+the component can reconcile, such as one to a different region, commits with the
+run. Transactions record no reads: what the merge accepts is valid by the
+component's rules. By default a component's merge treats a change on both sides as
+a conflict. A transaction on a plain cursor, given no merge, commits strictly: if
+its own value is unchanged, the run's changes are carried onto that value's cells,
+which may have been persisted during the run, and a run that changed nothing
+commits whatever changed meanwhile, as of the value it read. On a conflict, the
+transaction takes the claim of its nearest boundary and finishes under it. Claims
+on the same boundary run one at a time, and a callback runs at most twice. An exclusive transaction starts with that claim and runs
 once, for work too expensive to repeat or with side effects.
 
 A claim locks a transactional boundary, wherever in a cursor tree it is taken:
@@ -398,7 +403,7 @@ as a whole-container commit over one of its regions, is reconciled as a fork's s
 is: given a three-way merge, the claimed commit merges its run's value, as `own`,
 with that write, as `other`, from the value the run started with. Without a merge
 the commit fails rather than overwrite the write. A component's transactions pass
-its `reconcile`, so one that cannot reconcile changes on both sides fails.
+its `reconcile`, so a conflict there fails the commit.
 Each write through a boundary holds the read side of its read-write lock, and its
 claim holds the write side.
 

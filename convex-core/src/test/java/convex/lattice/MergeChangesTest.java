@@ -202,6 +202,6 @@ class MergeChangesTest {
 		var component=new ALatticeComponent<AHashMap<Keyword,ACell>>(fork) {};
 		fork.set(original.assoc(B,OURS));
 		root.set(original.assoc(Y,THEIRS));
-		assertThrows(UnsupportedOperationException.class,component::sync);
+		assertThrows(MergeConflictException.class,component::sync);
 	}
 }

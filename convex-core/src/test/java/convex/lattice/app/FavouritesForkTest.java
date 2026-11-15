@@ -19,6 +19,7 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeHost;
+import convex.lattice.MergeConflictException;
 
 /** The same favourites operations support shared signed views and private unsigned drafts. */
 class FavouritesForkTest {
@@ -69,7 +70,7 @@ class FavouritesForkTest {
 		assertSame(published,host.cursor().get(FAVOURITES,ALICE.getAccountKey()));
 	}
 
-	@Test void competingDraftsUseWholeRecordOrderingInEitherPublicationOrder() {
+	@Test void competingDraftsConflictAtTheSecondSyncInEitherOrder() {
 		for (boolean newestFirst:new boolean[] {false,true}) {
 			var host=LatticeHost.create();
 			var clock=new AtomicReference<>(CVMLong.ONE);
@@ -84,12 +85,13 @@ class FavouritesForkTest {
 			clock.set(CVMLong.create(3));
 			second.remove(99);
 			second.add(2);
-			if (newestFirst) { second.sync(); first.sync(); }
-			else { first.sync(); second.sync(); }
-			first.sync();
-			assertEquals(Sets.of(2),first.items());
-			assertEquals(Sets.of(2),second.items());
-			assertEquals(Sets.of(2),app.user(ALICE).items(),"The newer record wins, not a union of item sets");
+			var winner=newestFirst?second:first;
+			var loser=newestFirst?first:second;
+			winner.sync();
+			var published=app.component().get(ALICE.getAccountKey());
+			assertThrows(MergeConflictException.class,loser::sync,"keeping either whole record would lose the other's edits");
+			assertSame(published,app.component().get(ALICE.getAccountKey()),"a refused sync changes nothing");
+			assertEquals(newestFirst?Sets.of(2):Sets.of(1,99),app.user(ALICE).items());
 			assertSame(bob,app.component().get(BOB.getAccountKey()));
 			assertTrue(host.cursor().get().isEmpty());
 		}
@@ -122,8 +124,6 @@ class FavouritesForkTest {
 		draft.remove(1);
 		draft.add(3);
 		var pending=draft.storage().get();
-		clock.set(CVMLong.TWO);
-		app.user(ALICE).add(2); // Force reconciliation before the failed signing attempt.
 		var before=app.component().get(ALICE.getAccountKey());
 		assertThrows(IllegalStateException.class,draft::sync);
 		signingKey.set(null);

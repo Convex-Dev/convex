@@ -18,6 +18,7 @@ import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
 import convex.lattice.LatticeHost;
 import convex.lattice.MapComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
@@ -46,7 +47,9 @@ import convex.lattice.generic.SignedLattice;
  * atomic storage operation. Repeated user handles share that signed working state.
  * A user handle can fork the same domain API for a batch: edits then stamp private
  * unsigned state, and sync signs the reconciled record into the region. A nested
- * draft sync stops at its enclosing draft, without signing early.
+ * draft sync stops at its enclosing draft, without signing early. Local changes on
+ * both sides conflict, at a draft's sync or a transaction's commit, since keeping one
+ * whole record would lose the other's edits.
  * Incoming envelopes are verified and compared by their signed timestamps; a selected
  * envelope keeps its signature and is never stamped with the receiver's clock.
  * The newer record replaces the entire older record, so removed items stay removed.
@@ -196,6 +199,14 @@ public final class FavouritesExample {
 			return new Favourites(cursor,lattice,getTimestamp);
 		}
 		@Override public Favourites fork() { return rebind(storage.fork()); }
+
+		/**
+		 * The record is ordered whole by its timestamp, so a merge would keep one side
+		 * whole and lose the other's edits: a change on both sides is a conflict.
+		 */
+		@Override protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
+			throw new MergeConflictException("Both sides changed a favourites record");
+		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }

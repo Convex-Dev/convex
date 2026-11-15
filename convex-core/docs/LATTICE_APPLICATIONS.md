@@ -371,13 +371,14 @@ live view and a private view. Their storage and publication boundaries differ,
 not the meaning of actions such as adding a favourite or editing a file.
 
 A transaction executes operations on a private draft, then commits one local
-atomic change. During optimistic execution, a change to the transaction's input
-makes the operations run again against current state. Under a claim, a change
-that bypasses the claimed boundary is instead reconciled using the component's
-`reconcile`; a component that cannot reconcile changes on both sides refuses that
-conflicting commit. These are different ways of handling a conflict: retrying repeats the
-operations, while merging resolves the resulting versions according to component
-policy.
+atomic change by the component's `reconcile`, given the value it started from,
+its own value and the current value. A concurrent change the component can
+reconcile commits with the run; a conflict, which by default is any change on both
+sides, makes the operations run once more, under a claim, against current state.
+Under a claim, a change that bypasses the claimed boundary goes through the same
+`reconcile`, and a conflict there refuses the commit. These are different ways of
+handling a concurrent change: merging resolves the resulting versions according to
+component policy, while retrying repeats the operations.
 
 Execution produces a transaction value and a return value. Commit applies any
 required reconciliation and authoring, then atomically installs the resulting

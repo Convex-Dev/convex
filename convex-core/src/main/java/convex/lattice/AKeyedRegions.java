@@ -37,8 +37,10 @@ import convex.lattice.cursor.BoundaryCursor;
  * and an exclusive one claims only that region's boundary, so regions transact
  * exclusively at the same time. A transaction
  * on the whole container, by a subclass that implements {@link TransactionalComponent},
- * spans its regions and works on their values published into the container; a region
- * write landing there during an attempt makes it retry on top. An exclusive
+ * spans its regions and works on their values published into the container. A region
+ * write landing there during an attempt merges with its run region by region
+ * ({@link #reconcile(Index,Index,Index)}); a region both changed, which
+ * {@link #mergeRegion} refuses, reruns it under the claim. An exclusive
  * transaction on the container holds the claim beneath every region's boundary, so region writes wait
  * for it. Work a region keeps in a working copy of its own, including transactions
  * committed into that fork, has not yet been published into the container. It is
@@ -310,10 +312,9 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 
 	/**
 	 * Reconciles this container's working copy with a destination that also changed,
-	 * key by key. A key changed on only one side, or changed to the same value on
-	 * both, takes that value. A key this container does not serve keeps the
-	 * destination's value. A region it serves that the two sides changed differently
-	 * goes to {@link #mergeRegion}.
+	 * key by key. A key changed on only one side takes that side's value. A key this
+	 * container does not serve keeps the destination's value. A region it serves that
+	 * both sides changed, even to equal values, goes to {@link #mergeRegion}.
 	 */
 	@Override
 	protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
@@ -330,8 +331,6 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				if (same(ownHas,ownValue,has(base,key),get(base,key))) continue;
 				boolean otherHas=has(other,key);
 				ACell otherValue=get(other,key);
-				// Equal changes keep the destination's cells, which may be persisted
-				if (same(ownHas,ownValue,otherHas,otherValue)) continue;
 				if (same(otherHas,otherValue,has(base,key),get(base,key))) {
 					// Only own changed: carried onto the destination's cells where they are equal
 					result=put(result,key,ownHas,(ownHas && otherHas)?LatticeOps.mergeChanges(get(base,key),ownValue,otherValue):ownValue);
@@ -353,8 +352,8 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	}
 
 	/**
-	 * Reconciles one region that this container's working copy and its destination
-	 * changed differently. Called within the destination's atomic update, so it must
+	 * Reconciles one region that both this container's working copy and its destination
+	 * changed. Called within the destination's atomic update, so it must
 	 * use only the values given. The default refuses: a region's own merge works on
 	 * its component's working type, which may differ from what is stored here, so a
 	 * subclass that forks itself while such conflicts can arise supplies the rule.
@@ -366,7 +365,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * @return Reconciled stored value
 	 */
 	protected ACell mergeRegion(Keyword key,ACell base,ACell own,ACell other) {
-		throw new UnsupportedOperationException("Region "+key+" changed both in "+getClass().getSimpleName()
+		throw new MergeConflictException("Region "+key+" changed both in "+getClass().getSimpleName()
 			+" and at its destination, and no region merge is defined");
 	}
 
