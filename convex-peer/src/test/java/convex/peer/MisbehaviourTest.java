@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.NullStore;
+import convex.net.IncomingHandler;
 import convex.net.PeerRefusedException;
 import convex.net.impl.netty.NettyServer;
 import convex.peer.PeerRequestFailureTest.ReplyConnection;
@@ -180,20 +182,31 @@ public class MisbehaviourTest {
 	/**
 	 * Launches a remote that answers a challenge with a forged signature claiming
 	 * {@link #CLAIMED}, and names that key in its status.
+	 *
+	 * @param disconnected Completed when a connection to the remote closes
 	 */
-	static NettyServer forgingRemote() throws Exception {
+	static NettyServer forgingRemote(CompletableFuture<Void> disconnected) throws Exception {
 		NettyServer remote=new NettyServer(0);
-		remote.setReceiveAction(m -> {
-			try {
-				m.getPayload(NullStore.INSTANCE);
-			} catch (BadFormatException e) {
-				return;
+		remote.setConnectionHandler(connection -> new IncomingHandler() {
+			@Override
+			public Predicate<Message> handle(Message m) {
+				try {
+					m.getPayload(NullStore.INSTANCE);
+				} catch (BadFormatException e) {
+					return null;
+				}
+				switch (m.getType()) {
+				case CHALLENGE -> m.returnResult(Result.value(SignedData.create(CLAIMED,Ed25519Signature.ZERO,
+					Vectors.of(Hash.EMPTY_HASH,LOCAL.getAccountKey()).getRef())));
+				case STATUS -> m.returnResult(Result.value(Maps.of(Keywords.PEER,CLAIMED)));
+				default -> {}
+				}
+				return null;
 			}
-			switch (m.getType()) {
-			case CHALLENGE -> m.returnResult(Result.value(SignedData.create(CLAIMED,Ed25519Signature.ZERO,
-				Vectors.of(Hash.EMPTY_HASH,LOCAL.getAccountKey()).getRef())));
-			case STATUS -> m.returnResult(Result.value(Maps.of(Keywords.PEER,CLAIMED)));
-			default -> {}
+
+			@Override
+			public void close() {
+				disconnected.complete(null);
 			}
 		});
 		remote.launch();
@@ -203,7 +216,7 @@ public class MisbehaviourTest {
 	/** Verifying a remote whose challenge reply is forged fails with that evidence. */
 	@Test
 	public void aForgedChallengeReplyFailsVerification() throws Exception {
-		try (NettyServer remote=forgingRemote();
+		try (NettyServer remote=forgingRemote(new CompletableFuture<>());
 				ConvexRemote client=ConvexRemote.connect(remote.getHostAddress())) {
 			client.setKeyPair(LOCAL);
 			ExecutionException e=assertThrows(ExecutionException.class,
@@ -215,18 +228,20 @@ public class MisbehaviourTest {
 
 	/**
 	 * A peer connecting to a remote whose challenge reply is forged refuses it, rather than
-	 * taking the key its status names.
+	 * taking the key its status names, and disconnects.
 	 */
 	@Test
 	public void aForgedChallengeReplyRefusesThePeer() throws Exception {
 		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
-		try (NettyServer remote=forgingRemote()) {
+		CompletableFuture<Void> disconnected=new CompletableFuture<>();
+		try (NettyServer remote=forgingRemote(disconnected)) {
 			ConnectionManager manager=peer.getConnectionManager();
 			ExecutionException e=assertThrows(ExecutionException.class,
 				() -> manager.connectToPeer(remote.getHostAddress()).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS));
 			PeerRefusedException refused=assertInstanceOf(PeerRefusedException.class,e.getCause());
 			assertInstanceOf(BadSignatureException.class,refused.getCause());
 			assertNull(manager.getConnection(CLAIMED));
+			disconnected.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 		} finally {
 			peer.close();
 		}
