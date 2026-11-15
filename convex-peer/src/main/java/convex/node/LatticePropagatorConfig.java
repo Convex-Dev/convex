@@ -215,10 +215,9 @@ public final class LatticePropagatorConfig {
 		return (value==null) ? 100L : value.longValue();
 	}
 
-	/** Returns the maximum number of keys in a lattice path this group accepts. */
-	public long getMaxPathLength() {
-		CVMLong value=RT.ensureLong(config.get(MAX_PATH_LENGTH));
-		return (value==null) ? DEFAULT_MAX_PATH_LENGTH : value.longValue();
+	/** Returns the maximum number of keys in a lattice path this group accepts (zero accepts only the root). */
+	public int getMaxPathLength() {
+		return getNonNegativeInt(MAX_PATH_LENGTH,DEFAULT_MAX_PATH_LENGTH);
 	}
 
 	/** Returns the encoded-message limit before route verification. */

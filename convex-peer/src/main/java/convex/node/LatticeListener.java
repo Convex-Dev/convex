@@ -288,7 +288,9 @@ public final class LatticeListener implements Closeable {
 	private Predicate<Message> containFailure(AConnection connection,
 			LatticePropagator propagator,Throwable failure) {
 		propagator.recordFailure("inbound delivery",failure);
-		log.warn("Propagator group failed while receiving; closing its connection",failure);
+		log.warn("Propagator group failed while receiving; closing its connection: {}: {}",
+			failure.getClass().getSimpleName(),failure.getMessage());
+		log.debug("Inbound delivery failure",failure);
 		assignments.remove(connection,propagator);
 		try {
 			propagator.removeInboundConnection(connection);
@@ -358,7 +360,9 @@ public final class LatticeListener implements Closeable {
 			propagator.removeInboundConnection(connection);
 		} catch (Throwable e) {
 			Utils.checkRequestFailure(e);
-			log.warn("Propagator group failed during connection cleanup",e);
+			log.warn("Propagator group failed during connection cleanup: {}: {}",
+				e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Connection cleanup failure",e);
 		}
 	}
 

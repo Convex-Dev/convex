@@ -314,6 +314,27 @@ public class NodeServerTest {
 		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
 	}
 
+	/** A failure of the JVM itself while publishing stops the group's publication visibly. */
+	@Test
+	public void testFatalErrorStopsPublicationVisibly() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public ACell processSnapshot(ACell value) throws IOException {
+				if (CVMLong.create(13).equals(value)) throw new InternalError("simulated publication");
+				return super.processSnapshot(value);
+			}
+		};
+		maxNodeServer.addPropagator(group);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+
+		maxNodeServer.getCursor().set(CVMLong.create(13));
+		maxNodeServer.getHost().sync();
+		LatticePropagator.Failure recorded=failure.get(5,TimeUnit.SECONDS);
+		assertTrue(recorded.cause() instanceof InternalError);
+		assertEquals("publication processing",recorded.operation());
+	}
+
 	/** Every propagation-group callback is optional, isolated fan-out. */
 	@Test
 	public void testPropagatorFailuresCannotBreakAuthoritativeLoop() throws Exception {
@@ -663,7 +684,8 @@ public class NodeServerTest {
 
 		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),poisoned)));
 		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
-		assertTrue(poisoned.awaitResult(1).isError(),"the message whose merge ran out of memory is rejected");
+		assertEquals(ErrorCodes.ARGUMENT,poisoned.awaitResult(1).getErrorCode(),
+			"the message whose merge ran out of memory is rejected");
 		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
 		assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
 	}
@@ -2210,7 +2232,8 @@ public class NodeServerTest {
 		ScriptedPeer peer=new ScriptedPeer();
 		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
 
-		endpoint.handleIncomingMessage(latticeValueAt(1,Vectors.repeat(CVMLong.ONE,1<<20),peer));
+		int limit=LatticePropagatorConfig.DEFAULT_MAX_PATH_LENGTH;
+		endpoint.handleIncomingMessage(latticeValueAt(1,Vectors.repeat(CVMLong.ONE,limit+1),peer));
 		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
 		assertTrue(peer.isClosed(),"a path over the limit is the sender's fault, for the second reject");
 	}
@@ -2256,6 +2279,14 @@ public class NodeServerTest {
 		assertEquals(ErrorCodes.ARGUMENT,peer.awaitResult(1).getErrorCode());
 		endpoint.handleIncomingMessage(latticeQueryAt(2,Vectors.of(CVMLong.ONE,CVMLong.ONE),peer));
 		assertFalse(peer.awaitResult(2).isError(),"a path at the configured limit is read");
+	}
+
+	/** A negative path limit is not a valid setting. */
+	@Test
+	public void testNegativePathLengthIsInvalid() {
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_PATH_LENGTH,CVMLong.create(-1)));
+		assertThrows(IllegalArgumentException.class,groupConfig::getMaxPathLength);
 	}
 
 	/**

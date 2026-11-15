@@ -28,7 +28,6 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
@@ -1071,39 +1070,47 @@ public class LatticePropagator implements Closeable {
 	 * remaining queued values without waiting, then exits.
 	 */
 	private void propagationLoop() {
-		while (running || !triggerQueue.isEmpty()) {
-			try {
-				ACell value;
-				if (running) {
-					// A timed poll even with announcements off: closing the queue ends it
-					long wait=(rootAnnouncementInterval>0) ? rootAnnouncementInterval : Long.MAX_VALUE;
-					value = triggerQueue.poll(wait, TimeUnit.MILLISECONDS);
-				} else {
-					// Drain mode: non-blocking poll, exit when empty
-					value = triggerQueue.poll();
-					if (value == null) break;
-				}
+		try {
+			while (running || !triggerQueue.isEmpty()) {
+				try {
+					ACell value;
+					if (running) {
+						// A timed poll even with announcements off: closing the queue ends it
+						long wait=(rootAnnouncementInterval>0) ? rootAnnouncementInterval : Long.MAX_VALUE;
+						value = triggerQueue.poll(wait, TimeUnit.MILLISECONDS);
+					} else {
+						// Drain mode: non-blocking poll, exit when empty
+						value = triggerQueue.poll();
+						if (value == null) break;
+					}
 
-				if (value != null) {
-					processSnapshotSafe(value);
-				}
+					if (value != null) {
+						processSnapshotSafe(value);
+					}
 
-				// Periodic root announcement only while running
-				if (running) {
-					maybeAnnounceRoot(Utils.getCurrentTimestamp());
-				}
+					// Periodic root announcement only while running
+					if (running) {
+						maybeAnnounceRoot(Utils.getCurrentTimestamp());
+					}
 
-			} catch (InterruptedException e) {
-				// Drain remaining items before exiting
-				ACell remaining;
-				while ((remaining = triggerQueue.poll()) != null) {
-					processSnapshotSafe(remaining);
+				} catch (InterruptedException e) {
+					// Drain remaining items before exiting
+					ACell remaining;
+					while ((remaining = triggerQueue.poll()) != null) {
+						processSnapshotSafe(remaining);
+					}
+					break;
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					log.warn("Unexpected propagation loop failure: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+					log.debug("Propagation loop failure",e);
+					if (!running) break;
 				}
-				break;
-			} catch (Exception e) {
-				log.warn("Unexpected error in propagation loop", e);
-				if (!running) break;
 			}
+		} catch (Error e) {
+			// A failure of the JVM itself: stop publishing, and say so
+			log.error("Propagation group stopped publishing",e);
+			recordFailure("publication processing",e);
 		}
 		log.debug("LatticePropagator loop ended");
 	}
@@ -1120,7 +1127,8 @@ public class LatticePropagator implements Closeable {
 			// terminate NodeServer publication or another propagator's worker.
 			Utils.checkRequestFailure(e);
 			recordFailure("publication",e);
-			log.warn("Isolated propagation policy failure",e);
+			log.warn("Isolated propagation policy failure: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Propagation policy failure",e);
 		}
 	}
 
@@ -1403,11 +1411,10 @@ public class LatticePropagator implements Closeable {
 			// Not announced: the value has not been through this node's merge, and
 			// announcing it would mark its cells as already shared, leaving them out of
 			// the novelty of this node's next publication.
-			return CompletableFuture.completedFuture(Cells.persist(receivedValue, store));
-		} catch (InvalidStructureException e) {
+			return CompletableFuture.completedFuture(Cells.persistReceived(receivedValue, store));
+		} catch (BadFormatException e) {
 			// The peer's reply is not a valid value: an outcome of the pull, not a fault
-			return CompletableFuture.failedFuture(
-				new BadFormatException("Pulled value has invalid structure: "+e.getMessage(),e));
+			return CompletableFuture.failedFuture(e);
 		} catch (IOException e) {
 			// This node's own store failed: a fault, not an outcome of the pull
 			return CompletableFuture.failedFuture(new StoreException("Unable to store a pulled lattice value", e));

@@ -192,7 +192,8 @@ public class NettyServer extends AServer {
 					 } catch (Throwable e) {
 						 // A failure setting up one connection refuses that connection alone
 						 Utils.checkRequestFailure(e);
-						 log.warn("Incoming connection handler failed",e);
+						 log.warn("Incoming connection handler failed: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+						 log.debug("Incoming connection handler failure",e);
 						 if (!accepted.opened) accepted.open(null);
 						 conn.close();
 					 }

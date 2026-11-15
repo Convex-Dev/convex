@@ -176,9 +176,10 @@ Propagation failures are isolated:
 
 A failure while handling one connection, one message or one group's publication,
 including running out of memory or stack, fails that work alone and is logged. Only
-a failure of the JVM itself (`InternalError`, `UnknownError`) is not contained there;
-one that stops a group's inbound processing is recorded as that group's failure, and
-the group then refuses inbound messages.
+a failure of the JVM itself (`InternalError`, `UnknownError`) is not contained there.
+It stops the group's inbound processing or publication, whichever it struck, and is
+recorded as that group's failure; a group whose inbound processing has stopped
+refuses inbound messages.
 
 ## Lifecycle
 
