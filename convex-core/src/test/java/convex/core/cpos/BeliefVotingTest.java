@@ -458,6 +458,31 @@ public class BeliefVotingTest {
 	}
 
 	/**
+	 * A peer whose Order is behind takes the Blocks the network has agreed without
+	 * checking them, and checks only the new Block after them.
+	 */
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testLaggingMergeChecksOnlyNewBlocks() throws InvalidDataException {
+		int n=40;
+		SignedData<Block>[] network=new SignedData[n+1];
+		for (int i=0; i<n; i++) network[i]=unchecked(bl(400+i));
+		SignedData<Block> added=unchecked(bl(500));
+		network[n]=added;
+
+		SignedData<Order>[] orders=new SignedData[6];
+		orders[0]=or(0,TS,0,0,network[0]);
+		for (int i=1; i<6; i++) orders[i]=or(i,TS,n,n,network);
+		Order merged=BeliefMerge.create(Belief.create(orders),kps[0],TS+100,initialState).merge().getOrder(keys[0]);
+
+		assertEquals(n+1,merged.getBlockCount());
+		assertTrue(added.isSignatureChecked(),"the new Block is checked");
+		for (int i=0; i<n; i++) {
+			assertFalse(network[i].isSignatureChecked(),"agreed Block "+i+" is not checked");
+		}
+	}
+
+	/**
 	 * Orders in which the given Block wins the second position: two peers propose it,
 	 * and each other peer its own Block.
 	 */

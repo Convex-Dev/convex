@@ -657,12 +657,10 @@ public class BeliefMerge {
 			newBlocks.remove(it.next());
 		}
 		newBlocksOrdered.removeIf(sb -> {
+			// Membership first: only Blocks to be appended are checked
+			if (!newBlocks.contains(sb)) return true;
 			// We ignore blocks that don't look valid for current state
-			BlockResult br=state.checkBlock(sb);
-			if (br!=null) {
-				return true;
-			}
-			return !newBlocks.contains(sb);
+			return state.checkBlock(sb)!=null;
 		});
 
 		// sort new blocks by timestamp and append to winning Order
