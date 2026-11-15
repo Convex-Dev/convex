@@ -50,8 +50,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Checks this cell against each of its direct children, as structural correctness
-	 * requires. A store runs this check when it first persists the cell, so it reads
-	 * only this cell and its direct children, and checks no rule beyond structure.
+	 * requires, and no rule beyond structure. A store runs this check when it first
+	 * persists the cell, after persisting its children.
 	 *
 	 * @throws InvalidDataException  If the cell is inconsistent with a direct child
 	 */

@@ -1024,13 +1024,14 @@ public class Utils {
 	}
 
 	/**
-	 * Checks a failure of one request, such as one message or one connection, before
-	 * the caller contains it. Rethrows the failure if it is a failure of the JVM itself:
+	 * Checks a failure of one unit of work, such as one message, one connection or one
+	 * cleanup step, before the caller contains it, so that the work fails alone.
+	 * Rethrows the failure if it is a failure of the JVM itself:
 	 * a {@link VirtualMachineError} other than {@link StackOverflowError} or
 	 * {@link OutOfMemoryError}. Otherwise returns, restoring the current thread's
 	 * interrupt status if the failure is an {@link InterruptedException}.
 	 *
-	 * @param e Failure of one request
+	 * @param e Failure of one unit of work
 	 */
 	public static void checkRequestFailure(Throwable e) {
 		if ((e instanceof VirtualMachineError vme) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) {
