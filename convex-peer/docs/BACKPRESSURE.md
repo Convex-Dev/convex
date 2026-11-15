@@ -131,10 +131,11 @@ So a client that sends faster than it reads is slowed by TCP, like one whose req
 fill a queue, rather than losing results. Pausing always holds a decoded request, so
 that Netty's decoder does not ask the socket for more input while reads are off.
 
-A connection a lattice node has verified is never paused for its replies: it has a
-far larger allowance (`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own.
-A consensus peer verifies no connection opened to it
-([PEER_PRIORITY.md](PEER_PRIORITY.md)), so every connection to it is treated as a
+A verified connection is never paused for its replies: it has a far larger allowance
+(`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own, served first. A
+lattice node verifies the connections it admits; a consensus peer verifies a
+connection that proves it is a staked peer's own link
+([PEER_PRIORITY.md](PEER_PRIORITY.md)). Every other connection is treated as a
 client here. A client reply that finds the shared queue full is refused: the writer
 only hands messages to Netty, so that takes a server too short of CPU for the writer
 to keep up.
@@ -242,9 +243,10 @@ query load.
 The protocol allows messages up to 50 MB, primarily for peer Belief messages. A
 client has no reason to send a 50 MB message — transactions and queries are
 typically under 100 KB. But peer Beliefs arrive on inbound connections like client
-requests, and a consensus peer does not tell the two apart
-([PEER_PRIORITY.md](PEER_PRIORITY.md)), so a smaller limit cannot yet be set for
-clients alone to prevent malicious cumulation buffer growth.
+requests, and a consensus peer can tell the two apart only once it has verified the
+connection, after its first Belief ([PEER_PRIORITY.md](PEER_PRIORITY.md)). So a
+smaller limit cannot yet be set for clients alone to prevent malicious cumulation
+buffer growth.
 
 ### QueryHandler Parallelism
 

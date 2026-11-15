@@ -110,8 +110,10 @@ record of what has been announced is per store, not per receiver. A receiver can
 therefore lack cells an update refers to. It may not have been connected when
 they were first sent (a peer broadcasts as soon as it starts, while its
 connections are still opening). A queue may have refused the update that carried
-them. Or the receiver may have dropped that update because something else was
-missing, since decoding an update never stores the cells it carries.
+them. The update's DATA may have come on a link the receiver had not yet verified,
+and been ignored ([PEER_PRIORITY.md](PEER_PRIORITY.md)). Or the receiver may have
+dropped that update because something else was missing, since decoding an update
+never stores the cells it carries.
 
 Such an update ends in a request rather than a timer. `BeliefPropagator` stores
 the update's own cells, fetches what they lack from the connection the update
@@ -127,8 +129,8 @@ peers which have outbound connections but receive no inbound propagation. One
 random outbound peer is probed per interval; an unchanged Belief hash costs no
 acquisition.
 
-Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
-queue off the Netty event loop. This preserves the DATA-before-root order for a
+Inbound CPoS BELIEF messages, and DATA from verified connections, share one ordered,
+byte-bounded processing queue off the Netty event loop. This preserves the DATA-before-root order for a
 connection while keeping decoding and store work away from network I/O. The
 queue admits one message over its byte bound, so any legal frame can enter when
 capacity is available. If either bound is already full, the incoming DATA or
@@ -183,9 +185,10 @@ independent encoded-byte limit.
 
 ## Receiver policy and recovery
 
-Unsolicited DATA is staging only. It is accepted only after the connection has
-been assigned an authorised propagator/store capability, and it does not merge
-or publish a lattice value. The acquiror and its storage policy belong to the
+Unsolicited DATA is staging only, and is accepted only from an authorised
+connection: on a lattice node, one assigned an authorised propagator/store
+capability; on a consensus peer, one verified as a staked peer's own link
+([PEER_PRIORITY.md](PEER_PRIORITY.md)). It does not merge or publish a value. The acquiror and its storage policy belong to the
 receiving side. A later LATTICE_VALUE or BELIEF root activates normal processing
 and requests any missing cells.
 

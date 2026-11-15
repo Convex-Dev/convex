@@ -289,7 +289,8 @@ that communicate via an `AConnection`:
   applies transaction bookkeeping.
 - **Protocol handling** — incoming protocol messages (e.g. server-initiated
   CHALLENGE) are handled automatically (auto-response with the client's
-  keypair). Reverse DATA_REQUESTs and other unsolicited messages go to the
+  keypair, in the bound form naming the dialled peer if one is set,
+  [PEER_PRIORITY.md](PEER_PRIORITY.md#protocol)). Reverse DATA_REQUESTs and other unsolicited messages go to the
   deliveries set with `setDataRequestDelivery` and `setUnsolicitedMessageDelivery`,
   which may ask to wait; `ConvexRemote` passes that request on to its transport.
   `returnMessageHandler`, for paths that cannot pause such as `ConvexLocal`,
@@ -441,8 +442,9 @@ if (conn.supportsMessage()) {
 Used by lattice nodes for protocol exchange (challenge/response verification),
 data push, and other server-initiated communication. Only works on bidirectional
 connections. `supportsMessage()` returns false on return-only connections — check
-before attempting. A consensus peer's server sends only results, and requests for data
-missing from an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
+before attempting. A consensus peer's server sends only results, a challenge to an
+unverified connection that sends it a Belief or DATA, and requests for data missing from
+an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
 
 ### 5.3 Trust Checks
 
@@ -457,8 +459,8 @@ if (conn != null && conn.isTrusted()) {
 
 Messages on return-only connections are always untrusted (`supportsMessage()`
 returns false so verification cannot be initiated). Persistent bidirectional
-connections can accumulate trust via verification. A consensus peer makes no such
-check: it judges a Belief by its signed Orders, whoever sent it.
+connections can accumulate trust via verification. A consensus peer judges a Belief by
+its signed Orders, whoever sent it, but stores DATA only from a trusted connection.
 
 ### 5.4 Verification
 
@@ -472,8 +474,9 @@ A lattice node verifies an inbound connection that claims a key it wants to trus
 5. Verification succeeds → `conn.setTrustedKey(remoteKey)`
 6. Subsequent messages on this connection are trusted
 
-A consensus peer verifies only connections it opens; see
-[PEER_PRIORITY.md](PEER_PRIORITY.md).
+A consensus peer verifies a connection opened to it in the same way, with an answer
+that only a staked peer's own outbound link can give (`InboundVerifier`); see
+[PEER_PRIORITY.md](PEER_PRIORITY.md#verifying-an-inbound-connection).
 
 Application-specific policy (e.g. "is this key a registered peer in consensus
 state") is separate from the connection-layer verification. The connection

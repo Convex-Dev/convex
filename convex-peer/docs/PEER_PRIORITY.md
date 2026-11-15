@@ -12,11 +12,17 @@ timestamped in the future ([CAD051](https://docs.convex.world/docs/cad/cpos)). P
 each other's Orders, so knowing which connection a Belief arrived on would vouch for
 nothing it contains.
 
-A consensus peer therefore verifies only the connections it opens. It never challenges a
-connection opened to it ([CAD015](https://docs.convex.world/docs/cad/peercomms) Trust).
-Besides results, it sends on that connection only a request for data missing from an
-update that arrived on it ([PROPAGATION.md](PROPAGATION.md)). What comes back is
-content-addressed and judged like any other data.
+DATA is different: it is cells pushed ahead of a Belief, stored before anything refers to
+them. A consensus peer stores DATA only from a connection it trusts: one whose far end has
+proved it is a staked peer's own link to this peer
+([Verifying an Inbound Connection](#verifying-an-inbound-connection)). DATA from any other
+connection is ignored, and an update it preceded completes through the missing-data fetch
+([PROPAGATION.md](PROPAGATION.md)).
+
+Besides results, a peer sends on a connection opened to it only a challenge, when the
+connection is untrusted and sends a Belief or DATA, and a request for data missing from an
+update that arrived on it. What a fetch brings back is content-addressed and judged like
+any other data.
 
 ## Liveness
 
@@ -36,9 +42,9 @@ consensus:
    carrying it. The exception is an update with data missing that this peer fetches: its
    cells, and whatever the fetch brings, are stored before any Order in it is judged, as
    pushed DATA is. With one fetch at a time, that is one update at a time.
-3. **A bounded queue.** Pushed DATA and Beliefs from every connection share one ordered
-   queue, bounded by count and bytes. When it is full, further pushes are dropped; the
-   connection is never paused for them.
+3. **A bounded queue.** Pushed Beliefs from every connection, and DATA from trusted
+   connections, share one ordered queue, bounded by count and bytes. When it is full,
+   further pushes are dropped; the connection is never paused for them.
 
 While junk fills the queue, pushes from real peers can be dropped with it, and consensus
 proceeds at the polling rate. A sender that never answers can likewise hold a peer's one
@@ -49,19 +55,41 @@ rate at worst.
 
 | Message | Handling |
 |---------|----------|
-| BELIEF | Joins the propagation queue, whoever sent it |
-| DATA | Joins the propagation queue, whoever sent it. Its cells are staged in the store; they count only once a valid Belief refers to them |
+| BELIEF | Joins the propagation queue, whoever sent it. From an untrusted connection, it also starts verification of that connection |
+| DATA | From a trusted connection, joins the propagation queue, and its cells are stored if the connection's key still has the minimum effective stake; they count only once a valid Belief refers to them. From any other connection, ignored, and starts verification |
 | CHALLENGE | Answered with this peer's key, so whoever opened the connection can verify it |
-| RESULT | Completes this peer's request on that connection, a fetch of missing data; any other is ignored (CAD015) |
-
-Accepting DATA from any connection is under review: a peer could instead accept it only
-from a sender it has verified separately ([#826](https://github.com/Convex-Dev/convex/issues/826)).
+| RESULT | Completes this peer's request on that connection, a challenge or a fetch of missing data; any other is ignored (CAD015) |
 
 Data missing from a received Belief or Order is requested from the connection it arrived
 on, one fetch at a time ([PROPAGATION.md](PROPAGATION.md)). A peer's own connections to
 other peers answer such requests from its store.
 
-Lattice nodes do verify connections opened to them; see
+### Verifying an Inbound Connection
+
+`InboundVerifier` challenges an untrusted connection when it sends a Belief or DATA:
+
+1. It sends a CHALLENGE `[token, nil, networkID]`, signed by this peer.
+2. The far end must give the bound answer `[token, thisPeer, networkID, thisPeer]`, signed
+   by a key with at least the minimum effective stake. The last element is the peer the
+   answering connection was opened to reach. Only a peer's own outbound link gives this
+   form ([Outbound Connections](#outbound-connections-challengeresponse)); a server's
+   answer has three elements and is not accepted.
+3. On success, the connection's trusted key is set. DATA from it is then stored, and it
+   gets the trusted treatment for replies ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
+
+On a network thread the verifier only checks whether to start: whether the connection is
+trusted, has an attempt in flight, or is backing off. Signing, sending, waiting up to 5 s
+for the answer and checking it run on a virtual thread.
+
+A failed attempt delays the next one for that connection by the poll delay, doubling with
+each further failure up to 2⁸ poll delays. The verifier forgets a connection when it is
+trusted or closes. Closes are reported by the network listeners, and swept up when an
+attempt starts for transports that do not report them.
+
+The first update a peer sends on a new link may arrive before the link is trusted. Its
+DATA is then ignored, and that update completes through the fetch.
+
+Lattice nodes verify connections opened to them in their own way; see
 [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).
 
 ## Outbound Connections: Challenge/Response
@@ -74,6 +102,7 @@ Lattice nodes do verify connections opened to them; see
 | `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |
+| `Convex.setDialledPeer()` | The peer a client was opened to reach. While set, the client answers a challenge in the bound form naming it |
 | `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted) |
 | `LatticeConnectionManager.tryVerifyPeer()` | Async fire-and-forget verification |
 | `ConnectionManager.processChallenge()` | One-liner via `respondToChallenge()` with networkID context |
@@ -96,22 +125,35 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 - **contextID** — optional; peer Server uses networkID (genesis hash), NodeServer uses null
 - CHALLENGE messages use ID-based correlation like QUERY/STATUS/TRANSACT
 
+A client with a dialled peer answers in the bound form instead,
+`SignedData([token, challengerKey, contextID, dialledKey])`, always four elements, with a
+nil context if the challenge had none (`Message.answerBoundChallenge`). A consensus peer
+accepts only this form when it verifies a connection opened to it
+([Verifying an Inbound Connection](#verifying-an-inbound-connection)).
+
 ### Connection Flow
 
 **Peer `ConnectionManager.connectToPeer()`** (async `CompletableFuture<Convex>`):
-1. Connect to remote address
-2. Try `verifyPeer(null, networkID)` — discovery mode with network context
+1. Connect to remote address, and record the peer key it set out to reach, if any, as the
+   dialled peer
+2. Try `verifyPeer(null, networkID)` — discovery mode with network context (over TLS, the
+   expected key)
 3. If verified → `verifiedPeer` set, `AConnection.trustedKey` set, peer key proven
 4. If verification fails → fall back to `requestStatus()` (untrusted, self-reported key)
-5. Add connection keyed by peer identity
+5. With no key chosen before dialling, record the verified key, if any, as the dialled peer
+6. Add connection keyed by peer identity
+
+Peers send Beliefs only on connections added in step 6, so the dialled peer is recorded
+before any challenge they bring.
 
 **Lattice `LatticeConnectionManager`**:
 1. Connect to remote address
 2. If key pair available, fire async `verifyPeer(peerKey)` — non-blocking
 3. Connection immediately usable; `verifiedPeer` set when verification completes
 
-A peer's outbound connection still answers a CHALLENGE sent back on it, as any client with
-a key pair does, so released peers that challenge inbound connections can verify it.
+A peer's outbound connection answers a CHALLENGE sent back on it in the bound form, naming
+its dialled peer, so that peer can verify the link. Other clients with a key pair answer in
+the plain form.
 
 ## Generic Message API
 
