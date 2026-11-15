@@ -164,6 +164,19 @@ class BoundaryCursorTest {
 		assertSame(written,a.get(),"the destination's own cells, which may be persisted");
 	}
 
+	@Test void aMergeEqualToTheBypassingWriteKeepsItsCells() {
+		var root=tree();
+		var a=boundary(root,A);
+		AInteger written=CVMLong.create(123456789);
+		AInteger copy=CVMLong.create(123456789);
+		assertNotSame(written,copy,"the test needs two objects with one value");
+		Transactions.executeExclusively(a,draft -> {
+			root.set(root.get().assoc(A,written));
+			draft.set(CVMLong.ONE);
+		},(base,own,other) -> copy);
+		assertSame(written,a.get(),"a merge result equal to the destination's value is a write of an equal value");
+	}
+
 	@Test void aBypassingWriteThatMatchesTheRunNeedsNoMerge() {
 		var root=tree();
 		var a=boundary(root,A);
