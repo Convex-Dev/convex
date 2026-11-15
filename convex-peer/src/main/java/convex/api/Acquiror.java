@@ -21,6 +21,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -128,7 +129,11 @@ public final class Acquiror implements AutoCloseable {
 	 * Starts acquisition once and returns its stable completion future.
 	 *
 	 * @param <T> expected acquired cell type
-	 * @return future for the complete store-backed value
+	 * @return future for the complete store-backed value. It fails with a
+	 *         {@link BadFormatException} if a reply is malformed, a
+	 *         {@link MisbehaviourException} if it holds a cell other than the one
+	 *         requested, a {@link ResultException} for an error reply, and a
+	 *         {@link MissingDataException} if the source does not hold a requested cell
 	 */
 	@SuppressWarnings("unchecked")
 	public synchronized <T extends ACell> CompletableFuture<T> getFuture() {
@@ -215,7 +220,7 @@ public final class Acquiror implements AutoCloseable {
 	}
 
 	private void acceptResponse(Hash[] requested, Result result)
-			throws BadFormatException, IOException, ResultException {
+			throws BadFormatException, MisbehaviourException, IOException, ResultException {
 		if (result == null) throw new BadFormatException("Missing acquisition result");
 		if (result.isError()) throw new ResultException(result);
 
@@ -233,7 +238,7 @@ public final class Acquiror implements AutoCloseable {
 				throw new MissingDataException(store, requested[i]);
 			}
 			if (!requested[i].equals(value.getHash())) {
-				throw new BadFormatException("Acquisition response hash mismatch at index " + i);
+				throw new MisbehaviourException("Acquisition response holds a cell other than the one requested at index " + i);
 			}
 			// DATA response cells may themselves be partial. Store the top cell and
 			// let the normal missing-reference loop request its absent branches.

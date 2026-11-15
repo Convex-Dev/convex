@@ -3,11 +3,13 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -15,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,7 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
@@ -43,9 +47,11 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.Init;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.store.MemoryStore;
 import convex.core.store.NullStore;
 import convex.net.IncomingHandler;
 import convex.net.PeerRefusedException;
@@ -282,6 +288,126 @@ public class MisbehaviourTest {
 			Convex connected=manager.connectToPeer(remote.getHostAddress()).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 			assertSame(connected,manager.getConnection(CLAIMED));
 			assertTrue(connected.isConnected());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** Random cells, none of which is a cell requested. */
+	static ACell[] wrongCells(int n) {
+		ACell[] cells=new ACell[n];
+		for (int i=0; i<n; i++) cells[i]=Blobs.createRandom(400);
+		return cells;
+	}
+
+	/** The number of hashes a data request asks for. */
+	static int requestedCount(Message request) {
+		return (int)(((AVector<?>)request.getPayload()).count()-2);
+	}
+
+	/** A remote connection that answers each data request with the cells given for the number requested. */
+	static final class DataReplyConnection extends AConnection {
+		final IntFunction<ACell[]> answer;
+		volatile boolean closed;
+
+		DataReplyConnection(IntFunction<ACell[]> answer) {
+			this.answer=answer;
+		}
+
+		@Override public boolean sendMessage(Message msg) {
+			return trySendMessage(msg);
+		}
+
+		@Override public boolean trySendMessage(Message msg) {
+			if (msg.getType()==MessageType.DATA_REQUEST) {
+				Message reply=Message.createDataResponse(msg.getRequestID(),answer.apply(requestedCount(msg))).withConnection(this);
+				try {
+					completeRequest(reply);
+				} catch (BadFormatException e) {
+					throw new IllegalStateException(e);
+				}
+			}
+			return true;
+		}
+
+		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.4",30000); }
+		@Override public boolean isClosed() { return closed; }
+		@Override public void close() { closed=true; }
+		@Override public long getReceivedCount() { return 0; }
+	}
+
+	/** Has a peer fetch the data missing from an update sent on the connection, until the fetch is over. */
+	static void fetchFrom(DataReplyConnection connection) throws Exception {
+		MemoryStore senderStore=new MemoryStore();
+		SignedData<Order> held=MissingBeliefDataTest.signedOrder(REMOTE_A,1000);
+		MissingBeliefDataTest.update(Belief.create(held),senderStore);
+		// Refers to the Order the sender announced before, which the peer does not hold
+		List<Message> update=MissingBeliefDataTest.update(Belief.create(held,MissingBeliefDataTest.signedOrder(REMOTE_B,1001)),senderStore);
+		Message m=MissingBeliefDataTest.wire(update.get(update.size()-1)).withConnection(connection);
+
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			// Not started: this test thread runs it
+			BeliefPropagator propagator=new BeliefPropagator(peer);
+			assertFalse(propagator.mergeBeliefMessage(new HashMap<>(),m));
+			CompletableFuture<?> fetch=propagator.getMissingDataFetch();
+			assertNotNull(fetch,"the missing data is fetched");
+			fetch.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A sender that answers a fetch of missing data with cells other than those requested is disconnected. */
+	@Test
+	public void aWrongCellInAFetchedReplyClosesItsConnection() throws Exception {
+		DataReplyConnection sender=new DataReplyConnection(MisbehaviourTest::wrongCells);
+		fetchFrom(sender);
+		assertTrue(sender.isClosed());
+	}
+
+	/** A sender that does not hold the data it is asked for keeps its connection: that is no fault. */
+	@Test
+	public void aMissingCellInAFetchedReplyKeepsItsConnection() throws Exception {
+		DataReplyConnection sender=new DataReplyConnection(ACell[]::new);
+		fetchFrom(sender);
+		assertFalse(sender.isClosed());
+	}
+
+	/** Answers a status with the given Belief hash, and each data request with the cells given for the number requested. */
+	static Function<Message,Result> dataAnswer(Hash belief, IntFunction<ACell[]> cells) {
+		return m -> switch (m.getType()) {
+			case STATUS -> Result.value(Maps.of(Keywords.BELIEF,belief));
+			case DATA_REQUEST -> Result.value(Vectors.create(cells.apply(requestedCount(m))));
+			default -> null;
+		};
+	}
+
+	/** A polled peer that answers for its Belief with a cell other than the one requested is disconnected. */
+	@Test
+	public void aWrongCellInAPolledReplyClosesThePolledConnection() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		CompletableFuture<Void> disconnected=new CompletableFuture<>();
+		try (NettyServer remote=fakeRemote(dataAnswer(Blobs.createRandom(400).getHash(),MisbehaviourTest::wrongCells),disconnected);
+				ConvexRemote polled=ConvexRemote.connect(remote.getHostAddress())) {
+			polled.setStore(new MemoryStore());
+			peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),polled);
+			assertFalse(polled.isConnected());
+			disconnected.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A polled peer that does not hold the data it advertises keeps its connection. */
+	@Test
+	public void aMissingCellInAPolledReplyKeepsThePolledConnection() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try (NettyServer remote=fakeRemote(dataAnswer(Blobs.createRandom(400).getHash(),ACell[]::new),new CompletableFuture<>());
+				ConvexRemote polled=ConvexRemote.connect(remote.getHostAddress())) {
+			polled.setStore(new MemoryStore());
+			peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),polled);
+			assertTrue(polled.isConnected());
 		} finally {
 			peer.close();
 		}

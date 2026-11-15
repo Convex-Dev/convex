@@ -21,6 +21,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.message.Message;
 import convex.core.store.MemoryStore;
@@ -155,23 +156,24 @@ public class AcquirorTest {
 
 	@Test
 	public void testResponseCardinalityMustMatchRequest() throws Exception {
-		assertMalformedResponse(Vectors.empty());
-		assertMalformedResponse(Vectors.of(CVMLong.ZERO, CVMLong.ONE));
+		assertRejectedResponse(Vectors.empty(), BadFormatException.class);
+		assertRejectedResponse(Vectors.of(CVMLong.ZERO, CVMLong.ONE), BadFormatException.class);
 	}
 
+	/** A cell other than the one requested is false, not malformed. */
 	@Test
 	public void testResponseHashMustMatchRequest() throws Exception {
-		assertMalformedResponse(Vectors.of(Blobs.createRandom(400)));
+		assertRejectedResponse(Vectors.of(Blobs.createRandom(400)), MisbehaviourException.class);
 	}
 
-	private static void assertMalformedResponse(ACell response) throws Exception {
+	private static void assertRejectedResponse(ACell response, Class<? extends Throwable> type) throws Exception {
 		Blob expected = Blobs.createRandom(400);
 		try (MemoryStore store = new MemoryStore();
 				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes ->
 					CompletableFuture.completedFuture(Result.create(null, response)))) {
 			ExecutionException error = org.junit.jupiter.api.Assertions.assertThrows(
 				ExecutionException.class, () -> acquiror.getFuture().get(5, TimeUnit.SECONDS));
-			assertInstanceOf(BadFormatException.class, error.getCause());
+			assertInstanceOf(type, error.getCause());
 		}
 	}
 

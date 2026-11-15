@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -373,7 +374,14 @@ public class ConnectionManager extends AConnectionManager {
 			if (h.equals(server.getBelief().getHash())) return;
 			if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
 
-			ACell acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			ACell acquired;
+			try {
+				acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			} catch (ExecutionException e) {
+				// Bad input in the polled peer's reply goes to the handler below
+				if (e.getCause() instanceof ValidationException bad) throw bad;
+				throw e;
+			}
 			if (!(acquired instanceof Belief belief)) throw new BadFormatException("Advertised Belief is not a Belief");
 			// Checked here, where the polled peer is known
 			State state=server.getPeer().getConsensusState();

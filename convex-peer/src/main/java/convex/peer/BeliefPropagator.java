@@ -627,6 +627,8 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (!queuePropagation(m)) log.debug("Propagation queue full: fetched update dropped");
 					} else {
 						log.debug("Fetch of missing update data dropped: {}",error.toString());
+						// Fetched only from the update's sender, so bad input in the reply is its own
+						if (error instanceof ValidationException bad) server.getConnectionManager().handleBadInput(connection,bad);
 					}
 					return null;
 				});
