@@ -173,6 +173,11 @@ public class TransactionHandler extends AThreadedComponent {
 	/** Separate from intake's log, so an observer's defect does not use up intake's one warning. */
 	private final RequestFailureLog observerFailures=new RequestFailureLog(log);
 
+	private static final Result ERR_BLOCK_FAILED=Result.error(ErrorCodes.PEER, Strings.intern("Block production failed")).withSource(SourceCodes.PEER);
+
+	/** Separate from intake's log, so each site warns once of each kind of failure. */
+	private final RequestFailureLog blockFailures=new RequestFailureLog(log);
+
 	/**
 	 * Gets the signed value a transaction message carries, or null if the message does
 	 * not have that shape.
@@ -532,29 +537,43 @@ public class TransactionHandler extends AThreadedComponent {
 			newTransactions.clear();
 			lastBlockPublishedTime=timestamp;
 			return signedBlocks;
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+		} catch (Throwable e) {
 			// Guard for Block production from received transactions, which runs on the
-			// Belief propagator's thread: a failure drops these transactions, not the thread
-			log.warn("Exception preparing new block",e);
-			return null;
-		} finally {
-			// Defence in depth: if anything in block production threw, transactions may
-			// still be in newTransactions with registered interests. Clients must never
-			// hang — notify each interested client of the failure and clear interests
-			// before discarding. Phase 3 intake persistence is the primary guard that
-			// stops faulty transactions ever reaching here; this is a safety net.
-			if (!newTransactions.isEmpty()) {
-				log.warn("Discarded "+newTransactions.size()+" potentially faulty / malicious transactions");
-				for (SignedData<ATransaction> sd : newTransactions) {
-					Hash h=sd.getHash();
-					Message m=interests.remove(h);
-					if (m!=null) {
-						m.returnResult(Result.error(ErrorCodes.PEER, Strings.create("Block production failed")).withSource(SourceCodes.PEER));
-					}
-				}
+			// Belief propagator's thread: a failure fails these transactions, not the thread
+			Utils.checkRequestFailure(e);
+			try {
+				failTransactions(newTransactions,e);
+			} finally {
+				// Never carried into a later Block: their clients may already have been
+				// told they failed
 				newTransactions.clear();
 			}
+			// Last: logging can itself run out of memory
+			blockFailures.log(e,"Block production failed; {} transactions rejected",ntrans);
+			return null;
 		}
+	}
+
+	/**
+	 * Fails the clients of transactions taken from the queue for Blocks that could not
+	 * be produced or proposed: running out of memory is answered as load, any other
+	 * failure as a peer error.
+	 */
+	void failTransactions(Iterable<SignedData<ATransaction>> txs, Throwable cause) {
+		// LOAD as at intake: running out of memory says nothing about the transactions
+		Result r=(cause instanceof OutOfMemoryError)?Result.SERVER_LOADED:ERR_BLOCK_FAILED;
+		for (SignedData<ATransaction> sd: txs) {
+			// Removing the interest lets the client resubmit; the peer's own transactions have none
+			Message m=interests.remove(sd.getHash());
+			if (m!=null) sendRejection(m,r);
+		}
+	}
+
+	/** Fails the clients of the transactions in Blocks this peer could not propose. */
+	void failBlocks(SignedData<Block>[] blocks, Throwable cause) {
+		for (SignedData<Block> b: blocks) failTransactions(b.getValue().getTransactions(),cause);
+		// Last: logging can itself run out of memory
+		blockFailures.log(cause,"Block proposal failed; its transactions rejected");
 	}
 
 	/**

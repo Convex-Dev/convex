@@ -307,7 +307,15 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean published=false;
 		SignedData<Block>[] signedBlocks= server.transactionHandler.maybeGenerateBlocks(); 
 		if (signedBlocks!=null) {
-			belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
+			try {
+				belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
+			} catch (Throwable e) {
+				// The Blocks' transactions have left the queue: fail their clients, who would
+				// otherwise wait for ever. Proposing changes this peer's own state, so the
+				// failure itself still goes to the loop.
+				server.transactionHandler.failBlocks(signedBlocks,e);
+				throw e;
+			}
 			beliefChanged=true;
 			published=true;
 			

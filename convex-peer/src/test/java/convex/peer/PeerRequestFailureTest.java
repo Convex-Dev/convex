@@ -7,18 +7,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
+import convex.core.data.AArrayBlob;
+import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
@@ -28,6 +40,7 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -131,25 +144,41 @@ public class PeerRequestFailureTest {
 		}
 	}
 
-	/** A store that throws a chosen failure once, the first time it is asked to store a chosen cell. */
+	/** Failures of the peer's own handling of client transactions, each answered as load or a peer error. */
+	static final List<Throwable> FAILURES=List.of(new OutOfMemoryError("simulated"),new StackOverflowError("simulated"),
+		new NoClassDefFoundError("simulated"),new AssertionError("simulated"),new IllegalStateException("simulated"));
+
+	/** A store that throws a chosen failure once, the first time it is asked to store a chosen kind of cell. */
 	static final class FaultingStore extends MemoryStore {
-		volatile Hash failing;
+		final AtomicReference<Predicate<Ref<?>>> failing=new AtomicReference<>();
 		volatile Throwable failure;
 
 		void failOnce(Hash hash, Throwable e) {
+			failOnce(ref -> hash.equals(ref.getHash()),e);
+		}
+
+		void failOnce(Predicate<Ref<?>> which, Throwable e) {
 			failure=e;
-			failing=hash;
+			failing.set(which);
+		}
+
+		boolean fired() {
+			return failing.get()==null;
 		}
 
 		@Override
 		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-			Hash target=failing;
-			if ((target!=null)&&target.equals(ref.getHash())) {
-				failing=null;
+			Predicate<Ref<?>> which=failing.get();
+			// compareAndSet: fails once even if two threads store a matching cell together
+			if ((which!=null)&&which.test(ref)&&failing.compareAndSet(which,null)) {
 				throw Utils.<RuntimeException>sneakyThrow(failure);
 			}
 			return super.storeTopRef(ref,status,noveltyHandler);
 		}
+	}
+
+	static boolean isSignedBlock(Ref<?> ref) {
+		return (ref.getValue() instanceof SignedData<?> sd)&&(sd.getValue() instanceof Block);
 	}
 
 	/** The code a client gets for a transaction whose intake fails with the given failure: never FORMAT. */
@@ -170,20 +199,120 @@ public class PeerRequestFailureTest {
 		Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
 		try {
 			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
-			List<Throwable> failures=List.of(new OutOfMemoryError("simulated"),new StackOverflowError("simulated"),
-				new NoClassDefFoundError("simulated"),new AssertionError("simulated"),new IllegalStateException("simulated"));
 			int i=0;
-			for (Throwable failure: failures) {
+			for (Throwable failure: FAILURES) {
 				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
 				// The handler persists each transaction before queueing it
 				store.failOnce(tx.getHash(),failure);
 				Result rejected=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 				assertEquals(intakeCode(failure),rejected.getErrorCode(),failure+": "+rejected);
-				assertNull(store.failing,failure+" fired");
+				assertTrue(store.fired(),failure+" fired");
 			}
 			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"));
 			Result ok=client.transact(next).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A Block that cannot be produced fails its transactions alone: running out of memory
+	 * is answered as load and any other failure as a peer error. Later transactions are
+	 * still executed.
+	 */
+	@Test
+	public void aBlockThatCannotBeProducedFailsItsTransactions() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
+		try {
+			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+			int i=0;
+			for (Throwable failure: FAILURES) {
+				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
+				// The peer persists each Block it produces, before proposing it
+				store.failOnce(PeerRequestFailureTest::isSignedBlock,failure);
+				Result rejected=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				Keyword expected=(failure instanceof OutOfMemoryError)?ErrorCodes.LOAD:ErrorCodes.PEER;
+				assertEquals(expected,rejected.getErrorCode(),failure+": "+rejected);
+				assertTrue(store.fired(),failure+" fired");
+			}
+			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"));
+			Result ok=client.transact(next).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A key pair that fails once with a chosen failure the next time it signs an Order, and otherwise signs as another. */
+	static final class OrderFailingKeyPair extends AKeyPair {
+		final AKeyPair kp;
+		final AtomicReference<Throwable> failure=new AtomicReference<>();
+
+		OrderFailingKeyPair(AKeyPair kp) {
+			this.kp=kp;
+		}
+
+		@Override
+		public <R extends ACell> SignedData<R> signData(R value) {
+			// Only an Order: Block production signs Blocks with the same key pair
+			Throwable t=(value instanceof Order)?failure.getAndSet(null):null;
+			if (t!=null) throw Utils.<RuntimeException>sneakyThrow(t);
+			return kp.signData(value);
+		}
+
+		@Override public AccountKey getAccountKey() { return kp.getAccountKey(); }
+		@Override public boolean equals(AKeyPair other) { return kp.equals(other); }
+		@Override public ASignature sign(AArrayBlob message) { return kp.sign(message); }
+		@Override public Blob getSeed() { return kp.getSeed(); }
+	}
+
+	/**
+	 * A Block that cannot be proposed fails its transactions' clients, and the failure
+	 * still reaches the caller: running out of memory is answered as load and any other
+	 * failure as a peer error. The client can then resubmit the same transaction.
+	 */
+	@Test
+	public void aBlockThatCannotBeProposedFailsItsTransactions() throws Exception {
+		OrderFailingKeyPair kp=new OrderFailingKeyPair(LOCAL);
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,kp);
+		config.put(Keywords.STATE,Init.createState(List.of(LOCAL.getAccountKey())));
+		config.put(Keywords.PORT,0);
+		config.put(Keywords.STORE,new MemoryStore());
+		// Each round produces a Block at once, however soon after the last
+		config.put(Keywords.MIN_BLOCK_TIME,0);
+		Server peer=Server.create(config);
+		// Halted before launch, so the peer's own propagator never takes a transaction
+		// from the queue: Block production is left to this test thread
+		peer.haltConsensus(UpgradeError.missing(99));
+		peer.launch();
+		try {
+			LinkedBlockingQueue<SignedData<ATransaction>> queued=new LinkedBlockingQueue<>();
+			peer.getTransactionHandler().setRequestObserver(queued::add);
+			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+			// Not started: this test thread runs it
+			BeliefPropagator proposer=new BeliefPropagator(peer);
+			proposer.belief=peer.getBelief();
+			int i=0;
+			for (Throwable failure: FAILURES) {
+				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
+				CompletableFuture<Result> result=client.transact(tx);
+				assertEquals(tx,queued.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS));
+
+				kp.failure.set(failure);
+				assertThrows(failure.getClass(),() -> proposer.maybeUpdateBelief(null));
+
+				Keyword expected=(failure instanceof OutOfMemoryError)?ErrorCodes.LOAD:ErrorCodes.PEER;
+				Result rejected=result.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertEquals(expected,rejected.getErrorCode(),failure+": "+rejected);
+				// Its interest is gone, so the same transaction is accepted again. It stays
+				// queued and fails with the next round's Block: a proposal that succeeded
+				// would change the Order, and the next merge would then sign it first.
+				client.transact(tx);
+				assertEquals(tx,queued.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),failure.toString());
+			}
 		} finally {
 			peer.close();
 		}
