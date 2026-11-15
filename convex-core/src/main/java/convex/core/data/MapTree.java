@@ -843,11 +843,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	/**
 	 * Check for top level structural integrity. Does not traverse branch refs.
-	 * @return
+	 * @return true if valid, false otherwise
 	 */
 	boolean isValidStructure() {
-		if (shift<0) return false;
+		if ((shift<0)||(shift>=Hash.HEX_LENGTH)) return false;
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
+		if (children.length<2) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			Ref<AHashMap<K,V>> cref=children[i];
@@ -859,7 +860,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
-		if (children.length<2) throw new InvalidDataException("Non-canonical MapTree with child count "+children.length,this);
 	}
 
 	@SuppressWarnings("unchecked")

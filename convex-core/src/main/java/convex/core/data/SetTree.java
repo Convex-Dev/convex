@@ -636,7 +636,12 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		}
 	}
 
+	/**
+	 * Check for top level structural integrity. Does not traverse branch refs.
+	 * @return true if valid, false otherwise
+	 */
 	boolean isValidStructure() {
+		if ((shift<0)||(shift>MAX_SHIFT)) return false;
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		int n=children.length;
 		if (n<2) return false;
@@ -652,7 +657,6 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
-		if ((shift<0)||(shift>MAX_SHIFT)) throw new InvalidDataException("Invalid shift for SetTree", this);
 	}
 
 	@Override
