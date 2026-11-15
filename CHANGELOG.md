@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fail a Transfer whose target is not an Address with `:FORMAT`.
 - Keep an Etch store usable, verifiable and safe to reopen after a write or sync stops part-way. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))

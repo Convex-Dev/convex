@@ -14,6 +14,8 @@ import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
@@ -488,7 +490,28 @@ public class TransactionTest extends ACVMTest {
 		
 		RecordTest.doRecordTests(t);
 	}
-	
-	
 
+	/** A Transfer whose target field is not an Address fails with :FORMAT */
+	@Test
+	public void testTransferTargetNotAddress() {
+		long seq=state().getAccount(HERO).getSequence()+1;
+		for (ACell target: new ACell[] {null, CVMLong.create(7)}) {
+			Transfer t=Transfer.create(Vectors.of(HERO, seq, target, 1L));
+			ResultContext rc=state().applyTransaction(t);
+			assertEquals(ErrorCodes.FORMAT,rc.getErrorCode());
+		}
+	}
+
+	/** A Transfer without an Address target fails with :FORMAT within a Block too */
+	@Test
+	public void testTransferTargetNotAddressInBlock() {
+		State s=state();
+		Transfer good=Transfer.create(HERO, s.getAccount(HERO).getSequence()+1, VILLAIN, 100);
+		Transfer bad=Transfer.create(Vectors.of(VILLAIN, s.getAccount(VILLAIN).getSequence()+1, null, 1L));
+		Block b=Block.of(s.getTimestamp().longValue()+1000, HERO_KP.signData(good), VILLAIN_KP.signData(bad));
+		BlockResult br=s.applyBlock(InitTest.FIRST_PEER_KEYPAIR.signData(b));
+		assertFalse(br.isError(0));
+		assertEquals(s.getAccount(HERO).getSequence()+1,br.getState().getAccount(HERO).getSequence());
+		assertEquals(ErrorCodes.FORMAT,br.getErrorCode(1));
+	}
 }

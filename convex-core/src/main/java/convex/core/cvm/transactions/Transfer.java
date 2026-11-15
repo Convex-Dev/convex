@@ -1,6 +1,7 @@
 package convex.core.cvm.transactions;
 
 import convex.core.Coin;
+import convex.core.ErrorCodes;
 import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
@@ -56,6 +57,9 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public Context apply(Context ctx) {
+		// A Transfer decoded with a target that is not an Address has a null target
+		if (target==null) return ctx.withError(ErrorCodes.FORMAT, "Transfer target must be an Address");
+
 		// consume juice, ensure we have enough to make transfer!
 		ctx = ctx.consumeJuice(Juice.TRANSFER);
 		
