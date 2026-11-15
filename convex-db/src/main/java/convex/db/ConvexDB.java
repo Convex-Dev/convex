@@ -44,7 +44,9 @@ import convex.lattice.cursor.Cursors;
  * constructed, with no default. A database is the unit of merging: the ConvexDB
  * passes its policy to each database through {@link #database(AString)}, and merges
  * the database map by name, each database with that policy. Incoming merges, delivery
- * to a path, publication of forks and replica merges all use it.
+ * to a path, publication of a database's forks and replica merges all use it. A
+ * ConvexDB has a single writer, so a fork of the ConvexDB itself has no publication
+ * merge: its sync fails if the destination changed since the fork last synced.
  * {@link convex.db.lattice.RowLWW#merge} is the per-row last-write-wins policy that
  * Convex DB provides; an application that serialises its updates supplies its own.
  *
@@ -292,12 +294,6 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	@Override
 	public AHashMap<AString, Index<Keyword, ACell>> merge(AHashMap<AString, Index<Keyword, ACell>> incoming) {
 		return cursor().updateAndGet(own -> mergeValues(own, incoming));
-	}
-
-	@Override
-	protected AHashMap<AString, Index<Keyword, ACell>> mergePublication(AHashMap<AString, Index<Keyword, ACell>> own,
-			AHashMap<AString, Index<Keyword, ACell>> other) {
-		return mergeValues(own, other);
 	}
 
 	/** Each database name resolves to its {@link #database(AString)} component. */
