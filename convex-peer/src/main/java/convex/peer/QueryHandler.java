@@ -70,37 +70,40 @@ public class QueryHandler extends AThreadedComponent {
 		LoadMonitor.up();
 		if (first == null) return;
 
-		// Drain any additional queued messages (single lock acquisition)
-		batch.clear();
-		batch.add(first);
-		queryQueue.drainTo(batch);
+		try {
+			// Drain any additional queued messages (single lock acquisition)
+			batch.add(first);
+			queryQueue.drainTo(batch);
 
-		for (int i = 0; i < batch.size(); i++) {
-			Message m = batch.get(i);
-			MessageType type = m.getType();
-			// The one guard for every request this thread handles. Anyone can send
-			// queries, at a high rate, so a request that fails in any way is dropped
-			// here unless the JVM itself has failed: it must never cost the other
-			// queued requests or end this thread. A failed query also closes its
-			// connection.
-			try {
-				switch (type) {
-				case QUERY:
-					handleQuery(m);
-					break;
-				case DATA_REQUEST:
-					handleDataRequest(m);
-					break;
-				default:
-					log.warn("Unexpected Message type on query queue: " + type);
+			for (int i = 0; i < batch.size(); i++) {
+				Message m = batch.get(i);
+				MessageType type = m.getType();
+				// The one guard for every request this thread handles. Anyone can send
+				// queries, at a high rate, so a request that fails in any way is dropped
+				// here unless the JVM itself has failed: it must never cost the other
+				// queued requests or end this thread. A failed query also closes its
+				// connection.
+				try {
+					switch (type) {
+					case QUERY:
+						handleQuery(m);
+						break;
+					case DATA_REQUEST:
+						handleDataRequest(m);
+						break;
+					default:
+						log.warn("Unexpected Message type on query queue: " + type);
+					}
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					failures.log(e, "Dropped {} request", type);
+					if (type == MessageType.QUERY) m.closeConnection();
 				}
-			} catch (Throwable e) {
-				Utils.checkRequestFailure(e);
-				failures.log(e, "Dropped {} request", type);
-				if (type == MessageType.QUERY) m.closeConnection();
 			}
+		} finally {
+			// Released even if this pass fails: recovering from running out of memory relies on it
+			batch.clear();
 		}
-		batch.clear(); // release references
 	}
 	
 	/**

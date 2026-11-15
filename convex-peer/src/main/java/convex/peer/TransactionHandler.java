@@ -414,32 +414,40 @@ public class TransactionHandler extends AThreadedComponent {
 		ArrayList<Message> recipients=new ArrayList<>();
 		ArrayList<Result> results=new ArrayList<>();
 		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
-		for (long j = 0; j < nTrans; j++) {
-			SignedData<ATransaction> t = block.getTransactions().get(j);
-			Hash h = t.getHash();
-			Message m = interests.remove(h);
-			if (m == null) continue;
-			Result res;
-			try {
-				res=br.getResults().get(j);
-				extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
-				extInfo.put(Keywords.TX,h);
-				res=res.withExtraInfo(extInfo);
-			} catch (Throwable e) {
-				// Guard for each client's result. The transaction has executed and its
-				// interest is gone, so the client gets an error rather than nothing.
-				Utils.checkRequestFailure(e);
-				resultFailures.log(e,"Failed to produce result for transaction {}",h);
-				// PEER even for running out of memory: LOAD would invite a retry of a
-				// transaction that has already executed
-				res=ERR_RESULT_UNAVAILABLE;
+		try {
+			for (long j = 0; j < nTrans; j++) {
+				SignedData<ATransaction> t = block.getTransactions().get(j);
+				Hash h = t.getHash();
+				Message m = interests.remove(h);
+				if (m == null) continue;
+				// Listed at once, the error a placeholder: whatever fails below, this client
+				// is answered, as its interest is gone
+				recipients.add(m);
+				results.add(ERR_RESULT_UNAVAILABLE);
+				Result res;
+				try {
+					res=br.getResults().get(j);
+					extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
+					extInfo.put(Keywords.TX,h);
+					res=res.withExtraInfo(extInfo);
+				} catch (Throwable e) {
+					// Guard for each client's result. The transaction has executed and its
+					// interest is gone, so the client gets an error rather than nothing.
+					Utils.checkRequestFailure(e);
+					resultFailures.log(e,"Failed to produce result for transaction {}",h);
+					// PEER even for running out of memory: LOAD would invite a retry of a
+					// transaction that has already executed
+					res=ERR_RESULT_UNAVAILABLE;
+				}
+				observeTransactionResponse(t,res);
+				results.set(results.size()-1,res);
 			}
-			observeTransactionResponse(t,res);
-			recipients.add(m);
-			results.add(res);
+		} finally {
+			// Even if the loop failed: every client listed has lost its interest
+			if (!recipients.isEmpty()) {
+				Thread.ofVirtual().name("Transaction results for block "+blockNum).start(() -> deliverResults(recipients,results));
+			}
 		}
-		if (recipients.isEmpty()) return;
-		Thread.ofVirtual().name("Transaction results for block "+blockNum).start(() -> deliverResults(recipients,results));
 	}
 
 	/**

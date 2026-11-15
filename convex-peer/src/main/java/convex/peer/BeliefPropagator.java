@@ -337,8 +337,13 @@ public class BeliefPropagator extends AThreadedComponent {
 	
 	private void observeBeliefUpdate(Belief b) {
 		Consumer<Belief> obs=beliefUpdateObserver;
-		if (obs!=null) {
+		if (obs==null) return;
+		try {
 			obs.accept(b);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			// An observer's failure is not the Belief's: propagation carries on
+			observerFailures.log(e,"Belief update observer failed");
 		}
 	}
 
@@ -582,6 +587,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	private final RequestFailures receiveFailures=new RequestFailures(log);
 	private final RequestFailures mergeFailures=new RequestFailures(log);
 	private final RequestFailures fetchFailures=new RequestFailures(log);
+	private final RequestFailures observerFailures=new RequestFailures(log);
 	
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
 	private final AtomicBoolean fetching=new AtomicBoolean();

@@ -373,6 +373,33 @@ public class PeerRequestFailureTest {
 	}
 
 	/**
+	 * A Belief update observer that fails costs the update nothing: the Block is still
+	 * proposed and the update returns as usual.
+	 */
+	@Test
+	public void aFailingBeliefObserverCostsTheUpdateNothing() throws Exception {
+		Server peer=launchHaltedPeer(LOCAL);
+		try {
+			LinkedBlockingQueue<SignedData<ATransaction>> queued=new LinkedBlockingQueue<>();
+			peer.getTransactionHandler().setRequestObserver(queued::add);
+			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+			// Not started: this test thread runs it
+			BeliefPropagator proposer=new BeliefPropagator(peer);
+			proposer.belief=peer.getBelief();
+			int i=0;
+			for (Error error: CONTAINED) {
+				proposer.setBeliefUpdateObserver(b -> {throw error;});
+				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
+				client.transact(tx);
+				assertEquals(tx,queued.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),error.toString());
+				assertTrue(proposer.maybeUpdateBelief(null),error+": the Block is proposed");
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
 	 * A response observer that fails costs nothing else: each client still gets its
 	 * transaction's result, and the peer keeps running.
 	 */
