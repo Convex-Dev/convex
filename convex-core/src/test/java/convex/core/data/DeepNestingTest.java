@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,12 @@ public class DeepNestingTest {
 
 	/** A chain of single-entry vectors, optionally hashing each level as it is built. */
 	static ACell chain(int depth, boolean hashAsBuilt) {
-		ACell c=CVMLong.ONE;
+		return chain(CVMLong.ONE,depth,hashAsBuilt);
+	}
+
+	/** A chain of single-entry vectors over a value, optionally hashing each level as it is built. */
+	static ACell chain(ACell base, int depth, boolean hashAsBuilt) {
+		ACell c=base;
 		for (int i=0; i<depth; i++) {
 			c=Vectors.of(c);
 			if (hashAsBuilt) c.getHash();
@@ -56,6 +62,17 @@ public class DeepNestingTest {
 		assertEquals(expected.getHash(),fresh.getHash());
 		assertEquals(expected.getEncoding(),fresh.getEncoding());
 		assertEquals(sharedChain(DEEP,true).getHash(),sharedChain(DEEP,false).getHash());
+	}
+
+	/** A deep value holding a part only by its hash encodes as it does with the part present. */
+	@Test
+	public void testEncodingOfDeepValueWithMissingPart() {
+		Blob part=Blob.createRandom(new Random(1234),200); // a branch, in no store
+		ACell expected=chain(Vectors.of(part),DEEP,true);
+		AVector<ACell> holder=Vectors.of(part).updateRefs(r->Ref.forHash(r.getHash(),new MemoryStore()).markEmbedded(false));
+		ACell fresh=chain(holder,DEEP,false);
+		assertEquals(expected.getEncoding(),fresh.getEncoding());
+		assertEquals(expected.getHash(),fresh.getHash());
 	}
 
 	@Test

@@ -154,8 +154,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Encodes this Cell and every Cell beneath it not yet encoded, children before
-	 * parents, without recursion.
+	 * Encodes this Cell, first encoding each Cell beneath it that its encoding needs,
+	 * children before parents, without recursion.
 	 *
 	 * @return Encoding of this Cell
 	 */
@@ -183,7 +183,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			}
 			// Reverse push order preserves the recursive visitation order
 			for (int i=cell.getRefCount()-1; i>=0; i--) {
-				ACell child=cell.getRef(i).getValue();
+				Ref<ACell> ref=cell.getRef(i);
+				// A soft Ref is left to createEncoding, as on the recursive path: it holds
+				// the hash a branch needs, and an embedded value is too small to recurse far
+				if (!ref.isDirect()) continue;
+				ACell child=ref.getValue();
 				if ((child!=null)&&(child.encoding==null)) stack.add(child);
 			}
 		}
