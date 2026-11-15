@@ -307,11 +307,10 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * Deeply nested DATA that a peer with an in-memory store cannot store is not
-	 * stored, and a good Order sent after it is merged.
+	 * Deeply nested DATA is stored, and a good Order sent after it is merged.
 	 */
 	@Test
-	public void deeplyNestedDataIsNotStored() throws Exception {
+	public void deeplyNestedDataIsStored() throws Exception {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
@@ -330,7 +329,7 @@ public class InvalidPeerDataTest {
 			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
-			assertNull(peer.getStore().refForHash(outermost.getHash()));
+			assertNotNull(peer.getStore().refForHash(outermost.getHash()));
 		} finally {
 			peer.close();
 		}
@@ -355,13 +354,12 @@ public class InvalidPeerDataTest {
 
 	/**
 	 * A staked peer's Order that leaves out part of a Block, beside another staked peer's
-	 * Order holding deeply nested data, does not stop the merge of a good Order sent
-	 * after them, on a peer with an in-memory store.
+	 * Order holding deeply nested data, merges with it once the missing part is fetched,
+	 * on a peer with an in-memory store.
 	 */
 	@Test
 	public void anIncompleteOrderBesideDeeplyNestedData() throws Exception {
-		AKeyPair remoteC=AKeyPair.createSeeded(143);
-		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B,remoteC);
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 			long ts=blockTime(peer);
@@ -378,23 +376,17 @@ public class InvalidPeerDataTest {
 			cells.add(belief); // top cell last
 			Message update=Message.create(MessageType.BELIEF,belief,Format.encodeDelta(cells));
 
-			connect(peer).sendMessage(wire(update));
-
-			// A good Order that also leaves out part of a Block merges once fetched
+			// The sender holds the part it left out, and answers the peer's fetch for it
 			MemoryStore senderStore=new MemoryStore();
-			List<SignedData<ATransaction>> txsC=new ArrayList<>();
-			for (int i=1; i<=8; i++) txsC.add(remoteC.signData(Invoke.create(Init.GENESIS_ADDRESS,i,"*address*")));
-			Block blockC=Block.create(ts,txsC);
-			MissingBeliefDataTest.update(blockC.getTransactions(),senderStore);
-			SignedData<Order> good=order(remoteC,1,remoteC.signData(blockC));
-			LocalConnection answering=MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore));
-			for (Message m: MissingBeliefDataTest.update(Belief.create(good),senderStore)) answering.sendMessage(wire(m));
+			Cells.persist(incomplete.getTransactions(),senderStore);
+			MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore)).sendMessage(wire(update));
 
 			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
-			while ((merged!=null)&&!good.equals(merged.getOrders().get(remoteC.getAccountKey()))) {
+			while ((merged!=null)&&!(orderA.equals(merged.getOrders().get(REMOTE_A.getAccountKey()))
+					&&orderB.equals(merged.getOrders().get(REMOTE_B.getAccountKey())))) {
 				merged=updates.poll(WAIT,TimeUnit.SECONDS);
 			}
-			assertNotNull(merged,"the good Order is merged");
+			assertNotNull(merged,"both Orders are merged");
 			assertTrue(peer.isRunning());
 		} finally {
 			peer.close();
@@ -402,8 +394,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * A staked peer's Order holding deeply nested data that the peer cannot store does
-	 * not stop the merge of a good Order beside it.
+	 * A staked peer's Order holding deeply nested data does not stop the merge of a good
+	 * Order beside it.
 	 */
 	@Test
 	public void anOrderWithDeeplyNestedData() throws Exception {
@@ -430,12 +422,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * A deeply nested transaction that the peer cannot store is rejected as malformed,
-	 * and later transactions are still processed.
-	 */
-	/**
-	 * A query whose result is nested too deeply for the peer to send is dropped, and
-	 * the peer goes on answering other clients' queries.
+	 * A query whose result its code nests far deeper than recursion allows does not stop
+	 * the peer answering other clients' queries.
 	 */
 	@Test
 	public void aQueryWithADeeplyNestedResult() throws Exception {
@@ -452,28 +440,63 @@ public class InvalidPeerDataTest {
 		}
 	}
 
+	/**
+	 * A transaction whose result its code nests far deeper than recursion allows is
+	 * executed and stored, and the peer goes on executing the transactions after it.
+	 */
 	@Test
-	public void aDeeplyNestedTransactionIsRejected() throws Exception {
-		aDeeplyNestedTransactionIsRejected(new MemoryStore());
+	public void aTransactionWithADeeplyNestedResult() throws Exception {
+		aTransactionWithADeeplyNestedResult(new MemoryStore());
 	}
 
 	@Test
-	public void aDeeplyNestedTransactionIsRejectedOnEtch() throws Exception {
+	public void aTransactionWithADeeplyNestedResultOnEtch() throws Exception {
 		try (EtchStore store=EtchStore.createTemp()) {
-			aDeeplyNestedTransactionIsRejected(store);
+			aTransactionWithADeeplyNestedResult(store);
 		}
 	}
 
-	private void aDeeplyNestedTransactionIsRejected(AStore store) throws Exception {
+	private void aTransactionWithADeeplyNestedResult(AStore store) throws Exception {
+		Server peer=launchPeer(store,LOCAL);
+		try {
+			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+			String buildDeep="(loop [v 1 i 0] (if (< i "+DEEP+") (recur [v] (inc i)) v))";
+			Result deep=client.transact(buildDeep).get(WAIT,TimeUnit.SECONDS);
+			assertNull(deep.getErrorCode(),"the transaction succeeds");
+
+			Result ok=client.transact("(+ 1 2)").get(WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(3),ok.getValue(),"the next transaction runs");
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A transaction holding deeply nested code is accepted and executed, failing on the
+	 * CVM's depth limit, and later transactions are still processed.
+	 */
+	@Test
+	public void aDeeplyNestedTransactionIsExecuted() throws Exception {
+		aDeeplyNestedTransactionIsExecuted(new MemoryStore());
+	}
+
+	@Test
+	public void aDeeplyNestedTransactionIsExecutedOnEtch() throws Exception {
+		try (EtchStore store=EtchStore.createTemp()) {
+			aDeeplyNestedTransactionIsExecuted(store);
+		}
+	}
+
+	private void aDeeplyNestedTransactionIsExecuted(AStore store) throws Exception {
 		Server peer=launchPeer(store,LOCAL);
 		try {
 			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
 			ACell deep=nested(DEEP,new ArrayList<>());
 			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,deep));
-			Result rejected=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
-			assertEquals(ErrorCodes.FORMAT,rejected.getErrorCode());
+			Result failed=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
+			assertEquals(ErrorCodes.DEPTH,failed.getErrorCode());
 
-			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
+			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,2,"(+ 1 2)"));
 			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
 			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
 		} finally {

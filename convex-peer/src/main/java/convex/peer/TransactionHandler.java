@@ -274,8 +274,8 @@ public class TransactionHandler extends AThreadedComponent {
 				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
 				continue;
 			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-				// Guard for each received transaction, with the one in Phase 1. A stack
-				// overflow here is usually data nested too deeply for this peer to store.
+				// Guard for each received transaction, with the one in Phase 1: any failure,
+				// including running out of memory or stack, rejects only this transaction
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
 			}

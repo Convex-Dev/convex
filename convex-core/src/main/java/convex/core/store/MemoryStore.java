@@ -77,8 +77,12 @@ public class MemoryStore extends AStore {
 		return encoder;
 	}
 	
-	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel) {
+		return persistRef(ref,noveltyHandler,requiredStatus,topLevel,0);
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel, int depth) {
 		// Convert to direct Ref if possible
 		try {
 			ref = ref.toDirect();
@@ -107,7 +111,7 @@ public class MemoryStore extends AStore {
 		// Recursively persist children, tracking if all were fully resolved
 		final int[] minChildStatus = {requiredStatus};
 		cell  = cell.updateRefs(r -> {
-			Ref<ACell> result = persistRef(r,noveltyHandler,requiredStatus,false);
+			Ref<ACell> result = persistChild(r,noveltyHandler,requiredStatus,depth+1);
 			if (result.getStatus()<requiredStatus) {
 				minChildStatus[0]=Math.min(minChildStatus[0], result.getStatus());
 			}
@@ -132,6 +136,38 @@ public class MemoryStore extends AStore {
 			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
 		}
 		return ref;
+	}
+
+	/**
+	 * Persists a child Ref at the given nesting depth, persisting what lies beneath it
+	 * bottom up first if that depth is too deep to recurse further.
+	 */
+	@SuppressWarnings("unchecked")
+	private Ref<ACell> persistChild(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, int depth) {
+		if (depth>=MAX_PERSIST_DEPTH) {
+			ACell cell;
+			try {
+				cell=ref.getValue();
+			} catch (MissingDataException e) {
+				cell=null; // persistRef handles missing data
+			}
+			if (cell!=null) {
+				persistBeneath(cell,r->isPersisted(r,requiredStatus),r->persistRef(r,noveltyHandler,requiredStatus,false,0));
+			}
+			depth=0;
+		}
+		return persistRef(ref,noveltyHandler,requiredStatus,false,depth);
+	}
+
+	/**
+	 * Tests whether this store holds a branch Ref at the given status or above, as
+	 * persistRef checks before recursing.
+	 */
+	private boolean isPersisted(Ref<ACell> ref, int requiredStatus) {
+		// The Ref's own status may come from another store, so look in this one
+		if (ref.isEmbedded()) return false;
+		Ref<ACell> existing=refForHash(ref.getHash());
+		return (existing!=null)&&(existing.getStatus()>=requiredStatus);
 	}
 
 	@Override

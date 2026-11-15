@@ -435,10 +435,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
-				} catch (StackOverflowError e) {
-					// Nested too deeply for this peer to store
-					server.getConnectionManager().alertBadMessage(m,"DATA too deeply nested");
-				} catch (Exception | OutOfMemoryError e) {
+				} catch (Exception | StackOverflowError | OutOfMemoryError e) {
 					log.warn("Unable to stage peer DATA message",e);
 					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
 				}
@@ -529,14 +526,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					break;
 				}
 
-				Ref<SignedData<Order>> stored;
-				try {
-					stored=server.getStore().storeTopRef(Ref.get(so),Ref.PERSISTED,null);
-				} catch (StackOverflowError e) {
-					// Nested too deeply for this peer to store
-					rejectOrder(source,"Order too deeply nested");
-					continue;
-				}
+				Ref<SignedData<Order>> stored=server.getStore().storeTopRef(Ref.get(so),Ref.PERSISTED,null);
 				if (stored.getStatus()<Ref.PERSISTED) {
 					// A store can keep an Order without all of its parts, as an in-memory store does
 					if (source!=null) {
@@ -621,7 +611,6 @@ public class BeliefPropagator extends AThreadedComponent {
 					return null;
 				});
 		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// A stack overflow is data nested too deeply for this peer to store
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}
