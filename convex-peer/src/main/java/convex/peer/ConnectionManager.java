@@ -356,12 +356,12 @@ public class ConnectionManager extends AConnectionManager {
 
 			AMap<Keyword, ACell> status = API.ensureStatusMap(result.getValue());
 			if (status == null) {
-				log.warn("Dubious status response message: {}", result);
+				log.debug("Dubious status response message: {}", result);
 				return;
 			}
 			Hash h = RT.ensureHash(status.get(Keywords.BELIEF));
 			if (h==null) {
-				log.warn("Status response has no Belief hash: {}",result);
+				log.debug("Status response has no Belief hash: {}",result);
 				return;
 			}
 			if (h.equals(server.getBelief().getHash())) return;
@@ -369,7 +369,7 @@ public class ConnectionManager extends AConnectionManager {
 
 			ACell acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 			if (!(acquired instanceof Belief belief)) {
-				log.warn("Peer returned non-Belief value for advertised Belief hash {}",h);
+				log.debug("Peer returned non-Belief value for advertised Belief hash {}",h);
 				return;
 			}
 			if (!server.queueBelief(belief)) {
@@ -543,7 +543,8 @@ public class ConnectionManager extends AConnectionManager {
 	 * @param reason Reason message considered bad
 	 */
 	public void alertBadMessage(Message m, String reason) {
-		log.warn(reason);
+		// Bad data from another peer is expected on a public network: not an operator matter
+		log.debug("Bad message from {}: {}",m.getConnection(),reason);
 	}
 
 	/**

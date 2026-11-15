@@ -206,7 +206,7 @@ state is at risk:
   logs at debug. The first time a peer runs out of memory it logs a warning: it has
   too little memory or commits too much to client requests. A probable defect is
   logged once, as a warning in a request and as an error in the peer's own work.
-  Bad data from another peer is still logged as a warning.
+  Bad data from another peer logs at debug.
 
 ### Known limitations
 

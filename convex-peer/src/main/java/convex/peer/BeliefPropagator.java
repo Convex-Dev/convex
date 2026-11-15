@@ -542,7 +542,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					if (source!=null) {
 						server.getConnectionManager().alertBadMessage(source,"Bad Order Signature!!");
 					} else {
-						log.warn("Bad Order signature in locally acquired Belief");
+						log.debug("Bad Order signature in locally acquired Belief");
 					}
 					break;
 				}
