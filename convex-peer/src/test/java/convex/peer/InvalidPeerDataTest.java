@@ -433,6 +433,25 @@ public class InvalidPeerDataTest {
 	 * A deeply nested transaction that the peer cannot store is rejected as malformed,
 	 * and later transactions are still processed.
 	 */
+	/**
+	 * A query whose result is nested too deeply for the peer to send is dropped, and
+	 * the peer goes on answering other clients' queries.
+	 */
+	@Test
+	public void aQueryWithADeeplyNestedResult() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try (Convex remote=Convex.connect(peer.getHostAddress())) {
+			String buildDeep="(loop [v 1 i 0] (if (< i "+DEEP+") (recur [v] (inc i)) v))";
+			// Completes, normally or not, once the peer has dealt with the query
+			remote.query(buildDeep).handle((r,e)->r).get(WAIT,TimeUnit.SECONDS);
+
+			Result ok=Convex.connect(peer).query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
 	@Test
 	public void aDeeplyNestedTransactionIsRejected() throws Exception {
 		aDeeplyNestedTransactionIsRejected(new MemoryStore());

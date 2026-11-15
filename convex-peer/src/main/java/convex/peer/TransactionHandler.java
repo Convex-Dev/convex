@@ -216,7 +216,9 @@ public class TransactionHandler extends AThreadedComponent {
 				}
 				sigs[i]=sd;
 				toVerify.add(sd);
-			} catch (Exception e) {
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Guard for each received transaction, with the one in Phase 3: any failure,
+				// including running out of memory or stack, rejects only this transaction
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 			}
 		}
@@ -227,7 +229,7 @@ public class TransactionHandler extends AThreadedComponent {
 		// re-checked individually in Phase 3 under per-tx exception handling.
 		try {
 			Peer.preValidateSignatures(toVerify);
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
 			// Ignore — per-tx handling in Phase 3 produces correct per-client errors
 		}
 
@@ -271,8 +273,9 @@ public class TransactionHandler extends AThreadedComponent {
 			} catch (IOException e) {
 				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
 				continue;
-			} catch (Exception | StackOverflowError e) {
-				// A stack overflow is data nested too deeply for this peer to store
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Guard for each received transaction, with the one in Phase 1. A stack
+				// overflow here is usually data nested too deeply for this peer to store.
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
 			}
@@ -368,7 +371,8 @@ public class TransactionHandler extends AThreadedComponent {
 			boolean reported;
 			try {
 				reported=m.returnResult(results.get(i));
-			} catch (Exception e) {
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Guard for each result: one that cannot be sent costs no other client its result
 				log.warn("Failed to deliver transaction result for connection {}",m.getConnection(),e);
 				continue;
 			}
@@ -448,7 +452,9 @@ public class TransactionHandler extends AThreadedComponent {
 			newTransactions.clear();
 			lastBlockPublishedTime=timestamp;
 			return signedBlocks;
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Guard for Block production from received transactions, which runs on the
+			// Belief propagator's thread: a failure drops these transactions, not the thread
 			log.warn("Exception preparing new block",e);
 			return null;
 		} finally {
