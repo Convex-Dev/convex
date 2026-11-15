@@ -2,11 +2,14 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
@@ -25,16 +29,21 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.init.Init;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.store.NullStore;
+import convex.net.PeerRefusedException;
+import convex.net.impl.netty.NettyServer;
 import convex.peer.PeerRequestFailureTest.ReplyConnection;
 
 /**
@@ -160,6 +169,64 @@ public class MisbehaviourTest {
 			peer.processMessage(Message.createChallenge(2,good).withConnection(honest));
 			assertFalse(honest.result(2).isError());
 			assertFalse(honest.isClosed());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A key a forging remote claims, without holding its private key. */
+	static final AccountKey CLAIMED=REMOTE_B.getAccountKey();
+
+	/**
+	 * Launches a remote that answers a challenge with a forged signature claiming
+	 * {@link #CLAIMED}, and names that key in its status.
+	 */
+	static NettyServer forgingRemote() throws Exception {
+		NettyServer remote=new NettyServer(0);
+		remote.setReceiveAction(m -> {
+			try {
+				m.getPayload(NullStore.INSTANCE);
+			} catch (BadFormatException e) {
+				return;
+			}
+			switch (m.getType()) {
+			case CHALLENGE -> m.returnResult(Result.value(SignedData.create(CLAIMED,Ed25519Signature.ZERO,
+				Vectors.of(Hash.EMPTY_HASH,LOCAL.getAccountKey()).getRef())));
+			case STATUS -> m.returnResult(Result.value(Maps.of(Keywords.PEER,CLAIMED)));
+			default -> {}
+			}
+		});
+		remote.launch();
+		return remote;
+	}
+
+	/** Verifying a remote whose challenge reply is forged fails with that evidence. */
+	@Test
+	public void aForgedChallengeReplyFailsVerification() throws Exception {
+		try (NettyServer remote=forgingRemote();
+				ConvexRemote client=ConvexRemote.connect(remote.getHostAddress())) {
+			client.setKeyPair(LOCAL);
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> client.verifyPeer(null).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS));
+			assertInstanceOf(BadSignatureException.class,e.getCause());
+			assertNull(client.getVerifiedPeer());
+		}
+	}
+
+	/**
+	 * A peer connecting to a remote whose challenge reply is forged refuses it, rather than
+	 * taking the key its status names.
+	 */
+	@Test
+	public void aForgedChallengeReplyRefusesThePeer() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try (NettyServer remote=forgingRemote()) {
+			ConnectionManager manager=peer.getConnectionManager();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> manager.connectToPeer(remote.getHostAddress()).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS));
+			PeerRefusedException refused=assertInstanceOf(PeerRefusedException.class,e.getCause());
+			assertInstanceOf(BadSignatureException.class,refused.getCause());
+			assertNull(manager.getConnection(CLAIMED));
 		} finally {
 			peer.close();
 		}

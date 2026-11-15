@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Disconnect a remote that sends a transaction, Order or challenge whose signature does not verify, or badly shaped DATA; in-process clients such as the REST API stay connected. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
+- Fail `Convex.verifyPeer`, rather than completing with null, when the remote's reply to the identity challenge is forged or signed for another challenge; a peer refuses such a remote instead of identifying it by its unverified status.
 - Reply to a message or transaction a peer fails to handle with LOAD, LIMIT or PEER rather than an exception and its stack trace, logging the failure at debug and warning only the first time the peer runs out of memory or meets a probable defect.
 - Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run exclusive lattice transactions on any component, holding up writes through the nearest transactional boundary, a `BoundaryCursor` or else the root; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.

@@ -40,6 +40,8 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.MemoryStore;
@@ -472,7 +474,7 @@ public class MessageTest {
 		assertEquals(CVMLong.create(2),retagged.getRequestID());
 	}
 
-	@Test public void testChallengeResponseRequiresValidSignature() {
+	@Test public void testChallengeResponseRequiresValidSignature() throws Exception {
 		AKeyPair challenger=AKeyPair.generate();
 		AKeyPair responder=AKeyPair.generate();
 		Hash token=Blob.createRandom(new Random(42),16).getHash();
@@ -498,26 +500,29 @@ public class MessageTest {
 		assertEquals(responder.getAccountKey(),Message.verifyChallengeResponse(
 			Result.create(CVMLong.ONE,valid),token,challenger.getAccountKey(),context,
 			responder.getAccountKey()));
-		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+		assertThrows(InvalidDataException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			Blob.createRandom(new Random(43),16).getHash(),challenger.getAccountKey(),context,
 			responder.getAccountKey()),"a response cannot be replayed for another nonce");
-		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+		assertThrows(InvalidDataException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			token,AKeyPair.generate().getAccountKey(),context,responder.getAccountKey()),
 			"the challenger key is the response audience");
-		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+		assertThrows(InvalidDataException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			token,challenger.getAccountKey(),Strings.create("other-context"),
 			responder.getAccountKey()),"the protocol context is bound into the response");
 		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			token,challenger.getAccountKey(),context,AKeyPair.generate().getAccountKey()),
-			"the response signer must be the expected remote key");
+			"another signer may be an honest peer, so it proves no key without proving misbehaviour");
 
 		SignedData<ACell> other=responder.signData(CVMLong.ONE);
 		SignedData<ACell> forged=SignedData.create(responder.getAccountKey(),
 			other.getSignature(),Ref.get(values));
 		assertFalse(forged.checkSignature());
-		assertNull(Message.verifyChallengeResponse(
+		assertThrows(BadSignatureException.class,() -> Message.verifyChallengeResponse(
 			Result.create(CVMLong.ONE,forged),token,challenger.getAccountKey(),context,
 			responder.getAccountKey()));
+		assertThrows(BadSignatureException.class,() -> Message.verifyChallengeResponse(
+			Result.create(CVMLong.ONE,forged),token,challenger.getAccountKey(),context,
+			AKeyPair.generate().getAccountKey()),"a forged response fails whatever key it claims");
 	}
 
 	@Test public void testConnectionRequestIDsAreUniqueUnderConcurrency() {

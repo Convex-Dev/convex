@@ -367,7 +367,8 @@ up and reported; each lost route starts a new period.
 A connection future reports an expected failure as a checked exception: a
 `PeerConnectionException` when the name cannot be resolved or the peer reached, with
 the network error as its cause, or its subtype `PeerRefusedException` when the peer is
-reached but not admitted, because it fails the challenge, proves a key other than
+reached but not admitted, because it fails the challenge (with the invalid reply's
+exception as its cause, where it sent one), proves a key other than
 the one expected, turns out to be this node, or the application refuses it. A wait or
 attempt that is abandoned, because the manager closes or the peer is released,
 removed or replaced, is cancelled. Misuse, such as an invalid argument or identifying

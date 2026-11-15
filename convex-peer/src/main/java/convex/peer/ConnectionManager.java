@@ -36,6 +36,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
@@ -43,6 +44,8 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.PeerConnectionException;
+import convex.net.PeerRefusedException;
 import convex.net.RequestFailures;
 import convex.net.Transports;
 
@@ -471,6 +474,12 @@ public class ConnectionManager extends AConnectionManager {
 				? convex.verifyPeer(expectedPeer,server.getPeer().getNetworkID()) : identifyPeer(convex);
 			identity.whenComplete((peerKey, ex) -> {
 				pendingConnections.remove(convex);
+				Throwable cause=(ex!=null)?PeerConnectionException.unwrap(ex):null;
+				if (cause instanceof ValidationException) {
+					handleMisbehaviour(null,convex,"Bad challenge reply: "+cause.getMessage());
+					result.completeExceptionally(new PeerRefusedException("Peer at "+hostAddress+" failed identity challenge",cause));
+					return;
+				}
 				if (peerKey == null || ex != null) {
 					convex.close();
 					result.completeExceptionally(ex != null ? ex
@@ -517,6 +526,8 @@ public class ConnectionManager extends AConnectionManager {
 			}
 			return fallbackIdentify(convex);
 		}).exceptionallyCompose(ex -> {
+			// A reply that proves misbehaviour is never overridden by the remote's own status
+			if (PeerConnectionException.unwrap(ex) instanceof ValidationException) return CompletableFuture.failedFuture(ex);
 			log.debug("Peer verification not available at {}: {}", convex.getHostAddress(), ex.getMessage());
 			return fallbackIdentify(convex);
 		});
@@ -585,7 +596,7 @@ public class ConnectionManager extends AConnectionManager {
 	 * Handles provable misbehaviour by a peer this peer connected to, as
 	 * {@link #handleMisbehaviour(AConnection, String)} does for any connection.
 	 *
-	 * @param peerKey Key the peer was connected under
+	 * @param peerKey Key the peer was connected under, or null if it was not yet connected
 	 * @param connection Connection to the peer
 	 * @param reason What it did
 	 */
