@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-import java.util.function.BiConsumer;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
@@ -120,7 +119,8 @@ public final class EtchVerifier {
 	/**
 	 * Lightweight index-only visitor for an open, write-quiescent file. Shares
 	 * collision-chain and hash-path checks with strict validation, but does not
-	 * check record encodings, content hashes or reference completeness. Use
+	 * check record encodings, content hashes or reference completeness, so it
+	 * skips stale continuation slots without checking their records. Use
 	 * {@link #validate(File)} for safe traversal of potentially corrupt indexes.
 	 */
 	public static class IndexVisitor implements IEtchIndexVisitor {
@@ -129,6 +129,7 @@ public final class EtchVerifier {
 		public long empty;
 		public long values;
 		public long indexPtrs;
+		public long stale;
 
 		@Override public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {
 			if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("Etch verification interrupted");
@@ -137,7 +138,7 @@ public final class EtchVerifier {
 			entries+=count;
 			long[] slots=new long[count];
 			for (int i=0;i<count;i++) slots[i]=e.readSlot(indexPointer,i);
-			int[] starts=chainStarts(slots,(slot,message)->fail(message+" at slot "+slot));
+			int[] starts=chainStarts(slots);
 			for (int i=0;i<count;i++) {
 				long slot=slots[i];
 				long type=slot&POINTER_TYPE_MASK;
@@ -145,6 +146,8 @@ public final class EtchVerifier {
 					empty++;
 				} else if (type==POINTER_INDEX) {
 					indexPtrs++;
+				} else if ((type==POINTER_CHAIN)&&(starts[i]<0)) {
+					stale++;
 				} else {
 					values++;
 					Hash hash=e.readValueKey(e.rawPointer(slot));
@@ -170,27 +173,22 @@ public final class EtchVerifier {
 		return (expectedDigit<0 || EtchConstants.indexDigit(hash,level)!=expectedDigit)?level:-1;
 	}
 
-	/** Maps continuation slots to their start, reporting orphan/broken chains. */
-	private static int[] chainStarts(long[] slots, BiConsumer<Integer,String> problem) {
+	/**
+	 * Maps each continuation slot to the start of its chain, or to -1 for a stale
+	 * continuation: one with no chain start before it.
+	 */
+	private static int[] chainStarts(long[] slots) {
+		// A start with no continuation is a valid one-entry chain: the writer
+		// publishes the start before its first continuation.
 		int count=slots.length;
 		int[] starts=new int[count];
 		java.util.Arrays.fill(starts,-1);
 		for (int i=0;i<count;i++) {
 			if ((slots[i]&POINTER_TYPE_MASK)!=POINTER_START) continue;
-			int next=(i+1)%count;
-			if ((slots[next]&POINTER_TYPE_MASK)!=POINTER_CHAIN) {
-				problem.accept(i,"collision start is not followed by a continuation");
-				continue;
-			}
-			int j=next;
+			int j=(i+1)%count;
 			while ((slots[j]&POINTER_TYPE_MASK)==POINTER_CHAIN && starts[j]<0) {
 				starts[j]=i;
 				j=(j+1)%count;
-			}
-		}
-		for (int i=0;i<count;i++) {
-			if ((slots[i]&POINTER_TYPE_MASK)==POINTER_CHAIN && starts[i]<0) {
-				problem.accept(i,"collision continuation has no start");
 			}
 		}
 		return starts;
@@ -269,6 +267,7 @@ public final class EtchVerifier {
 		try {
 			State state=new State(reader,decoder,options);
 			state.walkIndex(0,reader.getIndexStart(),new int[MAX_LEVEL]);
+			state.checkStaleSlots();
 			state.checkRootTree();
 			return state.report();
 		} finally {
@@ -284,6 +283,7 @@ public final class EtchVerifier {
 		private final HashSet<Long> visitedRecords=new HashSet<>();
 		private final TreeMap<Long,Long> occupiedExtents=new TreeMap<>();
 		private final Map<Hash,List<Hash>> branches=new HashMap<>();
+		private final ArrayList<StaleSlot> staleSlots=new ArrayList<>();
 		private final ArrayList<Problem> problems=new ArrayList<>();
 		private long indexBlocks;
 		private long indexSlots;
@@ -350,8 +350,7 @@ public final class EtchVerifier {
 				slots[i]=slot;
 				if (slot==0L) emptySlots++;
 			}
-			int[] chainStarts=chainStarts(slots,(slot,message)->
-					malformed(ProblemKind.CHAIN,position+(long)slot*POINTER_SIZE,message));
+			int[] chainStarts=chainStarts(slots);
 
 			for (int i=0;i<count;i++) {
 				long slot=slots[i];
@@ -363,6 +362,8 @@ public final class EtchVerifier {
 					if (!validChildExtent(level,pointer)) continue;
 					path[level]=i;
 					walkIndex(level+1,pointer,path);
+				} else if ((type==POINTER_CHAIN)&&(chainStarts[i]<0)) {
+					staleSlots.add(new StaleSlot(position+(long)i*POINTER_SIZE,pointer));
 				} else {
 					int expected=(type==POINTER_CHAIN)?chainStarts[i]:i;
 					validateRecord(pointer,level,path,expected);
@@ -454,6 +455,20 @@ public final class EtchVerifier {
 			}
 		}
 
+		/**
+		 * Reports each stale continuation slot whose record is not also reached
+		 * through the index proper. Call after the whole index has been walked.
+		 */
+		private void checkStaleSlots() {
+			// A collapse cut off part-way leaves stale slots pointing at records it
+			// has already placed in its child index; any other stale slot is damage.
+			for (StaleSlot stale:staleSlots) {
+				if (!visitedRecords.contains(stale.pointer())) {
+					malformed(ProblemKind.CHAIN,stale.position(),"collision continuation has no start");
+				}
+			}
+		}
+
 		private void checkRootTree() {
 			Hash root=source.getRootHash();
 			if (isSpecialRoot(root)) return;
@@ -496,6 +511,10 @@ public final class EtchVerifier {
 				problems.add(new Problem(kind,position,message));
 			}
 		}
+	}
+
+	/** A stale continuation slot and the record pointer it holds. */
+	private record StaleSlot(long position, long pointer) {
 	}
 
 	private static boolean isSpecialRoot(Hash hash) {

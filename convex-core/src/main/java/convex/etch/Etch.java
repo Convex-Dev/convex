@@ -211,17 +211,26 @@ public class Etch {
 	/** Test-only construction around a deterministic mapper. */
 	Etch(AFileMapper mapper, String fileName, EtchFileCipher dataCipher,
 			EtchFileCipher indexCipher) {
+		this(mapper, fileName, null, dataCipher, indexCipher, false);
+	}
+
+	/**
+	 * Test-only construction around a deterministic mapper and an optional header
+	 * that the caller initialises. Without a header the index starts at byte 0.
+	 */
+	Etch(AFileMapper mapper, String fileName, AEtchHeader header, EtchFileCipher dataCipher,
+			EtchFileCipher indexCipher, boolean buildChains) {
 		this.file = null;
 		this.fileName = fileName;
 		this.data = null;
 		this.config = null;
-		this.header = null;
-		this.version = 0;
-		this.indexStart = 0L;
+		this.header = header;
+		this.version = (header == null) ? 0 : header.version();
+		this.indexStart = (header == null) ? 0L : header.indexStart();
 		this.mapper = mapper;
 		this.dataCipher = dataCipher;
 		this.indexCipher = indexCipher;
-		this.buildChains = false;
+		this.buildChains = buildChains;
 		this.shutdownHook = null;
 	}
 
@@ -441,6 +450,10 @@ public class Etch {
 				// Complete the new record before exposing any index transition.
 				long newDataPointer = appendData(key, ref);
 
+				// A continuation slot after the empty one is stale: clear it so the
+				// new chain cannot absorb it.
+				clearStaleChain(indexPosition, (nextDigit + 1) & mask, mask);
+
 				// Publish a valid one-entry chain, then its continuation. A reader
 				// may observe either the old plain slot, the one-entry chain or the
 				// completed two-entry chain, all of which are structurally valid.
@@ -475,8 +488,11 @@ public class Etch {
 				int ix = (digit + i) & mask;
 				slotValue = readSlot(indexPosition, ix);
 
-				// If we reach an empty location, write a chain continuation.
+				// If we reach an empty location, write a chain continuation. A
+				// continuation slot after it is stale: clear it so the chain cannot
+				// absorb it.
 				if (slotValue == 0L) {
+					clearStaleChain(indexPosition, (ix + 1) & mask, mask);
 					return writeNewData(indexPosition, ix, key, ref, POINTER_CHAIN);
 				}
 
@@ -513,23 +529,33 @@ public class Etch {
 			}
 
 			// publish the complete new index block BEFORE clearing the old chain:
-			// lock-free readers then see either the intact chain or the new block
+			// lock-free readers then see either the intact chain or the new block.
+			// Cut off part-way, the uncleared rest is a stale run (see below).
 			writeSlot(indexPosition, digit, newIndexPos | POINTER_INDEX);
 			for (int j = 1; j < i; j++) {
 				writeSlot(indexPosition, (digit + j) & mask, 0L); // clear the old chain
 			}
 			return ref;
 		} else if (type == POINTER_CHAIN) {
-			// need to collapse existing chain
+			// Walk back over continuation slots to the start of this chain.
 			int chainStartDigit = (digit - 1) & mask;
-			while (chainStartDigit != digit) {
-				long candidate = readSlot(indexPosition, chainStartDigit);
-				if (slotType(candidate) == POINTER_START)
-					break;
+			long startSlot = readSlot(indexPosition, chainStartDigit);
+			while (slotType(startSlot) == POINTER_CHAIN) {
 				chainStartDigit = (chainStartDigit - 1) & mask;
+				if (chainStartDigit == digit)
+					throw new Error("Infinite chain?");
+				startSlot = readSlot(indexPosition, chainStartDigit);
 			}
-			if (chainStartDigit == digit)
-				throw new Error("Infinite chain?");
+			if (slotType(startSlot) != POINTER_START) {
+				// A stale run: continuation slots with no start before them. A
+				// collapse publishes its child index before clearing the old chain,
+				// so one cut off part-way leaves the rest of the chain behind, and
+				// every entry in it is already in that child. Readers never follow
+				// a stale run, and writers never extend a chain into one, so it is
+				// safe to clear it and use the slot.
+				clearStaleChain(indexPosition, (chainStartDigit + 1) & mask, mask);
+				return writeNewData(indexPosition, digit, key, ref, POINTER_PLAIN);
+			}
 
 			int chainEndDigit = (digit + 1) & mask;
 			while (chainEndDigit != digit) {
@@ -552,7 +578,8 @@ public class Etch {
 			}
 
 			// publish the complete new index block BEFORE clearing the old chain:
-			// lock-free readers then see either the intact chain or the new block
+			// lock-free readers then see either the intact chain or the new block.
+			// Cut off part-way, the uncleared rest is a stale run.
 			writeSlot(indexPosition, chainStartDigit, newIndexPos | POINTER_INDEX);
 			for (int j = 1; j < n; j++) {
 				writeSlot(indexPosition, (chainStartDigit + j) & mask, 0L); // clear the old chain
@@ -562,6 +589,18 @@ public class Etch {
 			return writeNewData(indexPosition, digit, key, ref, POINTER_PLAIN);
 		} else {
 			throw new Error("Unexpected type: " + type);
+		}
+	}
+
+	/**
+	 * Clears the continuation slots from a digit up to the first slot that is not
+	 * one. The caller guarantees such a slot exists.
+	 */
+	private void clearStaleChain(long indexPosition, int digit, int mask) throws IOException {
+		// Clearing from the front keeps any remainder stale if this is cut off too.
+		while (slotType(readSlot(indexPosition, digit)) == POINTER_CHAIN) {
+			writeSlot(indexPosition, digit, 0L);
+			digit = (digit + 1) & mask;
 		}
 	}
 
