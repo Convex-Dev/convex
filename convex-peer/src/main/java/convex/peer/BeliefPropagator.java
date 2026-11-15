@@ -600,6 +600,8 @@ public class BeliefPropagator extends AThreadedComponent {
 					return null;
 				});
 		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Any failure starting this update's fetch drops it, and must clear the flag
+			// or no later fetch could start
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}
