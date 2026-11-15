@@ -188,8 +188,17 @@ public class BeliefPropagator extends AThreadedComponent {
 		// Try belief update.
 		// Might include new blocks published by the peer
 		// Returns true if peer's Order changed (and therefore needs immediate broadcast)
-		boolean updated= maybeUpdateBelief(incomingBelief);
-		
+		boolean updated;
+		try {
+			updated=maybeUpdateBelief(incomingBelief);
+		} catch (MissingDataException e) {
+			// The merge reads only Orders this peer holds in full: it lacks data it must
+			// hold, so it cannot proceed
+			log.error("Fatal: Belief merge is missing data this peer must hold: {}",e.getMissingHash(),e);
+			server.close();
+			return;
+		}
+
 		if (updated) {
 			if (log.isDebugEnabled()) {
 				log.debug("Belief updated cps="+Vectors.createLongs(belief.getOrder(server.getPeerKey()).getConsensusPoints()));
@@ -290,7 +299,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Handle general Belief update, taking belief registered in newBeliefs
 	 *
 	 * @return true if Peer Belief changed, false otherwise
-	 * @throws InterruptedException
+	 * @throws MissingDataException if this peer lacks data the merge reads
 	 */
 	protected boolean maybeUpdateBelief(Belief newBelief) {
 
@@ -339,29 +348,20 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief. A newly received Order that cannot be merged is dropped, and the
-	 * others are merged without it. Data missing from this peer's store closes the
-	 * peer.
+	 * others are merged without it.
 	 * @param newBeliefs New beliefs to merge
 	 *
 	 * @return True if Peer Belief Order was changed, false otherwise.
+	 * @throws MissingDataException if this peer lacks data the merge reads
 	 */
 	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
 		if ((newBeliefs==null)||(newBeliefs.length==0)) return false;
 		long ts=server.getTimestamp();
 		AKeyPair kp=server.getKeyPair();
 		State state=server.getPeer().getConsensusState();
-		Belief newBelief;
-		try {
-			newBelief=tryMerge(ts,kp,state,newBeliefs);
-			if (newBelief==null) {
-				newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
-			}
-		} catch (MissingDataException e) {
-			// The merge reads only Orders this peer holds in full: it lacks data it must
-			// hold, so it cannot proceed
-			log.error("Fatal: Belief merge is missing data this peer must hold: {}",e.getMissingHash(),e);
-			server.close();
-			return false;
+		Belief newBelief=tryMerge(ts,kp,state,newBeliefs);
+		if (newBelief==null) {
+			newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
 		}
 		if (newBelief==null) {
 			log.error("Belief merge failed even without the Orders that cannot be merged on their own");

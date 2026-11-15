@@ -474,6 +474,7 @@ public class Cells {
 	 * @param store Store to persist in
 	 * @return Value after persisting
 	 * @throws BadFormatException If a cell is inconsistent with a child
+	 * @throws MissingDataException If part of the value is not available
 	 * @throws IOException In case of IO error during persistence
 	 */
 	public static <T extends ACell> T persistReceived(T value, AStore store) throws BadFormatException, IOException {

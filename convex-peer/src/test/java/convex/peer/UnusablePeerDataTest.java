@@ -468,21 +468,23 @@ public class UnusablePeerDataTest {
 
 	/**
 	 * A peer merges only Orders it holds in full, so data missing from its store during a
-	 * Belief merge is fatal and closes the peer.
+	 * Belief merge is fatal: the propagator closes the peer and does nothing more.
 	 */
 	@Test
 	public void aMergeMissingDataClosesThePeer() throws Exception {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
-			SignedData<Order> signed=order(REMOTE_A,1,block(REMOTE_A,blockTime(peer)));
-			// An Order whose content no store holds
-			Ref<Order> missingRef=RefSoft.createForHash(signed.getValueRef().getHash(),new MemoryStore());
-			SignedData<Order> missing=SignedData.create(REMOTE_A.getAccountKey(),signed.getSignature(),missingRef);
+			// This peer's own Order, as if its store had lost the content
+			SignedData<Order> own=order(LOCAL,1,block(LOCAL,blockTime(peer)));
+			Ref<Order> missingRef=RefSoft.createForHash(own.getValueRef().getHash(),new MemoryStore());
+			SignedData<Order> hollow=SignedData.create(LOCAL.getAccountKey(),own.getSignature(),missingRef);
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 
-			// Not started: this test thread runs the merge
+			// Not started: this test thread runs one iteration, which merges the good Order
 			BeliefPropagator merger=new BeliefPropagator(peer);
-			merger.belief=peer.getBelief();
-			merger.maybeMergeBeliefs(Belief.create(missing));
+			merger.belief=Belief.create(hollow);
+			assertTrue(merger.queueBelief(Belief.create(good)));
+			merger.loop();
 
 			awaitShutdown(peer);
 			assertFalse(peer.isRunning());
@@ -608,6 +610,23 @@ public class UnusablePeerDataTest {
 			assertEquals(executed.getGenesisState(),executed.getConsensusState());
 			assertTrue(executed.getBlockResult(0).isError(0));
 			assertTrue(peer.isRunning());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A deeply nested query form passes the structure check and gets a result, and the
+	 * peer still answers queries after it.
+	 */
+	@Test
+	public void aDeeplyNestedQueryIsAnswered() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try {
+			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+			ACell deep=InvalidPeerDataTest.nested(InvalidPeerDataTest.DEEP,new ArrayList<>());
+			assertNotNull(client.query(deep).get(WAIT,TimeUnit.SECONDS));
+			assertEquals(CVMLong.create(3),client.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS).getValue());
 		} finally {
 			peer.close();
 		}

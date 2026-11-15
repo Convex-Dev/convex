@@ -1,6 +1,7 @@
 package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -531,6 +532,33 @@ public class StructureCheckTest {
 		Syntax inner=Syntax.create(CVMLong.ONE,Maps.of(Keywords.FOO,CVMLong.ONE));
 		Syntax outer=received(Syntax.createRef(Ref.get(inner),Maps.empty()),store);
 		assertNotPersisted(outer,store);
+	}
+
+	/**
+	 * A cell inconsistent with a child is refused however deeply it is nested, including
+	 * below the depth to which a store persists children recursively
+	 */
+	@ParameterizedTest
+	@MethodSource("stores")
+	public void testInvalidTreeNestedDeeply(AStore store) throws Exception {
+		// 128 elements claimed: eight branch leaves, the last holding 15, so the tree is a
+		// branch itself
+		ACell full=Cells.persist(store.decode(Blob.fromHex(bigLeaf(16))),store);
+		ACell short15=Cells.persist(store.decode(Blob.fromHex(bigLeaf(15))),store);
+		StringBuilder hex=new StringBuilder("808100");
+		for (int i=0; i<7; i++) hex.append(ref(full));
+		ACell bad=store.decode(Blob.fromHex(hex.append(ref(short15)).toString()));
+		assertEquals(128,((AVector<?>)bad).count());
+		assertFalse(bad.isEmbedded());
+
+		ACell nested=bad;
+		for (int i=0; i<1000; i++) {
+			nested=Vectors.of(nested);
+			nested.getHash(); // bottom up, so no hash is computed recursively
+		}
+		assertNotPersisted(nested,store);
+		Ref<?> found=store.refForHash(bad.getHash());
+		assertTrue((found==null)||(found.getStatus()<Ref.PERSISTED));
 	}
 
 	/**
