@@ -489,7 +489,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				log.debug("Missing data in Belief message "+m.getHash());
 				fetchMissing(m);
 			} catch (BadFormatException e1) {
-				log.debug("Malformed Belief message");
+				rejectReceived(m,e1,"Malformed Belief message");
 			}
 		} catch (Throwable e) {
 			// Any other failure processing the message: reject the whole message, unless

@@ -45,6 +45,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ValidationException;
@@ -166,7 +167,6 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
-	private static final Result ERR_BAD_FORMAT=Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER);
 
 	private final RequestFailures failures=new RequestFailures(log);
 
@@ -265,12 +265,8 @@ public class TransactionHandler extends AThreadedComponent {
 			this.receivedTransactionCount++;
 			try {
 				SignedData<ATransaction> sd=transactionOf(m);
-				if (sd==null) {
-					// Not the shape of a transaction message. Checked here, so that FORMAT
-					// is never inferred from an arbitrary failure below.
-					sendRejection(m,ERR_BAD_FORMAT);
-					continue;
-				}
+				// Checked explicitly, so that FORMAT is never inferred from an arbitrary failure below
+				if (sd==null) throw new BadFormatException("Transaction message without a signed transaction");
 				Result error=peer.checkTransactionFast(sd);
 				if (error!=null) {
 					m.returnResult(error.withSource(SourceCodes.PEER));

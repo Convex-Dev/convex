@@ -7,15 +7,14 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
 import convex.core.SourceCodes;
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
@@ -98,8 +97,9 @@ public class QueryHandler extends AThreadedComponent {
 				} catch (Throwable e) {
 					Utils.checkRequestFailure(e);
 					failures.log(e, "Dropped {} request", type);
-					// A reply, never a disconnect: a failure caught here may be this peer's own
 					if (type == MessageType.QUERY) Server.returnBestEffort(m,RequestFailures.reply(e));
+					// Only a validation failure is in the request itself: any other may be this peer's own
+					if (e instanceof ValidationException bad) server.getConnectionManager().handleBadInput(m.getConnection(),bad);
 				}
 			}
 		} finally {
@@ -124,14 +124,10 @@ public class QueryHandler extends AThreadedComponent {
 		}
 	}
 
-	private void handleQuery(Message m) {
+	private void handleQuery(Message m) throws BadFormatException {
 		// query is a vector [:Q id form address?]
 		AVector<ACell> v=RT.ensureVector(m.getPayload());
-		if ((v==null)||(v.count()<3)) {
-			// A shape a newer version might send, not provable misbehaviour: refused, not disconnected
-			m.returnResult(Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
-			return;
-		}
+		if ((v==null)||(v.count()<3)) throw new BadFormatException("Query is not [:Q id form address?]");
 		ACell id = v.get(1);
 		ACell form = v.get(2);
 

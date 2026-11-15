@@ -54,6 +54,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
+import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
@@ -617,6 +618,7 @@ public class Server implements Closeable {
 				return null;
 			default:
 				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
+				manager.handleBadInput(m.getConnection(),new BadFormatException("Unrecognised message type"));
 				return null;
 			}
 		} catch (MissingDataException e) {
@@ -681,6 +683,8 @@ public class Server implements Closeable {
 				// best effort -- connection may be bad
 				Utils.checkRequestFailure(e2);
 			}
+			// After the reply. A validation failure here is in the message's own encoding
+			if (e instanceof ValidationException bad) manager.handleBadInput(m.getConnection(),bad);
 			return null;
 		}
 		observeMessageReceived(m);

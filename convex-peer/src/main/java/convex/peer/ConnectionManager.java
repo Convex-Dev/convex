@@ -36,6 +36,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ValidationException;
@@ -366,23 +367,14 @@ public class ConnectionManager extends AConnectionManager {
 			unresponsiveSince.remove(peerKey);
 
 			AMap<Keyword, ACell> status = API.ensureStatusMap(result.getValue());
-			if (status == null) {
-				log.debug("Dubious status response message: {}", result);
-				return;
-			}
+			if (status == null) throw new BadFormatException("Status reply is not a status");
 			Hash h = RT.ensureHash(status.get(Keywords.BELIEF));
-			if (h==null) {
-				log.debug("Status response has no Belief hash: {}",result);
-				return;
-			}
+			if (h==null) throw new BadFormatException("Status reply has no Belief hash");
 			if (h.equals(server.getBelief().getHash())) return;
 			if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
 
 			ACell acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-			if (!(acquired instanceof Belief belief)) {
-				log.debug("Peer returned non-Belief value for advertised Belief hash {}",h);
-				return;
-			}
+			if (!(acquired instanceof Belief belief)) throw new BadFormatException("Advertised Belief is not a Belief");
 			// Checked here, where the polled peer is known
 			State state=server.getPeer().getConsensusState();
 			for (SignedData<Order> so: Belief.extractOrders(belief)) {
@@ -476,8 +468,8 @@ public class ConnectionManager extends AConnectionManager {
 			identity.whenComplete((peerKey, ex) -> {
 				pendingConnections.remove(convex);
 				Throwable cause=(ex!=null)?PeerConnectionException.unwrap(ex):null;
-				if (cause instanceof MisbehaviourException misbehaviour) {
-					handleBadInput(null,convex,misbehaviour);
+				if (cause instanceof ValidationException bad) handleBadInput(null,convex,bad);
+				if (cause instanceof MisbehaviourException) {
 					result.completeExceptionally(new PeerRefusedException("Peer at "+hostAddress+" failed identity challenge",cause));
 					return;
 				}
@@ -527,8 +519,10 @@ public class ConnectionManager extends AConnectionManager {
 			}
 			return fallbackIdentify(convex);
 		}).exceptionallyCompose(ex -> {
+			Throwable cause=PeerConnectionException.unwrap(ex);
 			// A reply that proves misbehaviour is never overridden by the remote's own status
-			if (PeerConnectionException.unwrap(ex) instanceof MisbehaviourException) return CompletableFuture.failedFuture(ex);
+			if (cause instanceof MisbehaviourException) return CompletableFuture.failedFuture(ex);
+			if (cause instanceof ValidationException bad) handleBadInput(null,convex,bad);
 			log.debug("Peer verification not available at {}: {}", convex.getHostAddress(), ex.getMessage());
 			return fallbackIdentify(convex);
 		});
@@ -564,7 +558,9 @@ public class ConnectionManager extends AConnectionManager {
 		});
 		// After the reply, for a local client that stays open; a remote one may be closed first
 		AVector<ACell> v=RT.ensureVector(m.getPayload());
-		if ((v!=null)&&(v.count()==3)&&(v.get(2) instanceof SignedData<?> challenge)&&!challenge.checkSignature()) {
+		if ((v==null)||(v.count()!=3)||!(v.get(2) instanceof SignedData<?> challenge)) {
+			handleBadInput(m.getConnection(),new BadFormatException("Invalid challenge format"));
+		} else if (!challenge.checkSignature()) {
 			handleBadInput(m.getConnection(),new BadSignatureException("Bad challenge signature",challenge));
 		}
 	}

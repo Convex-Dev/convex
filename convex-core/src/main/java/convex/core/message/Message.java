@@ -410,17 +410,19 @@ public class Message {
 	 * @param contextID   Optional context ID (expected in slot 2 if present), or null
 	 * @param expectedKey Expected signer key, or null to accept any
 	 * @return The verified remote AccountKey, or null if the response proves no key: an
-	 *         error, a reply of another shape, or one signed by a key other than the one expected
+	 *         error, or a response signed by a key other than the one expected
+	 * @throws BadFormatException If the response is malformed: not a signed vector of the
+	 *         challenge's length
 	 * @throws BadSignatureException If the response's signature does not verify
 	 * @throws MisbehaviourException If the response is validly signed for another challenge:
 	 *         its token, audience key or context differs
 	 */
 	@SuppressWarnings("unchecked")
 	public static AccountKey verifyChallengeResponse(Result result, Hash token, AccountKey ownKey, ACell contextID, AccountKey expectedKey)
-			throws MisbehaviourException {
+			throws BadFormatException, MisbehaviourException {
 		if (result == null || result.isError()) return null;
 		ACell rv = result.getValue();
-		if (!(rv instanceof SignedData)) return null;
+		if (!(rv instanceof SignedData)) throw new BadFormatException("Challenge response is not signed");
 		SignedData<ACell> response = (SignedData<ACell>) rv;
 		if (!response.checkSignature()) throw new BadSignatureException("Challenge response signature does not verify", response);
 		AccountKey remoteKey = response.getAccountKey();
@@ -428,11 +430,10 @@ public class Message {
 		if (expectedKey != null && !expectedKey.equals(remoteKey)) return null;
 
 		ACell inner = response.getValue();
-		if (!(inner instanceof AVector)) return null;
+		if (!(inner instanceof AVector)) throw new BadFormatException("Challenge response is not a vector");
 		AVector<ACell> values = (AVector<ACell>) inner;
 		long n = values.count();
-		// A shape a newer version might send, not provable misbehaviour
-		if (n != ((contextID == null) ? 2 : 3)) return null;
+		if (n != ((contextID == null) ? 2 : 3)) throw new BadFormatException("Challenge response has "+n+" elements");
 		if (!token.equals(values.get(0)) || !ownKey.equals(values.get(1))
 				|| (contextID != null && !Utils.equals(contextID, values.get(2)))) {
 			// An honest responder signs the challenge it was sent: this one signed another

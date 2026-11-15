@@ -523,6 +523,13 @@ public class MessageTest {
 		assertThrows(BadSignatureException.class,() -> Message.verifyChallengeResponse(
 			Result.create(CVMLong.ONE,forged),token,challenger.getAccountKey(),context,
 			AKeyPair.generate().getAccountKey()),"a forged response fails whatever key it claims");
+
+		// Malformed responses
+		for (ACell malformed: List.of(values,responder.signData(CVMLong.ONE),responder.signData(Vectors.of(token,challenger.getAccountKey())))) {
+			assertThrows(BadFormatException.class,() -> Message.verifyChallengeResponse(
+				Result.create(CVMLong.ONE,malformed),token,challenger.getAccountKey(),context,
+				responder.getAccountKey()),malformed.toString());
+		}
 	}
 
 	@Test public void testConnectionRequestIDsAreUniqueUnderConcurrency() {

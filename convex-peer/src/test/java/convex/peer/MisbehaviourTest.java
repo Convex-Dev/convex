@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
@@ -182,12 +184,13 @@ public class MisbehaviourTest {
 	static final AccountKey CLAIMED=REMOTE_B.getAccountKey();
 
 	/**
-	 * Launches a remote that answers a challenge with a forged signature claiming
-	 * {@link #CLAIMED}, and names that key in its status.
+	 * Launches a remote that answers each request with what the given function gives
+	 * for it, or not at all for null.
 	 *
+	 * @param answer Answer to each request
 	 * @param disconnected Completed when a connection to the remote closes
 	 */
-	static NettyServer forgingRemote(CompletableFuture<Void> disconnected) throws Exception {
+	static NettyServer fakeRemote(Function<Message,Result> answer, CompletableFuture<Void> disconnected) throws Exception {
 		NettyServer remote=new NettyServer(0);
 		remote.setConnectionHandler(connection -> new IncomingHandler() {
 			@Override
@@ -197,12 +200,8 @@ public class MisbehaviourTest {
 				} catch (BadFormatException e) {
 					return null;
 				}
-				switch (m.getType()) {
-				case CHALLENGE -> m.returnResult(Result.value(SignedData.create(CLAIMED,Ed25519Signature.ZERO,
-					Vectors.of(Hash.EMPTY_HASH,LOCAL.getAccountKey()).getRef())));
-				case STATUS -> m.returnResult(Result.value(Maps.of(Keywords.PEER,CLAIMED)));
-				default -> {}
-				}
+				Result r=answer.apply(m);
+				if (r!=null) m.returnResult(r);
 				return null;
 			}
 
@@ -213,6 +212,21 @@ public class MisbehaviourTest {
 		});
 		remote.launch();
 		return remote;
+	}
+
+	/** Answers a challenge with the given reply, and names {@link #CLAIMED} in its status. */
+	static Function<Message,Result> challengeAnswer(Result reply) {
+		return m -> switch (m.getType()) {
+			case CHALLENGE -> reply;
+			case STATUS -> Result.value(Maps.of(Keywords.PEER,CLAIMED));
+			default -> null;
+		};
+	}
+
+	/** A remote that answers a challenge with a forged signature claiming {@link #CLAIMED}. */
+	static NettyServer forgingRemote(CompletableFuture<Void> disconnected) throws Exception {
+		return fakeRemote(challengeAnswer(Result.value(SignedData.create(CLAIMED,Ed25519Signature.ZERO,
+			Vectors.of(Hash.EMPTY_HASH,LOCAL.getAccountKey()).getRef()))),disconnected);
 	}
 
 	/** Verifying a remote whose challenge reply is forged fails with that evidence. */
@@ -244,6 +258,30 @@ public class MisbehaviourTest {
 			assertInstanceOf(BadSignatureException.class,refused.getCause());
 			assertNull(manager.getConnection(CLAIMED));
 			disconnected.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A malformed challenge reply is rejected without a disconnect: verification fails with
+	 * the evidence, and a peer connecting falls back to the remote's status.
+	 */
+	@Test
+	public void aMalformedChallengeReplyKeepsTheConnection() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try (NettyServer remote=fakeRemote(challengeAnswer(Result.value(CVMLong.ONE)),new CompletableFuture<>());
+				ConvexRemote client=ConvexRemote.connect(remote.getHostAddress())) {
+			client.setKeyPair(LOCAL);
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> client.verifyPeer(null).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS));
+			assertInstanceOf(BadFormatException.class,e.getCause());
+			assertTrue(client.isConnected());
+
+			ConnectionManager manager=peer.getConnectionManager();
+			Convex connected=manager.connectToPeer(remote.getHostAddress()).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			assertSame(connected,manager.getConnection(CLAIMED));
+			assertTrue(connected.isConnected());
 		} finally {
 			peer.close();
 		}
