@@ -74,7 +74,7 @@ public class BlockResult extends ARecordGeneric {
 
 	/**
 	 * Gets the Results of all transactions in the Block
-	 * @return Vector of Results
+	 * @return Vector of Results, or null for an invalid Block that could not be read as a Block
 	 */
 	public AVector<Result> getResults() {
 		if (results==null) results=RT.ensureVector(values.get(1));
@@ -97,7 +97,7 @@ public class BlockResult extends ARecordGeneric {
 	 */
 	public Result getResult(long i) {
 		AVector<Result> results=getResults();
-		if ((i<0)||(i>=results.count())) return null;
+		if ((results==null)||(i<0)||(i>=results.count())) return null;
 		return RT.ensureCVM(results.get(i),Result.class);
 	}
 
