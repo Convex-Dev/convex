@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.prim.CVMLong;
 
 /**
- * Tests for UpgradeError classification, which drives the peer's freeze-vs-retry
- * decision. See UPGRADE.md.
+ * Tests for UpgradeError classification, which tells the operator of a halted peer
+ * how to recover it. See UPGRADE.md.
  */
 public class UpgradeErrorTest {
 
@@ -40,7 +40,7 @@ public class UpgradeErrorTest {
 		UpgradeError e = UpgradeError.failed(4, mde);
 		assertEquals(4L, e.getVersion());
 		assertInstanceOf(MissingDataException.class, e.getCause());
-		// A peer-local condition may succeed on resync-and-retry: retryable
+		// A peer-local condition is recoverable by a store repair or resync, with no release change
 		assertTrue(e.isRetryable());
 	}
 }

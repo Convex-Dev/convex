@@ -1209,7 +1209,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Freezes this peer's consensus participation due to a required upgrade this
-	 * release cannot apply. Both the CVM executor and the belief propagator check
+	 * peer cannot apply. Both the CVM executor and the belief propagator check
 	 * {@link #isConsensusHalted()} and cease all consensus activity (state
 	 * application, belief merge, block proposal, Order publication) — a full
 	 * consensus freeze, so the peer never votes on or publishes anything past the
@@ -1222,8 +1222,16 @@ public class Server implements Closeable {
 		if (consensusHalt == null) {
 			consensusHalt = error;
 			consensusHaltFuture.complete(error);
-			upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
-					error.getVersion(), Migrations.MAX_VERSION);
+			if (error.getCause()==null) {
+				upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
+						error.getVersion(), Migrations.MAX_VERSION);
+			} else if (error.isRetryable()) {
+				upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} needs data missing from this peer's store. Repair or resync the store and restart to rejoin. See UPGRADE.md",
+						error.getVersion(), error);
+			} else {
+				upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} failed. A corrected release is required to rejoin. See UPGRADE.md",
+						error.getVersion(), error);
+			}
 		}
 	}
 
