@@ -773,17 +773,50 @@ public class UnusablePeerDataTest {
 		Server peer=launchPeer(LOCAL);
 		try {
 			throwingOnce(peer,new OutOfMemoryError("Test"),new CompletableFuture<>()).start();
-			CompletableFuture<Void> shutdown=CompletableFuture.runAsync(() -> {
-				try {
-					peer.waitForShutdown();
-				} catch (InterruptedException e) {
-					throw new CompletionException(e);
-				}
-			});
-			shutdown.get(WAIT,TimeUnit.SECONDS);
+			awaitShutdown(peer);
 			assertFalse(peer.isRunning());
 		} finally {
 			peer.close();
 		}
+	}
+
+	/**
+	 * A peer holds all of every Block it agrees, so a Block missing from its store when
+	 * it computes its State is fatal and closes the peer.
+	 */
+	@Test
+	public void aFinalisedBlockMissingFromTheStoreClosesThePeer() throws Exception {
+		Server peer=launchPeer(LOCAL);
+		try (MemoryStore hollowStore=new MemoryStore()) {
+			// Stop Belief updates, so the executor computes only the Belief given here
+			BeliefPropagator propagator=peer.getBeliefPropagator();
+			propagator.close();
+			propagator.awaitStopped();
+
+			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"*address*"));
+			SignedData<Block> signed=LOCAL.signData(Block.of(blockTime(peer),tx));
+			assertFalse(signed.isEmbedded());
+			Order order=Order.create().append(signed).withConsensusPoints(new long[] {1,1,1,1}).withTimestamp(1);
+			// Decoded alone, the Order holds its Block by hash only
+			Order hollow=hollowStore.decode(order.getEncoding());
+			peer.getCVMExecutor().queueUpdate(Belief.create(LOCAL.signData(hollow)));
+
+			awaitShutdown(peer);
+			assertFalse(peer.isRunning());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** Waits for a peer's shutdown sequence to complete. */
+	static void awaitShutdown(Server peer) throws Exception {
+		CompletableFuture<Void> shutdown=CompletableFuture.runAsync(() -> {
+			try {
+				peer.waitForShutdown();
+			} catch (InterruptedException e) {
+				throw new CompletionException(e);
+			}
+		});
+		shutdown.get(WAIT,TimeUnit.SECONDS);
 	}
 }

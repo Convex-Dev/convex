@@ -13,6 +13,7 @@ import java.time.Instant;
 import convex.core.cpos.Belief;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.TODOException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.util.ConsumerDispatcher;
@@ -106,6 +107,10 @@ public class CVMExecutor extends AThreadedComponent {
 				// propagator both cease) until the operator updates and restarts.
 				server.haltConsensus(e);
 			}
+		} catch (MissingDataException e) {
+			// The peer does not hold data it agreed: fatal
+			log.error("Fatal: data missing from this peer's store, closing server",e);
+			server.close();
 		} catch (IOException e) {
 			// The peer cannot persist its state: fatal
 			log.error("Fatal exception encountered in CVM Executor",e);
@@ -118,16 +123,21 @@ public class CVMExecutor extends AThreadedComponent {
 
 	/**
 	 * Computes the State up to the Peer's finality point. Failing to compute it is not
-	 * fatal: the State stays where it is and the next loop tries again.
+	 * fatal: the State stays where it is and the next loop tries again. Missing data is
+	 * fatal, since a peer holds all of every Block it agrees and of its State.
 	 *
 	 * @param p Peer whose State to compute
 	 * @return Peer with its State computed, or the same Peer if computing it failed
+	 * @throws MissingDataException if the Peer does not hold all of a Block or its State
 	 */
 	private Peer computeState(Peer p) {
 		try {
 			Peer updated=p.updateState();
 			failedPosition=-1;
 			return updated;
+		} catch (MissingDataException e) {
+			// Before the catch-all, which retries: missing data never goes away by retrying
+			throw e;
 		} catch (RuntimeException e) {
 			long position=p.getStatePosition();
 			if (position!=failedPosition) {
