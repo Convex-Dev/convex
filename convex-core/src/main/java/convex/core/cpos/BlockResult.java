@@ -11,8 +11,6 @@ import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Cells;
-import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
@@ -112,51 +110,21 @@ public class BlockResult extends ARecordGeneric {
 	}
 
 	@Override
-	public ACell get(Keyword key) {
-		if (Keywords.STATE.equals(key)) return state;
-		if (Keywords.RESULTS.equals(key)) return results;
-		return null;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// TODO Auto-generated method stub
 	}
-	
+
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
+		ACell rs=values.get(1);
+		if (rs==null) return; // an invalid Block may have no results
+		if (!(rs instanceof AVector<?> results)) throw new InvalidDataException("Results not a vector",this);
 		long n=results.count();
 		for (long i=0; i<n; i++) {
 			ACell r=results.get(i);
 			if (!(r instanceof Result)) throw new InvalidDataException("Not a Result at position "+i+" - found "+Utils.getClassName(r),this);
 		}
-	}
-
-	
-	@Override 
-	public boolean equals(ACell a) {
-		if (a instanceof BlockResult)return equals((BlockResult)a);
-		return Cells.equalsEncoding(this,a);
-	}
-	
-	/**
-	 * Tests if this BlockResult is equal to another
-	 * @param a BlockResult to compare with
-	 * @return true if equal, false otherwise
-	 */
-	public boolean equals(BlockResult a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return Cells.equals(h, ha);
-		}
-		
-		if (!(Cells.equals(results, a.results))) return false;
-		if (!(Cells.equals(state, a.state))) return false;
-		return true;
 	}
 
 	/**
