@@ -51,7 +51,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.RequestFailureLog;
+import convex.net.RequestFailures;
 
 /**
  * Server component for handling client transactions and producing Blocks
@@ -164,29 +164,27 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
-	private static final Result ERR_STACK=Result.error(ErrorCodes.LIMIT, Strings.intern("Transaction exceeded this peer's stack depth")).withSource(SourceCodes.PEER);
 	private static final Result ERR_BAD_FORMAT=Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER);
-	private static final Result ERR_PEER_FAILURE=Result.error(ErrorCodes.PEER, Strings.intern("Peer failed to process transaction")).withSource(SourceCodes.PEER);
 
-	private final RequestFailureLog failures=new RequestFailureLog(log);
+	private final RequestFailures failures=new RequestFailures(log);
 
 	/**
 	 * For both observers, apart from intake's log, so an observer's defect does not use
 	 * up intake's one warning.
 	 */
-	private final RequestFailureLog observerFailures=new RequestFailureLog(log);
+	private final RequestFailures observerFailures=new RequestFailures(log);
 
 	private static final Result ERR_RESULT_UNAVAILABLE=Result.error(ErrorCodes.PEER,
 		Strings.intern("TX executed, but result not delivered")).withSource(SourceCodes.PEER);
 
 	/** Separate logs, so each site warns once of each kind of failure. */
-	private final RequestFailureLog resultFailures=new RequestFailureLog(log);
-	private final RequestFailureLog deliveryFailures=new RequestFailureLog(log);
+	private final RequestFailures resultFailures=new RequestFailures(log);
+	private final RequestFailures deliveryFailures=new RequestFailures(log);
 
 	private static final Result ERR_BLOCK_FAILED=Result.error(ErrorCodes.PEER, Strings.intern("Block production failed")).withSource(SourceCodes.PEER);
 
 	/** Separate from intake's log, so each site warns once of each kind of failure. */
-	private final RequestFailureLog blockFailures=new RequestFailureLog(log);
+	private final RequestFailures blockFailures=new RequestFailures(log);
 
 	/**
 	 * Gets the signed value a transaction message carries, or null if the message does
@@ -199,27 +197,10 @@ public class TransactionHandler extends AThreadedComponent {
 		return (v.get(2) instanceof SignedData<?> sd)?(SignedData<ATransaction>)sd:null;
 	}
 
-	/**
-	 * Rejects one client transaction whose handling failed: running out of memory is
-	 * answered as load, a stack overflow as a limit, any other failure as a peer error.
-	 */
+	/** Rejects one client transaction whose handling failed. */
 	private void reject(Message m, Throwable e) {
 		failures.log(e,"Rejected transaction for connection {}",m.getConnection());
-		sendRejection(m,rejectionFor(e));
-	}
-
-	private static Result rejectionFor(Throwable e) {
-		// Never FORMAT: that is only for an encoding or shape the peer has checked
-		if (e instanceof OutOfMemoryError) {
-			// The peer's heap ran out, which may be its load rather than this
-			// transaction, so busy: a retry may succeed
-			return Result.SERVER_LOADED;
-		}
-		if (e instanceof StackOverflowError) {
-			// Too deep for this peer: the same transaction would fail again, so a limit
-			return ERR_STACK;
-		}
-		return ERR_PEER_FAILURE;
+		sendRejection(m,RequestFailures.reply(e));
 	}
 
 	/**

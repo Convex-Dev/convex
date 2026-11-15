@@ -65,6 +65,7 @@ import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.net.AServer;
+import convex.net.RequestFailures;
 import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
@@ -127,15 +128,14 @@ public class Server implements Closeable {
 	Consumer<Message> receiveAction = m->{
 		Predicate<Message> retry = deliverMessage(m);
 		if (retry != null) {
-			if (!retry.test(m)) {
-				try {
-					m.returnResult(Result.SERVER_LOADED);
-				} catch (Exception e) {
-					// best effort
-				}
-			}
+			if (!retry.test(m)) returnBestEffort(m,Result.SERVER_LOADED);
 		}
 	};
+
+	/** One per boundary, so each warns once of each kind of failure that warrants it. */
+	private final RequestFailures dispatchFailures=new RequestFailures(log);
+	private final RequestFailures decodeFailures=new RequestFailures(log);
+	private final RequestFailures observerFailures=new RequestFailures(log);
 
 	/**
 	 * Manages authenticated outbound connections to other peers in the network.
@@ -425,8 +425,13 @@ public class Server implements Closeable {
 
 	private void observeMessageReceived(Message m) {
 		Consumer<Message> obs=messageReceiveObserver;
-		if (obs!=null) {
+		if (obs==null) return;
+		try {
 			obs.accept(m);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			// An observer's failure is not the message's: it is still processed
+			observerFailures.log(e,"Message receive observer failed");
 		}
 	}
 	
@@ -615,21 +620,15 @@ public class Server implements Closeable {
 				return null;
 			}
 		} catch (MissingDataException e) {
+			// Before the catch-all: the reply names the missing data
 			Hash missingHash = e.getMissingHash();
-			log.info("Missing data: {} in message of type {}", missingHash, m.getType());
-			try {
-				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Missing data: "+missingHash)).withSource(SourceCodes.PEER));
-			} catch (Exception e2) {
-				// best effort -- some message types don't have return handlers
-			}
+			log.debug("Missing data: {} in message of type {}", missingHash, m.getType());
+			returnBestEffort(m,Result.error(ErrorCodes.MISSING, Strings.create("Missing data: "+missingHash)).withSource(SourceCodes.PEER));
 			return null;
-		} catch (Exception e) {
-			log.warn("Unexpected error processing peer message",e);
-			try {
-				m.returnResult(Result.fromException(e).withID(m.getID()));
-			} catch (Exception e2) {
-				// best effort
-			}
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			dispatchFailures.log(e,"Failed to process {} message",m.getType());
+			returnBestEffort(m,RequestFailures.reply(e));
 			return null;
 		}
 	}
@@ -672,13 +671,15 @@ public class Server implements Closeable {
 		if (completeReply(m)) return null;
 		try {
 			m.getPayload(getStore());
-		} catch (Exception e) {
-			log.debug("Failed to decode message: {}", e.getMessage());
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			decodeFailures.log(e,"Failed to decode message");
 			try {
 				ACell id = m.getRequestID();
-				m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
-			} catch (Exception e2) {
+				m.returnMessage(Message.createResult(RequestFailures.reply(e).withID(id)));
+			} catch (Throwable e2) {
 				// best effort -- connection may be bad
+				Utils.checkRequestFailure(e2);
 			}
 			return null;
 		}
@@ -735,10 +736,18 @@ public class Server implements Closeable {
 	 * Silently ignores failures (message may not have a return handler or ID).
 	 */
 	private boolean returnError(Message m, Keyword errorCode, AString message) {
+		return returnBestEffort(m,Result.error(errorCode, message).withSource(SourceCodes.PEER));
+	}
+
+	/**
+	 * Replies to a message if it can: a message type may have no return handler, or its
+	 * connection may have failed.
+	 */
+	private static boolean returnBestEffort(Message m, Result r) {
 		try {
-			return m.returnResult(Result.error(errorCode, message).withSource(SourceCodes.PEER));
-		} catch (Exception e) {
-			// best effort — some message types don't have return handlers
+			return m.returnResult(r);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			return false;
 		}
 	}

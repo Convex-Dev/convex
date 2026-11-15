@@ -37,7 +37,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.RequestFailureLog;
+import convex.net.RequestFailures;
 import convex.net.Transports;
 
 /**
@@ -88,8 +88,8 @@ public class ConnectionManager extends AConnectionManager {
 	private final Set<Convex> pendingConnections=ConcurrentHashMap.newKeySet();
 
 	/** One per site, so each warns once of each kind of failure that warrants it. */
-	private final RequestFailureLog pollFailures=new RequestFailureLog(log);
-	private final RequestFailureLog connectFailures=new RequestFailureLog(log);
+	private final RequestFailures pollFailures=new RequestFailures(log);
+	private final RequestFailures connectFailures=new RequestFailures(log);
 
 	/** Background thread for connection maintenance and belief polling. */
 	private Thread thread;

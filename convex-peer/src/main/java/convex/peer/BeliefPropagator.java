@@ -39,7 +39,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.RequestFailureLog;
+import convex.net.RequestFailures;
 
 /**
  * Component class to handle propagation of new Beliefs from a Peer
@@ -573,15 +573,15 @@ public class BeliefPropagator extends AThreadedComponent {
 	private void rejectReceived(Message source, Throwable e, String reason) {
 		receiveFailures.log(e,"{}: {}",reason,(source==null)?"polled Belief":source.getConnection());
 		// Running out of memory, or a defect of this peer, says nothing about the sender
-		if ((source!=null)&&RequestFailureLog.mayBeCausedByRequest(e)) {
+		if ((source!=null)&&RequestFailures.mayBeCausedByRequest(e)) {
 			server.getConnectionManager().alertBadMessage(source,reason);
 		}
 	}
 
 	/** Separate logs, so each site warns once of each kind of failure. */
-	private final RequestFailureLog receiveFailures=new RequestFailureLog(log);
-	private final RequestFailureLog mergeFailures=new RequestFailureLog(log);
-	private final RequestFailureLog fetchFailures=new RequestFailureLog(log);
+	private final RequestFailures receiveFailures=new RequestFailures(log);
+	private final RequestFailures mergeFailures=new RequestFailures(log);
+	private final RequestFailures fetchFailures=new RequestFailures(log);
 	
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
 	private final AtomicBoolean fetching=new AtomicBoolean();

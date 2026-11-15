@@ -2,9 +2,11 @@ package convex.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,9 +15,16 @@ import org.slf4j.Marker;
 import org.slf4j.event.Level;
 import org.slf4j.helpers.LegacyAbstractLogger;
 
+import convex.core.ErrorCodes;
+import convex.core.Result;
+import convex.core.cvm.Keywords;
+import convex.core.data.Hash;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ResultException;
+import convex.core.store.MemoryStore;
 
-public class RequestFailureLogTest {
+public class RequestFailuresTest {
 
 	/** A logger that records the level and cause of each call. */
 	@SuppressWarnings("serial")
@@ -40,7 +49,7 @@ public class RequestFailureLogTest {
 	@Test
 	public void aDefectIsWarnedOfOnce() {
 		RecordingLogger logger=new RecordingLogger();
-		RequestFailureLog failures=new RequestFailureLog(logger);
+		RequestFailures failures=new RequestFailures(logger);
 		AssertionError defect=new AssertionError("simulated");
 		failures.log(defect,"Dropped {} request","QUERY");
 		failures.log(new NoClassDefFoundError("simulated"),"Dropped {} request","QUERY");
@@ -51,7 +60,7 @@ public class RequestFailureLogTest {
 	@Test
 	public void runningOutOfMemoryIsWarnedOfOnceApartFromDefects() {
 		RecordingLogger logger=new RecordingLogger();
-		RequestFailureLog failures=new RequestFailureLog(logger);
+		RequestFailures failures=new RequestFailures(logger);
 		OutOfMemoryError oom=new OutOfMemoryError("simulated");
 		failures.log(oom,"Dropped {} request","QUERY");
 		failures.log(new OutOfMemoryError("simulated"),"Dropped {} request","QUERY");
@@ -62,22 +71,44 @@ public class RequestFailureLogTest {
 
 	@Test
 	public void onlyExceptionsAndStackOverflowsMayBeCausedByTheRequest() {
-		assertTrue(RequestFailureLog.mayBeCausedByRequest(new BadFormatException("simulated")));
-		assertTrue(RequestFailureLog.mayBeCausedByRequest(new IllegalStateException()));
-		assertTrue(RequestFailureLog.mayBeCausedByRequest(new StackOverflowError()));
-		assertFalse(RequestFailureLog.mayBeCausedByRequest(new OutOfMemoryError()));
-		assertFalse(RequestFailureLog.mayBeCausedByRequest(new NoClassDefFoundError()));
-		assertFalse(RequestFailureLog.mayBeCausedByRequest(new AssertionError()));
+		assertTrue(RequestFailures.mayBeCausedByRequest(new BadFormatException("simulated")));
+		assertTrue(RequestFailures.mayBeCausedByRequest(new IllegalStateException()));
+		assertTrue(RequestFailures.mayBeCausedByRequest(new StackOverflowError()));
+		assertFalse(RequestFailures.mayBeCausedByRequest(new OutOfMemoryError()));
+		assertFalse(RequestFailures.mayBeCausedByRequest(new NoClassDefFoundError()));
+		assertFalse(RequestFailures.mayBeCausedByRequest(new AssertionError()));
 	}
 
 	@Test
 	public void otherFailuresAreLoggedAtDebug() {
 		RecordingLogger logger=new RecordingLogger();
-		RequestFailureLog failures=new RequestFailureLog(logger);
+		RequestFailures failures=new RequestFailures(logger);
 		List<Throwable> others=List.of(new StackOverflowError(),new IllegalStateException(),
 			new BadFormatException("simulated"));
 		for (Throwable e: others) failures.log(e,"Dropped {} request","QUERY");
 		assertEquals(List.of(Level.DEBUG,Level.DEBUG,Level.DEBUG),logger.levels);
 		assertEquals(others,logger.causes);
+	}
+
+	@Test
+	public void aTypedFailureKeepsItsMeaning() {
+		assertEquals(ErrorCodes.FORMAT,RequestFailures.reply(new BadFormatException("simulated")).getErrorCode());
+		MissingDataException missing=new MissingDataException(new MemoryStore(),Hash.EMPTY_HASH);
+		assertEquals(ErrorCodes.MISSING,RequestFailures.reply(missing).getErrorCode());
+		Result own=Result.error(ErrorCodes.TRUST,"simulated");
+		assertSame(own,RequestFailures.reply(new ResultException(own)));
+	}
+
+	@Test
+	public void anyOtherFailureIsThePeers() {
+		assertEquals(ErrorCodes.LOAD,RequestFailures.reply(new OutOfMemoryError()).getErrorCode());
+		assertEquals(ErrorCodes.LIMIT,RequestFailures.reply(new StackOverflowError()).getErrorCode());
+		for (Throwable e: List.of(new NoClassDefFoundError(),new AssertionError(),
+				new IllegalStateException(),new NullPointerException(),new IOException())) {
+			Result r=RequestFailures.reply(e);
+			assertEquals(ErrorCodes.PEER,r.getErrorCode(),e.toString());
+			// No stack trace of the peer's reaches the client
+			assertNull(r.getInfo().get(Keywords.TRACE),e.toString());
+		}
 	}
 }

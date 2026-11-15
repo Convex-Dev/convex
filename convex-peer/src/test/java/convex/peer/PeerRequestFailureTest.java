@@ -53,6 +53,7 @@ import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.message.AConnection;
@@ -116,7 +117,8 @@ public class PeerRequestFailureTest {
 			if (error!=null) throw error;
 			if (msg.getType()==MessageType.RESULT) {
 				Result r=msg.toResult();
-				results.put(r.getID(),r);
+				// Only by ID: a reply to a message that could not be decoded has none
+				if (r.getID()!=null) results.put(r.getID(),r);
 				received.add(r);
 			}
 			return true;
@@ -213,8 +215,8 @@ public class PeerRequestFailureTest {
 		return (ref.getValue() instanceof SignedData<?> sd)&&(sd.getValue() instanceof Block);
 	}
 
-	/** The code a client gets for a transaction whose intake fails with the given failure: never FORMAT. */
-	static Keyword intakeCode(Throwable failure) {
+	/** The code a client gets for a request whose handling fails with the given untyped failure: never FORMAT. */
+	static Keyword failureCode(Throwable failure) {
 		if (failure instanceof OutOfMemoryError) return ErrorCodes.LOAD;
 		if (failure instanceof StackOverflowError) return ErrorCodes.LIMIT;
 		return ErrorCodes.PEER;
@@ -237,7 +239,7 @@ public class PeerRequestFailureTest {
 				// The handler persists each transaction before queueing it
 				store.failOnce(tx.getHash(),failure);
 				Result rejected=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
-				assertEquals(intakeCode(failure),rejected.getErrorCode(),failure+": "+rejected);
+				assertEquals(failureCode(failure),rejected.getErrorCode(),failure+": "+rejected);
 				assertTrue(store.fired(),failure+" fired");
 			}
 			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"));
@@ -653,6 +655,94 @@ public class PeerRequestFailureTest {
 				// Already complete: the failure is in the caller's thread
 				assertTrue(connecting.isCompletedExceptionally(),error.toString());
 				assertSame(error,connecting.exceptionNow());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A challenge to the local peer from REMOTE_A, in no context. */
+	static Message challenge(long id) {
+		return Message.createChallenge(id,Message.signChallenge(REMOTE_A,Hash.EMPTY_HASH,LOCAL.getAccountKey(),null));
+	}
+
+	/**
+	 * A message whose handling fails is answered alone, with the failure's code, and
+	 * nothing is thrown: the next message is answered as usual. Here the peer's key pair
+	 * fails in signing its answer to a challenge.
+	 */
+	@Test
+	public void aMessageWhoseHandlingFailsIsAnsweredAlone() throws Exception {
+		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof AVector);
+		Server peer=launchHaltedPeer(kp);
+		try {
+			for (Error error: CONTAINED) {
+				kp.failure.set(error);
+				ReplyConnection client=new ReplyConnection(null);
+				assertNull(peer.processMessage(challenge(1).withConnection(client)),error.toString());
+				assertEquals(failureCode(error),client.result(1).getErrorCode(),error.toString());
+
+				ReplyConnection next=new ReplyConnection(null);
+				peer.processMessage(challenge(2).withConnection(next));
+				assertFalse(next.result(2).isError(),error+": the next challenge is answered");
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A failure of the JVM itself while handling a message is not contained. */
+	@Test
+	public void aJvmFailureInDispatchIsNotContained() throws Exception {
+		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof AVector);
+		Server peer=launchHaltedPeer(kp);
+		try {
+			kp.failure.set(new InternalError("simulated"));
+			Message m=challenge(1).withConnection(new ReplyConnection(null));
+			assertThrows(InternalError.class,() -> peer.processMessage(m));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A message whose decoding fails is answered alone, with the failure's code, and nothing is thrown. */
+	@Test
+	public void aMessageThatFailsToDecodeIsAnsweredAlone() throws Exception {
+		AtomicReference<Blob> failOn=new AtomicReference<>();
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+		MemoryStore store=new MemoryStore() {
+			@Override
+			public <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
+				// Only the test's message: the peer may decode others meanwhile
+				if (data.equals(failOn.get())) throw Utils.<RuntimeException>sneakyThrow(failure.get());
+				return super.decodeMultiCell(data);
+			}
+		};
+		Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
+		try {
+			for (Error error: CONTAINED) {
+				ReplyConnection client=new ReplyConnection(null);
+				Message m=InvalidPeerDataTest.wire(Message.createStatusRequest(1)).withConnection(client);
+				failure.set(error);
+				failOn.set(m.getMessageData());
+				assertNull(peer.deliverMessage(m),error.toString());
+				assertEquals(failureCode(error),client.received.poll().getErrorCode(),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A receive observer that fails costs the message nothing: it is still answered. */
+	@Test
+	public void aFailingReceiveObserverCostsNothing() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			for (Error error: CONTAINED) {
+				peer.setMessageReceiveObserver(m -> {throw error;});
+				ReplyConnection client=new ReplyConnection(null);
+				assertNull(peer.deliverMessage(Message.createStatusRequest(1).withConnection(client)),error.toString());
+				assertFalse(client.result(1).isError(),error.toString());
 			}
 		} finally {
 			peer.close();

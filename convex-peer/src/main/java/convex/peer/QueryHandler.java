@@ -19,7 +19,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.RequestFailureLog;
+import convex.net.RequestFailures;
 
 public class QueryHandler extends AThreadedComponent {
 
@@ -60,7 +60,7 @@ public class QueryHandler extends AThreadedComponent {
 	private final ArrayList<Message> batch = new ArrayList<>();
 
 	/** One per handler, so this site warns once of each kind of failure that warrants it. */
-	private final RequestFailureLog failures = new RequestFailureLog(log);
+	private final RequestFailures failures = new RequestFailures(log);
 
 	@Override
 	protected void loop() throws InterruptedException {
