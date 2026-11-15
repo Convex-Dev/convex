@@ -191,20 +191,22 @@ state is at risk:
   be produced gets PEER, so that it is not resubmitted. Only data that can cause a
   failure, not running out of memory or a defect of the peer, counts against the
   peer that sent it.
-- **Peer threads never end silently.** A failure of the peer's own work that
-  reaches the top of a thread's loop drops that pass, and the thread carries on.
-  Consensus state is held in immutable values, so the last consistent state
-  remains.
+- **The peer's own threads never end silently.** A failure that reaches the top of
+  the loop of one of its components or of its connection manager drops that pass,
+  and the thread carries on. Consensus state is held in immutable values, so the
+  last consistent state remains.
 - **The peer shuts down only when it cannot advance consensus state, or the JVM
-  has failed.** If applying or persisting consensus state fails, other than by
-  running out of memory, the peer shuts down rather than keep voting on Blocks it
-  has not applied, writing a final checkpoint of the last state it persisted.
-  Running out of memory there is retried on the next pass. A failure of the JVM
-  itself shuts the peer down without a checkpoint.
-- **Operators see what they must act on.** A failed request logs at debug. The
-  first time a peer runs out of memory it logs a warning: it has too little memory
-  or commits too much to client requests. A probable defect is logged once, as a
-  warning in a request and as an error in the peer's own work.
+  has failed in its own work.** If applying or persisting consensus state fails,
+  other than by running out of memory, the peer shuts down rather than keep voting
+  on Blocks it has not applied, writing a final checkpoint of the last state it
+  persisted. Running out of memory there is retried on the next pass. A failure of
+  the JVM itself at the top of one of the peer's loops shuts it down without a
+  checkpoint.
+- **Operators are warned of what they must act on.** A client request that fails
+  logs at debug. The first time a peer runs out of memory it logs a warning: it has
+  too little memory or commits too much to client requests. A probable defect is
+  logged once, as a warning in a request and as an error in the peer's own work.
+  Bad data from another peer is still logged as a warning.
 
 ### Known limitations
 

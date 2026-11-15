@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Answer a request a peer fails to handle with LOAD, LIMIT or PEER rather than an exception and its stack trace, and log such failures at debug, warning only the first time a peer runs out of memory or meets a probable defect.
+- Reply to a message or transaction a peer fails to handle with LOAD, LIMIT or PEER rather than an exception and its stack trace, logging the failure at debug and warning only the first time the peer runs out of memory or meets a probable defect.
 - Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run exclusive lattice transactions on any component, holding up writes through the nearest transactional boundary, a `BoundaryCursor` or else the root; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run colliding lattice transactions one at a time after two conflicts on their own value.
@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Keep a peer running when one request or one pass of its own work fails, whatever the failure, including running out of memory or stack: only that work is dropped, and the peer shuts down, with a final checkpoint, only when it cannot advance consensus state. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
+- Keep a peer running when one request or one pass of its own work fails, whatever the failure, including running out of memory or stack: only that work is dropped, and the peer shuts down only when it cannot advance consensus state, writing a final checkpoint, or when the JVM itself fails. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
 - Store a value a lattice node pulls from a peer without announcing it before the node has merged it, so the node's next update carries those cells to its other peers.
