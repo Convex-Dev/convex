@@ -79,9 +79,9 @@ public interface TransactionalComponent<V extends ACell,C> {
 
 	/**
 	 * Applies domain operations atomically and returns the result of the run that
-	 * committed. Runs optimistically; if this component's value keeps changing, the
+	 * committed. Runs optimistically; if this component's value changes meanwhile, the
 	 * transaction takes the claim beneath its storage and finishes under it, so the
-	 * callback runs at most three times. Changes elsewhere under the root never rerun it. Equality,
+	 * callback runs at most twice. Changes elsewhere under the root never rerun it. Equality,
 	 * rather than Java object identity, determines whether an input has changed or an
 	 * operation leaves that input unchanged.
 	 *

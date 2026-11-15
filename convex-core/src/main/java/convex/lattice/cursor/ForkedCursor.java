@@ -80,7 +80,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	public V reconcile(ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
 		try (Claim claim=working.claim()) {
-			V published=destination.updateAndGet(new Reconciliation<>(baseline.get(),working.get(),merge));
+			V published=destination.updateAndGet(new Reconciler<>(baseline.get(),working.get(),merge));
 			// The destination's cells, even where they only equal the working value: they
 			// may be persisted, and one copy is then held, not two.
 			working.adopt(published);

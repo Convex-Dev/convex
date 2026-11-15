@@ -32,11 +32,11 @@ import convex.core.util.Utils;
  *
  * <p>Optimistic execution is the fast path for transactions that do not collide. A
  * change elsewhere under the root never reruns a callback: its finished result is
- * applied to the new root. When the transaction's own value has changed twice, it
- * takes the {@link Claim} beneath its cursor (see {@link ACursor#claim}) and finishes
- * under it. Claims on the same boundary run one at a time, and a callback runs at
- * most three times. {@link #transactExclusively} starts with the claim, for work too
- * expensive to repeat or with side effects: its callback runs once.</p>
+ * applied to the new root. When the transaction's own value has changed, it takes the
+ * {@link Claim} beneath its cursor (see {@link ACursor#claim}) and finishes under it.
+ * Claims on the same boundary run one at a time, and a callback runs at most twice.
+ * {@link #transactExclusively} starts with the claim, for work too expensive to
+ * repeat or with side effects: its callback runs once.</p>
  *
  * <p>Under a {@link BoundaryCursor}, a write that does not pass through the boundary
  * can still change the value while it is claimed. Given a {@link ThreeWayMerge}, the
@@ -45,9 +45,6 @@ import convex.core.util.Utils;
  * does. Without one, it fails rather than overwrite the change.</p>
  */
 public final class Transactions {
-
-	/** Changes to a transaction's own value it accepts before taking the claim. */
-	private static final int CONFLICTS_BEFORE_CLAIM=2;
 
 	private Transactions() {}
 
@@ -79,7 +76,7 @@ public final class Transactions {
 	 * @param <R> Result type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
-	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other; or null to fail instead
 	 * @return Result of the run that committed, computed before any merge at commit
 	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
@@ -87,9 +84,7 @@ public final class Transactions {
 		Objects.requireNonNull(cursor);
 		Objects.requireNonNull(action);
 		Transaction<V,R> attempt=new Transaction<>(cursor,action,merge);
-		while (attempt.conflicts<CONFLICTS_BEFORE_CLAIM) {
-			if (attempt.commit()) return attempt.output;
-		}
+		if (attempt.commit()) return attempt.output;
 		return attempt.commitClaimed();
 	}
 
@@ -110,7 +105,7 @@ public final class Transactions {
 	 * @param <V> Value type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
-	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other; or null to fail instead
 	 */
 	public static <V extends ACell> void execute(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(action);
@@ -145,7 +140,7 @@ public final class Transactions {
 	 * @param <R> Result type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
-	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other; or null to fail instead
 	 * @return Result of the callback, which ran once, computed before any merge at commit
 	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
@@ -172,7 +167,7 @@ public final class Transactions {
 	 * @param <V> Value type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
-	 * @param merge Reconciliation of the run's input, its value and the changed value, or null to fail instead
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other; or null to fail instead
 	 */
 	public static <V extends ACell> void executeExclusively(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(action);
@@ -188,13 +183,12 @@ public final class Transactions {
 		/** Reconciles a change under the claim with the computed run, or null to refuse it. */
 		private final ThreeWayMerge<V> merge;
 		private boolean computed;
-		private V input;
+		/** Value the computed run started from. */
+		private V base;
 		/** Value the computed run leaves in its draft. */
-		private V candidate;
+		private V own;
 		/** Result of the computed run, which is the committed run once commit succeeds. */
 		private R output;
-		/** Times a computed run was invalidated by a change to the transaction's own value. */
-		int conflicts;
 
 		Transaction(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
 			this.cursor=cursor;
@@ -203,28 +197,21 @@ public final class Transactions {
 		}
 
 		private void run(V value) {
-			input=value;
-			var draft=new Root<>(input);
+			base=value;
+			var draft=new Root<>(base);
 			output=action.apply(draft);
 			V result=draft.get();
 			// Preserve the original immutable value for a no-op.
-			candidate=Utils.equals(input,result)?input:result;
+			own=Utils.equals(base,result)?base:result;
 			computed=true;
 		}
 
-		/** One optimistic attempt. False leaves the caller to try again or take the claim. */
+		/** The one optimistic attempt. False leaves the caller to take the claim. */
 		boolean commit() {
-			V observed=cursor.get();
-			if (!computed || !Utils.equals(observed,input)) {
-				if (computed && ++conflicts>=CONFLICTS_BEFORE_CLAIM) return false;
-				run(observed);
-			}
-			// Validate against a fresh observation, including no-ops. Its reference
-			// may differ from the input while denoting exactly the same value.
-			observed=cursor.get();
-			if (!Utils.equals(observed,input)) return false;
-			// A run that changed nothing still commits as a write, so a cursor that cannot be written refuses it
-			return cursor.compareAndSet(observed,candidate);
+			run(cursor.get());
+			// By value, so an equal value in other cells is no change. A run that changed
+			// nothing still commits as a write, so a cursor that cannot be written refuses it.
+			return cursor.compareAndSet(base,own);
 		}
 
 		/**
@@ -233,18 +220,18 @@ public final class Transactions {
 		 */
 		R commitClaimed() {
 			try (Claim claim=cursor.claim()) {
-				V observed=cursor.get();
-				if (!computed || !Utils.equals(observed,input)) run(observed);
+				V other=cursor.get();
+				if (!computed || !Utils.equals(other,base)) run(other);
 				if (merge!=null) {
-					cursor.updateAndGet(new Reconciliation<>(input,candidate,merge));
+					cursor.updateAndGet(new Reconciler<>(base,own,merge));
 					return output;
 				}
 				for (;;) {
-					observed=cursor.get();
-					if (!Utils.equals(observed,input)) {
+					other=cursor.get();
+					if (!Utils.equals(other,base)) {
 						throw new IllegalStateException("Value changed under a transaction's claim, by this thread or by a write that did not pass through the claimed boundary");
 					}
-					if (cursor.compareAndSet(observed,candidate)) return output;
+					if (cursor.compareAndSet(other,own)) return output;
 				}
 			}
 		}

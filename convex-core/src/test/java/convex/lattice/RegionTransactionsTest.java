@@ -376,8 +376,8 @@ class RegionTransactionsTest {
 		var app=new App(root);
 		app.live().execute(m -> {
 			int attempt=attempts.incrementAndGet();
-			if (attempt<3) {
-				// Two changes to the region's own value make the third run take its claim
+			if (attempt<2) {
+				// A change to the region's own value makes the second run take its claim
 				root.set(root.get().assoc(LIVE,Sets.of(100+attempt)));
 			} else {
 				// Under the region's claim, a write that does not pass through its boundary goes ahead
@@ -386,8 +386,8 @@ class RegionTransactionsTest {
 			}
 			m.add(1);
 		});
-		assertEquals(3,attempts.get());
-		assertEquals(Sets.of(1,9,102),at(root,LIVE),"the container's change and the region's run both survive");
+		assertEquals(2,attempts.get());
+		assertEquals(Sets.of(1,9,101),at(root,LIVE),"the container's change and the region's run both survive");
 	}
 
 	@Test void aRegionWithNoPublicationMergeFailsRatherThanLoseAContainerChange() {

@@ -303,17 +303,17 @@ class TransactionBehaviourTest {
 		assertEquals(5,bank.branch(SOUTH).balance("carol"));
 	}
 
-	@Test void repeatedConflictsFinishUnderTheClaim() {
+	@Test void aConflictFinishesUnderTheClaim() {
 		var root=new ScriptedRoot();
 		Ledger north=bank(root).branch(NORTH);
-		for (int i=0;i<2;i++) root.competeWith(deposit(NORTH,"alice",1));
+		root.competeWith(deposit(NORTH,"alice",1));
 		List<Boolean> claimed=new ArrayList<>();
 		north.execute(draft -> {
 			claimed.add(root.claimedByCaller());
 			draft.transfer("alice","bob",30);
 		});
-		assertEquals(List.of(false,false,true),claimed,"The third run holds the claim, so it cannot conflict");
-		assertEquals(72,north.balance("alice"));
+		assertEquals(List.of(false,true),claimed,"The second run holds the claim, so it cannot conflict");
+		assertEquals(71,north.balance("alice"));
 		assertFalse(root.claimedByCaller(),"The claim was released");
 	}
 

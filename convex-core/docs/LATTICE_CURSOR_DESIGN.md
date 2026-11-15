@@ -356,9 +356,9 @@ through one starts from the default and its commit is a write like any other.
 Optimistic execution is the fast path for transactions that do not collide. Commit
 checks only the transaction's own value: a change elsewhere under the root never
 reruns the callback, and its finished result is applied to the new root. When its own
-value has changed twice, the transaction takes the claim of its nearest boundary and
+value has changed, the transaction takes the claim of its nearest boundary and
 finishes under it. Claims on the same boundary run one at a time, and a callback
-runs at most three times. An exclusive transaction starts with that claim and runs
+runs at most twice. An exclusive transaction starts with that claim and runs
 once, for work too expensive to repeat or with side effects.
 
 A claim locks a transactional boundary, wherever in a cursor tree it is taken:
