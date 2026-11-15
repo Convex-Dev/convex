@@ -13,7 +13,6 @@ import java.time.Instant;
 import convex.core.cpos.Belief;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
-import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.TODOException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.util.ConsumerDispatcher;
@@ -82,7 +81,7 @@ public class CVMExecutor extends AThreadedComponent {
 				}
 
 				// Trigger State update (if any new Blocks are confirmed)
-				Peer updatedPeer=computeState(peer);
+				Peer updatedPeer=peer.updateState();
 				if (updatedPeer!=peer) {
 					peer=updatedPeer;
 					persistPeerData();
@@ -107,44 +106,10 @@ public class CVMExecutor extends AThreadedComponent {
 				// propagator both cease) until the operator updates and restarts.
 				server.haltConsensus(e);
 			}
-		} catch (MissingDataException e) {
-			// The peer does not hold data it agreed: fatal
-			log.error("Fatal: data missing from this peer's store, closing server",e);
-			server.close();
-		} catch (IOException e) {
-			// The peer cannot persist its state: fatal
+		} catch (Exception e) {
+			// A State this peer cannot compute or persist from what it holds: it cannot proceed
 			log.error("Fatal exception encountered in CVM Executor",e);
 			server.close();
-		}
-	}
-
-	/** State position at which computing the State last failed, or -1 */
-	private long failedPosition=-1;
-
-	/**
-	 * Computes the State up to the Peer's finality point. Failing to compute it is not
-	 * fatal: the State stays where it is and the next loop tries again. Missing data is
-	 * fatal, since a peer holds all of every Block it agrees and of its State.
-	 *
-	 * @param p Peer whose State to compute
-	 * @return Peer with its State computed, or the same Peer if computing it failed
-	 * @throws MissingDataException if the Peer does not hold all of a Block or its State
-	 */
-	private Peer computeState(Peer p) {
-		try {
-			Peer updated=p.updateState();
-			failedPosition=-1;
-			return updated;
-		} catch (MissingDataException e) {
-			// Before the catch-all, which retries: missing data never goes away by retrying
-			throw e;
-		} catch (RuntimeException e) {
-			long position=p.getStatePosition();
-			if (position!=failedPosition) {
-				log.error("Unable to compute State beyond position {}; will retry",position,e);
-				failedPosition=position;
-			}
-			return p;
 		}
 	}
 

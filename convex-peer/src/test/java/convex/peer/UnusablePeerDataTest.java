@@ -788,24 +788,42 @@ public class UnusablePeerDataTest {
 	public void aFinalisedBlockMissingFromTheStoreClosesThePeer() throws Exception {
 		Server peer=launchPeer(LOCAL);
 		try (MemoryStore hollowStore=new MemoryStore()) {
-			// Stop Belief updates, so the executor computes only the Belief given here
-			BeliefPropagator propagator=peer.getBeliefPropagator();
-			propagator.close();
-			propagator.awaitStopped();
-
 			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"*address*"));
 			SignedData<Block> signed=LOCAL.signData(Block.of(blockTime(peer),tx));
 			assertFalse(signed.isEmbedded());
 			Order order=Order.create().append(signed).withConsensusPoints(new long[] {1,1,1,1}).withTimestamp(1);
 			// Decoded alone, the Order holds its Block by hash only
 			Order hollow=hollowStore.decode(order.getEncoding());
-			peer.getCVMExecutor().queueUpdate(Belief.create(LOCAL.signData(hollow)));
-
-			awaitShutdown(peer);
-			assertFalse(peer.isRunning());
+			assertClosedByBelief(peer,Belief.create(LOCAL.signData(hollow)));
 		} finally {
 			peer.close();
 		}
+	}
+
+	/** A peer that cannot compute its State from the Belief it holds cannot proceed, so it closes. */
+	@Test
+	public void aStateThatCannotBeComputedClosesThePeer() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A);
+		try {
+			// Without an Order of its own the peer has no finality point to compute to
+			assertClosedByBelief(peer,Belief.create(order(REMOTE_A,1,block(REMOTE_A,blockTime(peer)))));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * Has a peer's CVM executor compute its State from only the given Belief, and checks
+	 * the peer closes.
+	 */
+	static void assertClosedByBelief(Server peer, Belief belief) throws Exception {
+		// Stop Belief updates, so the executor computes only the Belief given here
+		BeliefPropagator propagator=peer.getBeliefPropagator();
+		propagator.close();
+		propagator.awaitStopped();
+		peer.getCVMExecutor().queueUpdate(belief);
+		awaitShutdown(peer);
+		assertFalse(peer.isRunning());
 	}
 
 	/** Waits for a peer's shutdown sequence to complete. */
