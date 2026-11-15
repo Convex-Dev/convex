@@ -776,7 +776,11 @@ public class ServerTest {
 			assertTrue(propagator.hasBeliefPollCapacity(),"pushes filling their queue must not stop polling");
 			assertNull(server.processMessage(belief));
 
-			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);
+			// From a trusted connection, so that the DATA reaches the full queue
+			LocalConnection trusted=LocalConnection.create(m -> true);
+			trusted.setTrustedKey(network.SERVER.getPeerKey());
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
+				.withConnection(trusted);
 			assertNull(server.processMessage(data));
 		} finally {
 			server.close();

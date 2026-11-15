@@ -502,18 +502,17 @@ these policies:
   down to a quarter ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
 - **A stalled reader loses only its own replies.** Bytes handed to Netty but not
   yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
-  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a connection a lattice node has
-  verified). Over that cap
+  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified connection). Over that cap
   the connection's results are refused and logged at debug. The client sees a
   `:TIMEOUT`.
 - **Shedding load.** A client result that finds the shared bound full is refused.
   The writer only hands messages to Netty, so this takes a server too short of CPU
   for the writer to keep up.
-- **Verified lattice peers first.** Replies to connections a lattice node has
-  verified go into a lane the writer drains first and that is exempt from the
-  shared bound, so they never queue behind client results. A consensus peer
-  verifies no connection opened to it, so its replies to other peers' requests
-  share the client lane.
+- **Verified peers first.** Replies to verified connections go into a lane the
+  writer drains first and that is exempt from the shared bound, so they never queue
+  behind client results. A lattice node verifies the connections it admits; a
+  consensus peer verifies a staked peer's own link to it
+  ([PEER_PRIORITY.md](PEER_PRIORITY.md#verifying-an-inbound-connection)).
 
 ### Test Tool
 

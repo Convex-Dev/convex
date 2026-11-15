@@ -491,7 +491,7 @@ public class InvalidPeerDataTest {
 	/**
 	 * A local client, as the REST API uses, acquires a value the peer has persisted,
 	 * and is refused at once, with nothing written, a value the peer has only stored,
-	 * as DATA from any connection leaves it.
+	 * as DATA from a trusted connection leaves it.
 	 */
 	@Test
 	public void acquiringAValueNotPersisted() throws Exception {

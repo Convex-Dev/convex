@@ -139,11 +139,15 @@ class InboundVerifier {
 		} catch (Exception e) {
 			log.debug("Inbound verification failed for {}: {}", conn.getRemoteAddress(), e.toString());
 		} finally {
-			attempt.reply().cancel(false);
-			finish(conn, attempt, trusted);
-			BiConsumer<AConnection, Boolean> observer = outcomeObserver;
-			if (observer != null) observer.accept(conn, trusted);
-			attempt.stopped().complete(null);
+			try {
+				attempt.reply().cancel(false);
+				finish(conn, attempt, trusted);
+				BiConsumer<AConnection, Boolean> observer = outcomeObserver;
+				if (observer != null) observer.accept(conn, trusted);
+			} finally {
+				// Always, or close() would wait for this attempt forever
+				attempt.stopped().complete(null);
+			}
 		}
 	}
 

@@ -19,7 +19,9 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.State;
@@ -28,6 +30,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
@@ -171,6 +174,17 @@ public class InboundVerificationTest {
 
 			AConnection link=trusted.get(WAIT,TimeUnit.SECONDS);
 			assertEquals(REMOTE_A.getAccountKey(),link.getTrustedKey());
+
+			// DATA on the trusted link is now stored
+			Blob value=Blobs.createRandom(400);
+			Message sentData=Message.createDataMessage(List.of(value),(int)CPoSConstants.MAX_MESSAGE_LENGTH);
+			CompletableFuture<Message> staged=new CompletableFuture<>();
+			receiver.getBeliefPropagator().setDataStageObserver(m -> {
+				if (sentData.getMessageData().equals(m.getMessageData())) staged.complete(m);
+			});
+			sender.getConnectionManager().broadcast(sentData);
+			staged.get(WAIT,TimeUnit.SECONDS);
+			assertNotNull(receiver.getStore().refForHash(value.getHash()));
 		} finally {
 			sender.close();
 			receiver.close();
@@ -179,24 +193,26 @@ public class InboundVerificationTest {
 
 	/**
 	 * A peer's outbound link answers for the peer it was opened to reach. An answer
-	 * naming any other peer is refused, even if the link verified this one; and a
-	 * client that was opened to reach no particular peer answers plainly and is refused.
+	 * naming any other peer is refused, even if the link verified this one; a client
+	 * that was opened to reach no particular peer answers plainly and is refused; and
+	 * a correct answer signed by a key without stake is refused.
 	 */
 	@Test
-	public void theAnswerMustNameThisPeer() throws Exception {
+	public void theAnswerMustNameThisPeerAndBeStaked() throws Exception {
 		Server peer=launch(LOCAL);
 		try {
-			assertEquals(REMOTE_A.getAccountKey(),verifyClient(peer,LOCAL.getAccountKey(),true));
-			assertNull(verifyClient(peer,REMOTE_B.getAccountKey(),false));
-			assertNull(verifyClient(peer,null,false));
+			assertEquals(REMOTE_A.getAccountKey(),verifyClient(peer,REMOTE_A,LOCAL.getAccountKey(),true));
+			assertNull(verifyClient(peer,REMOTE_A,REMOTE_B.getAccountKey(),false));
+			assertNull(verifyClient(peer,REMOTE_A,null,false));
+			assertNull(verifyClient(peer,UNSTAKED,LOCAL.getAccountKey(),false));
 		} finally {
 			peer.close();
 		}
 	}
 
-	/** Has a client with a staked key, which has verified the peer, send it a Belief. */
-	private AccountKey verifyClient(Server peer, AccountKey dialled, boolean expectTrusted) throws Exception {
-		ConvexLocal client=Convex.connect(peer,null,REMOTE_A);
+	/** Has a client with the given key, which has verified the peer, send it a Belief. */
+	private AccountKey verifyClient(Server peer, AKeyPair kp, AccountKey dialled, boolean expectTrusted) throws Exception {
+		ConvexLocal client=Convex.connect(peer,null,kp);
 		try {
 			assertEquals(LOCAL.getAccountKey(),
 				client.verifyPeer(LOCAL.getAccountKey(),peer.getPeer().getNetworkID()).get(WAIT,TimeUnit.SECONDS));
@@ -209,21 +225,21 @@ public class InboundVerificationTest {
 		}
 	}
 
-	/** A sender without a key that passes the peer's challenge on to another peer's server is not trusted. */
+	/** Only the bound answer is accepted: a plain answer, even signed by a staked peer, is refused. */
 	@Test
-	public void anAnswerFromAnotherPeersServerIsRefused() throws Exception {
+	public void aPlainAnswerIsRefused() throws Exception {
 		Server peer=launch(LOCAL);
 		Server other=launch(REMOTE_B);
-		ConvexLocal toOther=Convex.connect(other);
+		ConvexLocal signer=Convex.connect(other);
 		try {
-			CompletableFuture<Result> forwarded=new CompletableFuture<>();
+			CompletableFuture<Result> plain=new CompletableFuture<>();
 			LocalConnection sender=connect(peer,m -> {
 				if (m.getType()!=MessageType.CHALLENGE) return true;
 				AVector<ACell> payload=m.getPayload();
 				@SuppressWarnings("unchecked")
 				SignedData<ACell> challenge=(SignedData<ACell>)payload.get(2);
-				toOther.message(Message.createChallenge(CVMLong.ONE,challenge)).thenAccept(r -> {
-					forwarded.complete(r);
+				signer.message(Message.createChallenge(CVMLong.ONE,challenge)).thenAccept(r -> {
+					plain.complete(r);
 					m.returnResult(r);
 				});
 				return true;
@@ -232,11 +248,11 @@ public class InboundVerificationTest {
 
 			sender.sendMessage(data(Blobs.createRandom(400)));
 
-			assertFalse(forwarded.get(WAIT,TimeUnit.SECONDS).isError(),"the other peer's server answered");
+			assertFalse(plain.get(WAIT,TimeUnit.SECONDS).isError(),"a valid plain answer was given");
 			AConnection link=refused.get(WAIT,TimeUnit.SECONDS);
 			assertFalse(link.isTrusted());
 		} finally {
-			toOther.close();
+			signer.close();
 			other.close();
 			peer.close();
 		}
@@ -289,6 +305,40 @@ public class InboundVerificationTest {
 		}
 	}
 
+	/**
+	 * DATA that arrives before its connection is verified is ignored, and the update it
+	 * preceded completes through the missing-data fetch from its sender.
+	 */
+	@Test
+	public void dataBeforeVerificationCompletesThroughTheFetch() throws Exception {
+		MemoryStore senderStore=new MemoryStore();
+		SignedData<Order> orderA=MissingBeliefDataTest.signedOrder(REMOTE_A,1000);
+		SignedData<Order> orderB=MissingBeliefDataTest.signedOrder(REMOTE_B,1001);
+		Belief belief=Belief.create(orderA,orderB);
+		// A message limit that fits each signed Order but not both splits the update
+		// into DATA and a root
+		UpdateAccumulator update=new UpdateAccumulator(300,MissingBeliefDataTest.LIMIT,belief.getHash());
+		ACell announced=Cells.announce(belief,update,senderStore);
+		List<Message> sent=update.toMessages(announced);
+		assertTrue(sent.stream().anyMatch(m -> m.getType()==MessageType.DATA),"the update sends DATA");
+
+		Server peer=launch(LOCAL);
+		try {
+			CompletableFuture<SignedData<Order>> merged=MissingBeliefDataTest.awaitOrder(peer,REMOTE_A.getAccountKey());
+			AtomicInteger requests=new AtomicInteger();
+			Predicate<Message> answering=MissingBeliefDataTest.answeringFrom(senderStore);
+			LocalConnection senderEnd=connect(peer,m -> {
+				if (m.getType()==MessageType.DATA_REQUEST) requests.incrementAndGet();
+				return answering.test(m);
+			});
+			for (Message m: sent) senderEnd.sendMessage(MissingBeliefDataTest.wire(m));
+			assertEquals(orderA,merged.get(WAIT,TimeUnit.SECONDS));
+			assertTrue(requests.get()>0,"the update's cells were fetched");
+		} finally {
+			peer.close();
+		}
+	}
+
 	/** A Belief from an unverified connection is merged as before: only DATA waits on trust. */
 	@Test
 	public void beliefsAreTakenWhileVerifying() throws Exception {
@@ -301,7 +351,7 @@ public class InboundVerificationTest {
 			var good=InvalidPeerDataTest.order(REMOTE_B,1,
 				InvalidPeerDataTest.block(REMOTE_B,InvalidPeerDataTest.blockTime(peer)));
 			connect(peer,m -> true).sendMessage(MissingBeliefDataTest.wire(
-				Message.createBelief(convex.core.cpos.Belief.create(good))));
+				Message.createBelief(Belief.create(good))));
 			assertEquals(good.getHash(),merged.get(WAIT,TimeUnit.SECONDS));
 		} finally {
 			peer.close();
