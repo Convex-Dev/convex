@@ -740,7 +740,7 @@ These executable assemblies and tests exercise the design boundaries.
 | Atomic edits versus mergeable drafts | [FavouritesTransactionTest](../src/test/java/convex/lattice/app/FavouritesTransactionTest.java) and [TaskBoardApplicationTest](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java) |
 | Shared regions and independent publication | [SharedRegionsTest](../src/test/java/convex/lattice/app/SharedRegionsTest.java) |
 | An application in its `:app` region, making its parts when needed, with transactions over them | [ShopExample](../src/test/java/convex/lattice/app/ShopExample.java) and [ShopApplicationTest](../src/test/java/convex/lattice/app/ShopApplicationTest.java) |
-| A file and a shop update committed in one transaction across `:fs` and `:app` | [ShopWithFilesTest](../../convex-integration/src/test/java/convex/lattice/ShopWithFilesTest.java) |
+| A file and application state committed in one transaction across `:fs` and `:app` | [FileCountTest](../../convex-integration/src/test/java/convex/lattice/FileCountTest.java) |
 | DID ownership and several authorised keys | [OwnedScoresApplicationTest](../src/test/java/convex/lattice/app/OwnedScoresApplicationTest.java) |
 | Saving, reopening, batched durability and private host storage | [FavouritesLifecycleTest](../src/test/java/convex/lattice/app/FavouritesLifecycleTest.java) |
 | Replication and staged receipt | [ReadingListApplicationTest](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java) |
