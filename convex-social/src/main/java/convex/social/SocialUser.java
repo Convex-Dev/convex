@@ -102,7 +102,7 @@ public class SocialUser extends IndexComponent<Keyword, ACell> implements Transa
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+	protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
 		return SocialLattice.INSTANCE.merge(own,other);
 	}
 }

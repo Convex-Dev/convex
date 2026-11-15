@@ -48,7 +48,7 @@ class RegionTransactionsTest {
 		void add(long n) { cursor().updateAndGet(s -> union(s,n)); }
 	}
 
-	/** A transacting component with no publication merge. */
+	/** A transacting component that cannot reconcile changes on both sides. */
 	private static final class Unmerged extends ALatticeComponent<ASet<CVMLong>>
 			implements TransactionalComponent<ASet<CVMLong>,Unmerged> {
 		Unmerged(AForkableCursor<ASet<CVMLong>> cursor) { super(cursor); }
@@ -376,8 +376,8 @@ class RegionTransactionsTest {
 		var app=new App(root);
 		app.live().execute(m -> {
 			int attempt=attempts.incrementAndGet();
-			if (attempt<3) {
-				// Two changes to the region's own value make the third run take its claim
+			if (attempt<2) {
+				// A change to the region's own value makes the second run take its claim
 				root.set(root.get().assoc(LIVE,Sets.of(100+attempt)));
 			} else {
 				// Under the region's claim, a write that does not pass through its boundary goes ahead
@@ -386,18 +386,18 @@ class RegionTransactionsTest {
 			}
 			m.add(1);
 		});
-		assertEquals(3,attempts.get());
-		assertEquals(Sets.of(1,9,102),at(root,LIVE),"the container's change and the region's run both survive");
+		assertEquals(2,attempts.get());
+		assertEquals(Sets.of(1,9,101),at(root,LIVE),"the container's change and the region's run both survive");
 	}
 
-	@Test void aRegionWithNoPublicationMergeFailsRatherThanLoseAContainerChange() {
+	@Test void aRegionThatCannotReconcileFailsRatherThanLoseAContainerChange() {
 		var root=liveRoot();
 		var region=new Unmerged(BoundaryCursor.over(root.<ASet<CVMLong>>path(LIVE)));
 		var failure=assertThrows(UnsupportedOperationException.class,() -> region.exclusive().execute(m -> {
 			root.set(root.get().assoc(LIVE,Sets.of(9)));
 			m.cursor().set(Sets.of(1));
 		}));
-		assertInstanceOf(UnsupportedOperationException.class,failure.getCause(),"the component's own refusal to merge");
+		assertTrue(failure.getMessage().contains("Unmerged"),"the component's own refusal names it");
 		assertEquals(Sets.of(9),at(root,LIVE),"never overwritten");
 	}
 

@@ -88,6 +88,25 @@ public class ConvexDBComponentTest {
 		assertSame(published,original.cursor().get());
 	}
 
+	/** A fork of the whole collection publishes alone, but refuses to reconcile a concurrent change. */
+	@Test
+	public void testCollectionForkRefusesConcurrentChanges() {
+		ConvexDB cdb=ConvexDB.connect(host(),RowLWW::merge);
+		SQLDatabase db=createDatabase(cdb);
+		ConvexDB fork=cdb.fork();
+		assertTrue(fork.database(DB_NAME).tables().insert(TABLE_NAME,1,"forked"));
+		assertTrue(db.tables().insert(TABLE_NAME,2,"concurrent"));
+		var current=cdb.cursor().get();
+
+		assertThrows(UnsupportedOperationException.class,fork::sync);
+		assertSame(current,cdb.cursor().get());
+
+		ConvexDB alone=cdb.fork();
+		assertTrue(alone.database(DB_NAME).tables().insert(TABLE_NAME,3,"alone"));
+		alone.sync();
+		assertNotNull(db.tables().selectByKey(TABLE_NAME,CVMLong.create(3)));
+	}
+
 	/** A database is the unit of forking: its table store and tables are live views. */
 	@Test
 	public void testTablesAreNotForkedSeparately() {

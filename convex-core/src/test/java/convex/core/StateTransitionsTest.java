@@ -291,7 +291,18 @@ public class StateTransitionsTest {
 		// Should be no state transition with a bad block
 		assertEquals(s,br.getState());
 	}
-	
+
+	@Test
+	public void testBadBlockNotABlock() {
+		State s = TestState.STATE;
+		@SuppressWarnings("unchecked")
+		SignedData<Block> sb=(SignedData<Block>)(SignedData<?>)KEYPAIR_PEER.signData(CVMLong.ONE);
+
+		BlockResult br=s.applyBlock(sb);
+		assertNull(br.getResult(0));
+		assertEquals(s,br.getState());
+	}
+
 	@Test
 	public void testBadBlockInsufficientStake() throws BadSignatureException {
 		State s = TestState.STATE;

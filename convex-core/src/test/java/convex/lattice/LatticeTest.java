@@ -7,14 +7,18 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.lattice.cursor.Root;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 
@@ -91,6 +95,26 @@ public class LatticeTest {
 		ACell genesis=Lattice.ROOT.zero();
 		var root=Root.create(genesis);
 		assertSame(genesis,root.get());
+	}
+
+	/**
+	 * The root's {@code :app} region merges the applications a node registers,
+	 * keeps those it already holds and ignores incoming ones it does not know.
+	 */
+	@Test public void testAppRegion() {
+		Keyword counter=Keyword.intern("counter");
+		Keyword held=Keyword.intern("held");
+		Keyword unknown=Keyword.intern("unknown");
+		KeyedLattice apps=(KeyedLattice)Lattice.ROOT.<Index<Keyword,ACell>>path(Keywords.APP);
+		assertNotNull(apps);
+		assertEquals(Index.none(),apps.zero());
+
+		KeyedLattice root=Lattice.ROOT.addLattice(Keywords.APP,apps.addLattice(counter,MaxLattice.INSTANCE));
+		Index<Keyword,ACell> own=Index.of(Keywords.APP,Index.of(counter,CVMLong.ONE,held,CVMLong.ONE));
+		Index<Keyword,ACell> other=Index.of(Keywords.APP,Index.of(counter,CVMLong.TWO,unknown,CVMLong.ONE));
+
+		Index<Keyword,ACell> merged=root.merge(own,other);
+		assertEquals(Index.of(counter,CVMLong.TWO,held,CVMLong.ONE),merged.get(Keywords.APP));
 	}
 
 	@Test public void testMaxLattice() {

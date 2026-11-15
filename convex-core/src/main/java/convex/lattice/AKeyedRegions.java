@@ -45,13 +45,13 @@ import convex.lattice.cursor.BoundaryCursor;
  * not part of a transaction on the container, and it merges with the container's
  * current value when the region next syncs. A live region's exclusive transaction,
  * and an ordinary one once it has taken the
- * claim after two conflicts, holds against writes through its boundary; a
+ * claim after a conflict, holds against writes through its boundary; a
  * transaction on the container that changes the same region meanwhile does not pass
- * through it, so the region's commit merges that change with its own run by the
- * region's publication merge, or fails if the region has none.</p>
+ * through it, so the region's commit reconciles that change with its own run by the
+ * region's {@link #reconcile(Index,Index,Index)}, or fails if the region cannot.</p>
  *
  * <p>A fork of this container, or a container built over a fork, reconciles at sync
- * region by region ({@link #mergePublication(Index,Index,Index)}): a region changed
+ * region by region ({@link #reconcile(Index,Index,Index)}): a region changed
  * on only one side takes that side, so regions that update independently never
  * conflict, and a region this container does not serve that both sides changed
  * keeps the destination's value.</p>
@@ -316,7 +316,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * goes to {@link #mergeRegion}.
 	 */
 	@Override
-	protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+	protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> result=other;
 		for (Index<Keyword,ACell> side:Arrays.asList(base,own)) {
 			if (side==null) continue;
@@ -330,8 +330,11 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				if (same(ownHas,ownValue,has(base,key),get(base,key))) continue;
 				boolean otherHas=has(other,key);
 				ACell otherValue=get(other,key);
-				if (same(otherHas,otherValue,has(base,key),get(base,key)) || same(ownHas,ownValue,otherHas,otherValue)) {
-					result=put(result,key,ownHas,ownValue);
+				// Equal changes keep the destination's cells, which may be persisted
+				if (same(ownHas,ownValue,otherHas,otherValue)) continue;
+				if (same(otherHas,otherValue,has(base,key),get(base,key))) {
+					// Only own changed: carried onto the destination's cells where they are equal
+					result=put(result,key,ownHas,(ownHas && otherHas)?LatticeOps.mergeChanges(get(base,key),ownValue,otherValue):ownValue);
 				} else {
 					Keyword region=served(key);
 					if (region!=null) result=put(result,key,true,mergeRegion(region,get(base,key),ownValue,otherValue));

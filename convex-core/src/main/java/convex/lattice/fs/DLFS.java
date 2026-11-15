@@ -8,7 +8,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
-import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -47,34 +47,34 @@ public class DLFS {
 	 * absent. Changes to the drive propagate through to the parent cursor.
 	 *
 	 * <p>File data remains heap-backed. For incremental blob persistence during
-	 * streamed writes use {@link #connect(AForkableCursor, AString, AStore)}.</p>
+	 * streamed writes use {@link #connect(AForkableCursor, AString, Persister)}.</p>
 	 *
 	 * @param parent Parent cursor (e.g. an owner's drives map)
 	 * @param driveName Name of the drive within the parent
 	 * @return A local DLFS filesystem connected to the parent
 	 */
 	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName) {
-		return connect(parent,driveName,(AStore)null);
+		return connect(parent,driveName,(Persister)null);
 	}
 
 	/**
-	 * Connects a named drive and checkpoints streamed blob data incrementally in the
-	 * supplied store. The caller retains ownership of the store and keeps it open
-	 * while the filesystem is in use; it should be the store which publishes the
-	 * containing lattice root.
+	 * Connects a named drive and checkpoints streamed blob data incrementally through
+	 * the supplied persister. It should save into the store which publishes the
+	 * containing lattice root, and the caller keeps that store open while the
+	 * filesystem is in use.
 	 *
 	 * @param parent Parent cursor
 	 * @param driveName Name of the drive within the parent
-	 * @param store Store for incremental blob persistence, or null for heap-only data
+	 * @param persister Persister for incremental blob persistence, or null for heap-only data
 	 * @return A connected filesystem
 	 */
 	@SuppressWarnings("unchecked")
-	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName, AStore store) {
+	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName, Persister persister) {
 		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
 		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
 		// Atomic initialisation must not replace another caller's concurrent writes.
 		cursor.updateAndGet(current -> current!=null?current:DLFSLattice.INSTANCE.zero());
-		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
+		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,persister,DLFSLocation.at(parent,driveName));
 	}
 
 	/**
@@ -88,24 +88,24 @@ public class DLFS {
 	 * @return Connected filesystem view, or {@code null} if the drive is absent
 	 */
 	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName) {
-		return open(parent,driveName,(AStore)null);
+		return open(parent,driveName,(Persister)null);
 	}
 
 	/**
-	 * Opens an existing drive with incremental blob persistence in the supplied
-	 * store. The caller retains ownership of the store.
+	 * Opens an existing drive with incremental blob persistence through the supplied
+	 * persister. The caller keeps its store open while the filesystem is in use.
 	 *
 	 * @param parent Parent cursor containing named drives
 	 * @param driveName Existing drive name
-	 * @param store Store for incremental blob persistence, or null for heap-only data
+	 * @param persister Persister for incremental blob persistence, or null for heap-only data
 	 * @return Connected filesystem view, or {@code null} if the drive is absent
 	 */
 	@SuppressWarnings("unchecked")
-	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, AStore store) {
+	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, Persister persister) {
 		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
 		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
 		if (cursor.getOrDefault(null)==null) return null;
-		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
+		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,persister,DLFSLocation.at(parent,driveName));
 	}
 
 	public static DLFSLocal createLocal() {

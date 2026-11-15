@@ -15,6 +15,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 
@@ -339,7 +340,13 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 */
 	private void switchRoot(V snapshot,V published) {
 		try {
-			cursor().persist(held -> (held==snapshot)?published:persist(held));
+			cursor().persist(new Persister() {
+				@SuppressWarnings("unchecked")
+				@Override
+				public <T extends ACell> T persist(T held) throws IOException {
+					return (held==snapshot)?(T)published:LatticeHost.this.persist(held);
+				}
+			});
 		} catch (IOException e) {
 			throw new StoreException("Lattice host sync failed: persistence error",e);
 		}

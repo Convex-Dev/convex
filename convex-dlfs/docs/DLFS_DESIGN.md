@@ -533,7 +533,7 @@ AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesRoot =
 DLFSDrives drives = DLFSDrives.connect(drivesRoot, store);
 
 // Create a named drive if absent and use the
-// containing application's store for incremental blob persistence
+// containing application's store as its persister
 DLFileSystem drive = drives.getOrCreateDrive("myDrive").fileSystem();
 
 // File operations automatically update the cursor, which propagates
@@ -578,8 +578,8 @@ host or store lifecycle. Supply a completion callback when creating the manager
 to choose publication after successful mutations, for example
 `new DLFSDriveManager(drives, () -> { app.sync(); root.sync(); })`.
 The callback belongs to service wiring; domain components know only their cursors.
-The component hierarchy exposes its root `AStore` internally to each drive's
-`DLFSLocal` adapter, while `sync()` remains the explicit publication and replication
+The component hierarchy passes its `Persister`, normally the host's store, to each
+drive's `DLFSLocal` adapter, while `sync()` remains the explicit publication and replication
 boundary. NIO channel writes install store-backed references every 16 MiB, and file
 writers save content every 1 MiB before their single install, without selecting
 retained GC roots. A region, drive collection or
@@ -624,11 +624,11 @@ cursor-backed and registered in WebDAV automatically.
 
 ### Persistence
 
-Component-backed drives obtain the root component's `AStore`; cursor-level embedders
-get the same incremental blob persistence by passing that store to
-`DLFS.connect(parent, name, store)` or `DLFS.open(parent, name, store)`. Both paths
-therefore use `DLFSLocal` and `Cells.persist` rather than separate persistence
-adapters. `DLFSDriveManager.sync()` marks the explicit publication boundary.
+Component-backed drives obtain the root component's `Persister`, normally the host's
+store; cursor-level embedders get the same incremental blob persistence by passing a
+persister, such as the store itself, to `DLFS.connect(parent, name, persister)` or
+`DLFS.open(parent, name, persister)`. Both paths therefore use `DLFSLocal` and save
+through the persister rather than separate persistence adapters. `DLFSDriveManager.sync()` marks the explicit publication boundary.
 Persisting immutable blob structure before that boundary replaces direct references
 with soft references but does not select a GC root. The filesystem neither owns nor
 closes the supplied store.

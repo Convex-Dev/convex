@@ -163,6 +163,7 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
+	private static final Result ERR_STACK=Result.error(ErrorCodes.LIMIT, Strings.intern("Transaction exceeded this peer's stack depth")).withSource(SourceCodes.PEER);
 	
 	private Result checkPeerState() {
 		try {
@@ -217,7 +218,16 @@ public class TransactionHandler extends AThreadedComponent {
 				sigs[i]=sd;
 				toVerify.add(sd);
 			} catch (Exception e) {
+				// Guard for each received transaction, with the one in Phase 3: a payload
+				// that is not as it should be rejects only this transaction
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
+			} catch (StackOverflowError e) {
+				// Too deep for this peer: the same transaction would fail again, so a limit
+				m.returnResult(ERR_STACK);
+			} catch (OutOfMemoryError e) {
+				// The peer's heap ran out, which may be its load rather than this
+				// transaction, so busy: a retry may succeed
+				m.returnResult(Result.SERVER_LOADED);
 			}
 		}
 
@@ -227,7 +237,7 @@ public class TransactionHandler extends AThreadedComponent {
 		// re-checked individually in Phase 3 under per-tx exception handling.
 		try {
 			Peer.preValidateSignatures(toVerify);
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
 			// Ignore — per-tx handling in Phase 3 produces correct per-client errors
 		}
 
@@ -271,10 +281,19 @@ public class TransactionHandler extends AThreadedComponent {
 			} catch (IOException e) {
 				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
 				continue;
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-				// Only this transaction's work held the stack or memory, and it has unwound,
-				// so the transaction is simply unusable
+			} catch (Exception e) {
+				// Guard for each received transaction, with the one in Phase 1: a payload
+				// that is not as it should be rejects only this transaction
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
+				continue;
+			} catch (StackOverflowError e) {
+				// Too deep for this peer: the same transaction would fail again, so a limit
+				m.returnResult(ERR_STACK);
+				continue;
+			} catch (OutOfMemoryError e) {
+				// The peer's heap ran out, which may be its load rather than this
+				// transaction, so busy: a retry may succeed
+				m.returnResult(Result.SERVER_LOADED);
 				continue;
 			}
 			if (!registerInterest(sd.getHash(), m)) continue;
@@ -369,7 +388,8 @@ public class TransactionHandler extends AThreadedComponent {
 			boolean reported;
 			try {
 				reported=m.returnResult(results.get(i));
-			} catch (Exception e) {
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Guard for each result: one that cannot be sent costs no other client its result
 				log.warn("Failed to deliver transaction result for connection {}",m.getConnection(),e);
 				continue;
 			}
@@ -449,7 +469,9 @@ public class TransactionHandler extends AThreadedComponent {
 			newTransactions.clear();
 			lastBlockPublishedTime=timestamp;
 			return signedBlocks;
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Guard for Block production from received transactions, which runs on the
+			// Belief propagator's thread: a failure drops these transactions, not the thread
 			log.warn("Exception preparing new block",e);
 			return null;
 		} finally {

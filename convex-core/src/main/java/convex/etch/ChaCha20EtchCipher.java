@@ -108,13 +108,16 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 		}
 
 		private void loadBlock() {
-			keyStreamOffset=EtchCipherLocator.writeChaCha20(position,locator);
+			int blockOffset=EtchCipherLocator.writeChaCha20(position,locator);
 			inputState[COUNTER_WORD]=Utils.readInt(locator,EtchConstants.V3_CHACHA_NONCE_SIZE);
 			for (int i=0;i<STATE_WORDS-NONCE_WORD;i++) {
 				inputState[NONCE_WORD+i]=Pack.littleEndianToInt(locator,i*Integer.BYTES);
 			}
 			ChaChaEngine.chachaCore(ROUNDS,inputState,outputState);
 			Pack.intToLittleEndian(outputState,keyStream,0);
+			// Mark the keystream loaded only once it is complete: an Error before this
+			// leaves the block unloaded, so the next use at this position reloads it.
+			keyStreamOffset=blockOffset;
 		}
 
 		private void decrypt(ByteBuffer input, byte[] destination, int destinationOffset) {

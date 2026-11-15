@@ -112,7 +112,7 @@ public class Follows extends MapComponent<ACell, ACell> implements Transactional
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<ACell, ACell> mergePublication(AHashMap<ACell, ACell> own,AHashMap<ACell, ACell> other) {
+	protected AHashMap<ACell, ACell> reconcile(AHashMap<ACell, ACell> own,AHashMap<ACell, ACell> other) {
 		return SocialLattice.FOLLOWS_LATTICE.merge(own,other);
 	}
 

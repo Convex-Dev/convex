@@ -658,26 +658,21 @@ public class Peer {
 	}
 
 	/**
-	 * Reads the transactions of an agreed Block entry. They are readable if the entry
-	 * is a signed Block whose transactions are a vector of at most
-	 * {@link Constants#MAX_TRANSACTIONS_PER_BLOCK} signed values. Any other Block is
-	 * invalid, so none of its transactions take effect.
+	 * Reads the transaction entries of an agreed Block entry. A Block may be invalid
+	 * and still have them: it may claim more than
+	 * {@link Constants#MAX_TRANSACTIONS_PER_BLOCK}, and an entry need not be a signed
+	 * transaction, so read each one with {@link #readEntry(AVector, long)}.
 	 *
 	 * @param entry Entry of an Order's Blocks
-	 * @return Transactions, or null if they are not readable
+	 * @return Transaction entries, or null if the entry is not a signed Block with a
+	 *         vector of transactions
 	 * @throws MissingDataException if part of the Block is not held in the local store
 	 */
 	static AVector<SignedData<ATransaction>> readTransactions(ACell entry) {
 		if (!(entry instanceof SignedData<?> signed)) return null;
 		Block block=RT.ensureCVM(signed.getValue(),Block.class);
 		if (block==null) return null;
-		AVector<SignedData<ATransaction>> txs=block.getTransactions();
-		if ((txs==null)||(txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK)) return null;
-		long n=txs.count();
-		for (long i=0; i<n; i++) {
-			if (!(readEntry(txs,i) instanceof SignedData)) return null;
-		}
-		return txs;
+		return block.getTransactions();
 	}
 	
 	public Peer recalcState(long pos) {
@@ -771,12 +766,16 @@ public class Peer {
 	 * @return Transactions, or null if there are none to validate
 	 */
 	private static AVector<SignedData<ATransaction>> transactionsToValidate(AVector<SignedData<Block>> blocks, long b) {
+		AVector<SignedData<ATransaction>> txs;
 		try {
-			return readTransactions(readEntry(blocks,b));
+			txs=readTransactions(readEntry(blocks,b));
 		} catch (MissingDataException e) {
 			// Left to applying the Block, which reports it
 			return null;
 		}
+		// A Block with more transactions than it may hold is invalid: none to check
+		if ((txs==null)||(txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK)) return null;
+		return txs;
 	}
 
 	/**
@@ -785,7 +784,8 @@ public class Peer {
 	 */
 	private static void verifyChunk(AVector<SignedData<ATransaction>> txns, int from, int to) {
 		for (int i = from; i < to; i++) {
-			txns.get(i).checkSignature();
+			// An entry that is not a signed transaction makes the Block invalid when applied
+			if (readEntry(txns, i) instanceof SignedData<?> signed) signed.checkSignature();
 		}
 	}
 

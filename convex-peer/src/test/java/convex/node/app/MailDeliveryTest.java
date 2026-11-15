@@ -68,8 +68,8 @@ class MailDeliveryTest {
 			Index<Keyword,ACell> reduced=LatticeOps.reduce(ROOT,value,path);
 			return reduced==null?cursor().get():merge(reduced);
 		}
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.mergePublication(ROOT,LatticeContext.EMPTY,own,other);
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.reconcile(ROOT,LatticeContext.EMPTY,own,other);
 		}
 	}
 

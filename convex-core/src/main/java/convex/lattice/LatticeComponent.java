@@ -67,8 +67,8 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Reconciles declared lattice values while preserving unrelated destination keys. */
 	@Override
-	protected V mergePublication(V own,V other) {
-		return LatticeOps.mergePublication(lattice,getContext(),own,other);
+	protected V reconcile(V own,V other) {
+		return LatticeOps.reconcile(lattice,getContext(),own,other);
 	}
 
 	@Override

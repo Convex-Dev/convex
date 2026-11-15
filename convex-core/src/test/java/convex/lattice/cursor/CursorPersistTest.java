@@ -23,6 +23,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
+import convex.test.Persisters;
 
 /** Persisting through a cursor installs the persisted value wherever the cursor holds one. */
 public class CursorPersistTest {
@@ -92,14 +93,13 @@ public class CursorPersistTest {
 		fork.sync(noMerge);
 
 		var calls=new AtomicInteger();
-		fork.persist(value -> {
+		fork.persist(Persisters.after(value -> {
 			// The second call persists the baseline: a sync lands first and moves it.
 			if (calls.incrementAndGet()==2) {
 				fork.updateAndGet(s -> s.include(b));
 				fork.sync(noMerge);
 			}
-			return Cells.persist(value,store);
-		});
+		},store));
 		fork.updateAndGet(s -> s.include(c));
 		assertEquals(Sets.of(a,b,c),fork.sync(noMerge));
 	}

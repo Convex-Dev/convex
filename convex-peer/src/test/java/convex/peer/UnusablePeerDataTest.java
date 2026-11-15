@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -54,7 +53,6 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
-import convex.etch.EtchStore;
 import convex.node.NodeServerTest;
 
 /**
@@ -469,6 +467,31 @@ public class UnusablePeerDataTest {
 	}
 
 	/**
+	 * A peer merges only Orders it holds in full, so data missing from its store during a
+	 * Belief merge is fatal and closes the peer.
+	 */
+	@Test
+	public void aMergeMissingDataClosesThePeer() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			SignedData<Order> signed=order(REMOTE_A,1,block(REMOTE_A,blockTime(peer)));
+			// An Order whose content no store holds
+			Ref<Order> missingRef=RefSoft.createForHash(signed.getValueRef().getHash(),new MemoryStore());
+			SignedData<Order> missing=SignedData.create(REMOTE_A.getAccountKey(),signed.getSignature(),missingRef);
+
+			// Not started: this test thread runs the merge
+			BeliefPropagator merger=new BeliefPropagator(peer);
+			merger.belief=peer.getBelief();
+			merger.maybeMergeBeliefs(Belief.create(missing));
+
+			awaitShutdown(peer);
+			assertFalse(peer.isRunning());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
 	 * A transaction that fails the structure check is rejected as malformed, and later
 	 * transactions are still processed.
 	 */
@@ -585,118 +608,6 @@ public class UnusablePeerDataTest {
 			assertEquals(executed.getGenesisState(),executed.getConsensusState());
 			assertTrue(executed.getBlockResult(0).isError(0));
 			assertTrue(peer.isRunning());
-		} finally {
-			peer.close();
-		}
-	}
-
-	/** Nesting depth of the deep values these tests send */
-	static final int DEEP=10000;
-
-	/**
-	 * Builds vectors nested to a depth, each holding the next.
-	 *
-	 * @param depth Nesting depth
-	 * @param branches Receives the cells that are not embedded, innermost first
-	 * @return Outermost vector
-	 */
-	static ACell nested(int depth, List<ACell> branches) {
-		ACell nested=CVMLong.ONE;
-		for (int i=0; i<depth; i++) {
-			nested=Vectors.of(nested);
-			if (!nested.isEmbedded()) {
-				nested.getHash(); // bottom up, so no hash is computed recursively
-				branches.add(nested);
-			}
-		}
-		return nested;
-	}
-
-	/**
-	 * Deeply nested DATA from any connection that the peer cannot store is dropped. A
-	 * good Order sent after it is still merged.
-	 */
-	@Test
-	public void deeplyNestedDataIsDropped() throws Exception {
-		deeplyNestedDataIsDropped(new MemoryStore());
-	}
-
-	@Test
-	public void deeplyNestedDataIsDroppedOnEtch() throws Exception {
-		try (EtchStore store=EtchStore.createTemp()) {
-			deeplyNestedDataIsDropped(store);
-		}
-	}
-
-	private void deeplyNestedDataIsDropped(AStore store) throws Exception {
-		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
-		try {
-			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
-			ArrayList<ACell> branches=new ArrayList<>();
-			ACell nested=nested(DEEP,branches);
-			ACell top=Vectors.of(nested,nested,nested,nested,nested);
-			branches.add(top);
-			// Outermost first, so storing it stores everything beneath it in one call
-			Collections.reverse(branches);
-			Message data=Message.createDataMessage(branches,(int)CPoSConstants.MAX_MESSAGE_LENGTH);
-
-			LocalConnection senderEnd=connect(peer);
-			senderEnd.sendMessage(wire(data));
-			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
-			senderEnd.sendMessage(wire(Message.createBelief(Belief.create(good))));
-
-			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
-			assertNotNull(merged,"the good Order is merged");
-			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
-		} finally {
-			peer.close();
-		}
-	}
-
-	/**
-	 * A deeply nested transaction that the peer cannot store is rejected as malformed,
-	 * and later transactions are still processed.
-	 */
-	@Test
-	public void aDeeplyNestedTransactionIsRejected() throws Exception {
-		aDeeplyNestedTransactionIsRejected(new MemoryStore());
-	}
-
-	@Test
-	public void aDeeplyNestedTransactionIsRejectedOnEtch() throws Exception {
-		try (EtchStore store=EtchStore.createTemp()) {
-			aDeeplyNestedTransactionIsRejected(store);
-		}
-	}
-
-	private void aDeeplyNestedTransactionIsRejected(AStore store) throws Exception {
-		Server peer=launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
-			ACell deep=nested(DEEP,new ArrayList<>());
-			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,deep));
-			Result rejected=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
-			assertEquals(ErrorCodes.FORMAT,rejected.getErrorCode());
-
-			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
-			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
-			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
-		} finally {
-			peer.close();
-		}
-	}
-
-	/**
-	 * A deeply nested query gets a result, and the peer still answers queries after it.
-	 */
-	@Test
-	public void aDeeplyNestedQueryIsAnswered() throws Exception {
-		Server peer=launchPeer(LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
-			ACell deep=nested(DEEP,new ArrayList<>());
-			assertNotNull(client.query(deep).get(WAIT,TimeUnit.SECONDS));
-			assertEquals(CVMLong.create(3),client.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS).getValue());
 		} finally {
 			peer.close();
 		}

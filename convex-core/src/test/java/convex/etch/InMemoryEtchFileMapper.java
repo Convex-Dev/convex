@@ -3,6 +3,7 @@ package convex.etch;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.function.LongPredicate;
 
 import convex.core.util.Utils;
 
@@ -14,6 +15,9 @@ final class InMemoryEtchFileMapper extends AFileMapper {
 	private long forcedPosition=-1L;
 	private long forcedLength=-1L;
 	private boolean failNextFullForce;
+	private LongPredicate slotWriteFailureMatch;
+	private Error slotWriteFailure;
+	private Error rangeForceFailure;
 
 	InMemoryEtchFileMapper() {
 		this(0L);
@@ -50,6 +54,20 @@ final class InMemoryEtchFileMapper extends AFileMapper {
 
 	void failNextFullForce() {
 		failNextFullForce=true;
+	}
+
+	/**
+	 * Throws the error once, from the first later slot write whose stored value
+	 * the predicate matches, before that slot changes.
+	 */
+	void failSlotWrite(LongPredicate match, Error error) {
+		slotWriteFailureMatch=match;
+		slotWriteFailure=error;
+	}
+
+	/** Throws the error once, from the next range force. */
+	void failNextRangeForce(Error error) {
+		rangeForceFailure=error;
 	}
 
 	@Override
@@ -93,6 +111,12 @@ final class InMemoryEtchFileMapper extends AFileMapper {
 
 	@Override
 	void writeLongReleaseMapped(long position, long value) {
+		Error failure=slotWriteFailure;
+		if ((failure!=null)&&slotWriteFailureMatch.test(value)) {
+			slotWriteFailure=null;
+			slotWriteFailureMatch=null;
+			throw failure;
+		}
 		Utils.writeLong(bytes,Math.toIntExact(position),value);
 	}
 
@@ -107,6 +131,11 @@ final class InMemoryEtchFileMapper extends AFileMapper {
 
 	@Override
 	void forceRangeMapped(long position, long length) {
+		Error failure=rangeForceFailure;
+		if (failure!=null) {
+			rangeForceFailure=null;
+			throw failure;
+		}
 		rangeForceCount++;
 		forcedPosition=position;
 		forcedLength=length;

@@ -36,8 +36,8 @@ Subclasses and compositions add behaviour; the base gains no capability hooks th
 every subclass and view would have to forward. A service owned by a transactional
 boundary gets at most one hook, resolved through existing source links: `claim()`,
 for transactions and fork publication, is the only one. Storage, durability and
-publication attach at the host, and a module that needs a store mid-write, such as
-DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
+publication attach at the host, and a module that saves content mid-write, such as
+DLFS writing blob checkpoints, takes a `Persister` as an explicit parameter. `persist` is not a
 hook: it is one method with a store-agnostic `Persister`, which views inherit and
 only the cursors that hold a value, `Root` and `ForkedCursor`, override.
 
@@ -175,6 +175,8 @@ The two values are equal, so only memory use tells them apart. Stored data is
 released only once whoever holds the value has switched to the new cells: a holder
 left on the original keeps the whole tree in memory, however much of it is stored.
 
+A `Persister` persists any value, not only a cursor's: every store is one, and a
+builder such as `BlobOutputStream` takes one to save content as it is written.
 `persist(persister)` makes that switch for a cursor, replacing the cells it holds
 with the equal ones a `Persister` returns, such as `LatticeHost::persist`, in one
 atomic step. The cursor holds no store. An edit landing meanwhile repeats the
@@ -262,11 +264,18 @@ destination and reconciliation baseline. Each `sync(merge)` supplies the policy 
 that publication: an unchanged copy adopts the destination, an unchanged destination
 accepts the working value, and divergent changes invoke the supplied function.
 Both tests are by value, so a destination persisted since the last sync counts as
-unchanged, and accepting the working value replaces its persisted cells with the
-fork's. A fork persisted first hands over persisted cells; otherwise the destination
-holds the fork's cells strongly until it is next saved.
+unchanged, and the working value's changes are carried onto its persisted cells.
 `reconcile(merge)` is the same with a `ThreeWayMerge`, which also receives the value
-both sides last agreed on. The fork retains no merge callback. Ordinary roots, paths
+both sides last agreed on.
+
+A three-way merge is total: it is given every case, and a side that changed nothing
+contributes nothing. Its result is built on `other`, the value the destination holds,
+so cells held there, which may be persisted, stay held wherever the result equals
+them, and only what `own` changed comes in as new cells. Where the result is known
+by reference, the update that applies the merge skips it: a destination still
+holding the base takes `own`, which was built from it, and an unchanged `own` takes
+the destination's value. These checks cost nothing, so a sync or commit that meets
+no concurrent change does no merge work. The fork retains no merge callback. Ordinary roots, paths
 and transformed views implement both as a read-only no-op without invoking that
 function or publishing any enclosing fork; a read-only view refuses them.
 
@@ -295,13 +304,17 @@ or wait for operations on it. This is a callback contract, without thread owners
 or re-entrancy guards.
 
 A component with an independent publication boundary owns such a fork and supplies
-its own reconciliation rule; `ALatticeComponent.mergePublication(own, other)` is
-that component's merge, called only when both sides changed. No `ALattice` is
+its own reconciliation rule. `ALatticeComponent.reconcile(base, own, other)` is
+that component's three-way merge. By default it carries own's changes onto the
+destination's cells where only own changed, and calls `reconcile(own, other)`, the
+component's rule for a real conflict, only when both sides changed. No `ALattice` is
 required. `LatticeComponent` adapts a lattice for components that choose to use one. An application overrides it
 to take regions that its own components publish from the destination; each such
 component publishes through its own fork of the host.
-A component can override `mergePublication(base, own, other)` instead, to use the
-value both sides last agreed on; by default that form calls the two-value one.
+A lattice join takes `own` first, since tie rules such as `LWWLattice`'s prefer that
+side, so it is built on own's cells; `LatticeOps.reconcile` then carries the joined
+value onto the destination's cells. A component can override the three-value form
+instead, to use the value both sides last agreed on throughout.
 `LatticeOps.mergeChanges` is an experimental rule for it, for a merge with no better
 way of handling conflicts. A merge that can resolve a conflict itself, as a lattice
 join does, should do that instead. Each side's changes are kept, so changes to
@@ -352,11 +365,14 @@ place first. A default view is present wherever it is read, so a transaction
 through one starts from the default and its commit is a write like any other.
 
 Optimistic execution is the fast path for transactions that do not collide. Commit
-checks only the transaction's own value: a change elsewhere under the root never
-reruns the callback, and its finished result is applied to the new root. When its own
-value has changed twice, the transaction takes the claim of its nearest boundary and
+is a strict three-way merge on the transaction's own value: a change elsewhere under
+the root never reruns the callback, and its finished result is applied to the new
+root. If its own value is unchanged, the run's changes are carried onto that value's
+cells, which may have been persisted during the run. A run that changed nothing
+commits whatever changed meanwhile, as of the value it read. When its own
+value has changed, the transaction takes the claim of its nearest boundary and
 finishes under it. Claims on the same boundary run one at a time, and a callback
-runs at most three times. An exclusive transaction starts with that claim and runs
+runs at most twice. An exclusive transaction starts with that claim and runs
 once, for work too expensive to repeat or with side effects.
 
 A claim locks a transactional boundary, wherever in a cursor tree it is taken:
@@ -368,9 +384,8 @@ write through the boundary from another thread that would change its value waits
 for the release and recalculates, and a write that leaves the value equal carries
 on. Persisting leaves the value equal, so it proceeds during a claim and the root
 then holds the persisted cells; an exclusive transaction that changes nothing writes
-nothing over them. A transaction that does change the value commits cells built from
-the value it started with, so cells persisted meanwhile are replaced until the next
-save. Reads never wait. Without a claim, each read or compare-and-set of the root
+nothing over them, and one that does change the value carries its changes onto them.
+Reads never wait. Without a claim, each read or compare-and-set of the root
 adds one type check, and nothing is recorded per transaction.
 
 A `BoundaryCursor` wraps any cursor, and writes pass straight through it. Claims
@@ -381,11 +396,9 @@ stops writes through it too, since they pass through. A write that reaches a
 boundary's storage without passing through it, while the boundary is claimed, such
 as a whole-container commit over one of its regions, is reconciled as a fork's sync
 is: given a three-way merge, the claimed commit merges its run's value, as `own`,
-with that write, as `other`, from the value the run started with; where only one
-side changed it takes that side, keeping the destination's cells when the run
-changed nothing. Without a merge the commit fails rather than overwrite the write.
-A component's transactions pass its publication merge, so one without a
-publication merge fails.
+with that write, as `other`, from the value the run started with. Without a merge
+the commit fails rather than overwrite the write. A component's transactions pass
+its `reconcile`, so one that cannot reconcile changes on both sides fails.
 Each write through a boundary holds the read side of its read-write lock, and its
 claim holds the write side.
 

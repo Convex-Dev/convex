@@ -17,12 +17,13 @@ import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Format;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
-import convex.lattice.LatticeHost;
+import convex.lattice.cursor.Cursors;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
@@ -185,7 +186,7 @@ public class RESTServer implements Closeable {
 		AKeyPair kp = server.getKeyPair();
 		if ((kp != null) && restConfig.isMcpEnabled() && restConfig.isSigningEnabled()) {
 			// In memory only: nothing syncs or persists the record, so keys last as long as this server
-			this.signingService = new SigningService(LatticeHost.create().cursor(), kp, Utils::getCurrentTimestampCell);
+			this.signingService = new SigningService(Cursors.root(Index.none()), kp, Utils::getCurrentTimestampCell);
 		} else {
 			this.signingService = null;
 		}

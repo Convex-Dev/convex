@@ -168,7 +168,9 @@ Every route by which state arrives reaches the policy:
   are refused.
 - **Fork publication**: `sync()` reconciles a fork with its destination through the
   policy. `SQLDatabase` publishes only its tables: the destination's other sections
-  stay as they are.
+  stay as they are. `ConvexDB` has a single writer and cannot reconcile changes on both sides: a fork of
+  it publishes only if the destination is unchanged since the fork's last sync, and
+  otherwise its sync fails.
 - **Replicas**: `SQLDatabase.mergeReplicas` verifies each signed replica with
   `acceptsReplica`, then merges its state with the policy.
 

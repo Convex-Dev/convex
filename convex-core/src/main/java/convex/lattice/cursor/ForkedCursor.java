@@ -7,13 +7,16 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.store.Persister;
+import convex.core.util.Utils;
+import convex.lattice.LatticeOps;
 
 /**
  * Independent working storage which reconciles with a destination on sync.
  * An unchanged fork adopts the destination; an unchanged destination accepts
  * the working value. When both changed, the merge supplied to sync decides.
  * Unchanged means equal in value, so a destination persisted since the last sync
- * is unchanged, and accepting the working value replaces its persisted cells.
+ * is unchanged, and the working value's changes are carried onto its persisted cells.
  *
  * <p>Sync updates the destination atomically while holding the claim on the whole
  * working root. Working writes are ordered around sync; reads never wait. Failed
@@ -58,6 +61,8 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * Reconciles and publishes through one atomic destination update. Its cursor
 	 * handles CAS retries and any signing or stamping. Concurrent working writes
 	 * wait until publication and adoption of the result are complete.
+	 * Where only the working value changed, its changes are carried onto the
+	 * destination's cells.
 	 * @param merge Reconciliation of working and destination values when both changed;
 	 *        must be retry-safe and must not mutate either cursor
 	 * @return Published value
@@ -65,21 +70,26 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override
 	public V sync(BinaryOperator<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
-		return reconcile((base,own,other) -> merge.apply(own,other));
+		return reconcile((base,own,other) -> {
+			if (Utils.equals(own,base) || Utils.equals(own,other)) return other;
+			// The destination changed nothing, so this never conflicts
+			if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+			return merge.apply(own,other);
+		});
 	}
 
 	/**
 	 * As {@link #sync}, also giving the merge the value both sides last agreed on. On a
 	 * retry that is the destination value already merged, so it sees only what is new.
-	 * @param merge Reconciliation of base, working and destination values when both
-	 *        changed; must be retry-safe and must not mutate either cursor
+	 * @param merge Total reconciliation of base, working and destination values (see
+	 *        {@link ThreeWayMerge}); must be retry-safe and must not mutate either cursor
 	 * @return Published value
 	 */
 	@Override
 	public V reconcile(ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
 		try (Claim claim=working.claim()) {
-			V published=destination.updateAndGet(new Reconciliation<>(baseline.get(),working.get(),merge));
+			V published=destination.updateAndGet(new Reconciler<>(baseline.get(),working.get(),merge));
 			// The destination's cells, even where they only equal the working value: they
 			// may be persisted, and one copy is then held, not two.
 			working.adopt(published);
@@ -97,7 +107,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * only if no sync has moved it meanwhile; a moved baseline waits for the next persist.
 	 */
 	@Override
-	public V persist(Persister<V> persister) throws IOException {
+	public V persist(Persister persister) throws IOException {
 		V persisted=working.persist(persister);
 		V previous=baseline.get();
 		if (previous!=null) baseline.compareAndSet(previous,persister.persist(previous));

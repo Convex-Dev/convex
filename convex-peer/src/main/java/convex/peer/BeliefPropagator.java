@@ -29,7 +29,6 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -340,7 +339,8 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief. A newly received Order that cannot be merged is dropped, and the
-	 * others are merged without it.
+	 * others are merged without it. Data missing from this peer's store closes the
+	 * peer.
 	 * @param newBeliefs New beliefs to merge
 	 *
 	 * @return True if Peer Belief Order was changed, false otherwise.
@@ -350,13 +350,22 @@ public class BeliefPropagator extends AThreadedComponent {
 		long ts=server.getTimestamp();
 		AKeyPair kp=server.getKeyPair();
 		State state=server.getPeer().getConsensusState();
-		Belief newBelief=tryMerge(ts,kp,state,newBeliefs);
-		if (newBelief==null) {
-			newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
+		Belief newBelief;
+		try {
+			newBelief=tryMerge(ts,kp,state,newBeliefs);
 			if (newBelief==null) {
-				log.error("Belief merge failed even without the Orders that cannot be merged on their own");
-				return false;
+				newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
 			}
+		} catch (MissingDataException e) {
+			// The merge reads only Orders this peer holds in full: it lacks data it must
+			// hold, so it cannot proceed
+			log.error("Fatal: Belief merge is missing data this peer must hold: {}",e.getMissingHash(),e);
+			server.close();
+			return false;
+		}
+		if (newBelief==null) {
+			log.error("Belief merge failed even without the Orders that cannot be merged on their own");
+			return false;
 		}
 
 		AccountKey key=kp.getAccountKey();
@@ -384,10 +393,14 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Merges Beliefs into this peer's Belief.
 	 *
 	 * @return Merged Belief, or null if the merge fails
+	 * @throws MissingDataException if this peer lacks data the merge reads
 	 */
 	private Belief tryMerge(long ts, AKeyPair kp, State state, Belief... beliefs) {
 		try {
 			return BeliefMerge.create(belief,kp,ts,state).merge(beliefs);
+		} catch (MissingDataException e) {
+			// Not a failure of the received Orders: this peer's own fault, for the caller
+			throw e;
 		} catch (InvalidDataException | RuntimeException | StackOverflowError | OutOfMemoryError e) {
 			// The merge builds a new Belief and changes nothing else, and only its work
 			// held the stack or memory, so this peer's Belief is as it was
@@ -511,8 +524,8 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (BadFormatException e1) {
 				log.debug("Malformed Belief message");
 			}
-		} catch (ClassCastException e) {
-			// Bad message from Peer
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Any other failure processing the message: reject the whole message
 			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
 		}
 		return false;
@@ -524,8 +537,8 @@ public class BeliefPropagator extends AThreadedComponent {
 			return mergeBeliefValue(orders,acquired,null);
 		} catch (MissingDataException e) {
 			log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
-		} catch (ClassCastException e) {
-			log.warn("Malformed locally acquired Belief: {}",Utils.getClassName(e));
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			log.warn("Unable to merge locally acquired Belief: {}",Utils.getClassName(e));
 		}
 		return false;
 	}
@@ -543,8 +556,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefReceivedCount++;
 		Collection<SignedData<Order>> incoming=Belief.extractOrders(value);
 		for (SignedData<Order> so: incoming) {
-			AccountKey key=so.getAccountKey();
+			AccountKey key=null;
 			try {
+				key=so.getAccountKey();
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
 				// The merge ignores Orders from unstaked keys, which anyone can make:
@@ -552,7 +566,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				if (!BeliefMerge.isValidPeer(state,key)) continue;
 				Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 				if (newOrder==null) {
-					reject(source,"Signed value in a Belief is not an Order");
+					rejectOrder(source,"Signed value in a Belief is not an Order");
 					continue;
 				}
 				if (orders.containsKey(key)) {
@@ -569,42 +583,24 @@ public class BeliefPropagator extends AThreadedComponent {
 					break;
 				}
 
-				SignedData<Order> persisted=persistOrder(so);
-				if (persisted==null) {
-					awaitMissing(source,so.getHash());
-					continue;
-				}
-				so=persisted;
+				// The merge reads only Orders persisted in full
+				so=Cells.persist(so,getStore());
+				observeOrderUpdate(so);
+				orders.put(key,so);
+				changed=true;
 			} catch (MissingDataException e) {
 				awaitMissing(source,e.getMissingHash());
-				continue;
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
 			} catch (RuntimeException | StackOverflowError | OutOfMemoryError e) {
-				// Reading or storing this Order failed, and only its work held the stack or
-				// memory: drop it, and keep the others
+				// Processing this Order failed, and only its work held the stack or memory:
+				// drop it, and keep the others
 				log.debug("Unusable Order from peer {}",key,e);
-				reject(source,"Unusable Order");
-				continue;
+				rejectOrder(source,"Unusable Order: "+Utils.getClassName(e));
 			}
-			observeOrderUpdate(so);
-			orders.put(key,so);
-			changed=true;
 		}
 		return changed;
-	}
-
-	/**
-	 * Persists a received signed Order with everything it refers to.
-	 *
-	 * @return Persisted Order, or null if part of it is not held yet
-	 * @throws MissingDataException if part of it is not held yet
-	 */
-	private SignedData<Order> persistOrder(SignedData<Order> so) throws IOException {
-		Ref<SignedData<Order>> ref=getStore().storeTopRef(Ref.get(so),Ref.PERSISTED,null);
-		if (ref.getStatus()<Ref.PERSISTED) return null;
-		return ref.getValue();
 	}
 
 	/**
@@ -619,8 +615,11 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 	}
 
-	/** Reports a received Order this peer cannot use, from a wire message or a local acquisition. */
-	private void reject(Message source, String reason) {
+	/**
+	 * Rejects one received Order, alerting the connection it arrived on, or logging if
+	 * it came from a locally acquired Belief.
+	 */
+	private void rejectOrder(Message source, String reason) {
 		if (source!=null) {
 			server.getConnectionManager().alertBadMessage(source,reason);
 		} else {
@@ -670,8 +669,8 @@ public class BeliefPropagator extends AThreadedComponent {
 					return null;
 				});
 		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// Only this fetch's work held the stack or memory, and it has unwound by here,
-			// so the update is simply unusable; the next update may fetch again
+			// Any failure starting this update's fetch drops it, and must clear the flag
+			// or no later fetch could start
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}

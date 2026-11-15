@@ -35,14 +35,17 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
+import convex.core.store.Persister;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.BoundaryCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Persister;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.Transactions;
+import convex.lattice.generic.FunctionLattice;
+import convex.lattice.generic.MapLattice;
+import convex.test.Persisters;
 import convex.test.Samples;
 
 /**
@@ -123,12 +126,8 @@ public class PersistedCellsHeldSoftlyTest {
 
 	// ===== Cursors under test =====
 
-	private AHashMap<ACell,ACell> save(AHashMap<ACell,ACell> value) throws IOException {
-		return Cells.persist(value,store);
-	}
-
 	private void persist(AForkableCursor<AHashMap<ACell,ACell>> cursor) {
-		try { cursor.persist(this::save); }
+		try { cursor.persist(store); }
 		catch (IOException e) { throw new UncheckedIOException(e); }
 	}
 
@@ -190,6 +189,11 @@ public class PersistedCellsHeldSoftlyTest {
 			}))));
 	}
 
+	/** Edits by a transaction, whose commit carries the run's changes onto the cells held then. */
+	static Stream<Edit> transactions() {
+		return edits().filter(edit -> edit.name().contains("transaction"));
+	}
+
 	/** One way of writing a whole value. */
 	private record Write(String name,BiConsumer<AForkableCursor<AHashMap<ACell,ACell>>,AHashMap<ACell,ACell>> action) {
 		@Override public String toString() { return name; }
@@ -215,7 +219,7 @@ public class PersistedCellsHeldSoftlyTest {
 			super(cursor);
 		}
 
-		Working(AForkableCursor<AHashMap<ACell,ACell>> cursor,Persister<AHashMap<ACell,ACell>> persister) {
+		Working(AForkableCursor<AHashMap<ACell,ACell>> cursor,Persister persister) {
 			super(cursor,persister);
 		}
 
@@ -227,7 +231,7 @@ public class PersistedCellsHeldSoftlyTest {
 			return storage().get();
 		}
 
-		@Override protected AHashMap<ACell,ACell> mergePublication(
+		@Override protected AHashMap<ACell,ACell> reconcile(
 				AHashMap<ACell,ACell> base,AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
 			mergedBase=base;
 			mergedOwn=own;
@@ -261,11 +265,22 @@ public class PersistedCellsHeldSoftlyTest {
 			child.sync();
 		}
 
-		@Override protected AHashMap<ACell,ACell> mergePublication(
+		@Override protected AHashMap<ACell,ACell> reconcile(
 				AHashMap<ACell,ACell> base,AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
 			return LatticeOps.mergeChanges(base,own,other);
 		}
 	}
+
+	/** A component that keeps the default reconciliation. */
+	private static class Plain extends ALatticeComponent<AHashMap<ACell,ACell>> {
+		Plain(AForkableCursor<AHashMap<ACell,ACell>> cursor) {
+			super(cursor);
+		}
+	}
+
+	/** Nested maps whose entries keep this side's value where both sides changed one. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	private static final ALattice<AHashMap<ACell,ACell>> NESTED=(ALattice)MapLattice.create(MapLattice.create(FunctionLattice.create((a,b) -> a)));
 
 	// ===== The checks themselves =====
 
@@ -367,13 +382,12 @@ public class PersistedCellsHeldSoftlyTest {
 	@Test void writesThatNeverStopCannotHoldUpAPersist() throws IOException {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 		List<Long> written=new ArrayList<>();
-		root.persist(value -> {
+		root.persist(Persisters.after(value -> {
 			assertTrue(written.size()<3,"Still persisting after three attempts");
 			long seed=9000+written.size();
 			written.add(seed);
 			root.updateAndGet(current -> with(current,seed));
-			return Cells.persist(value,store);
-		});
+		},store));
 		assertEquals(List.of(9000L,9001L,9002L),written,"Three attempts, then it stops");
 		for (long seed:written) assertTrue(holds(root.get(),seed),"Every write is kept");
 	}
@@ -424,6 +438,34 @@ public class PersistedCellsHeldSoftlyTest {
 		assertTrue(holds(host.cursor().get(),9000));
 	}
 
+	/** A fork taken before the destination's save brings only its own change back to it. */
+	@Test void aSyncWhereOnlyTheForkChangedKeepsTheDestinationsSavedCells() {
+		var host=LatticeHost.create(tree(),hostStore());
+		var component=new Plain(host.cursor().fork());
+		host.sync();
+		component.cursor().updateAndGet(root -> with(root,9000));
+
+		component.sync();
+
+		assertTrue(holds(host.cursor().get(),9000));
+		assertOnlyStrongAround(host.cursor().get(),blob(9000));
+	}
+
+	/** A lattice join where both sides changed is built on the fork's cells, then carried onto the destination's. */
+	@Test void aLatticeJoinKeepsTheDestinationsSavedCells() {
+		var host=LatticeHost.create(tree(),hostStore());
+		var component=new LatticeComponent<>(NESTED,host.cursor().fork());
+		component.cursor().updateAndGet(root -> with(root,9000));
+		write(host,9001);
+		host.sync();
+
+		component.sync();
+
+		assertTrue(holds(host.cursor().get(),9000));
+		assertTrue(holds(host.cursor().get(),9001));
+		assertOnlyStrongAround(host.cursor().get(),blob(9000));
+	}
+
 	@Test void cellsBuiltByAMergeAreHeldSoftlyAfterTheSameSync() {
 		var host=savedHost();
 		var component=new Working(host.cursor().fork(),host::persist);
@@ -442,10 +484,9 @@ public class PersistedCellsHeldSoftlyTest {
 		var host=savedHost();
 		var component=new AtomicReference<Working>();
 		var edited=new AtomicReference<Boolean>(false);
-		component.set(new Working(host.cursor().fork(),value -> {
+		component.set(new Working(host.cursor().fork(),Persisters.after(value -> {
 			if (edited.compareAndSet(false,true)) component.get().edit(9001);
-			return host.persist(value);
-		}));
+		},host::persist)));
 		component.get().edit(9000);
 
 		component.get().sync();
@@ -532,7 +573,7 @@ public class PersistedCellsHeldSoftlyTest {
 	@Test void whenPersistingFailsThePublishStandsAndTheErrorIsReported() {
 		var host=savedHost();
 		var failure=new IOException("store failed");
-		var component=new Working(host.cursor().fork(),value -> { throw failure; });
+		var component=new Working(host.cursor().fork(),Persisters.failing(failure));
 		component.edit(9000);
 		var held=component.held();
 
@@ -549,7 +590,7 @@ public class PersistedCellsHeldSoftlyTest {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 		var before=root.get();
 
-		var saved=root.persist(this::save);
+		var saved=root.persist(store);
 
 		assertSame(saved,root.get());
 		assertNotSame(before,root.get(),"The saved cells are other objects");
@@ -613,10 +654,7 @@ public class PersistedCellsHeldSoftlyTest {
 		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
 		Runnable landing=once(() -> edit.apply(root,9000,NOTHING));
 
-		root.persist(value -> {
-			landing.run();
-			return save(value);
-		});
+		root.persist(Persisters.after(value -> landing.run(),store));
 
 		assertTrue(holds(root.get(),9000),"The edit is kept");
 		assertHeldSoftly(store,root.get());
@@ -633,10 +671,20 @@ public class PersistedCellsHeldSoftlyTest {
 		assertOnlyStrongAround(root.get(),blob(9000));
 	}
 
+	@ParameterizedTest(name="{0}")
+	@MethodSource("transactions")
+	void aPersistLandingDuringATransactionLeavesOnlyTheEditStrong(Edit edit) {
+		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
+
+		edit.apply(root,9000,once(() -> persist(root)));
+
+		assertTrue(holds(root.get(),9000),"The edit is kept");
+		assertOnlyStrongAround(root.get(),blob(9000));
+	}
+
 	/**
-	 * A finished value, from a compare-and-set or a transaction, is built on the cells
-	 * read before the persist and goes in as it is, so those cells are held again
-	 * until the next persist.
+	 * A finished value, from a compare-and-set, is built on the cells read before the
+	 * persist and goes in as it is, so those cells are held again until the next persist.
 	 */
 	@ParameterizedTest(name="{0}")
 	@MethodSource("edits")

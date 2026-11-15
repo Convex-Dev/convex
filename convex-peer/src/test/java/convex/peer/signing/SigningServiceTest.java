@@ -82,8 +82,8 @@ public class SigningServiceTest {
 		}
 
 		@Override
-		protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
-			return LatticeOps.mergePublication(LATTICE, LatticeContext.EMPTY, own, other);
+		protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+			return LatticeOps.reconcile(LATTICE, LatticeContext.EMPTY, own, other);
 		}
 
 		@Override

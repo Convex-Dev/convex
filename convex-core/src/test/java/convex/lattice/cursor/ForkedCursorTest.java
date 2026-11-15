@@ -1,6 +1,7 @@
 package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,6 +59,19 @@ public class ForkedCursorTest {
 		assertEquals(Sets.of(2),root.get(),"an unchanged fork never writes");
 		assertEquals(Sets.of(2),fork.get());
 		assertEquals(0,merges.get(),"adopting a moved parent needs no merge");
+	}
+
+	@Test public void aMergeEqualToTheDestinationKeepsItsCells() {
+		Root<ASet<CVMLong>> root=Root.create(Sets.<CVMLong>empty());
+		var fork=root.fork();
+		fork.updateAndGet(s -> s.include(CVMLong.ONE));
+		ASet<CVMLong> written=Sets.of(1,2);
+		root.set(written);
+		assertNotSame(written,union(fork.get(),written),"the test needs a merge that builds an equal copy");
+
+		assertSame(written,fork.sync(ForkedCursorTest::union),"a union equal to the destination is a write of an equal value");
+		assertSame(written,root.get());
+		assertSame(written,fork.get(),"the fork adopts the destination's cells");
 	}
 
 	/** A competing edit must never require a second, fallible merge after publication. */

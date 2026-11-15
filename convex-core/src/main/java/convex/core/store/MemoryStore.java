@@ -79,7 +79,7 @@ public class MemoryStore extends AStore {
 	}
 	
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel) {
-		return persistRef(ref, noveltyHandler, requiredStatus, topLevel, false);
+		return persistRef(ref,noveltyHandler,requiredStatus,topLevel,false,0);
 	}
 
 	/**
@@ -87,7 +87,7 @@ public class MemoryStore extends AStore {
 	 *        in this store, so its structure has been checked
 	 */
 	@SuppressWarnings("unchecked")
-	private <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel, boolean checked) {
+	private <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel, boolean checked, int depth) {
 		// Convert to direct Ref if possible
 		try {
 			ref = ref.toDirect();
@@ -118,7 +118,7 @@ public class MemoryStore extends AStore {
 		final int[] minChildStatus = {requiredStatus};
 		final boolean childrenChecked=checked;
 		cell  = cell.updateRefs(r -> {
-			Ref<ACell> result = persistRef(r,noveltyHandler,requiredStatus,false,childrenChecked);
+			Ref<ACell> result = persistChild(r,noveltyHandler,requiredStatus,childrenChecked,depth+1);
 			if (result.getStatus()<requiredStatus) {
 				minChildStatus[0]=Math.min(minChildStatus[0], result.getStatus());
 			}
@@ -148,6 +148,39 @@ public class MemoryStore extends AStore {
 		return ref;
 	}
 
+	/**
+	 * Persists a child Ref at the given nesting depth, persisting what lies beneath it
+	 * bottom up first if that depth is too deep to recurse further.
+	 */
+	@SuppressWarnings("unchecked")
+	private Ref<ACell> persistChild(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean checked, int depth) {
+		if (depth>=MAX_PERSIST_DEPTH) {
+			ACell cell;
+			try {
+				cell=ref.getValue();
+			} catch (MissingDataException e) {
+				cell=null; // persistRef handles missing data
+			}
+			if (cell!=null) {
+				// Everything beneath a checked cell lies in the same persisted tree
+				persistBeneath(cell,r->isPersisted(r,requiredStatus),r->persistRef(r,noveltyHandler,requiredStatus,false,checked,0));
+			}
+			depth=0;
+		}
+		return persistRef(ref,noveltyHandler,requiredStatus,false,checked,depth);
+	}
+
+	/**
+	 * Tests whether this store holds a branch Ref at the given status or above, as
+	 * persistRef checks before recursing.
+	 */
+	private boolean isPersisted(Ref<ACell> ref, int requiredStatus) {
+		// The Ref's own status may come from another store, so look in this one
+		if (ref.isEmbedded()) return false;
+		Ref<ACell> existing=refForHash(ref.getHash());
+		return (existing!=null)&&(existing.getStatus()>=requiredStatus);
+	}
+
 	@Override
 	public Hash getRootHash() throws IOException {
 		if (rootData==null) return null;
@@ -160,6 +193,10 @@ public class MemoryStore extends AStore {
 		return (T) rootData;
 	}
 
+	/**
+	 * Sets the root data, held in memory. Unlike {@link AStore#setRootData}, this
+	 * does not persist the root's tree in this store.
+	 */
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) {
 		rootData=data;

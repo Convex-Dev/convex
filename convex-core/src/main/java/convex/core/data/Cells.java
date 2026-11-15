@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -203,25 +204,41 @@ public class Cells {
 	}
 	
 	/**
-	 * Persist a cell in the given store
+	 * Persist a cell in the given store, with everything it refers to. A store that
+	 * keeps nothing, such as NullStore, reports success.
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
 	 * @throws InvalidStructureException If a cell persisted for the first time is inconsistent with a child
+	 * @throws MissingDataException if part of the cell is not available
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
 		Ref<T> sref=store.storeTopRef(ref, Ref.PERSISTED, null);
+		ensureStatus(sref,Ref.PERSISTED,store);
 		return sref.getValue();
+	}
+
+	/**
+	 * Throws MissingDataException if a Ref returned by a store is below the required
+	 * status, naming the first missing branch, or the Ref's own hash if none is found.
+	 */
+	private static void ensureStatus(Ref<?> sref, int status, AStore store) {
+		if (sref.getStatus()>=status) return;
+		HashSet<Hash> missing=new HashSet<>();
+		sref.findMissing(missing,1);
+		Hash h=missing.isEmpty()?sref.getHash():missing.iterator().next();
+		throw new MissingDataException(store,h);
 	}
 	
 	/**
-	 * Persist a cell in the given store
-	 * @param a Cell to persist
-	 * @param store Store instance to persist in
-	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException in case of IO error during persistence
+	 * Store a cell in the given store. Only the cell itself is certain to be stored,
+	 * at STORED status; a store may also store cells it refers to.
+	 * @param a Cell to store
+	 * @param store Store instance to store in
+	 * @return Cell after storing (may be the same Cell if no change in cell hierarchy)
+	 * @throws IOException in case of IO error during storing
 	 */
 	public static <T extends ACell> T store(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
@@ -232,20 +249,23 @@ public class Cells {
 	/**
 	 * Announces a Cell, reporting as novelty any cells that have not been previously announced.
 	 * Should only be called in special circumstances, where novelty is registered for the first time
-	 * typically as part of a broadcast cycle.
-	 * 
+	 * typically as part of a broadcast cycle. A store that keeps nothing, such as NullStore,
+	 * reports success.
+	 *
 	 * @param a Cell to announce
 	 * @param noveltyHandler Handler for novelty values
 	 * @param store Store to announce in
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
 	 * @throws InvalidStructureException If a cell persisted for the first time is inconsistent with a child
+	 * @throws MissingDataException if part of the cell is not available
 	 */
 	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
 		if (a==null) {
 			return null; // null is never "novelty"
 		};
 		Ref<T> ref=store.storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
+		ensureStatus(ref,Ref.ANNOUNCED,store);
 		return ref.getValue();
 	}
 

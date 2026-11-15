@@ -36,7 +36,7 @@ public class Order extends ARecordGeneric {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 	private static final int IX_TIMESTAMP = 0;
 	private static final int IX_CONSENSUS = 1;
-	private static final int IX_BLOCKS = 2;
+	static final int IX_BLOCKS = 2;
 	
 	static final long NUM_FIELDS=FORMAT.count();
 

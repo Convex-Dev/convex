@@ -72,7 +72,7 @@ public class BlockResult extends ARecordGeneric {
 
 	/**
 	 * Gets the Results of all transactions in the Block
-	 * @return Vector of Results
+	 * @return Vector of Results, or null for an invalid Block that could not be read as a Block
 	 */
 	public AVector<Result> getResults() {
 		if (results==null) results=RT.ensureVector(values.get(1));
@@ -129,9 +129,8 @@ public class BlockResult extends ARecordGeneric {
 
 	/**
 	 * Creates a BlockResult for an invalid Block (e.g. no peer in Global State). Each
-	 * transaction gets the error, unless the Block has no transaction vector or more
-	 * transactions than a Block may hold, in which case there are no per-transaction
-	 * results.
+	 * transaction gets the error, up to the most transactions a Block may hold. A Block
+	 * with no transaction vector has no per-transaction results.
 	 *
 	 * @param state State at time of creation
 	 * @param block Invalid block, or null if there is no readable Block
@@ -142,10 +141,11 @@ public class BlockResult extends ARecordGeneric {
 		Result r=Result.create(null, message,ErrorCodes.PEER);
 		AVector<?> txs=(block==null)?null:block.getTransactions();
 		AVector<Result> rs;
-		if ((txs==null)||(txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK)) {
+		if (txs==null) {
 			rs=null;
 		} else {
-			rs=Vectors.repeat(r, (int)txs.count());
+			long n=Math.min(txs.count(), Constants.MAX_TRANSACTIONS_PER_BLOCK);
+			rs=Vectors.repeat(r, (int)n);
 		}
 
 		return new BlockResult(state,rs);

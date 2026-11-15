@@ -36,6 +36,7 @@ import convex.core.message.MessageType;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
@@ -1191,7 +1192,13 @@ public class LatticePropagator implements Closeable {
 			// again is not a write, so the cursor switches to its cells as a persist does.
 			ACell announced=value;
 			announcedCursor.set(announced);
-			announcedCursor.persist(held -> Cells.equals(held,announced)?announced:held);
+			announcedCursor.persist(new Persister() {
+				@SuppressWarnings("unchecked")
+				@Override
+				public <T extends ACell> T persist(T held) {
+					return Cells.equals(held,announced)?(T)announced:held;
+				}
+			});
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
 			sequence = ++announceSequence;
@@ -1391,8 +1398,8 @@ public class LatticePropagator implements Closeable {
 	 * Stores a pull reply's value locally. A complete reply is persisted directly. A
 	 * partial reply (root only, or root after DATA chunks) is completed by acquiring
 	 * from the peer: any cells the reply or its chunks staged in the store are found
-	 * there and not fetched again. Completeness is checked explicitly, since a store
-	 * may hold a partial value without throwing.
+	 * there and not fetched again. Completeness is checked first, so that a partial
+	 * reply is completed by acquiring rather than refused by persisting.
 	 *
 	 * <p>Either way the value ends persisted, never announced.</p>
 	 */

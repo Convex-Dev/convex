@@ -131,7 +131,7 @@ public class LatticeMQ extends MapComponent<ACell, Index<Keyword, ACell>> {
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<ACell, Index<Keyword, ACell>> mergePublication(
+	protected AHashMap<ACell, Index<Keyword, ACell>> reconcile(
 			AHashMap<ACell, Index<Keyword, ACell>> own,
 			AHashMap<ACell, Index<Keyword, ACell>> other) {
 		return TOPIC_MAP.merge(own,other);

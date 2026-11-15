@@ -26,9 +26,10 @@ import convex.core.data.RefDirect;
 import convex.core.data.RefSoft;
 import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Persister;
+import convex.test.Persisters;
 import convex.test.Samples;
 
 public class ALatticeComponentTest {
@@ -40,7 +41,7 @@ public class ALatticeComponentTest {
 			super(cursor);
 		}
 
-		TestComponent(AForkableCursor<ASet<ACell>> cursor,Persister<ASet<ACell>> persister) {
+		TestComponent(AForkableCursor<ASet<ACell>> cursor,Persister persister) {
 			super(cursor,persister);
 		}
 
@@ -51,7 +52,7 @@ public class ALatticeComponentTest {
 		@Override public TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
 
 		@Override
-		protected ASet<ACell> mergePublication(ASet<ACell> own,ASet<ACell> other) {
+		protected ASet<ACell> reconcile(ASet<ACell> own,ASet<ACell> other) {
 			return own.includeAll(other);
 		}
 
@@ -153,10 +154,9 @@ public class ALatticeComponentTest {
 		var b=Blob.fromHex("bb");
 		var component=new AtomicReference<TestComponent>();
 		var edited=new AtomicBoolean();
-		component.set(new TestComponent(host.cursor().fork(),value -> {
+		component.set(new TestComponent(host.cursor().fork(),Persisters.after(value -> {
 			if (edited.compareAndSet(false,true)) component.get().add(b);
-			return host.persist(value);
-		}));
+		},host::persist)));
 		component.get().add(a);
 		var persisted=component.get().persist();
 		assertEquals(Sets.of(a,b),persisted);

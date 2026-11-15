@@ -11,7 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.Test;
 
@@ -235,24 +237,24 @@ public class MailTest {
 		assertTrue(mail.mailbox(BOB_DID).deposited().isEmpty());
 	}
 
-	/** A forced CAS conflict retries the same envelope without duplicating it or leaking the failed attempt. */
+	/** A concurrent write before the commit reruns the same envelope without duplicating it or leaking the failed attempt. */
 	@Test void retryKeepsOnlyCommittedSends() {
 		var envelope=aliceToBob(1000,"retry");
 		var abandoned=aliceToBob(1001,"first attempt only");
 		var concurrent=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1002,Strings.create("concurrent"));
-		var commits=new AtomicInteger();
+		var armed=new AtomicBoolean();
 		var root=new Root<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>>(Mail.LATTICE.zero()) {
-			@Override public boolean compareAndSet(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> expected,
-					AHashMap<ACell,Index<ABlob,SignedData<ACell>>> value) {
-				if (commits.incrementAndGet()==1) {
+			@Override public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> updateAndGet(
+					UnaryOperator<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> update) {
+				if (armed.compareAndSet(true,false)) {
 					// Another writer deposits before the first transaction can commit.
-					super.set(expected.assoc(CAROL_DID,Index.create(concurrent.key(),concurrent.signed())));
-					return false;
+					super.set(get().assoc(CAROL_DID,Index.create(concurrent.key(),concurrent.signed())));
 				}
-				return super.compareAndSet(expected,value);
+				return super.updateAndGet(update);
 			}
 		};
 		Mail mail=Mail.connect(root,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
+		armed.set(true);
 		var attempts=new AtomicInteger();
 		mail.execute(draft -> {
 			draft.send(envelope);
@@ -457,8 +459,8 @@ public class MailTest {
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> lattice.merge(own,other));
 		}
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.mergePublication(lattice,LatticeContext.EMPTY,own,other);
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.reconcile(lattice,LatticeContext.EMPTY,own,other);
 		}
 	}
 

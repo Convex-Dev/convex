@@ -8,10 +8,10 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Path;
 import convex.core.exceptions.StoreException;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
-import convex.lattice.cursor.Persister;
 import convex.lattice.cursor.ThreeWayMerge;
 
 /**
@@ -19,7 +19,7 @@ import convex.lattice.cursor.ThreeWayMerge;
  *
  * <p>Lightweight components share a working cursor. Components with an independent
  * publication boundary bind a {@link ForkedCursor} of their destination. Sync
- * supplies this component's publication merge to that fork. Representation changes
+ * supplies this component's {@link #reconcile(ACell,ACell,ACell)} to that fork. Representation changes
  * compose through destination cursor views, such as signing or projection.
  * Publication uses ordinary cursor updates; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
@@ -46,7 +46,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	protected final AForkableCursor<V> storage;
 
 	/** Persists this component's own working state, or null when its parent persists it. */
-	private final Persister<V> persister;
+	private final Persister persister;
+
+	/** This component's {@link #reconcile(ACell,ACell,ACell)}, made once rather than at each sync or commit. */
+	private final ThreeWayMerge<V> reconciler=this::reconcile;
 
 	/** Binds the supplied storage directly, without creating another fork. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
@@ -54,7 +57,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/** Binds the supplied storage with the function that persists it, for working state of its own. */
-	protected ALatticeComponent(AForkableCursor<V> cursor,Persister<V> persister) {
+	protected ALatticeComponent(AForkableCursor<V> cursor,Persister persister) {
 		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
 		this.persister=persister;
 	}
@@ -95,28 +98,40 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Reconciles a working snapshot with a concurrently changed destination.
-	 * Called only when both sides changed, within the destination's atomic update.
-	 * Implementations must use the supplied values without mutating working state.
-	 * Staged components must define this operation; live views do not need it.
+	 * Resolves a working snapshot that conflicts with a concurrently changed
+	 * destination. Called by {@link #reconcile(ACell,ACell,ACell)} only when both sides
+	 * changed, within the destination's atomic update. Implementations must use the
+	 * supplied values without mutating working state. Staged components must define
+	 * this operation; live views do not need it.
+	 *
+	 * @param own Working value
+	 * @param other Destination value
+	 * @return Reconciled value
 	 */
-	protected V mergePublication(V own,V other) {
-		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no publication merge");
+	protected V reconcile(V own,V other) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" cannot reconcile changes on both sides");
 	}
 
 	/**
-	 * Reconciles as {@link #mergePublication(ACell,ACell)} does, also given the value
-	 * both sides last agreed on. Sync calls this form, and by default it ignores the
-	 * base. Experimental: a merge with no better way of handling conflicts, such as a
-	 * lattice join, can override it with {@link LatticeOps#mergeChanges}.
+	 * Reconciles this component's working value with its destination, given the value
+	 * both sides last agreed on. Called whatever changed: a side that changed nothing
+	 * contributes nothing. The result is built on {@code other}, the value held there, so
+	 * cells the destination holds, which may be persisted, stay held wherever the result
+	 * equals them. By default only own's changes are carried onto other, and
+	 * {@link #reconcile(ACell,ACell)} resolves changes on both sides. Experimental: a
+	 * merge with no better way of handling conflicts can override this with
+	 * {@link LatticeOps#mergeChanges}.
 	 *
 	 * @param base Value both sides last agreed on, or null if there was none
 	 * @param own Working value
 	 * @param other Destination value
 	 * @return Reconciled value
 	 */
-	protected V mergePublication(V base,V own,V other) {
-		return mergePublication(own,other);
+	protected V reconcile(V base,V own,V other) {
+		if (Utils.equals(own,base) || Utils.equals(own,other)) return other;
+		// Other changed nothing, so this never conflicts
+		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		return reconcile(own,other);
 	}
 
 	/**
@@ -293,23 +308,15 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Returns the publication merge of a transacting component, which reconciles a
-	 * change made under its claim without passing through it, or null if it is not a
-	 * lattice component. A component with no publication merge fails that commit with
-	 * an {@link UnsupportedOperationException} naming it.
+	 * Returns the reconciliation of a transacting component, which reconciles a change
+	 * made under its claim without passing through it, or null if it is not a lattice
+	 * component. A component that cannot reconcile changes on both sides fails that
+	 * commit with an {@link UnsupportedOperationException} naming it.
 	 */
 	@SuppressWarnings("unchecked")
-	static <V extends ACell> ThreeWayMerge<V> publicationMerge(TransactionalComponent<V,?> source) {
+	static <V extends ACell> ThreeWayMerge<V> reconciler(TransactionalComponent<V,?> source) {
 		if (!(source instanceof ALatticeComponent<?> c)) return null;
-		ALatticeComponent<V> component=(ALatticeComponent<V>)c;
-		return (base,own,other) -> {
-			try {
-				return component.mergePublication(base,own,other);
-			} catch (UnsupportedOperationException e) {
-				throw new UnsupportedOperationException(component.getClass().getSimpleName()
-					+" has no support for commit merges: its value changed under a transaction's claim, by a write that did not pass through the claimed boundary",e);
-			}
-		};
+		return ((ALatticeComponent<V>)c).reconciler;
 	}
 
 	/**
@@ -329,7 +336,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public V sync() {
 		syncChildren();
-		V published=storage.reconcile(this::mergePublication);
+		V published=storage.reconcile(reconciler);
 		if (persister!=null) persistWorkingState();
 		return published;
 	}

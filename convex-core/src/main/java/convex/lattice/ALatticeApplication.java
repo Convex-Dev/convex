@@ -1,8 +1,8 @@
 package convex.lattice;
 
 import convex.core.data.ACell;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Persister;
 
 /**
  * Application lifecycle over a component's working state and managed children.
@@ -34,7 +34,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * Binds working state of its own with the function that persists it, normally a
 	 * private copy of the root, {@code host.cursor().fork()}, with {@code host::persist}.
 	 */
-	protected ALatticeApplication(AForkableCursor<V> cursor,Persister<V> persister) {
+	protected ALatticeApplication(AForkableCursor<V> cursor,Persister persister) {
 		super(cursor,persister);
 	}
 
