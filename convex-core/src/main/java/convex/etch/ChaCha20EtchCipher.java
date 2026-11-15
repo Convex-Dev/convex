@@ -20,53 +20,37 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 			0x61707865,0x3320646e,0x79622d32,0x6b206574
 	};
 
-	/** The ChaCha20 block function from a 16-word input state to a 16-word output. */
-	@FunctionalInterface
-	interface BlockFunction {
-		void apply(int[] input, int[] output);
-	}
-
-	private static final BlockFunction CHACHA20_BLOCK=
-			(input,output)->ChaChaEngine.chachaCore(ROUNDS,input,output);
-
 	private final int[] keyWords=new int[KEY_LENGTH/Integer.BYTES];
-	private final BlockFunction blockFunction;
 	private final ThreadLocal<State> states;
 	private final ArrayList<State> createdStates=new ArrayList<>();
 
 	static ChaCha20EtchCipher derive(byte[] secret, byte[] fileSalt) {
 		byte[] derived=EtchKeyDerivation.deriveFileCipherKey(secret,fileSalt);
 		try {
-			return new ChaCha20EtchCipher(derived,CHACHA20_BLOCK);
+			return new ChaCha20EtchCipher(derived);
 		} finally {
 			Arrays.fill(derived,(byte)0);
 		}
 	}
 
 	static ChaCha20EtchCipher fromKey(byte[] key) {
-		return new ChaCha20EtchCipher(key,CHACHA20_BLOCK);
+		return new ChaCha20EtchCipher(key);
 	}
 
-	/** Test-only construction with a replacement block function. */
-	static ChaCha20EtchCipher fromKey(byte[] key, BlockFunction blockFunction) {
-		return new ChaCha20EtchCipher(key,blockFunction);
-	}
-
-	private ChaCha20EtchCipher(byte[] key, BlockFunction blockFunction) {
+	private ChaCha20EtchCipher(byte[] key) {
 		if ((key==null)||(key.length!=KEY_LENGTH)) {
 			throw new IllegalArgumentException("ChaCha20 requires a 32-byte key");
 		}
 		for (int i=0;i<keyWords.length;i++) {
 			keyWords[i]=Pack.littleEndianToInt(key,i*Integer.BYTES);
 		}
-		this.blockFunction=blockFunction;
 		states=ThreadLocal.withInitial(this::createState);
 	}
 
 	private State createState() {
 		synchronized (this) {
 			ensureActive();
-			State state=new State(keyWords,blockFunction);
+			State state=new State(keyWords);
 			createdStates.add(state);
 			return state;
 		}
@@ -109,12 +93,10 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 		private final byte[] keyStream=new byte[EtchConstants.V3_CHACHA_BLOCK_SIZE];
 		private final int[] inputState=new int[STATE_WORDS];
 		private final int[] outputState=new int[STATE_WORDS];
-		private final BlockFunction blockFunction;
 		private long position=-1L;
 		private int keyStreamOffset=EtchConstants.V3_CHACHA_BLOCK_SIZE;
 
-		private State(int[] keyWords, BlockFunction blockFunction) {
-			this.blockFunction=blockFunction;
+		private State(int[] keyWords) {
 			System.arraycopy(CONSTANTS,0,inputState,0,CONSTANTS.length);
 			System.arraycopy(keyWords,0,inputState,CONSTANTS.length,keyWords.length);
 		}
@@ -131,7 +113,7 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 			for (int i=0;i<STATE_WORDS-NONCE_WORD;i++) {
 				inputState[NONCE_WORD+i]=Pack.littleEndianToInt(locator,i*Integer.BYTES);
 			}
-			blockFunction.apply(inputState,outputState);
+			ChaChaEngine.chachaCore(ROUNDS,inputState,outputState);
 			Pack.intToLittleEndian(outputState,keyStream,0);
 			// Mark the keystream loaded only once it is complete: an Error before this
 			// leaves the block unloaded, so the next use at this position reloads it.
