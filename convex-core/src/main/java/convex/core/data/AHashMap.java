@@ -5,7 +5,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-import convex.core.exceptions.InvalidDataException;
 import convex.core.util.MergeFunction;
 
 public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K, V> {
@@ -128,12 +127,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		return (ADataStructure<R>) mapEntries((Function<MapEntry<K, V>, MapEntry<K, V>>)mapper);
 	}
 
-	/**
-	 * Validates the map checking the prefix of children is consistent for the given shift level
-	 * 
-	 * @throws InvalidDataException
-	 */
-	protected abstract void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException;
 
 	/**
 	 * Returns true if this map contains all the same keys as another map

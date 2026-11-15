@@ -14,6 +14,7 @@ import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
+import convex.core.util.Utils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -299,7 +300,8 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 						// best effort
 					}
 				}
-			} catch (RuntimeException | StackOverflowError e) {
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				try { failureAction.accept(e); }
 				finally { ctx.close(); }
 			} finally {
@@ -328,8 +330,9 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		try {
 			dispatch(ctx,m);
 			if (!backpressured) resumeReading(ctx);
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
 			// Resumed delivery runs as an event-loop task, outside decode's failure path.
+			Utils.checkRequestFailure(e);
 			failed=true;
 			try { failureAction.accept(e); }
 			finally { ctx.close(); }

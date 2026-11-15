@@ -35,6 +35,16 @@ public abstract class AThreadedComponent {
 					break;
 				} catch (Exception e) {
 					log.error("Unexpected error in component loop: {}",thread,e);
+				} catch (Error e) {
+					if (!isFatal(e)) {
+						// A defect some input reached, or an overflow that has unwound: the next iteration can run
+						log.error("Unexpected error in component loop: {}",thread,e);
+						continue;
+					}
+					// Stop the peer rather than leave it running without this component
+					log.error("Fatal error in component loop, closing server: {}",thread,e);
+					server.close();
+					break;
 				}
 			}
 			
@@ -44,7 +54,19 @@ public abstract class AThreadedComponent {
 		}
 	}
 	
-	public double getLoad() {  
+	/**
+	 * Tests whether an Error leaves the JVM unable to run the peer reliably: a virtual
+	 * machine error other than a stack overflow, or a linkage error.
+	 *
+	 * @param e Error to test
+	 * @return True if the Error is fatal
+	 */
+	static boolean isFatal(Error e) {
+		if (e instanceof StackOverflowError) return false;
+		return (e instanceof VirtualMachineError)||(e instanceof LinkageError);
+	}
+
+	public double getLoad() {
 		return LoadMonitor.getLoad(thread);
 	}
 

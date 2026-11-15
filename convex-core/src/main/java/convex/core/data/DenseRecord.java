@@ -7,6 +7,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 
 public class DenseRecord extends ACAD3Record {
 
@@ -50,6 +51,12 @@ public class DenseRecord extends ACAD3Record {
 	@Override
 	public Ref<ACell> getRef(int i) {
 		return data.getRef(i);
+	}
+
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		// This cell's children are those of the vector it wraps
+		data.validateStructure();
 	}
 
 	@Override

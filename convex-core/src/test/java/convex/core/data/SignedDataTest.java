@@ -9,12 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -199,7 +201,30 @@ public class SignedDataTest {
 		Ref<SignedData<?>> r=sd.getRef();
 		
 		assertEquals(enc.getContentHash(),r.getHash());
-		
+
 		doSignedDataTest(sd);
+	}
+
+	/** Signed data without a public key has the short encoding 0x91 (CAD003) */
+	@Test
+	public void testShortForm() throws BadFormatException {
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		// Large enough that the short form is not embedded either
+		ABlob value=Blob.createRandom(new Random(7), 80);
+		SignedData<ABlob> sd=SignedData.create(kp.signData(value).getSignature(), value.getRef());
+
+		Blob enc=sd.getEncoding();
+		assertEquals(Tag.SIGNED_DATA_SHORT,enc.byteAt(0));
+		assertEquals(1+Ed25519Signature.SIGNATURE_LENGTH+value.getEncodingLength(),enc.count());
+		assertFalse(sd.isEmbedded());
+
+		SignedData<ABlob> decoded=Samples.TEST_STORE.decode(enc);
+		assertEquals(sd,decoded);
+		assertTrue(decoded.checkSignature(kp.getAccountKey()));
+
+		// A message re-encodes each child cell it decodes
+		Blob msg=Format.encodeMultiCell(Vectors.of(sd),true);
+		AVector<?> v=(AVector<?>)CVMEncoder.INSTANCE.decodeMultiCell(msg);
+		assertEquals(sd,v.get(0));
 	}
 }

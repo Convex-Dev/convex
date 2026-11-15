@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Future;
 
 /**
  * A host's scoped sync worker, for a service that accepts delayed durability.
@@ -77,6 +78,11 @@ public final class AutoSync implements Closeable {
 
 	boolean isWorker() {
 		return worker.isWorker();
+	}
+
+	/** Gets the schedule of runs, which is done once it has ended, failing if a fatal failure ended it. */
+	Future<?> schedule() {
+		return worker.schedule();
 	}
 
 	private void finish() throws IOException {

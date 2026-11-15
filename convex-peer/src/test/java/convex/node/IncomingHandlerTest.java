@@ -3,6 +3,7 @@ package convex.node;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.net.Socket;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -91,6 +92,25 @@ class IncomingHandlerTest {
 			try (var client=ConvexRemote.connect(listener.getHostAddress())) {
 				assertEquals(CVMLong.ONE,client.request(Message.createPing(1)).get(5,TimeUnit.SECONDS).getValue());
 			}
+		}
+	}
+
+	@Test void outOfMemoryInFactoryRefusesOnlyItsSocket() throws Exception {
+		var listener=new LatticeListener(NodeConfig.port(0));
+		try {
+			listener.setConnectionHandler(connection -> { throw new OutOfMemoryError("simulated"); });
+			listener.launch();
+			assertClosedOnAccept(listener);
+			listener.setConnectionHandler(connection -> message -> {
+				reply(message,1);
+				return null;
+			});
+			try (var client=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ONE,client.request(Message.createPing(1)).get(5,TimeUnit.SECONDS).getValue());
+			}
+		} finally {
+			assertTimeoutPreemptively(Duration.ofSeconds(10),listener::close,
+				"closing must not wait on the refused socket");
 		}
 	}
 

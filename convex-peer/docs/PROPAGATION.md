@@ -159,6 +159,7 @@ protocol limits:
 | One eager lattice propagation | 16 MiB | `LatticePropagatorConfig.maxDeltaBroadcastSize` |
 | Node inbound processing queue | 1,024 messages and 16 MiB | `inboundQueueSize`, `maxInboundQueueBytes` |
 | Concurrent lattice acquisitions | 1,024 | `inboundQueueSize` |
+| Keys in a received lattice path | 1,024 | `maxPathLength` |
 | DATA_REQUESTs served at once over routes the node opened | 16, a quarter per route | `maxDataRequests` |
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |

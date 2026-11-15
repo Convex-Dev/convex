@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -21,6 +22,7 @@ final class HostWorker {
 	}
 
 	private final ScheduledExecutorService executor;
+	private final Future<?> schedule;
 	private final CompletableFuture<Throwable> failure=new CompletableFuture<>();
 	private volatile Thread thread;
 
@@ -29,10 +31,15 @@ final class HostWorker {
 		if (nanos<=0) throw new IllegalArgumentException("Interval must be positive");
 		Objects.requireNonNull(step);
 		executor=Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().name(name).factory());
-		executor.scheduleWithFixedDelay(() -> run(step),nanos,nanos,TimeUnit.NANOSECONDS);
+		schedule=executor.scheduleWithFixedDelay(() -> run(step),nanos,nanos,TimeUnit.NANOSECONDS);
 	}
 
-	/** Whether a failure is one no service can carry on from, so it is thrown rather than reported. */
+	/** Gets the schedule of runs, which is done once it has ended, failing if a fatal failure ended it. */
+	Future<?> schedule() {
+		return schedule;
+	}
+
+	/** Whether a failure is one no service can carry on from, so it ends the schedule as well as being reported. */
 	static boolean isFatal(Throwable e) {
 		return (e instanceof VirtualMachineError) && !(e instanceof StackOverflowError);
 	}
@@ -58,8 +65,9 @@ final class HostWorker {
 		} catch (Throwable e) {
 			// Includes EtchCorruptionError. A periodic task that throws is never run
 			// again, so every recoverable failure is reported and the schedule continues.
-			if (isFatal(e)) throw (Error)e;
+			// A fatal one is reported too, so the stop is visible, then ends the schedule.
 			report(e);
+			if (isFatal(e)) throw (Error)e;
 		}
 	}
 

@@ -619,20 +619,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
-		validate();
-		for (int i = 0; i < entries.length; i++) {
-			MapEntry<K, V> e = entries[i];
-			Hash h = e.getKeyHash();
-			if (h.commonHexPrefixLength(prefix,shift)<shift) {
-				throw new InvalidDataException("Prefix " + prefix + " invalid for map entry: " + e + " with hash: " + h,
-						this);
-			}
-			e.validate();
-		}
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((count == 0) && (this != EMPTY)) {
 			throw new InvalidDataException("Empty map not using canonical instance", this);

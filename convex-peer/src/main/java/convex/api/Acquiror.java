@@ -158,14 +158,13 @@ public final class Acquiror implements AutoCloseable {
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause();
 			future.completeExceptionally((cause != null) ? cause : e);
-		} catch (StackOverflowError e) {
-			future.completeExceptionally(e);
-		} catch (VirtualMachineError e) {
-			future.completeExceptionally(e);
-			throw e;
 		} catch (Exception e) {
 			log.warn("Acquisition failed for {}: {}", hash, e.getMessage());
 			future.completeExceptionally(e);
+		} catch (Throwable e) {
+			// Fails this acquisition, even when the JVM itself has failed
+			future.completeExceptionally(e);
+			Utils.checkRequestFailure(e);
 		} finally {
 			currentRequest = null;
 			termination.complete(null);
@@ -185,9 +184,7 @@ public final class Acquiror implements AutoCloseable {
 				missing.add(hash);
 			} else {
 				ref.findMissing(missing, CPoSConstants.MISSING_LIMIT);
-				if (missing.isEmpty()) {
-					return Cells.persist(ref.getValue(), store);
-				}
+				if (missing.isEmpty()) return Cells.persistReceived(ref.getValue(), store);
 			}
 
 			Hash[] requested = missing.toArray(Utils.EMPTY_HASHES);

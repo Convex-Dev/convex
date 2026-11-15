@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Let operators limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
 - Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run exclusive lattice transactions on any component, holding up writes through the nearest transactional boundary, a `BoundaryCursor` or else the root; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run colliding lattice transactions one at a time after two conflicts on their own value.
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Validate data that peers and lattice nodes receive more strictly before using it.
 - Keep an Etch store usable, verifiable and safe to reopen after a write or sync stops part-way. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))

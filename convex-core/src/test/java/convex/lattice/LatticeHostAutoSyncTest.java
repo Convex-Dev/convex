@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -102,6 +103,30 @@ class LatticeHostAutoSyncTest {
 			assertTrue(skipped.get(10,TimeUnit.SECONDS),"A failed application sync skips that interval's host sync");
 			assertTrue(synced.await(10,TimeUnit.SECONDS));
 			assertTrue(store.events.contains("retain 1"),"Later runs sync again");
+		}
+	}
+
+	@Test void fatalApplicationSyncFailureIsReportedAndStopsTheSchedule() throws Exception {
+		var store=new RecordingStore();
+		var host=LatticeHost.create(CVMLong.ONE,store);
+		var attempts=new AtomicInteger();
+		var sync=host.autoSync(Duration.ofMillis(1),() -> {
+			attempts.incrementAndGet();
+			throw new OutOfMemoryError("simulated");
+		});
+		try {
+			Throwable failure=sync.failure().toCompletableFuture().get(10,TimeUnit.SECONDS);
+			assertTrue(failure instanceof OutOfMemoryError,"a fatal failure is reported, not left silent");
+			assertThrows(ExecutionException.class,() -> sync.schedule().get(10,TimeUnit.SECONDS),
+				"a fatal failure ends the schedule");
+			assertEquals(1,attempts.get());
+			assertThrows(OutOfMemoryError.class,sync::close,"closing runs the failing application sync once more");
+		} finally {
+			try {
+				sync.close();
+			} catch (OutOfMemoryError simulated) {
+				// The application sync's simulated failure, run once more as the sync closes
+			}
 		}
 	}
 

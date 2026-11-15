@@ -43,6 +43,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
@@ -191,6 +192,25 @@ public class IndexTest {
 
 		Blob enc=m.getEncoding();
 		assertEquals(m,Samples.TEST_STORE.decode(enc));
+	}
+
+	/**
+	 * Decoding rejects an Index node whose own encoding breaks the canonical shape: a
+	 * node holding more than its entry needs children, and a node without an entry
+	 * needs two or more children. A single entry's key must be a blob.
+	 */
+	@Test public void testDecodeRejectsNonCanonicalShape() throws BadFormatException {
+		// Count 2: an entry for key 0x12, and no children
+		assertThrows(BadFormatException.class,()->CVMEncoder.INSTANCE.decode(Blob.fromHex("8402"+"80"+"310112"+"1101"+"02"+"0000")));
+
+		// Count 2: no entry, and one child holding both entries, keys 0x10 and 0x11
+		Index<ABlob,CVMLong> both=Index.of(Blob.fromHex("10"),1,Blob.fromHex("11"),2);
+		assertTrue(both.isEmbedded());
+		String oneChild="8402"+"00"+"00"+"0002"+both.getEncoding().toHexString();
+		assertThrows(BadFormatException.class,()->CVMEncoder.INSTANCE.decode(Blob.fromHex(oneChild)));
+
+		// A single entry whose key is an integer
+		assertThrows(BadFormatException.class,()->CVMEncoder.INSTANCE.decode(Blob.fromHex("8401"+"1101"+"1101")));
 	}
 
 	@Test
@@ -947,6 +967,27 @@ public class IndexTest {
 				reopened.close();
 			}
 		}
+	}
+
+	/**
+	 * validateCell uses nothing outside the cell's encoding, so it passes on a node
+	 * whose own entry key is a branch that is not available
+	 */
+	@Test
+	public void testValidateCellLeavesBranchKeyUnread() throws Exception {
+		byte[] bytes=new byte[150];
+		Arrays.fill(bytes,(byte)0x42);
+		Blob key=Blob.wrap(bytes);
+		Blob extended=key.append(Blob.fromHex("01")).toFlatBlob();
+		Index<ABlob,CVMLong> index=Index.of(key,CVMLong.ONE,extended,CVMLong.ZERO);
+
+		// Decoded on its own, so neither key is available
+		Index<ABlob,CVMLong> decoded=new MemoryStore().decode(index.getEncoding());
+		assertEquals(2,decoded.count());
+		Ref<ACell> keyRef=decoded.getRef(0);
+		assertFalse(keyRef.isEmbedded());
+		assertThrows(MissingDataException.class, ()->keyRef.getValue());
+		Cells.validateCell(decoded);
 	}
 
 	/**

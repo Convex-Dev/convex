@@ -326,16 +326,16 @@ public class TransactionHandler extends AThreadedComponent {
 	private BiConsumer<SignedData<ATransaction>, Result> responseObserver;
 
 	public void maybeReportTransactions(Peer peer) {
-		// Report transaction results
-		long newConsensusPoint = peer.getFinalityPoint();
+		// Report transaction results of Blocks executed so far
+		long newConsensusPoint = Math.min(peer.getFinalityPoint(), peer.getStatePosition());
 		if (newConsensusPoint > reportedConsensusPoint) {
 			log.debug("Consensus point update from {} to {}" ,reportedConsensusPoint , newConsensusPoint);
 			for (long i = reportedConsensusPoint; i < newConsensusPoint; i++) {
-				SignedData<Block> block = peer.getPeerOrder().getBlock(i);
 				// only report our own transactions!
-				if (block.getAccountKey().equals(peer.getPeerKey())) {
+				Block block = peer.getOwnBlock(i);
+				if (block != null) {
 					BlockResult br = peer.getBlockResult(i);
-					reportTransactions(block.getValue(), br,i);
+					reportTransactions(block, br,i);
 				}
 			}
 			reportedConsensusPoint=newConsensusPoint;

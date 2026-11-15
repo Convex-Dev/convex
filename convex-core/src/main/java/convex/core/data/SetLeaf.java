@@ -414,35 +414,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return true;
 	}
 	
-	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		validateWithPrefix(Hash.EMPTY_HASH,0,-1);
-	}
-
-	@Override
-	protected void validateWithPrefix(Hash prefix, int digit, int position) throws InvalidDataException {
-		if (!isValidOrder(elements)) {
-			throw new InvalidDataException("Bad ordering of set elements!",this);
-		}
-		
-		for (int i = 0; i < elements.length; i++) {
-			Ref<T> e = elements[i];
-			Hash h = e.getHash();
-			long match=h.hexMatch(prefix);
-			if (match<(position-1)) {
-				throw new InvalidDataException("Parent prefix did not match",this);
-			}
-			if (position>=0) {
-				int mydigit=h.getHexDigit(position);
-				if (mydigit!=digit) {
-					throw new InvalidDataException("Bad hex digit at position: "+position,this);
-				}
-			}
-			e.validate();
-
-		}
-	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {

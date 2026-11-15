@@ -32,28 +32,47 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	protected Ref<ACell> cachedRef=null;
 
+	/**
+	 * Validates this cell and every cell below it that is not already validated or
+	 * persisted: this cell's own data first, then each child, then this cell against
+	 * its children. A cell already validated or persisted is trusted with its whole
+	 * tree. Subclasses may add rules beyond structure after calling this.
+	 *
+	 * @throws InvalidDataException If a cell checked is invalid
+	 */
 	@Override
 	public void validate() throws InvalidDataException {
-		Cells.validate(this);
+		if (getRef().isValidated()) return;
+		try {
+			validateCell();
+			int n=getRefCount();
+			for (int i=0; i<n; i++) {
+				getRef(i).validate();
+			}
+			validateStructure();
+		} catch (InvalidDataException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),this);
+		}
 	}
 	
 	/**
-	 * Validates the local structure and invariants of this cell.
-	 * 
-	 * Should validate directly contained data, but should not validate all other structure of this cell. 
-	 * 
-	 * In particular, should not traverse potentially missing child Refs.
-	 * 
-	 * @throws InvalidDataException  If the Cell is invalid
+	 * Validates this cell's own data, using nothing outside its encoding. It may check
+	 * objects the cell holds directly, the hash of any ref {@link #getRef(int)} returns
+	 * and the value of an embedded one, but never the value of a branch ref: a rule that
+	 * needs a child's value belongs in {@link #validateStructure()}.
+	 *
+	 * @throws InvalidDataException If the cell is invalid
 	 */
 	protected abstract void validateCell() throws InvalidDataException;
 	
 	/**
-	 * Validates the structure and invariants of this cell.
-	 * 
-	 * May visit child refs. Should complete in O(1) time.
-	 * 
-	 * @throws InvalidDataException  If the Cell is invalid
+	 * Checks this cell against each of its direct children, as structural correctness
+	 * requires, and no rule beyond structure. A store runs this check when it first
+	 * persists the cell, after persisting its children.
+	 *
+	 * @throws InvalidDataException  If the cell is inconsistent with a direct child
 	 */
 	public void validateStructure() throws InvalidDataException {
 		// nothing by default
