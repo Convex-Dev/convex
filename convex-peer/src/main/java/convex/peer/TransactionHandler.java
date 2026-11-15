@@ -51,6 +51,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.RequestFailureLog;
 
 /**
  * Server component for handling client transactions and producing Blocks
@@ -164,6 +165,56 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
 	private static final Result ERR_STACK=Result.error(ErrorCodes.LIMIT, Strings.intern("Transaction exceeded this peer's stack depth")).withSource(SourceCodes.PEER);
+	private static final Result ERR_BAD_FORMAT=Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER);
+	private static final Result ERR_PEER_FAILURE=Result.error(ErrorCodes.PEER, Strings.intern("Peer failed to process transaction")).withSource(SourceCodes.PEER);
+
+	private final RequestFailureLog failures=new RequestFailureLog(log);
+
+	/**
+	 * Gets the signed value a transaction message carries, or null if the message does
+	 * not have that shape.
+	 */
+	@SuppressWarnings("unchecked")
+	private static SignedData<ATransaction> transactionOf(Message m) {
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v==null)||(v.count()<3)) return null;
+		return (v.get(2) instanceof SignedData<?> sd)?(SignedData<ATransaction>)sd:null;
+	}
+
+	/**
+	 * Rejects one client transaction whose handling failed: running out of memory is
+	 * answered as load, a stack overflow as a limit, any other failure as a peer error.
+	 */
+	private void reject(Message m, Throwable e) {
+		failures.log(e,"Rejected transaction for connection {}",m.getConnection());
+		sendRejection(m,rejectionFor(e));
+	}
+
+	private static Result rejectionFor(Throwable e) {
+		// Never FORMAT: that is only for an encoding or shape the peer has checked
+		if (e instanceof OutOfMemoryError) {
+			// The peer's heap ran out, which may be its load rather than this
+			// transaction, so busy: a retry may succeed
+			return Result.SERVER_LOADED;
+		}
+		if (e instanceof StackOverflowError) {
+			// Too deep for this peer: the same transaction would fail again, so a limit
+			return ERR_STACK;
+		}
+		return ERR_PEER_FAILURE;
+	}
+
+	/**
+	 * Sends a rejection to a client, dropping it if it cannot be sent, unless the JVM
+	 * itself has failed.
+	 */
+	private static void sendRejection(Message m, Result r) {
+		try {
+			m.returnResult(r);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+		}
+	}
 	
 	private Result checkPeerState() {
 		try {
@@ -208,8 +259,12 @@ public class TransactionHandler extends AThreadedComponent {
 			Message m=messages.get(i);
 			this.receivedTransactionCount++;
 			try {
-				AVector<ACell> v = m.getPayload();
-				SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
+				SignedData<ATransaction> sd=transactionOf(m);
+				if (sd==null) {
+					// Not the shape of a transaction message
+					sendRejection(m,ERR_BAD_FORMAT);
+					continue;
+				}
 				Result error=peer.checkTransactionFast(sd);
 				if (error!=null) {
 					m.returnResult(error.withSource(SourceCodes.PEER));
@@ -217,17 +272,11 @@ public class TransactionHandler extends AThreadedComponent {
 				}
 				sigs[i]=sd;
 				toVerify.add(sd);
-			} catch (Exception e) {
-				// Guard for each received transaction, with the one in Phase 3: a payload
-				// that is not as it should be rejects only this transaction
-				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
-			} catch (StackOverflowError e) {
-				// Too deep for this peer: the same transaction would fail again, so a limit
-				m.returnResult(ERR_STACK);
-			} catch (OutOfMemoryError e) {
-				// The peer's heap ran out, which may be its load rather than this
-				// transaction, so busy: a retry may succeed
-				m.returnResult(Result.SERVER_LOADED);
+			} catch (Throwable e) {
+				// Guard for each received transaction, with the one in Phase 3: any failure
+				// rejects only this transaction, unless the JVM itself has failed
+				Utils.checkRequestFailure(e);
+				reject(m,e);
 			}
 		}
 
@@ -237,8 +286,10 @@ public class TransactionHandler extends AThreadedComponent {
 		// re-checked individually in Phase 3 under per-tx exception handling.
 		try {
 			Peer.preValidateSignatures(toVerify);
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// Ignore — per-tx handling in Phase 3 produces correct per-client errors
+		} catch (Throwable e) {
+			// Ignore, unless the JVM itself has failed: Phase 3 checks each signature
+			// again under each transaction's own guard
+			Utils.checkRequestFailure(e);
 		}
 
 		// Phase 3: Check cached signature results, persist fully, queue valid transactions.
@@ -276,24 +327,16 @@ public class TransactionHandler extends AThreadedComponent {
 				// message) this throws MissingDataException before we queue the tx.
 				sd=Cells.persist(sd, store);
 			} catch (MissingDataException e) {
-				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Transaction data not available: "+e.getMissingHash())).withSource(SourceCodes.PEER));
+				sendRejection(m,Result.error(ErrorCodes.MISSING, Strings.create("Transaction data not available: "+e.getMissingHash())).withSource(SourceCodes.PEER));
 				continue;
 			} catch (IOException e) {
-				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
+				sendRejection(m,Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
 				continue;
-			} catch (Exception e) {
-				// Guard for each received transaction, with the one in Phase 1: a payload
-				// that is not as it should be rejects only this transaction
-				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
-				continue;
-			} catch (StackOverflowError e) {
-				// Too deep for this peer: the same transaction would fail again, so a limit
-				m.returnResult(ERR_STACK);
-				continue;
-			} catch (OutOfMemoryError e) {
-				// The peer's heap ran out, which may be its load rather than this
-				// transaction, so busy: a retry may succeed
-				m.returnResult(Result.SERVER_LOADED);
+			} catch (Throwable e) {
+				// Guard for each received transaction, with the one in Phase 1: any failure
+				// rejects only this transaction, unless the JVM itself has failed
+				Utils.checkRequestFailure(e);
+				reject(m,e);
 				continue;
 			}
 			if (!registerInterest(sd.getHash(), m)) continue;

@@ -2,25 +2,39 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
+import convex.api.Convex;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
+import convex.core.data.Ref;
+import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.store.MemoryStore;
+import convex.core.util.Utils;
 
 /**
  * Tests that a peer contains the failure of one external request, whatever is thrown,
@@ -112,6 +126,125 @@ public class PeerRequestFailureTest {
 				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
 				assertFalse(failing.isClosed(),error.toString());
 			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A store that throws a chosen failure once, the first time it is asked to store a chosen cell. */
+	static final class FaultingStore extends MemoryStore {
+		volatile Hash failing;
+		volatile Throwable failure;
+
+		void failOnce(Hash hash, Throwable e) {
+			failure=e;
+			failing=hash;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+			Hash target=failing;
+			if ((target!=null)&&target.equals(ref.getHash())) {
+				failing=null;
+				throw Utils.<RuntimeException>sneakyThrow(failure);
+			}
+			return super.storeTopRef(ref,status,noveltyHandler);
+		}
+	}
+
+	/** The code a client gets for a transaction whose intake fails with the given failure: never FORMAT. */
+	static Keyword intakeCode(Throwable failure) {
+		if (failure instanceof OutOfMemoryError) return ErrorCodes.LOAD;
+		if (failure instanceof StackOverflowError) return ErrorCodes.LIMIT;
+		return ErrorCodes.PEER;
+	}
+
+	/**
+	 * A transaction whose intake fails is rejected alone: running out of memory is
+	 * answered as load, a stack overflow as a limit and any other failure as a peer
+	 * error, never as bad format. Later transactions are still executed.
+	 */
+	@Test
+	public void aTransactionThatFailsIsRejectedWithItsCause() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
+		try {
+			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+			List<Throwable> failures=List.of(new OutOfMemoryError("simulated"),new StackOverflowError("simulated"),
+				new NoClassDefFoundError("simulated"),new AssertionError("simulated"),new IllegalStateException("simulated"));
+			int i=0;
+			for (Throwable failure: failures) {
+				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
+				// The handler persists each transaction before queueing it
+				store.failOnce(tx.getHash(),failure);
+				Result rejected=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertEquals(intakeCode(failure),rejected.getErrorCode(),failure+": "+rejected);
+				assertNull(store.failing,failure+" fired");
+			}
+			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"));
+			Result ok=client.transact(next).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A transaction message whose third element is not a signed value is badly formatted. */
+	@Test
+	public void aTransactionMessageWithoutASignedValueIsBadlyFormatted() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			// Not started: this test thread runs it
+			TransactionHandler handler=new TransactionHandler(peer);
+			ReplyConnection client=new ReplyConnection(null);
+			Message m=Message.create(MessageType.TRANSACT,Vectors.of(MessageTag.TRANSACT,CVMLong.create(1),CVMLong.ONE));
+			assertTrue(handler.offerTransaction(m.withConnection(client)));
+			handler.loop();
+			assertEquals(ErrorCodes.FORMAT,client.result(1).getErrorCode());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A transaction whose rejection fails as it is sent, in the cheap checks or the
+	 * signature check, fails alone: a good transaction in the same batch is still
+	 * queued, with no error sent to its client.
+	 */
+	@Test
+	public void aTransactionWhoseReplyFailsLeavesTheRestOfItsBatch() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			SignedData<ATransaction> good=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 2)"));
+			// Fails the cheap checks: there is no such origin account
+			SignedData<ATransaction> noOrigin=LOCAL.signData(Invoke.create(Address.create(999999),1,"(+ 1 2)"));
+			// Fails the signature check: another transaction's signature
+			SignedData<ATransaction> badSignature=SignedData.create(LOCAL.getAccountKey(),good.getSignature(),
+				Invoke.create(ORIGIN,1,"(+ 2 2)").getRef());
+			for (Error error: CONTAINED) {
+				TransactionHandler handler=new TransactionHandler(peer);
+				ReplyConnection healthy=new ReplyConnection(null);
+				assertTrue(handler.offerTransaction(Message.createTransaction(1,noOrigin).withConnection(new ReplyConnection(error))));
+				assertTrue(handler.offerTransaction(Message.createTransaction(2,badSignature).withConnection(new ReplyConnection(error))));
+				assertTrue(handler.offerTransaction(Message.createTransaction(3,good).withConnection(healthy)));
+				handler.loop();
+				assertTrue(healthy.results.isEmpty(),error+": "+healthy.results);
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A failure of the JVM itself during transaction intake is not contained. */
+	@Test
+	public void aJvmFailureDuringIntakeIsNotContained() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			TransactionHandler handler=new TransactionHandler(peer);
+			SignedData<ATransaction> noOrigin=LOCAL.signData(Invoke.create(Address.create(999999),1,"(+ 1 2)"));
+			ReplyConnection failing=new ReplyConnection(new InternalError("simulated"));
+			assertTrue(handler.offerTransaction(Message.createTransaction(1,noOrigin).withConnection(failing)));
+			assertThrows(InternalError.class,handler::loop);
 		} finally {
 			peer.close();
 		}
