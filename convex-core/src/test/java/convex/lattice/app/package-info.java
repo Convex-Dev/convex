@@ -38,8 +38,8 @@
  *   <li>{@link convex.lattice.app.ShopExample}, tested by
  *       {@link convex.lattice.app.ShopApplicationTest}: an application built from
  *       independent regions, whose operations are transactions across them, while
- *       each region transacts on its own and is built live or staged at the caller's
- *       choice.</li>
+ *       each region transacts on its own and the shop or any region forks to work
+ *       apart.</li>
  * </ul>
  *
  * <p>Network delivery and propagation scenarios belong in {@code convex.node.app}

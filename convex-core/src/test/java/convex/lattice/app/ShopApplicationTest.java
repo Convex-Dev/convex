@@ -7,18 +7,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.AKeyedRegions.RegionFactory;
-import convex.lattice.app.ShopExample.Orders;
 import convex.lattice.app.ShopExample.Shop;
 import convex.lattice.app.ShopExample.Stock;
 import convex.lattice.cursor.Root;
@@ -26,14 +21,9 @@ import convex.lattice.cursor.Root;
 /**
  * Transactions across independent regions plugged into one application, the
  * {@link ShopExample}: the shop's operations span its regions, while each region
- * still transacts on its own and its order book can be built live or staged with
- * no change to the shop.
+ * still transacts on its own, and the shop or any region forks to work apart.
  */
 class ShopApplicationTest {
-
-	private static RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders(boolean staged) {
-		return staged?STAGED_ORDERS:LIVE_ORDERS;
-	}
 
 	private static ACell at(Shop shop,Keyword region) {
 		return shop.value().get(region);
@@ -43,22 +33,18 @@ class ShopApplicationTest {
 		return Index.of(item,CVMLong.create(count));
 	}
 
-	@ParameterizedTest(name="staged orders: {0}")
-	@ValueSource(booleans={false,true})
-	void anOrderChangesEveryRegionItTouchesTogether(boolean staged) {
-		var shop=open(orders(staged));
+	@Test void anOrderChangesEveryRegionItTouchesTogether() {
+		var shop=open();
 		shop.list(TEA,2);
 		assertEquals(Sets.of(TEA),at(shop,CATALOGUE));
 		assertEquals(stock(TEA,2),at(shop,STOCK));
 		shop.order(1,TEA);
 		assertEquals(stock(TEA,1),at(shop,STOCK));
-		assertEquals(Maps.of(CVMLong.ONE,TEA),at(shop,ORDERS),"committed with the stock, however the order book is built");
+		assertEquals(Maps.of(CVMLong.ONE,TEA),at(shop,ORDERS),"committed with the stock");
 	}
 
-	@ParameterizedTest(name="staged orders: {0}")
-	@ValueSource(booleans={false,true})
-	void anOrderThatCannotBeFilledChangesNothing(boolean staged) {
-		var shop=open(orders(staged));
+	@Test void anOrderThatCannotBeFilledChangesNothing() {
+		var shop=open();
 		shop.list(TEA,1);
 		shop.order(1,TEA);
 		var before=shop.value();
@@ -67,10 +53,8 @@ class ShopApplicationTest {
 		assertSame(before,shop.value());
 	}
 
-	@ParameterizedTest(name="staged orders: {0}")
-	@ValueSource(booleans={false,true})
-	void operationsComposeIntoOneTransactionThatCommitsAllOrNothing(boolean staged) {
-		var shop=open(orders(staged));
+	@Test void operationsComposeIntoOneTransactionThatCommitsAllOrNothing() {
+		var shop=open();
 		shop.list(TEA,1);
 		var before=shop.value();
 		assertThrows(IllegalStateException.class,() -> shop.execute(s -> {
@@ -95,7 +79,7 @@ class ShopApplicationTest {
 		alone.take(TEA);
 		alone.exclusive().execute(s -> s.restock(TEA,1));
 
-		var shop=open(LIVE_ORDERS);
+		var shop=open();
 		shop.list(COFFEE,1);
 		shop.order(1,COFFEE);
 		var catalogue=at(shop,CATALOGUE);
@@ -110,20 +94,32 @@ class ShopApplicationTest {
 		assertSame(orders,at(shop,ORDERS));
 	}
 
-	@Test void orderBooksBuiltLiveOrStagedPublishTheirOwnEditsDifferently() {
-		var live=open(LIVE_ORDERS);
-		live.orders().record(7,TEA);
-		assertEquals(Maps.of(CVMLong.create(7),TEA),at(live,ORDERS),"in the shop at once");
+	@Test void aForkedRegionKeepsItsEditsUntilItSyncs() {
+		var shop=open();
+		var draft=shop.orders().fork();
+		draft.record(7,TEA);
+		shop.orders().record(8,COFFEE);
+		assertEquals(Maps.of(CVMLong.create(8),COFFEE),at(shop,ORDERS),"the draft's order is not in the shop yet");
+		draft.sync();
+		assertEquals(Maps.of(CVMLong.create(7),TEA,CVMLong.create(8),COFFEE),at(shop,ORDERS),"both orders");
+	}
 
-		var staged=open(STAGED_ORDERS);
-		staged.orders().record(7,TEA);
-		assertNull(at(staged,ORDERS),"kept until the shop syncs");
-		staged.sync();
-		assertEquals(Maps.of(CVMLong.create(7),TEA),at(staged,ORDERS));
+	@Test void aForkedShopPublishesItsOperationsWhenItSyncs() {
+		var shop=open();
+		shop.list(TEA,1);
+		var draft=shop.fork();
+		draft.order(1,TEA);
+		shop.catalogue().add(COFFEE);
+		assertEquals(stock(TEA,1),at(shop,STOCK),"the draft's order is not in the shop yet");
+		assertNull(at(shop,ORDERS));
+		draft.sync();
+		assertEquals(stock(TEA,0),at(shop,STOCK));
+		assertEquals(Maps.of(CVMLong.ONE,TEA),at(shop,ORDERS));
+		assertEquals(Sets.of(TEA,COFFEE),at(shop,CATALOGUE),"the region only the shop changed keeps its change");
 	}
 
 	@Test void aShopTransactionRetriesOnTopOfAStockCommit() {
-		var shop=open(LIVE_ORDERS);
+		var shop=open();
 		shop.list(TEA,1);
 		var runs=new AtomicInteger();
 		shop.execute(s -> {
@@ -135,7 +131,7 @@ class ShopApplicationTest {
 	}
 
 	@Test void anExclusiveRestockLeavesTheOtherRegionsFree() {
-		var shop=open(LIVE_ORDERS);
+		var shop=open();
 		shop.list(TEA,1);
 		shop.order(1,TEA);
 		shop.stock().exclusive().execute(s -> {
@@ -152,7 +148,7 @@ class ShopApplicationTest {
 	}
 
 	@Test void anOrderDuringAnExclusiveRestockIsMergedIntoIt() {
-		var shop=open(LIVE_ORDERS);
+		var shop=open();
 		shop.list(TEA,2);
 		shop.stock().exclusive().execute(s -> {
 			// The shop commits at its root, not through the stock's boundary
@@ -164,7 +160,7 @@ class ShopApplicationTest {
 	}
 
 	@Test void anExclusiveShopTransactionHoldsUpRegionWritesUntilItCommits() {
-		var shop=open(LIVE_ORDERS);
+		var shop=open();
 		shop.list(TEA,1);
 		var restock=new AtomicReference<Thread>();
 		shop.exclusive().execute(s -> {

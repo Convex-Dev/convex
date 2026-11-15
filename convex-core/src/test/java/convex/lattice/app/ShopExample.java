@@ -6,7 +6,6 @@ import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.AKeyedRegions.RegionFactory;
 import convex.lattice.IndexComponent;
 import convex.lattice.MapComponent;
 import convex.lattice.Regions;
@@ -25,16 +24,15 @@ import convex.lattice.cursor.Root;
  * <ul>
  *   <li>The catalogue is a library {@link UnionSet}, used as it is.</li>
  *   <li>{@link Stock} holds counts; concurrent changes to a count both apply.</li>
- *   <li>{@link Orders} holds orders by unique identifier, built live or staged by
- *       whichever factory the shop is given, {@link #LIVE_ORDERS} or
- *       {@link #STAGED_ORDERS}.</li>
+ *   <li>{@link Orders} holds orders by unique identifier.</li>
  * </ul>
  *
  * <p>{@link Shop} extends {@link Regions}. Its operations are transactions across
  * the regions they touch, and compose into larger transactions; each region also
- * transacts on its own, exclusively or not. {@link #open} builds one over a plain
- * root. A service that stores or replicates the shop registers it with a host
- * instead, {@code host.addApplication(new Shop(host.cursor(),LIVE_ORDERS))}.</p>
+ * transacts on its own, exclusively or not. The shop, or any region of it, forks
+ * to work apart and syncs to publish. {@link #open} builds one over a plain root. A
+ * service that stores or replicates the shop registers it with a host instead,
+ * {@code host.addApplication(new Shop(host.cursor()))}.</p>
  */
 public final class ShopExample {
 
@@ -45,17 +43,11 @@ public final class ShopExample {
 	public static final Keyword TEA=Keyword.intern("tea");
 	public static final Keyword COFFEE=Keyword.intern("coffee");
 
-	/** An order book whose edits land in the shop at once. */
-	public static final RegionFactory<AHashMap<CVMLong,Keyword>,Orders> LIVE_ORDERS=Orders::new;
-
-	/** An order book that keeps its own edits until the shop syncs. */
-	public static final RegionFactory<AHashMap<CVMLong,Keyword>,Orders> STAGED_ORDERS=cursor -> new Orders(cursor).fork();
-
 	private ShopExample() {}
 
 	/** Lists, orders and restocks in a fresh shop, printing its value after each step. */
 	public static void main(String[] args) {
-		var shop=open(STAGED_ORDERS);
+		var shop=open();
 		shop.list(TEA,2);
 		System.out.println("Listed:     "+shop.value());
 		shop.order(1,TEA);
@@ -65,27 +57,29 @@ public final class ShopExample {
 			stock.restock(TEA,10);
 		});
 		System.out.println("Restocked:  "+shop.value());
-		shop.orders().record(3,TEA);
-		System.out.println("Staged:     "+shop.value());
-		shop.sync();
+		var draft=shop.orders().fork();
+		draft.record(3,TEA);
+		System.out.println("Drafted:    "+shop.value());
+		draft.sync();
 		System.out.println("Synced:     "+shop.value());
 	}
 
-	/** Builds a shop over a fresh in-memory root, with its order book from the given factory. */
-	public static Shop open(RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders) {
-		return new Shop(new Root<>(Index.<Keyword,ACell>none()),orders);
+	/** Builds a shop over a fresh in-memory root. */
+	public static Shop open() {
+		return new Shop(new Root<>(Index.<Keyword,ACell>none()));
 	}
 
 	/** The application: three regions, and operations that span them. */
 	public static final class Shop extends Regions implements TransactionalComponent<Index<Keyword,ACell>,Shop> {
-		public Shop(AForkableCursor<Index<Keyword,ACell>> cursor,RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders) {
+		public Shop(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			super(cursor);
 			create(CATALOGUE,(AForkableCursor<ASet<Keyword>> c) -> new UnionSet<>(c));
 			create(STOCK,(AForkableCursor<Index<Keyword,CVMLong>> c) -> new Stock(c));
-			create(ORDERS,orders);
+			create(ORDERS,(AForkableCursor<AHashMap<CVMLong,Keyword>> c) -> new Orders(c));
 		}
 		private Shop(AForkableCursor<Index<Keyword,ACell>> cursor,Shop source) { super(cursor,source); }
 		@Override public Shop rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new Shop(cursor,this); }
+		@Override public Shop fork() { return rebind(storage.fork()); }
 
 		public UnionSet<Keyword> catalogue() { return registered(CATALOGUE); }
 		public Stock stock() { return registered(STOCK); }
