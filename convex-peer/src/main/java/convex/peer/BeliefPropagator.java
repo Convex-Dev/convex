@@ -540,8 +540,10 @@ public class BeliefPropagator extends AThreadedComponent {
 
 				if (!so.checkSignature()) {
 					if (source!=null) {
-						server.getConnectionManager().alertBadMessage(source,"Bad Order Signature!!");
+						// The connection that sent it, not the key the Order names
+						server.getConnectionManager().handleMisbehaviour(source.getConnection(),"Bad Order signature");
 					} else {
+						// A polled Belief's peer is held to account where it was polled
 						log.debug("Bad Order signature in locally acquired Belief");
 					}
 					break;
@@ -571,16 +573,13 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 
 	/**
-	 * Rejects one received message or Order whose processing failed. It is reported as
-	 * a bad message only if the data may have caused the failure; a polled Belief, with
-	 * no message, is only logged.
+	 * Rejects one received message or Order whose processing failed: it is dropped and
+	 * logged, with nothing held against its sender.
 	 */
 	private void rejectReceived(Message source, Throwable e, String reason) {
+		// Never a disconnect: a failure caught here may be this peer's own, and only an
+		// explicit check proves misbehaviour
 		receiveFailures.log(e,"{}: {}",reason,(source==null)?"polled Belief":source.getConnection());
-		// Running out of memory, or a defect of this peer, says nothing about the sender
-		if ((source!=null)&&RequestFailures.mayBeCausedByRequest(e)) {
-			server.getConnectionManager().alertBadMessage(source,reason);
-		}
 	}
 
 	/** Separate logs, so each site warns once of each kind of failure. */

@@ -20,7 +20,9 @@ import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
+import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
@@ -29,10 +31,14 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
@@ -372,6 +378,17 @@ public class ConnectionManager extends AConnectionManager {
 				log.debug("Peer returned non-Belief value for advertised Belief hash {}",h);
 				return;
 			}
+			// Checked here, where the polled peer is known: an Order whose signature fails
+			// in the Belief it publishes is provable misbehaviour
+			State state=server.getPeer().getConsensusState();
+			for (SignedData<Order> so: Belief.extractOrders(belief)) {
+				// Only the Orders the merge would check: unstaked keys it drops unchecked
+				if (!BeliefMerge.isValidPeer(state,so.getAccountKey())) continue;
+				if (!so.checkSignature()) {
+					handleMisbehaviour(peerKey,connection,"Bad Order signature in polled Belief");
+					return;
+				}
+			}
 			if (!server.queueBelief(belief)) {
 				log.debug("Discarding acquired Belief because the local queue filled during polling");
 			}
@@ -533,18 +550,48 @@ public class ConnectionManager extends AConnectionManager {
 			Hash h = RT.ensureHash(ctx);
 			return (h == null) || h.equals(networkID);
 		});
+		// A challenge whose signature does not verify is provable misbehaviour. After the
+		// reply, for a local client that stays open; a remote one may be closed first
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v!=null)&&(v.count()==3)&&(v.get(2) instanceof SignedData<?> challenge)&&!challenge.checkSignature()) {
+			handleMisbehaviour(m.getConnection(),"Bad challenge signature");
+		}
 	}
 
-	// ========== Alerts ==========
+	// ========== Misbehaviour ==========
 
 	/**
-	 * Called to signal a bad / corrupt message from a Peer.
-	 * @param m Message of concern
-	 * @param reason Reason message considered bad
+	 * Handles provable misbehaviour by the remote end of a connection: data that no
+	 * honest, correct implementation sends, such as a signature that does not verify.
+	 * Every such case comes here, so that the response is decided in one place. For
+	 * now the connection is closed, unless it is local.
+	 *
+	 * @param connection Connection whose remote end misbehaved
+	 * @param reason What it did
 	 */
-	public void alertBadMessage(Message m, String reason) {
-		// Bad data from another peer is expected on a public network: not an operator matter
-		log.debug("Bad message from {}: {}",m.getConnection(),reason);
+	public void handleMisbehaviour(AConnection connection, String reason) {
+		if (connection==null) return;
+		// A local connection is this process's own client, such as the REST API, relaying
+		// for others it must handle itself
+		if (connection instanceof LocalConnection) {
+			log.debug("Misbehaviour on a local connection, kept open: {}",reason);
+			return;
+		}
+		log.debug("Closing connection to {} after misbehaviour: {}",connection.getRemoteAddress(),reason);
+		connection.close();
+	}
+
+	/**
+	 * Handles provable misbehaviour by a peer this peer connected to, as
+	 * {@link #handleMisbehaviour(AConnection, String)} does for any connection.
+	 *
+	 * @param peerKey Key the peer was connected under
+	 * @param connection Connection to the peer
+	 * @param reason What it did
+	 */
+	void handleMisbehaviour(AccountKey peerKey, Convex connection, String reason) {
+		// Closed even if no longer mapped to its key: the misbehaving connection must go
+		if (!closeConnection(peerKey,connection,"Misbehaviour: "+reason)) closeSilently(connection);
 	}
 
 	/**

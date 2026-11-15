@@ -316,6 +316,10 @@ public class TransactionHandler extends AThreadedComponent {
 			try {
 				if (!sd.checkSignature()) {
 					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
+					// A signature that does not verify against its own key is provable misbehaviour.
+					// After the reply, for a local client that stays open; a remote one may be
+					// closed before the reply is written
+					server.getConnectionManager().handleMisbehaviour(m.getConnection(),"Bad transaction signature");
 					continue;
 				}
 				Result affordability=checkTransactionAffordability(

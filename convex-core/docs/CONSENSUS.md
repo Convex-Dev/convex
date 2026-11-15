@@ -188,9 +188,15 @@ state is at risk:
   for an invalid encoding, MISSING for missing data); any other failure is the
   peer's: LOAD for running out of memory, so a retry may succeed, LIMIT for a stack
   overflow, PEER otherwise. A transaction that has executed but whose result cannot
-  be produced gets PEER, so that it is not resubmitted. Only data that can cause a
-  failure, not running out of memory or a defect of the peer, counts against the
-  peer that sent it.
+  be produced gets PEER, so that it is not resubmitted. A failure caught while
+  handling a request is never held against its sender.
+- **Provable misbehaviour disconnects the sender.** A remote that sends data no
+  honest, correct implementation sends (a transaction, Order or challenge whose
+  signature does not verify, or DATA that breaks its required shape) is
+  disconnected; an Order with a bad signature is held against the connection that
+  sent it, not the key it names. Data that may be an honest mistake, such as
+  missing data or an unknown message type, is refused without a disconnect. A
+  local connection, the process's own client relaying for others, is never closed.
 - **The peer's own threads never end silently.** A failure that reaches the top of
   the loop of one of its components or of its connection manager drops that pass,
   and the thread carries on. Consensus state is held in immutable values, so the
