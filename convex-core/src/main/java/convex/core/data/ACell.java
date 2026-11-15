@@ -143,7 +143,54 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	public final Blob getEncoding() {
 		if (encoding!=null) return encoding;
-		encoding=createEncoding();
+		try {
+			encoding=createEncoding();
+		} catch (StackOverflowError e) {
+			// Encoding a branch hashes its children first, so a deep enough value
+			// overflows the stack: encode it children first with an explicit stack
+			return encodeIterative();
+		}
+		return encoding;
+	}
+
+	/**
+	 * Encodes this Cell, first encoding each Cell beneath it that its encoding needs,
+	 * children before parents, without recursion.
+	 *
+	 * @return Encoding of this Cell
+	 */
+	private Blob encodeIterative() {
+		// Each Cell is encoded by createEncoding, as on the recursive path, so the
+		// encodings are the same; only the order differs, and each Cell then finds its
+		// children already encoded and does not recurse into them
+		ArrayList<ACell> stack=new ArrayList<>();
+		stack.add(this);
+		while (!stack.isEmpty()) {
+			ACell cell=stack.removeLast();
+			if (cell==null) {
+				// A null marker means everything beneath the preceding Cell is encoded
+				cell=stack.removeLast();
+				if (cell.encoding==null) cell.encoding=cell.createEncoding();
+				continue;
+			}
+			if (cell.encoding!=null) continue;
+			stack.add(cell);
+			stack.add(null);
+			if (!cell.isCanonical()) {
+				// A non-canonical Cell encodes as its canonical form
+				stack.add(cell.getCanonical());
+				continue;
+			}
+			// Reverse push order preserves the recursive visitation order
+			for (int i=cell.getRefCount()-1; i>=0; i--) {
+				Ref<ACell> ref=cell.getRef(i);
+				// A soft Ref is left to createEncoding, as on the recursive path: it holds
+				// the hash a branch needs, and an embedded value is too small to recurse far
+				if (!ref.isDirect()) continue;
+				ACell child=ref.getValue();
+				if ((child!=null)&&(child.encoding==null)) stack.add(child);
+			}
+		}
 		return encoding;
 	}
 	
@@ -335,6 +382,24 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			return (result>limit)?0:result;
 		}
 		if (!isCanonical()) return getCanonical().getEncodingLength(limit);
+		try {
+			return measureEncodingLength(limit);
+		} catch (StackOverflowError e) {
+			// Measuring a child measures its own children first, so a deep enough value
+			// overflows the stack: encode it children first and use that length
+			int result=encodeIterative().size();
+			return (result>limit)?0:result;
+		}
+	}
+
+	/**
+	 * Measures the encoding length of this canonical Cell from its header and child
+	 * Refs, as {@link #getEncodingLength(int)} defines.
+	 *
+	 * @param limit Maximum encoding length of interest
+	 * @return Exact encoding length, or 0 if beyond limit
+	 */
+	private int measureEncodingLength(int limit) {
 		int length=calcHeaderLength();
 		if (length>limit) return 0;
 		int n=getRefCount();

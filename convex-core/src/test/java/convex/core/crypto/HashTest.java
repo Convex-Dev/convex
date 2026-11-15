@@ -139,4 +139,24 @@ public class HashTest {
 
 		assertEquals(0, h.compareTo(h.toFlatBlob()));
 	}
+
+	/**
+	 * A hash computed after an interrupted use of the thread's digest, which left input
+	 * in it, is still correct.
+	 */
+	@Test
+	void testHashAfterInterruptedDigest() {
+		byte[] bs = new byte[] { 1, 2, 3, 4, 5 };
+		Hash expected = Hashing.sha3(bs);
+
+		Hashing.getDigest().update(new byte[] { 9, 9, 9 });
+		assertEquals(expected, Blob.wrap(bs).getContentHash());
+
+		Hashing.getDigest().update(new byte[] { 9, 9, 9 });
+		assertEquals(expected, Hashing.sha3(bs));
+
+		byte[] expected256 = Hashing.sha256(bs).getBytes();
+		Hashing.getSHA256Digest().update(new byte[] { 9, 9, 9 });
+		assertEquals(Utils.toHexString(expected256), Hashing.sha256(bs).toHexString());
+	}
 }

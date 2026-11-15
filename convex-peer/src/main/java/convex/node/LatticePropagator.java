@@ -1388,8 +1388,8 @@ public class LatticePropagator implements Closeable {
 	 * Stores a pull reply's value locally. A complete reply is persisted directly. A
 	 * partial reply (root only, or root after DATA chunks) is completed by acquiring
 	 * from the peer: any cells the reply or its chunks staged in the store are found
-	 * there and not fetched again. Completeness is checked explicitly, since a store
-	 * may hold a partial value without throwing.
+	 * there and not fetched again. Completeness is checked first, so that a partial
+	 * reply is completed by acquiring rather than refused by persisting.
 	 *
 	 * <p>Either way the value ends persisted, never announced.</p>
 	 */

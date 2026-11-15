@@ -672,6 +672,8 @@ public class Peer {
 		java.util.ArrayList<Future<?>> futures = null;
 		for (long b = start; b < end; b++) {
 			AVector<SignedData<ATransaction>> transactions = RT.ensureCVM(blocks.get(b).getValue(),Block.class).getTransactions();
+			// A Block with more transactions than it may hold is invalid: none to check
+			if (transactions.count() > Constants.MAX_TRANSACTIONS_PER_BLOCK) continue;
 			int count = (int) transactions.count();
 			if (count == 0) continue;
 
@@ -707,7 +709,9 @@ public class Peer {
 	 */
 	private static void verifyChunk(AVector<SignedData<ATransaction>> txns, int from, int to) {
 		for (int i = from; i < to; i++) {
-			txns.get(i).checkSignature();
+			// An entry that is not a signed transaction makes the Block invalid when applied
+			ACell tx = txns.get(i);
+			if (tx instanceof SignedData<?> signed) signed.checkSignature();
 		}
 	}
 

@@ -1,6 +1,5 @@
 package convex.api;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -87,22 +86,28 @@ public class ConvexLocal extends AConvexConnected {
 		return acquire(hash, server.getStore());
 	}
 
+	/**
+	 * Acquires a value the peer has persisted, copying it into the given store if that
+	 * is not the peer's own. The future fails with {@link MissingDataException} if the
+	 * peer has not persisted the value.
+	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
 		ThreadUtils.runVirtual("local-acquire", ()-> {
-			AStore peerStore=server.getStore();
-			Ref<ACell> ref=peerStore.refForHash(hash);
-			if (ref==null) {
-				f.completeExceptionally(new MissingDataException(peerStore,hash));
-			} else {
-				try {
-					ref=store.storeTopRef(ref, Ref.PERSISTED, null);
-				} catch (IOException e) {
-					f.completeExceptionally(e);
-				}
-				f.complete((T) ref.getValue());
+			try {
+				AStore peerStore=server.getStore();
+				Ref<ACell> ref=peerStore.refForHash(hash);
+				// Persisted means held in full. Anything less, such as DATA staged from a
+				// connection, is refused before any write rather than completed or stored
+				if ((ref==null)||(ref.getStatus()<Ref.PERSISTED)) throw new MissingDataException(peerStore,hash);
+				ACell value=ref.getValue();
+				if (store!=peerStore) value=Cells.persist(value,store);
+				f.complete((T) value);
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Any failure fails this request, whose future must always complete
+				f.completeExceptionally(e);
 			}
 		});
 		return f;

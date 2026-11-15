@@ -24,6 +24,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 
@@ -112,38 +113,72 @@ public class BeliefMerge {
 		// Iterate over each Peer's ordering conveyed in this Belief
 		long bcount=bOrders.count();
 		for (long i=0; i<bcount; i++) {
-			MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
-			ABlob key=be.getKey();
-			
-			if (!isValidPeer(key)) continue;
-			
-			SignedData<Order> b=be.getValue();
-			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
-			Order bc = RT.ensureCVM(b.getValue(),Order.class);
-			if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
-			
-			SignedData<Order> a=result.get(key);
-			if (a == null) {
-				// This is a new order to us, so include if valid
-				result=result.assocEntry(be); 
-				continue;
-			}
-			
-			if (a.equals(b)) continue; // PERF: fast path for no changes
+			try {
+				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
+				ABlob key=be.getKey();
 
-			Order ac = RT.ensureCVM(a.getValue(),Order.class);
+				if (!isValidPeer(key)) continue;
 
-			boolean shouldReplace=compareOrders(ac,bc);
-			if (shouldReplace) {
-				result=result.assocEntry(be);
-				continue;
+				SignedData<Order> b=be.getValue();
+				if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
+				Order bc = RT.ensureCVM(b.getValue(),Order.class);
+				if (bc == null) continue; // a signed value that is not an Order
+				if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
+
+				SignedData<Order> a=result.get(key);
+				if (b.equals(a)) continue; // PERF: fast path for no changes
+				if (!hasReadableBlocks(bc)) continue; // an Order the merge cannot read
+
+				if (a == null) {
+					// This is a new order to us, so include if valid
+					result=result.assocEntry(be);
+					continue;
+				}
+
+				Order ac = RT.ensureCVM(a.getValue(),Order.class);
+
+				boolean shouldReplace=compareOrders(ac,bc);
+				if (shouldReplace) {
+					result=result.assocEntry(be);
+					continue;
+				}
+			} catch (MissingDataException e) {
+				// Missing data is the caller's to fetch, as before
+				throw e;
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Any other failure processing a received Order: ignore that Order, as for
+				// any other the merge does not adopt
 			}
 		}
 		return result;
 	}
 	
 	/**
-	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for 
+	 * Checks that the merge can read an Order's Blocks: they are a vector, and each Block
+	 * beyond those it shares with this peer's Order is a signed Block whose transactions
+	 * are a vector.
+	 *
+	 * @param order Order to check
+	 * @return true if the merge can read the Order's Blocks, false otherwise
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	private boolean hasReadableBlocks(Order order) {
+		if (!(order.values().get(Order.IX_BLOCKS) instanceof AVector blocks)) return false;
+		// The merge reads Blocks only from this peer's consensus point on, and Blocks
+		// shared with this peer's Order were read when that Order took them
+		Order myOrder=getMyOrder();
+		long start=(myOrder==null)?0:blocks.commonPrefixLength(myOrder.getBlocks());
+		long n=blocks.count();
+		for (long i=start; i<n; i++) {
+			if (!(blocks.get(i) instanceof SignedData signed)) return false;
+			Block block=RT.ensureCVM(signed.getValue(),Block.class);
+			if ((block==null)||(block.getTransactions()==null)) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for
 	 * minimum effective stake.
 	 * 
 	 * @param key Peer Key to test

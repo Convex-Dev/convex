@@ -376,6 +376,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			// Shouldn't happen if Beliefs are already validated
 			// e.printStackTrace();
 			throw new Error("Invalid data in belief merge!", e);
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Merging the received Orders failed: drop them and keep this peer's Belief
+			log.warn("Belief merge failed, received Orders dropped",e);
+			return false;
 		}
 	}
 	
@@ -430,7 +434,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
-				} catch (Exception e) {
+				} catch (Exception | StackOverflowError | OutOfMemoryError e) {
 					log.warn("Unable to stage peer DATA message",e);
 					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
 				}
@@ -467,8 +471,8 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (BadFormatException e1) {
 				log.debug("Malformed Belief message");
 			}
-		} catch (ClassCastException e) {
-			// Bad message from Peer
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Any other failure processing the message: reject the whole message
 			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
 		}
 		return false;
@@ -480,8 +484,8 @@ public class BeliefPropagator extends AThreadedComponent {
 			return mergeBeliefValue(orders,acquired,null);
 		} catch (MissingDataException e) {
 			log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
-		} catch (ClassCastException e) {
-			log.warn("Malformed locally acquired Belief: {}",Utils.getClassName(e));
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			log.warn("Unable to merge locally acquired Belief: {}",Utils.getClassName(e));
 		}
 		return false;
 	}
@@ -499,8 +503,8 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefReceivedCount++;
 		Collection<SignedData<Order>> incoming=Belief.extractOrders(value);
 		for (SignedData<Order> so: incoming) {
-			AccountKey key=so.getAccountKey();
 			try {
+				AccountKey key=so.getAccountKey();
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
 				// The merge ignores Orders from unstaked keys, which anyone can make:
@@ -534,9 +538,24 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Any other failure processing this Order: reject it and carry on with the rest
+				rejectOrder(source,"Unusable Order: "+Utils.getClassName(e));
 			}
 		}
 		return changed;
+	}
+
+	/**
+	 * Rejects one received Order, alerting the connection it arrived on, or logging if
+	 * it came from a locally acquired Belief.
+	 */
+	private void rejectOrder(Message source, String reason) {
+		if (source!=null) {
+			server.getConnectionManager().alertBadMessage(source,reason);
+		} else {
+			log.warn("{} in locally acquired Belief",reason);
+		}
 	}
 	
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
@@ -580,7 +599,9 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 					return null;
 				});
-		} catch (Exception e) {
+		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			// Any failure starting this update's fetch drops it, and must clear the flag
+			// or no later fetch could start
 			fetching.set(false);
 			log.debug("Unable to fetch missing update data",e);
 		}

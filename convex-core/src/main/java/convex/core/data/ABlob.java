@@ -147,6 +147,9 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @return The hash
 	 */
 	public final Hash computeHash(MessageDigest digest) {
+		// Digests are shared per thread: clear anything an interrupted use left behind,
+		// such as a stack overflow between update and digest
+		digest.reset();
 		updateDigest(digest);
 		return Hash.wrap(digest.digest());
 	}

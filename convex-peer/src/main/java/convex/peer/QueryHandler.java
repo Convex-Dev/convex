@@ -73,15 +73,25 @@ public class QueryHandler extends AThreadedComponent {
 		for (int i = 0; i < batch.size(); i++) {
 			Message m = batch.get(i);
 			MessageType type = m.getType();
-			switch (type) {
-			case QUERY:
-				handleQuery(m);
-				break;
-			case DATA_REQUEST:
-				handleDataRequest(m);
-				break;
-			default:
-				log.warn("Unexpected Message type on query queue: " + type);
+			// The one guard for every request this thread handles. Anyone can send
+			// queries, at a high rate, so a request that fails in any way, including
+			// running out of memory or stack, is dropped here: it must never cost the
+			// other queued requests or end this thread. A failed query also closes its
+			// connection.
+			try {
+				switch (type) {
+				case QUERY:
+					handleQuery(m);
+					break;
+				case DATA_REQUEST:
+					handleDataRequest(m);
+					break;
+				default:
+					log.warn("Unexpected Message type on query queue: " + type);
+				}
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				log.debug("Dropped {} request: {}", type, e.toString());
+				if (type == MessageType.QUERY) m.closeConnection();
 			}
 		}
 		batch.clear(); // release references
@@ -92,54 +102,38 @@ public class QueryHandler extends AThreadedComponent {
 	 * missing data we do not hold are ignored.
 	 *
 	 * @param m
-	 * @throws BadFormatException
+	 * @throws BadFormatException If the request is badly formatted
 	 */
-	protected void handleDataRequest(Message m)  {
+	protected void handleDataRequest(Message m) throws BadFormatException {
 		// payload for a missing data request should be a valid Hash
-		try {
-			Message response=m.makeDataResponse(server.getStore());
-			boolean sent = m.returnMessage(response);
-			if (!sent) {
-				log.debug("Dropped data request response for connection {}", m.getConnection());
-			} else {
-				// log.info("Missing data request handled. Load = "+LoadMonitor.getLoad());
-			}
-		} catch (BadFormatException e) {
-			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
-		} catch (Exception e) {
-			log.warn("Unable to deliver missing data due to exception:", e);
+		Message response=m.makeDataResponse(server.getStore());
+		boolean sent = m.returnMessage(response);
+		if (!sent) {
+			log.debug("Dropped data request response for connection {}", m.getConnection());
 		}
 	}
-	
+
 	private void handleQuery(Message m) {
-		try {
-			// query is a vector [id , form, address?]
-			AVector<ACell> v= m.getPayload();
-			ACell id = v.get(1);
-			ACell form = v.get(2);
-	
-			// extract the Address, might be null
-			Address address = RT.ensureAddress(v.get(3));
-	
-			log.debug( "Processing query: {} with address: {}" , form, address);
-			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
-			// address);
-			
-			// Return result
-			ResultContext resultContext = server.getPeer().executeQuery(form, address);
-			Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
-			
-			// Report result back to message sender
-			boolean resultReturned= m.returnResult(result);
+		// query is a vector [id , form, address?]
+		AVector<ACell> v= m.getPayload();
+		ACell id = v.get(1);
+		ACell form = v.get(2);
 
-			if (!resultReturned) {
-				log.debug("Dropped query result {} for connection {}", id, m.getConnection());
-			}
-		} catch (Exception e) {
-			log.debug("Terminated client: "+e.getMessage());
-			m.closeConnection();
+		// extract the Address, might be null
+		Address address = RT.ensureAddress(v.get(3));
+
+		log.debug( "Processing query: {} with address: {}" , form, address);
+
+		// Return result
+		ResultContext resultContext = server.getPeer().executeQuery(form, address);
+		Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
+
+		// Report result back to message sender
+		boolean resultReturned= m.returnResult(result);
+
+		if (!resultReturned) {
+			log.debug("Dropped query result {} for connection {}", id, m.getConnection());
 		}
-
 	}
 
 	@Override

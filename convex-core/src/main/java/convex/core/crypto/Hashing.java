@@ -35,6 +35,7 @@ public class Hashing {
 	 */
 	public static Hash sha3(byte[] data) {
 		MessageDigest md = getSHA3Digest();
+		md.reset(); // shared per thread: clear anything an interrupted use left behind
 		byte[] hash = md.digest(data);
 		return Hash.wrap(hash);
 	}
@@ -90,6 +91,7 @@ public class Hashing {
 	 */
 	public static Hash sha256(byte[] data) {
 		MessageDigest md = getSHA256Digest();
+		md.reset(); // shared per thread: clear anything an interrupted use left behind
 		byte[] hash = md.digest(data);
 		return Hash.wrap(hash);
 	}
