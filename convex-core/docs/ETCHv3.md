@@ -231,7 +231,10 @@ durability boundary:
 The body is forced before the new header can become valid, so a completely written
 new header that reaches storage early is still safe to select. A failed body force,
 header write or header force is reported to the caller and the in-memory active
-generation advances only after the final force succeeds. After later unsynchronised
+generation advances only after the final force succeeds. A copy written but not
+forced may still reach storage, so after a commit fails past its header write the
+next mutation first publishes `OPEN` over that copy, and the next `sync` or `close`
+commits even if nothing changed. After later unsynchronised
 writes begin, a crash may preserve any mixture of them; exact rollback to the last
 generation is not guaranteed, because in-place index pages can be written back by the
 operating system before `sync`.

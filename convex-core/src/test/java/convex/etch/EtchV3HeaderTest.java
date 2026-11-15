@@ -13,8 +13,11 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.util.Utils;
 
@@ -225,6 +228,69 @@ public class EtchV3HeaderTest {
 	}
 
 	@Test
+	public void testSyncCutOffAfterHeaderWritePublishesOpenBeforeNextMutation() throws Exception {
+		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
+		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
+		EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,false,salt,null);
+		Etch etch=new Etch(mapper,"memory-sync-cut-off",header,null,null,false);
+		try {
+			header.initialise(etch);
+			Blob first=Blob.wrap(sequence(1,40));
+			etch.write(first.getHash(),first.getRef());
+
+			// The clean copy is written but its force is cut off: unforced, it may
+			// still reach storage
+			mapper.failNextRangeForce(new OutOfMemoryError("Simulated"));
+			assertThrows(OutOfMemoryError.class,etch::flush);
+			long cleanCopyEnd=etch.getDataLength();
+
+			Blob second=Blob.wrap(sequence(2,40));
+			etch.write(second.getHash(),second.getRef());
+			assertTrue(etch.getDataLength()>cleanCopyEnd);
+
+			// A crash now must not reopen as clean with the earlier file end
+			assertEquals(EtchConstants.V3_OPEN,selectFromMapper(mapper).closeState());
+
+			etch.flush();
+			EtchV3Header synced=selectFromMapper(mapper);
+			assertEquals(EtchConstants.V3_CLEAN_CLOSED,synced.closeState());
+			assertEquals(etch.getDataLength(),synced.syncedFileEnd());
+		} finally {
+			etch.close();
+		}
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans= {false,true})
+	public void testOpenCommitCutOffAfterHeaderWriteIsCommittedAgain(boolean closing) throws Exception {
+		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
+		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
+		Etch etch=new Etch(mapper,"memory-open-cut-off",null,null);
+		try {
+			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
+					false,salt,null);
+			header.initialise(etch);
+			header.sync(etch);
+
+			// The OPEN copy is written but its force is cut off, before any mutation
+			mapper.failNextRangeForce(new StackOverflowError("Simulated"));
+			assertThrows(StackOverflowError.class,()->header.prepareMutation(etch));
+
+			// Nothing changed, but the copy may reach storage: sync or close replaces it
+			if (closing) {
+				header.close(etch);
+			} else {
+				header.sync(etch);
+			}
+			EtchV3Header synced=selectFromMapper(mapper);
+			assertEquals(EtchConstants.V3_CLEAN_CLOSED,synced.closeState());
+			assertEquals(etch.getDataLength(),synced.syncedFileEnd());
+		} finally {
+			etch.close();
+		}
+	}
+
+	@Test
 	public void testRejectsAmbiguousEqualGenerationCopies() {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,false,salt,null);
@@ -347,6 +413,16 @@ public class EtchV3HeaderTest {
 		assertFalse(header.isIndexEncrypted());
 		assertTrue(header.fileSalt()[0]!=0);
 		assertEquals(publicKeyHint,header.publicKeyHint());
+	}
+
+	/** Selects the header that opening the mapper's current bytes would use. */
+	private static EtchV3Header selectFromMapper(InMemoryEtchFileMapper mapper) throws IOException {
+		return EtchV3Header.select(
+				mapper.copyRange(EtchConstants.V3_HEADER_A_OFFSET,
+						EtchConstants.V3_HEADER_A_OFFSET+EtchConstants.V3_HEADER_COPY_SIZE),
+				mapper.copyRange(EtchConstants.V3_HEADER_B_OFFSET,
+						EtchConstants.V3_HEADER_B_OFFSET+EtchConstants.V3_HEADER_COPY_SIZE),
+				null,"memory");
 	}
 
 	private static Hash hashSequence(int first) {
