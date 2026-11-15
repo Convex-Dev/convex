@@ -207,9 +207,11 @@ public class State extends ARecordGeneric {
 	 */
 	public BlockResult checkBlock(SignedData<Block> signedBlock) {
 		Block block=RT.ensureCVM(signedBlock.getValue(),Block.class);
+		// First: the key below means nothing until the signature verifies
+		if (!signedBlock.checkSignature()) return BlockResult.createInvalidBlock(this,block,Strings.BAD_SIGNATURE);
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=getPeer(peerKey);
-		
+
 		// If no current peer for this block, dump it
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
 		

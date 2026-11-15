@@ -38,7 +38,9 @@ Peers converge on one ordering of Blocks without leaders or rounds. Each peer
 keeps an **Order** (its view of the ordering plus its consensus points) inside a
 signed **Belief** it gossips. `BeliefMerge` combines the Orders of other peers
 with the peer's own, weighted by effective stake, and adopts the stake-weighted
-winner; repeated adoption of the majority view converges exponentially fast.
+winner, less any new Block after the winner's consensus point whose signature
+does not verify; repeated adoption of the majority view converges exponentially
+fast.
 
 Confirmation proceeds through `CPoSConstants.CONSENSUS_LEVELS` levels. Level 0
 is the raw Block vector; each higher level records the longest prefix agreed by
@@ -122,7 +124,8 @@ attributable liveness wedge under attack: legitimate Blocks behind the offending
 one wait until the horizon passes it.
 
 **Stage (ii), ordering hygiene (liveness).** `filterBlocks` calls
-`demoteFutureBlocks` on the winning order before consensus is computed, stably
+`demoteFutureBlocks` on the winning order, after leaving out badly signed
+Blocks and before consensus is computed, stably
 moving out-of-window Blocks to the back of the unconfirmed tail. It is a stable
 partition, not a timestamp sort: sorting by claimed timestamp would let a peer
 back-date within the 15-minute window to jump ahead of others. In-horizon Blocks
@@ -153,6 +156,10 @@ trust in a specific peer for submission is a separate, explicit choice.
   `MAX_BLOCK_BACKDATE` and per-peer timestamp monotonicity in `checkBlock`.
 - **Future-dated Orders.** Ignored in belief merge, so an attacker cannot make a
   Belief artificially newest.
+- **Blocks under another peer's key.** `checkBlock` makes a Block whose signature
+  does not verify invalid, and a peer takes no such Block into its Order after
+  the winning ordering's consensus point. One the network has already agreed is
+  taken, so the peer follows consensus and execution fails it.
 - **Stake-weight manipulation.** Advancement needs 2/3 of *effective* stake;
   decay removes the weight of inactive peers and sub-minimum peers cannot
   produce Blocks. Delegated stake adds weight but is withdrawable only by its

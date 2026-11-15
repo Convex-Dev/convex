@@ -1,6 +1,7 @@
 package convex.core.cpos;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -390,6 +391,106 @@ public class BeliefVotingTest {
 		assertEquals(6,merged.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
 		// Proposal may legitimately recede to the stake-supported prefix
 		assertEquals(7,merged.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_PROPOSAL));
+	}
+
+	/**
+	 * Two peers can win a position no other Order agrees on. A Block with a bad
+	 * signature there still never joins this peer's Order.
+	 */
+	@Test
+	public void testForgedBlockInWinningOrdering() throws InvalidDataException {
+		SignedData<Block> forged=forged(10,1,4);
+		assertNotTaken(forged,winningAtSecondPosition(forged));
+	}
+
+	/** A Block with a bad signature seen only in a losing Order is not appended to this peer's Order. */
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testForgedBlockOutsideWinningOrdering() throws InvalidDataException {
+		SignedData<Block> A=bl(0);
+		SignedData<Block> forged=forged(10,1,5);
+		SignedData<Order>[] orders=new SignedData[6];
+		for (int i=0; i<5; i++) orders[i]=or(i,TS,0,0,A);
+		orders[5]=or(5,TS,0,0,A,forged);
+		assertNotTaken(forged,orders);
+	}
+
+	/**
+	 * A Block with a bad signature that the rest of the network has agreed is taken, so
+	 * this peer follows consensus and execution fails the Block.
+	 */
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testForgedBlockAgreedByNetwork() throws InvalidDataException {
+		SignedData<Block> A=bl(0);
+		SignedData<Block> forged=forged(10,1,4);
+		SignedData<Order>[] orders=new SignedData[6];
+		orders[0]=or(0,TS,0,0,A);
+		for (int i=1; i<6; i++) orders[i]=or(i,TS,2,2,A,forged);
+		Order merged=BeliefMerge.create(Belief.create(orders),kps[0],TS+100,initialState).merge().getOrder(keys[0]);
+		assertTrue(merged.getBlocks().anyMatch(b->forged.equals(b)),"agreed Block not taken: "+merged.getBlocks());
+	}
+
+	/**
+	 * A merge checks only Blocks new to this peer's Order: none it already holds, and
+	 * none in consensus.
+	 */
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testMergeChecksOnlyNewBlocks() throws InvalidDataException {
+		int n=40;
+		SignedData<Block>[] held=new SignedData[n];
+		for (int i=0; i<n; i++) held[i]=unchecked(bl(200+i));
+		SignedData<Block> added=unchecked(bl(300));
+		SignedData<Block>[] extended=java.util.Arrays.copyOf(held,n+1);
+		extended[n]=added;
+
+		SignedData<Order>[] orders=new SignedData[6];
+		orders[0]=or(0,TS,n,n,held);
+		for (int i=1; i<6; i++) orders[i]=or(i,TS,n,n,extended);
+		Order merged=BeliefMerge.create(Belief.create(orders),kps[0],TS+100,initialState).merge().getOrder(keys[0]);
+
+		assertEquals(n+1,merged.getBlockCount());
+		assertTrue(added.isSignatureChecked(),"the new Block is checked");
+		for (int i=0; i<n; i++) {
+			assertFalse(held[i].isSignatureChecked(),"held Block "+i+" is not checked again");
+		}
+	}
+
+	/**
+	 * Orders in which the given Block wins the second position: two peers propose it,
+	 * and each other peer its own Block.
+	 */
+	@SuppressWarnings("unchecked")
+	private SignedData<Order>[] winningAtSecondPosition(SignedData<Block> winner) {
+		SignedData<Block> A=bl(0);
+		SignedData<Order>[] orders=new SignedData[6];
+		for (int i=0; i<4; i++) orders[i]=or(i,TS,0,0,A,bl(6+i));
+		for (int i=4; i<6; i++) orders[i]=or(i,TS,0,0,A,winner);
+		return orders;
+	}
+
+	/** Merges the Orders as peer 0, checking the bad Block is not taken but every good one is. */
+	private void assertNotTaken(SignedData<Block> bad, SignedData<Order>[] orders) throws InvalidDataException {
+		Order merged=BeliefMerge.create(Belief.create(orders),kps[0],TS+100,initialState).merge().getOrder(keys[0]);
+		AVector<SignedData<Block>> blocks=merged.getBlocks();
+		assertFalse(blocks.anyMatch(b->bad.equals(b)),"bad Block taken: "+blocks);
+		for (SignedData<Order> order: orders) {
+			for (SignedData<Block> b: order.getValue().getBlocks()) {
+				if (!bad.equals(b)) assertTrue(blocks.anyMatch(x->b.equals(x)),"good Block missing: "+blocks);
+			}
+		}
+	}
+
+	/** A Block at the given time claiming one peer's key, with another peer's signature */
+	private SignedData<Block> forged(int ts, int claimed, int signer) {
+		Block b=Block.of(ts,tr(ts));
+		return SignedData.create(keys[claimed],kps[signer].signData(b).getSignature(),b.getRef());
+	}
+
+	/** A copy of a signed Block whose signature nothing has checked yet */
+	private static SignedData<Block> unchecked(SignedData<Block> b) {
+		return SignedData.create(b.getAccountKey(),b.getSignature(),b.getValue().getRef());
 	}
 
 	@SuppressWarnings("unchecked")
