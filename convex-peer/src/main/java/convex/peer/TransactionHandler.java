@@ -170,8 +170,18 @@ public class TransactionHandler extends AThreadedComponent {
 
 	private final RequestFailureLog failures=new RequestFailureLog(log);
 
-	/** Separate from intake's log, so an observer's defect does not use up intake's one warning. */
+	/**
+	 * For both observers, apart from intake's log, so an observer's defect does not use
+	 * up intake's one warning.
+	 */
 	private final RequestFailureLog observerFailures=new RequestFailureLog(log);
+
+	private static final Result ERR_RESULT_UNAVAILABLE=Result.error(ErrorCodes.PEER,
+		Strings.intern("TX executed, but result not delivered")).withSource(SourceCodes.PEER);
+
+	/** Separate logs, so each site warns once of each kind of failure. */
+	private final RequestFailureLog resultFailures=new RequestFailureLog(log);
+	private final RequestFailureLog deliveryFailures=new RequestFailureLog(log);
 
 	private static final Result ERR_BLOCK_FAILED=Result.error(ErrorCodes.PEER, Strings.intern("Block production failed")).withSource(SourceCodes.PEER);
 
@@ -432,10 +442,16 @@ public class TransactionHandler extends AThreadedComponent {
 			try {
 				res=br.getResults().get(j);
 				extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
-				extInfo.put(Keywords.TX,t.getHash());
+				extInfo.put(Keywords.TX,h);
 				res=res.withExtraInfo(extInfo);
-			} catch (Exception e) {
-				res=Result.error(ErrorCodes.FATAL, "Failed to produce result").withSource(SourceCodes.PEER);
+			} catch (Throwable e) {
+				// Guard for each client's result. The transaction has executed and its
+				// interest is gone, so the client gets an error rather than nothing.
+				Utils.checkRequestFailure(e);
+				resultFailures.log(e,"Failed to produce result for transaction {}",h);
+				// PEER even for running out of memory: LOAD would invite a retry of a
+				// transaction that has already executed
+				res=ERR_RESULT_UNAVAILABLE;
 			}
 			observeTransactionResponse(t,res);
 			recipients.add(m);
@@ -450,15 +466,16 @@ public class TransactionHandler extends AThreadedComponent {
 	 * client's connection is closed or its reader is not draining, which is normal
 	 * operation, or if the server is shedding load.
 	 */
-	private static void deliverResults(ArrayList<Message> recipients, ArrayList<Result> results) {
+	private void deliverResults(ArrayList<Message> recipients, ArrayList<Result> results) {
 		for (int i=0; i<recipients.size(); i++) {
 			Message m=recipients.get(i);
 			boolean reported;
 			try {
 				reported=m.returnResult(results.get(i));
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			} catch (Throwable e) {
 				// Guard for each result: one that cannot be sent costs no other client its result
-				log.warn("Failed to deliver transaction result for connection {}",m.getConnection(),e);
+				Utils.checkRequestFailure(e);
+				deliveryFailures.log(e,"Failed to deliver transaction result for connection {}",m.getConnection());
 				continue;
 			}
 			if (!reported && log.isDebugEnabled()) {
@@ -479,7 +496,14 @@ public class TransactionHandler extends AThreadedComponent {
 	private void observeTransactionResponse(SignedData<ATransaction> sd, Result r) {
 		BiConsumer<SignedData<ATransaction>,Result> observer=this.responseObserver;
 		if (observer!=null) {
-			observer.accept(sd,r);
+			try {
+				observer.accept(sd,r);
+			} catch (Throwable e) {
+				// Runs on the CVM executor's thread: the observer's failure must cost
+				// neither this client's result nor the peer
+				Utils.checkRequestFailure(e);
+				observerFailures.log(e,"Transaction response observer failed");
+			}
 		}
 	}
 	

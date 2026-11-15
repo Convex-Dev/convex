@@ -2,6 +2,7 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,6 +24,7 @@ import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
@@ -67,6 +69,8 @@ public class PeerRequestFailureTest {
 	static final class ReplyConnection extends AConnection {
 		final Error error;
 		final ConcurrentHashMap<ACell,Result> results=new ConcurrentHashMap<>();
+		/** Every result received, in order, for waiting on one sent from another thread. */
+		final LinkedBlockingQueue<Result> received=new LinkedBlockingQueue<>();
 		volatile boolean closed;
 
 		ReplyConnection(Error error) {
@@ -86,6 +90,7 @@ public class PeerRequestFailureTest {
 			if (msg.getType()==MessageType.RESULT) {
 				Result r=msg.toResult();
 				results.put(r.getID(),r);
+				received.add(r);
 			}
 			return true;
 		}
@@ -312,6 +317,85 @@ public class PeerRequestFailureTest {
 				// would change the Order, and the next merge would then sign it first.
 				client.transact(tx);
 				assertEquals(tx,queued.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),failure.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A response observer that fails costs nothing else: each client still gets its
+	 * transaction's result, and the peer keeps running.
+	 */
+	@Test
+	public void aFailingResponseObserverCostsNothingElse() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+			long seq=1;
+			for (Throwable failure: FAILURES) {
+				peer.getTransactionHandler().setResponseObserver((sd,r) -> {
+					throw Utils.<RuntimeException>sneakyThrow(failure);
+				});
+				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,seq,"(+ 1 "+seq+")"));
+				Result r=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertEquals(CVMLong.create(1+seq),r.getValue(),failure+": "+r);
+				seq++;
+			}
+			assertTrue(peer.isRunning());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A result that cannot be produced, here because the Block's results have no entry
+	 * for the transaction, is answered as a peer error.
+	 */
+	@Test
+	public void aResultThatCannotBeProducedIsAPeerError() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			// Not started: this test thread runs it
+			TransactionHandler handler=new TransactionHandler(peer);
+			ReplyConnection client=new ReplyConnection(null);
+			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 2)"));
+			assertTrue(handler.offerTransaction(Message.createTransaction(1,tx).withConnection(client)));
+			handler.loop(); // registers the client's interest
+			Block block=Block.of(InvalidPeerDataTest.blockTime(peer),tx);
+			handler.reportTransactions(block,BlockResult.create(peer.getPeer().getConsensusState(),new Result[0]),0);
+			Result r=client.received.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			assertNotNull(r,"a result is sent");
+			assertEquals(ErrorCodes.PEER,r.getErrorCode(),r.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A result that cannot be sent costs no other client its result: the next client in
+	 * the same Block still gets its own.
+	 */
+	@Test
+	public void aResultThatCannotBeDeliveredLeavesTheOthers() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			SignedData<ATransaction> a=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 2)"));
+			SignedData<ATransaction> b=LOCAL.signData(Invoke.create(ORIGIN,2,"(+ 2 3)"));
+			Block block=Block.of(InvalidPeerDataTest.blockTime(peer),a,b);
+			BlockResult br=BlockResult.create(peer.getPeer().getConsensusState(),
+				new Result[] {Result.value(CVMLong.create(3)),Result.value(CVMLong.create(5))});
+			for (Error error: CONTAINED) {
+				TransactionHandler handler=new TransactionHandler(peer);
+				ReplyConnection failing=new ReplyConnection(error);
+				ReplyConnection healthy=new ReplyConnection(null);
+				assertTrue(handler.offerTransaction(Message.createTransaction(1,a).withConnection(failing)));
+				assertTrue(handler.offerTransaction(Message.createTransaction(2,b).withConnection(healthy)));
+				handler.loop(); // registers both interests, sending nothing
+				handler.reportTransactions(block,br,0);
+				Result r=healthy.received.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertNotNull(r,error+": the healthy client gets its result");
+				assertEquals(CVMLong.create(5),r.getValue(),error.toString());
 			}
 		} finally {
 			peer.close();
