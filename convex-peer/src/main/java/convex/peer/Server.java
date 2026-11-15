@@ -745,7 +745,7 @@ public class Server implements Closeable {
 	 * Replies to a message if it can: a message type may have no return handler, or its
 	 * connection may have failed.
 	 */
-	private static boolean returnBestEffort(Message m, Result r) {
+	static boolean returnBestEffort(Message m, Result r) {
 		try {
 			return m.returnResult(r);
 		} catch (Throwable e) {

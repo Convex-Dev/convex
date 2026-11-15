@@ -58,6 +58,7 @@ import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
+import convex.core.lang.Reader;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -93,16 +94,23 @@ public class PeerRequestFailureTest {
 		new OutOfMemoryError("simulated"),new NoClassDefFoundError("simulated"),
 		new AssertionError("simulated"));
 
-	/** A client connection that records results, or throws a chosen Error on every reply. */
+	/** A client connection that records results, or throws a chosen Error on every reply or the first. */
 	static final class ReplyConnection extends AConnection {
 		final Error error;
+		final boolean once;
 		final ConcurrentHashMap<ACell,Result> results=new ConcurrentHashMap<>();
 		/** Every result received, in order, for waiting on one sent from another thread. */
 		final LinkedBlockingQueue<Result> received=new LinkedBlockingQueue<>();
 		volatile boolean closed;
+		volatile boolean failed;
 
 		ReplyConnection(Error error) {
+			this(error,false);
+		}
+
+		ReplyConnection(Error error, boolean once) {
 			this.error=error;
+			this.once=once;
 		}
 
 		Result result(long id) {
@@ -114,7 +122,10 @@ public class PeerRequestFailureTest {
 		}
 
 		@Override public boolean trySendMessage(Message msg) {
-			if (error!=null) throw error;
+			if ((error!=null)&&!(once&&failed)) {
+				failed=true;
+				throw error;
+			}
 			if (msg.getType()==MessageType.RESULT) {
 				Result r=msg.toResult();
 				// Only by ID: a reply to a message that could not be decoded has none
@@ -132,7 +143,8 @@ public class PeerRequestFailureTest {
 
 	/**
 	 * A query whose handling fails, here as its result is sent, fails alone: its
-	 * connection is closed and the next query in the same batch is answered.
+	 * connection is kept, as the failure proves nothing against the sender, and the next
+	 * query in the same batch is answered.
 	 */
 	@Test
 	public void aQueryThatFailsLeavesTheRestOfItsBatch() throws Exception {
@@ -147,8 +159,45 @@ public class PeerRequestFailureTest {
 				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",ORIGIN).withConnection(healthy)));
 				handler.loop();
 				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-				assertTrue(failing.isClosed(),error.toString());
+				assertFalse(failing.isClosed(),error.toString());
 			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A query whose handling fails is answered with the failure's code, and its connection is kept. */
+	@Test
+	public void aQueryThatFailsIsAnsweredAndKeepsItsConnection() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			for (Error error: CONTAINED) {
+				// Not started: this test thread runs it
+				QueryHandler handler=new QueryHandler(peer);
+				// Fails as the result is first sent, so the reply to the failure gets through
+				ReplyConnection flaky=new ReplyConnection(error,true);
+				assertTrue(handler.offerQuery(Message.createQuery(1,"(+ 1 2)",ORIGIN).withConnection(flaky)));
+				handler.loop();
+				assertEquals(failureCode(error),flaky.result(1).getErrorCode(),error.toString());
+				assertFalse(flaky.isClosed(),error.toString());
+			}
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A query without an address, which the protocol allows, is answered. */
+	@Test
+	public void aQueryWithoutAnAddressIsAnswered() throws Exception {
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		try {
+			// Not started: this test thread runs it
+			QueryHandler handler=new QueryHandler(peer);
+			ReplyConnection client=new ReplyConnection(null);
+			Message m=Message.create(MessageType.QUERY,Vectors.of(MessageTag.QUERY,CVMLong.create(1),Reader.read("(+ 1 2)")));
+			assertTrue(handler.offerQuery(m.withConnection(client)));
+			handler.loop();
+			assertEquals(CVMLong.create(3),client.result(1).getValue());
 		} finally {
 			peer.close();
 		}

@@ -7,12 +7,14 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
 import convex.core.SourceCodes;
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
@@ -81,8 +83,7 @@ public class QueryHandler extends AThreadedComponent {
 				// The one guard for every request this thread handles. Anyone can send
 				// queries, at a high rate, so a request that fails in any way is dropped
 				// here unless the JVM itself has failed: it must never cost the other
-				// queued requests or end this thread. A failed query also closes its
-				// connection.
+				// queued requests or end this thread.
 				try {
 					switch (type) {
 					case QUERY:
@@ -97,7 +98,8 @@ public class QueryHandler extends AThreadedComponent {
 				} catch (Throwable e) {
 					Utils.checkRequestFailure(e);
 					failures.log(e, "Dropped {} request", type);
-					if (type == MessageType.QUERY) m.closeConnection();
+					// A reply, never a disconnect: a failure caught here may be this peer's own
+					if (type == MessageType.QUERY) Server.returnBestEffort(m,RequestFailures.reply(e));
 				}
 			}
 		} finally {
@@ -123,13 +125,18 @@ public class QueryHandler extends AThreadedComponent {
 	}
 
 	private void handleQuery(Message m) {
-		// query is a vector [id , form, address?]
-		AVector<ACell> v= m.getPayload();
+		// query is a vector [:Q id form address?]
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v==null)||(v.count()<3)) {
+			// A shape a newer version might send, not provable misbehaviour: refused, not disconnected
+			m.returnResult(Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
+			return;
+		}
 		ACell id = v.get(1);
 		ACell form = v.get(2);
 
-		// extract the Address, might be null
-		Address address = RT.ensureAddress(v.get(3));
+		// The address is optional, and might be null
+		Address address = (v.count()>3)?RT.ensureAddress(v.get(3)):null;
 
 		log.debug( "Processing query: {} with address: {}" , form, address);
 
