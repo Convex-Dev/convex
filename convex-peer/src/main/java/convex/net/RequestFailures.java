@@ -9,9 +9,10 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.data.Strings;
-import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.util.Utils;
 
 /**
@@ -23,6 +24,7 @@ import convex.core.util.Utils;
  */
 public final class RequestFailures {
 	private static final Result ERR_FORMAT=Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT).withSource(SourceCodes.PEER);
+	private static final Result ERR_SIGNATURE=Result.error(ErrorCodes.SIGNATURE,Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER);
 	private static final Result ERR_MISSING=Result.error(ErrorCodes.MISSING,Strings.intern("Missing data")).withSource(SourceCodes.PEER);
 	private static final Result ERR_STACK=Result.error(ErrorCodes.LIMIT,Strings.intern("Request exceeded this peer's stack depth")).withSource(SourceCodes.PEER);
 	private static final Result ERR_PEER=Result.error(ErrorCodes.PEER,Strings.intern("Peer failed to process request")).withSource(SourceCodes.PEER);
@@ -59,17 +61,19 @@ public final class RequestFailures {
 	}
 
 	/**
-	 * Gives the reply to a request that failed. A typed failure keeps its meaning: an
-	 * invalid encoding is FORMAT, missing data MISSING, and a {@link ResultException}
-	 * its own result. Any other failure is this peer's: running out of memory is LOAD,
-	 * a stack overflow LIMIT, and anything else PEER.
+	 * Gives the reply to a request that failed. A typed failure keeps its meaning: a
+	 * signature that does not verify is SIGNATURE, any other invalid data FORMAT,
+	 * missing data MISSING, and a {@link ResultException} its own result. Any other
+	 * failure is this peer's: running out of memory is LOAD, a stack overflow LIMIT,
+	 * and anything else PEER.
 	 *
 	 * @param e Failure of the request
 	 * @return Error result to reply with
 	 */
 	public static Result reply(Throwable e) {
 		if (e instanceof ResultException re) return re.getResult();
-		if (e instanceof BadFormatException) return ERR_FORMAT;
+		if (e instanceof BadSignatureException) return ERR_SIGNATURE;
+		if (e instanceof ValidationException) return ERR_FORMAT;
 		if (e instanceof MissingDataException) return ERR_MISSING;
 		// The heap ran out, which may be this peer's load rather than the request: a retry may succeed
 		if (e instanceof OutOfMemoryError) return Result.SERVER_LOADED;

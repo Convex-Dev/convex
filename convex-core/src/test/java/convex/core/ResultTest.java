@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
@@ -28,7 +29,11 @@ import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
@@ -99,6 +104,14 @@ public class ResultTest {
 		// This should round trip efficiently
 		Result a=Result.error(Keywords.FOO, "Blah").withSource(SourceCodes.CLIENT);
 		assertSame(a,Result.fromException(new ResultException(a)));
+
+		// Invalid data keeps its meaning, with no stack trace
+		for (ValidationException e: List.of(new InvalidDataException("simulated",null),new MisbehaviourException("simulated"))) {
+			Result r=Result.fromException(e);
+			assertEquals(ErrorCodes.FORMAT,r.getErrorCode(),e.toString());
+			assertTrue(r.getInfo()==null || r.getInfo().get(Keywords.TRACE)==null,e.toString());
+		}
+		assertEquals(ErrorCodes.SIGNATURE,Result.fromException(new BadSignatureException("simulated",null)).getErrorCode());
 	}
 
 	@Test

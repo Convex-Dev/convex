@@ -18,6 +18,9 @@ import convex.core.Result;
 import convex.core.cvm.Keywords;
 import convex.core.data.Hash;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.store.MemoryStore;
@@ -81,6 +84,9 @@ public class RequestFailuresTest {
 	@Test
 	public void aTypedFailureKeepsItsMeaning() {
 		assertEquals(ErrorCodes.FORMAT,RequestFailures.reply(new BadFormatException("simulated")).getErrorCode());
+		assertEquals(ErrorCodes.FORMAT,RequestFailures.reply(new InvalidDataException("simulated",null)).getErrorCode());
+		assertEquals(ErrorCodes.FORMAT,RequestFailures.reply(new MisbehaviourException("simulated")).getErrorCode());
+		assertEquals(ErrorCodes.SIGNATURE,RequestFailures.reply(new BadSignatureException("simulated",null)).getErrorCode());
 		MissingDataException missing=new MissingDataException(new MemoryStore(),Hash.EMPTY_HASH);
 		assertEquals(ErrorCodes.MISSING,RequestFailures.reply(missing).getErrorCode());
 		Result own=Result.error(ErrorCodes.TRUST,"simulated");
