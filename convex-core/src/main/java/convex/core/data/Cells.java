@@ -198,7 +198,8 @@ public class Cells {
 	}
 	
 	/**
-	 * Persist a cell in the given store, with everything it refers to
+	 * Persist a cell in the given store, with everything it refers to. A store that
+	 * keeps nothing, such as NullStore, reports success.
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
@@ -225,11 +226,12 @@ public class Cells {
 	}
 	
 	/**
-	 * Persist a cell in the given store
-	 * @param a Cell to persist
-	 * @param store Store instance to persist in
-	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException in case of IO error during persistence
+	 * Store a cell in the given store. Only the cell itself is certain to be stored,
+	 * at STORED status; a store may also store cells it refers to.
+	 * @param a Cell to store
+	 * @param store Store instance to store in
+	 * @return Cell after storing (may be the same Cell if no change in cell hierarchy)
+	 * @throws IOException in case of IO error during storing
 	 */
 	public static <T extends ACell> T store(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
@@ -240,8 +242,9 @@ public class Cells {
 	/**
 	 * Announces a Cell, reporting as novelty any cells that have not been previously announced.
 	 * Should only be called in special circumstances, where novelty is registered for the first time
-	 * typically as part of a broadcast cycle.
-	 * 
+	 * typically as part of a broadcast cycle. A store that keeps nothing, such as NullStore,
+	 * reports success.
+	 *
 	 * @param a Cell to announce
 	 * @param noveltyHandler Handler for novelty values
 	 * @param store Store to announce in

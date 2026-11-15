@@ -412,19 +412,23 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	
 	
 	/**
-	 * Persists this Ref in the current store if not embedded and not already
-	 * persisted.
-	 * 
+	 * Persists this Ref's value in the given store, unless this Ref already has
+	 * PERSISTED status, which it may have from another store. The returned Ref has
+	 * the status the store achieved: a store that keeps part of an incomplete value,
+	 * as MemoryStore does, returns a lower status instead of throwing.
+	 * {@link Cells#persist(ACell, AStore)} fails in that case.
+	 *
 	 * This may convert the Ref from a direct reference to a soft reference.
-	 * 
+	 *
 	 * If the persisted Ref represents novelty, will trigger the specified novelty
-	 * handler 
-	 * 
+	 * handler
+	 *
 	 * @param noveltyHandler Novelty handler to call (may be null)
-	 * @return the persisted Ref 
+	 * @param store Store to persist in
+	 * @return the persisted Ref
 	 * @throws IOException in case of IO error during persistence
-	 * @throws MissingDataException If the Ref's value does not exist or has been
-	 *         garbage collected before being persisted 
+	 * @throws MissingDataException If part of the value is not available, from a
+	 *         store that does not keep values in part
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
@@ -434,13 +438,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Persists this Ref in the given store if not embedded and not already
-	 * persisted. Resulting status will be PERSISTED or higher.
-	 *
-	 * This may convert the Ref from a direct reference to a soft reference.
+	 * Persists this Ref's value in the given store with no novelty handler, as
+	 * {@link #persist(Consumer, AStore)} does.
 	 *
 	 * @param store Store to persist in
-	 * @throws MissingDataException if the Ref cannot be fully persisted.
+	 * @throws MissingDataException If part of the value is not available, from a
+	 *         store that does not keep values in part
 	 * @return the persisted Ref
 	 * @throws IOException in case of IO error during persistence
 	 */

@@ -182,6 +182,10 @@ public class MemoryStore extends AStore {
 		return (T) rootData;
 	}
 
+	/**
+	 * Sets the root data, held in memory. Unlike {@link AStore#setRootData}, this
+	 * does not persist the root's tree in this store.
+	 */
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) {
 		rootData=data;
