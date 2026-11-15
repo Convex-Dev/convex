@@ -19,6 +19,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Block;
@@ -421,6 +422,24 @@ public class PeerTest {
 
 		p = p.updateState();
 		assertEquals(Vectors.createLongs(0,0), p.getTransactionLocation(tx.getHash()));
+	}
+
+	/**
+	 * A lookup covers no more of a Block's entries than a Block may hold: in a Block
+	 * claiming more, which is invalid, an entry beyond that maximum is not found.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testLocateInOversizedBlock() throws InvalidDataException {
+		int max=Constants.MAX_TRANSACTIONS_PER_BLOCK;
+		ACell[] entries=new ACell[max+1];
+		for (int i=0; i<=max; i++) entries[i]=CVMLong.create(i);
+		Peer p=Peer.create(KP, GENESIS);
+		p = finalise(p, Block.create(p.getTimestamp(), (AVector)Vectors.create(entries)));
+
+		p = p.updateState();
+		assertEquals(Vectors.createLongs(0,max-1), p.getTransactionLocation(CVMLong.create(max-1).getHash()));
+		assertNull(p.getTransactionLocation(CVMLong.create(max).getHash()));
 	}
 
 	/**

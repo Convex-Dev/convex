@@ -41,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import convex.api.Convex;
+import convex.core.Constants;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.cvm.AccountStatus;
@@ -682,10 +683,13 @@ public class ExplorerAPI extends AWebSite {
 	// Transactions table for use in block
 	private DomContent makeTransactionsSection(SignedData<Block> sblock, long blockNum, Context ctx) {
 		AVector<SignedData<ATransaction>> transactions = sblock.getValue().getTransactions();
-		int txCount = transactions.size();
-		
+		long txCount = transactions.count();
+		// A Block claiming more than it may hold is invalid, and its claim can be
+		// billions of entries: list no more than a Block may hold
+		long shown = Math.min(txCount, Constants.MAX_TRANSACTIONS_PER_BLOCK);
+
 		ArrayList<DomContent[]> rows = new ArrayList<>();
-		for (long i = 0; i < txCount; i++) {
+		for (long i = 0; i < shown; i++) {
 			String txLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+i);
 			SignedData<ATransaction> strans=transactions.get(i);
 			
