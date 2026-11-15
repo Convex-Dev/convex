@@ -29,6 +29,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
@@ -518,6 +519,57 @@ public class MessageTest {
 		assertNull(Message.verifyChallengeResponse(
 			Result.create(CVMLong.ONE,forged),token,challenger.getAccountKey(),context,
 			responder.getAccountKey()));
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test public void testBoundChallengeResponse() {
+		AKeyPair challenger=AKeyPair.generate();
+		AKeyPair responder=AKeyPair.generate();
+		AccountKey challengerKey=challenger.getAccountKey();
+		Hash token=Blob.createRandom(new Random(44),16).getHash();
+		Hash network=Blob.createRandom(new Random(45),32).getHash();
+		SignedData<ACell> challenge=Message.signChallenge(challenger,token,null,network);
+
+		Result bound=Message.answerBoundChallenge(responder,challenge,challengerKey);
+		assertEquals(responder.getAccountKey(),
+			Message.verifyBoundChallengeResponse(bound,token,challengerKey,network));
+		assertNull(Message.verifyChallengeResponse(bound,token,challengerKey,network,null),
+			"a bound answer is not a plain one");
+		assertNull(Message.verifyBoundChallengeResponse(bound,token,challengerKey,null),
+			"the context is bound into the answer");
+
+		Result plain=Message.answerChallenge(responder,challenge,null);
+		assertEquals(3,((AVector<?>)((SignedData<?>)plain.getValue()).getValue()).count());
+		assertNull(Message.verifyBoundChallengeResponse(plain,token,challengerKey,network),
+			"a plain answer is not a bound one");
+
+		Result otherPeer=Message.answerBoundChallenge(responder,challenge,
+			AKeyPair.generate().getAccountKey());
+		assertFalse(otherPeer.isError());
+		assertNull(Message.verifyBoundChallengeResponse(otherPeer,token,challengerKey,network),
+			"an answer naming another dialled peer is refused");
+
+		// A challenge without a context still gets four elements, with a nil context
+		SignedData<ACell> noContext=Message.signChallenge(challenger,token,null,null);
+		Result unscoped=Message.answerBoundChallenge(responder,noContext,challengerKey);
+		assertEquals(Vectors.of(token,challengerKey,null,challengerKey),
+			((SignedData<?>)unscoped.getValue()).getValue());
+		assertEquals(responder.getAccountKey(),
+			Message.verifyBoundChallengeResponse(unscoped,token,challengerKey,null));
+
+		assertTrue(Message.answerBoundChallenge(responder,challenge,null).isError());
+		assertTrue(Message.answerBoundChallenge(responder,
+			Message.signChallenge(challenger,token,AKeyPair.generate().getAccountKey(),network),
+			challengerKey).isError(),"the challenge must address the responder");
+		assertNull(Message.verifyBoundChallengeResponse(bound,
+			Blob.createRandom(new Random(46),16).getHash(),challengerKey,network),
+			"an answer cannot be replayed for another token");
+
+		SignedData<ACell> other=responder.signData(CVMLong.ONE);
+		SignedData<ACell> forged=SignedData.create(responder.getAccountKey(),other.getSignature(),
+			((SignedData<ACell>)bound.getValue()).getValueRef());
+		assertNull(Message.verifyBoundChallengeResponse(Result.create(CVMLong.ONE,forged),
+			token,challengerKey,network));
 	}
 
 	@Test public void testConnectionRequestIDsAreUniqueUnderConcurrency() {
