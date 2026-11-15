@@ -416,6 +416,22 @@ public class BeliefVotingTest {
 	}
 
 	/**
+	 * A Block with a bad signature already in this peer's Order after its consensus
+	 * point, as one taken before an upgrade would be, is dropped while the network has
+	 * not agreed it, even though half the stake still holds it.
+	 */
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testHeldForgedBlockIsDropped() throws InvalidDataException {
+		SignedData<Block> A=bl(0);
+		SignedData<Block> forged=forged(10,1,4);
+		SignedData<Order>[] orders=new SignedData[6];
+		for (int i=0; i<3; i++) orders[i]=or(i,TS,1,1,A,forged);
+		for (int i=3; i<6; i++) orders[i]=or(i,TS,1,1,A);
+		assertNotTaken(forged,orders);
+	}
+
+	/**
 	 * A Block with a bad signature that the rest of the network has agreed is taken, so
 	 * this peer follows consensus and execution fails the Block.
 	 */
@@ -432,12 +448,11 @@ public class BeliefVotingTest {
 	}
 
 	/**
-	 * A merge checks only Blocks new to this peer's Order: none it already holds, and
-	 * none in consensus.
+	 * A merge checks the Block after the consensus point, and none in consensus.
 	 */
 	@SuppressWarnings("unchecked")
 	@Test
-	public void testMergeChecksOnlyNewBlocks() throws InvalidDataException {
+	public void testMergeChecksNothingInConsensus() throws InvalidDataException {
 		int n=40;
 		SignedData<Block>[] held=new SignedData[n];
 		for (int i=0; i<n; i++) held[i]=unchecked(bl(200+i));
@@ -463,7 +478,7 @@ public class BeliefVotingTest {
 	 */
 	@SuppressWarnings("unchecked")
 	@Test
-	public void testLaggingMergeChecksOnlyNewBlocks() throws InvalidDataException {
+	public void testLaggingMergeChecksNothingAgreed() throws InvalidDataException {
 		int n=40;
 		SignedData<Block>[] network=new SignedData[n+1];
 		for (int i=0; i<n; i++) network[i]=unchecked(bl(400+i));

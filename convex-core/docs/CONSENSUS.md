@@ -38,9 +38,8 @@ Peers converge on one ordering of Blocks without leaders or rounds. Each peer
 keeps an **Order** (its view of the ordering plus its consensus points) inside a
 signed **Belief** it gossips. `BeliefMerge` combines the Orders of other peers
 with the peer's own, weighted by effective stake, and adopts the stake-weighted
-winner, less any new Block after the winner's consensus point whose signature
-does not verify; repeated adoption of the majority view converges exponentially
-fast.
+winner, less any Block after the consensus point whose signature does not
+verify; repeated adoption of the majority view converges exponentially fast.
 
 Confirmation proceeds through `CPoSConstants.CONSENSUS_LEVELS` levels. Level 0
 is the raw Block vector; each higher level records the longest prefix agreed by
@@ -157,9 +156,9 @@ trust in a specific peer for submission is a separate, explicit choice.
 - **Future-dated Orders.** Ignored in belief merge, so an attacker cannot make a
   Belief artificially newest.
 - **Blocks under another peer's key.** `checkBlock` makes a Block whose signature
-  does not verify invalid, and a peer takes no such Block into its Order after
-  the winning ordering's consensus point. One the network has already agreed is
-  taken, so the peer follows consensus and execution fails it.
+  does not verify invalid, and a peer keeps no such Block in its Order after the
+  consensus point. One the network has already agreed is taken, so the peer
+  follows consensus and execution fails it.
 - **Stake-weight manipulation.** Advancement needs 2/3 of *effective* stake;
   decay removes the weight of inactive peers and sub-minimum peers cannot
   produce Blocks. Delegated stake adds weight but is withdrawable only by its

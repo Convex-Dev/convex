@@ -258,9 +258,9 @@ public class BeliefMerge {
 		if (winningBlocks == null) return null; // if no voting stake on any order
 
 		// What the network has agreed, judged on the winning ordering as it stands, is taken
-		// as it is: this peer checks only the new Blocks after it
+		// as it is: this peer checks every Block after it and after its own consensus point
 		long agreed=updateConsensus(myOrder.withBlocks(winningBlocks),stakedOrders,totalStake).getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS);
-		long checkFrom=Math.max(agreed,winningBlocks.commonPrefixLength(myOrder.getBlocks()));
+		long checkFrom=Math.max(agreed,consensusPoint);
 		AVector<SignedData<Block>> myNewBlocks=filterBlocks(winningBlocks,checkFrom,consensusPoint);
 
 		// Take winning blocks into my Order
