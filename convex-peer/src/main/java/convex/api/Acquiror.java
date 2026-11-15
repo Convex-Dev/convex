@@ -28,6 +28,7 @@ import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
+import convex.net.RequestFailures;
 
 /**
  * One-shot, lifecycle-aware acquisition of a complete CAD3 value tree.
@@ -46,6 +47,7 @@ import convex.core.util.Utils;
 public final class Acquiror implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(Acquiror.class.getName());
+	private static final RequestFailures failures = new RequestFailures(log);
 
 	/** Transport hook for requesting an ordered batch of content hashes. */
 	@FunctionalInterface
@@ -163,14 +165,11 @@ public final class Acquiror implements AutoCloseable {
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause();
 			future.completeExceptionally((cause != null) ? cause : e);
-		} catch (StackOverflowError e) {
+		} catch (Throwable e) {
+			// Completed before anything can rethrow, so no failure leaves the caller waiting
 			future.completeExceptionally(e);
-		} catch (VirtualMachineError e) {
-			future.completeExceptionally(e);
-			throw e;
-		} catch (Exception e) {
-			log.warn("Acquisition failed for {}: {}", hash, e.getMessage());
-			future.completeExceptionally(e);
+			Utils.checkRequestFailure(e);
+			failures.log(e, "Acquisition of {} failed", hash);
 		} finally {
 			currentRequest = null;
 			termination.complete(null);

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CompletableFuture;
@@ -151,6 +152,20 @@ public class AcquirorTest {
 			MissingDataException missing = assertInstanceOf(MissingDataException.class, error.getCause());
 			assertEquals(expected.getHash(), missing.getMissingHash());
 			assertEquals(1, requests.get(), "retry policy belongs to the acquisition caller");
+		}
+	}
+
+	/** An Error from the source still fails the acquisition. */
+	@Test
+	public void testErrorFailsAcquisition() throws Exception {
+		Blob expected = Blobs.createRandom(400);
+		AssertionError defect = new AssertionError("defect in the source");
+		try (MemoryStore store = new MemoryStore();
+				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> { throw defect; })) {
+			CompletableFuture<ACell> acquired = acquiror.getFuture();
+			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+			assertTrue(acquired.isCompletedExceptionally());
+			assertSame(defect, assertThrows(ExecutionException.class, acquired::get).getCause());
 		}
 	}
 

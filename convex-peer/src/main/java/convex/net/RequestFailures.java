@@ -16,8 +16,8 @@ import convex.core.exceptions.ValidationException;
 import convex.core.util.Utils;
 
 /**
- * The failures of requests that one handling site contains: how each is logged, and
- * the reply to it. Running out of memory, and a failure that is probably a defect
+ * The failures of requests that one site contains: how each is logged, and the reply
+ * to it. Running out of memory, and a failure that is probably a defect
  * rather than bad input (an {@link Error} other than {@link StackOverflowError} or
  * {@link OutOfMemoryError}), are each logged at warn with the stack trace the first
  * time; anything else, and later ones, at debug.
