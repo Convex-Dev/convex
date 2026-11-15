@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -153,18 +154,20 @@ public class AcquirorTest {
 		}
 	}
 
-	/** A fetch that runs out of memory fails this acquisition alone, and its worker ends. */
+	/** A fetch that fails with an Error fails this acquisition alone, and its worker ends. */
 	@Test
-	public void testOutOfMemoryFailsOnlyThisAcquisition() throws Exception {
+	public void testErrorFailsOnlyThisAcquisition() throws Exception {
 		Blob expected = Blobs.createRandom(400);
-		try (MemoryStore store = new MemoryStore();
-				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> {
-					throw new OutOfMemoryError("simulated fetch");
-				})) {
-			ExecutionException error = org.junit.jupiter.api.Assertions.assertThrows(
-				ExecutionException.class, () -> acquiror.getFuture().get(5, TimeUnit.SECONDS));
-			assertInstanceOf(OutOfMemoryError.class, error.getCause());
-			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+		for (Error simulated : List.of(new OutOfMemoryError("simulated fetch"), new NoClassDefFoundError("simulated fetch"))) {
+			try (MemoryStore store = new MemoryStore();
+					Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> {
+						throw simulated;
+					})) {
+				ExecutionException error = org.junit.jupiter.api.Assertions.assertThrows(
+					ExecutionException.class, () -> acquiror.getFuture().get(5, TimeUnit.SECONDS));
+				assertSame(simulated, error.getCause());
+				assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+			}
 		}
 	}
 

@@ -159,14 +159,13 @@ public final class Acquiror implements AutoCloseable {
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause();
 			future.completeExceptionally((cause != null) ? cause : e);
-		} catch (StackOverflowError e) {
-			future.completeExceptionally(e);
-		} catch (VirtualMachineError e) {
-			future.completeExceptionally(e);
-			throw e;
 		} catch (Exception e) {
 			log.warn("Acquisition failed for {}: {}", hash, e.getMessage());
 			future.completeExceptionally(e);
+		} catch (Throwable e) {
+			// Fails this acquisition, even when the JVM itself has failed
+			future.completeExceptionally(e);
+			Utils.checkRequestFailure(e);
 		} finally {
 			currentRequest = null;
 			termination.complete(null);

@@ -190,9 +190,8 @@ public class NettyServer extends AServer {
 					 try {
 						 accepted.open(factory.apply(conn));
 					 } catch (Throwable e) {
-						 // Only this connection's setup held the stack or memory
-						 if (e instanceof VirtualMachineError
-								 && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
+						 // A failure setting up one connection refuses that connection alone
+						 Utils.checkRequestFailure(e);
 						 log.warn("Incoming connection handler failed",e);
 						 if (!accepted.opened) accepted.open(null);
 						 conn.close();

@@ -20,6 +20,7 @@ import convex.core.data.ACell;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.util.Utils;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.net.PeerConnectionException;
@@ -545,14 +546,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ThrowingRunnable action) {
 		try {
 			action.run();
-		} catch (VirtualMachineError e) {
-			// Only this group's work held the stack or memory
-			if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
-			propagator.recordFailure(operation,e);
-			log.warn("Contained propagation-group {} during {}; isolated {}",
-				e.getClass().getSimpleName(),operation,propagator);
-			log.debug("Contained propagation-group error",e);
 		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			propagator.recordFailure(operation,e);
 			log.warn("Propagator group failed during {}; isolated {}: {}: {}",
 				operation,propagator,e.getClass().getSimpleName(),e.getMessage());
@@ -592,11 +587,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.warn("Rejected inbound lattice value of wrong type: {}",
 				(value==null) ? "null" : value.getClass().getSimpleName());
 			return false;
-		} catch (StackOverflowError e) {
-			log.warn("Rejected inbound lattice value after stack overflow");
-			return false;
-		} catch (Exception e) {
-			log.warn("Rejected inbound lattice value",e);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			log.warn("Rejected inbound lattice value after {}",e.getClass().getSimpleName());
+			log.debug("Inbound lattice value failure",e);
 			return false;
 		}
 	}

@@ -338,7 +338,8 @@ public class LatticePropagator implements Closeable {
 		}
 		try {
 			signal.complete(failure);
-		} catch (RuntimeException | StackOverflowError observerFailure) {
+		} catch (Throwable observerFailure) {
+			Utils.checkRequestFailure(observerFailure);
 			// Health observers are application policy too. Reporting degradation must
 			// not turn it into a NodeServer failure.
 			log.warn("Propagation failure observer failed",observerFailure);
@@ -794,12 +795,9 @@ public class LatticePropagator implements Closeable {
 			boolean matched;
 			try {
 				matched=condition.test(value);
-			} catch (VirtualMachineError e) {
-				// Only the caller's condition held the stack or memory: it fails that caller's wait
-				if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
-				future.completeExceptionally(e);
-				return;
 			} catch (Throwable e) {
+				// The caller's condition failed: that fails the caller's wait alone
+				Utils.checkRequestFailure(e);
 				future.completeExceptionally(e);
 				return;
 			}
@@ -1022,7 +1020,8 @@ public class LatticePropagator implements Closeable {
 		} catch (IOException e) {
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to drain propagation protocol endpoint cleanly",e);
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to stop propagation protocol endpoint cleanly",e);
 		}
@@ -1036,7 +1035,8 @@ public class LatticePropagator implements Closeable {
 	private void closeRoutes(long timeout) {
 		try {
 			connectionManager.close(timeout);
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			recordFailure("route shutdown",e);
 			log.warn("Unable to close propagation routes cleanly",e);
 		}
@@ -1109,21 +1109,16 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Background-thread wrapper around {@link #processSnapshot}. IOException
-	 * is logged rather than propagated — the background path is best-effort.
+	 * Publishes one value as {@link #processSnapshot} does, recording a failure as this
+	 * group's instead of throwing it, unless it is a failure of the JVM itself.
 	 */
 	private void processSnapshotSafe(ACell value) {
 		try {
 			processSnapshot(value);
-		} catch (VirtualMachineError e) {
-			// Only this publication held the stack or memory
-			if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
-			recordFailure("publication",e);
-			log.warn("Contained {} in propagator group",e.getClass().getSimpleName(),e);
 		} catch (Throwable e) {
-			// A broken filter, store cache or connection implementation belongs to
-			// this policy group. It must never terminate NodeServer publication or
-			// another propagator's worker.
+			// A failure publishing one value belongs to this policy group. It must never
+			// terminate NodeServer publication or another propagator's worker.
+			Utils.checkRequestFailure(e);
 			recordFailure("publication",e);
 			log.warn("Isolated propagation policy failure",e);
 		}

@@ -174,10 +174,11 @@ Propagation failures are isolated:
   timeout; and
 - `NodeServer.close()` still reaches `STOPPED` unless its own resource fails.
 
-Running out of memory or stack while handling one connection, one message or one
-group's publication fails that work alone, and is contained and logged. Other JVM
-failures remain process failures; one that stops a group's inbound processing is
-recorded as that group's failure, and the group then refuses inbound messages.
+A failure while handling one connection, one message or one group's publication,
+including running out of memory or stack, fails that work alone and is logged. Only
+a failure of the JVM itself (`InternalError`, `UnknownError`) is not contained there;
+one that stops a group's inbound processing is recorded as that group's failure, and
+the group then refuses inbound messages.
 
 ## Lifecycle
 

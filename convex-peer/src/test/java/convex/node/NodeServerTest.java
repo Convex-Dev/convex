@@ -490,26 +490,6 @@ public class NodeServerTest {
 		assertEquals(CVMLong.create(7), c.get());
 	}
 
-	/** A lattice whose merge throws an Error (e.g. simulating deep-recursion StackOverflowError). */
-	static final class ThrowingLattice extends ALattice<AInteger> {
-		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
-			throw new StackOverflowError("simulated deep-recursion merge");
-		}
-		@Override public AInteger zero() { return null; }
-		@Override public boolean checkForeign(AInteger value) { return true; }
-		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
-	}
-
-	/** A lattice modelling a fatal JVM failure rather than malformed recursion. */
-	static final class FatalThrowingLattice extends ALattice<AInteger> {
-		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
-			throw new OutOfMemoryError("simulated fatal merge failure");
-		}
-		@Override public AInteger zero() { return null; }
-		@Override public boolean checkForeign(AInteger value) { return true; }
-		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
-	}
-
 	@Test
 	public void testHostAndPropagationDefaultsAndOverrides() {
 		NodeConfig hostDefaults=NodeConfig.create();
@@ -620,18 +600,32 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * #561: StackOverflowError from a maliciously deep value is recoverable once its
-	 * stack unwinds, so the merge is rejected atomically without losing the dispatcher.
+	 * #561: a merge that fails, including by overflowing the stack on a maliciously
+	 * deep value or running out of memory, is rejected and leaves the cursor unchanged.
 	 */
 	@Test
-	public void testMergeStackOverflowRejectedNotPropagated() {
-		maxNodeServer = new TestNode<>(new ThrowingLattice(), store, NodeConfig.port(-1));
-		var c = maxNodeServer.getCursor();
-		c.set(CVMLong.create(5));
+	public void testFailedMergeRejected() throws IOException {
+		List<Error> errors=List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"),
+			new NoClassDefFoundError("simulated"));
+		for (Error error: errors) {
+			try (TestNode<AInteger> node=new TestNode<>(new PoisonedLattice(CVMLong.create(7),error),store,NodeConfig.port(-1))) {
+				var c=node.getCursor();
+				c.set(CVMLong.create(5));
+				assertFalse(node.mergeIncoming(CVMLong.create(7)),error.toString());
+				assertEquals(CVMLong.create(5),c.get(),error.toString());
+			}
+		}
+	}
 
-		assertFalse(maxNodeServer.mergeIncoming(CVMLong.create(7)),
-			"a recursive stack overflow must be caught and rejected");
-		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
+	/** A failure of the JVM itself in a merge is not contained, and leaves the cursor unchanged. */
+	@Test
+	public void testJvmFailureInMergePropagates() {
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(7),new InternalError("simulated")),
+			store,NodeConfig.port(-1));
+		var c=maxNodeServer.getCursor();
+		c.set(CVMLong.create(5));
+		assertThrows(InternalError.class,() -> maxNodeServer.mergeIncoming(CVMLong.create(7)));
+		assertEquals(CVMLong.create(5),c.get());
 	}
 
 	/** A lattice whose merge of one chosen value throws a chosen Error, and otherwise keeps the larger value. */
@@ -655,11 +649,11 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Running out of memory on one lattice message fails that message alone: its
-	 * connection is closed and later messages are still handled.
+	 * Running out of memory merging one lattice message rejects that message alone, as
+	 * any failed merge does, and later messages are still handled.
 	 */
 	@Test
-	public void testOutOfMemoryFailsOnlyItsMessage() throws Exception {
+	public void testOutOfMemoryInMergeRejectsOnlyItsMessage() throws Exception {
 		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new OutOfMemoryError("simulated")),
 			store,NodeConfig.port(-1));
 		LatticePropagator group=propagator(maxNodeServer);
@@ -669,9 +663,30 @@ public class NodeServerTest {
 
 		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),poisoned)));
 		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
+		assertTrue(poisoned.awaitResult(1).isError(),"the message whose merge ran out of memory is rejected");
 		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
-		assertTrue(poisoned.isClosed(),"the connection whose message ran out of memory is closed");
 		assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
+	}
+
+	/**
+	 * Running out of memory handling one lattice message outside the merge, here
+	 * returning its result, closes that message's connection alone: later messages are
+	 * still handled.
+	 */
+	@Test
+	public void testOutOfMemoryReplyingClosesOnlyItsConnection() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator group=propagator(maxNodeServer);
+		maxNodeServer.launch();
+		ScriptedPeer faulting=new ScriptedPeer();
+		faulting.onReply=new OutOfMemoryError("simulated");
+		ScriptedPeer honest=new ScriptedPeer();
+
+		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),faulting)));
+		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
+		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
+		assertNull(faulting.onReply,"replying ran out of memory");
+		assertTrue(faulting.isClosed(),"the connection whose reply ran out of memory is closed");
 	}
 
 	/** An Error that no message can be blamed for stops the group's inbound processing visibly. */
@@ -688,18 +703,6 @@ public class NodeServerTest {
 		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof InternalError);
 		assertNotNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),peer)),
 			"a group whose inbound processing stopped refuses further messages");
-	}
-
-	/** Fatal VM errors must reach the dispatcher's fail-closed boundary. */
-	@Test
-	public void testFatalMergeErrorPropagates() {
-		maxNodeServer = new TestNode<>(new FatalThrowingLattice(), store, NodeConfig.port(-1));
-		var c = maxNodeServer.getCursor();
-		c.set(CVMLong.create(5));
-
-		assertThrows(OutOfMemoryError.class,
-			() -> maxNodeServer.mergeIncoming(CVMLong.create(7)));
-		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted fatal merge");
 	}
 
 	/**
@@ -1622,6 +1625,8 @@ public class NodeServerTest {
 		final ConcurrentHashMap<ACell,CompletableFuture<Result>> results = new ConcurrentHashMap<>();
 		volatile boolean refuseSends = false;
 		volatile boolean closed = false;
+		/** Thrown once, by the next attempt to return a result. */
+		volatile Error onReply = null;
 
 		ScriptedPeer() {
 			this(AKeyPair.generate().getAccountKey());
@@ -1639,6 +1644,11 @@ public class NodeServerTest {
 
 		@Override public boolean trySendMessage(Message msg) {
 			if (msg.getType() == MessageType.RESULT) {
+				Error replying = onReply;
+				if (replying != null) {
+					onReply = null;
+					throw replying;
+				}
 				Result result = msg.toResult();
 				result(result.getID()).complete(result);
 			}

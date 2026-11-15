@@ -504,7 +504,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 		try {
 			if (handler!=null && handler.test(message)) recordNonMergeAccept(context.stats());
 			else recordMergeReject(context.connection(),context.stats());
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			recordMergeReject(context.connection(),context.stats());
 			propagator.recordFailure("application message handler",e);
 			log.warn("Propagation-group application handler failed",e);
@@ -594,7 +595,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 		if (listener==null) return;
 		try {
 			listener.onAccepted(connection,propagator,path,value,changed);
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			log.warn("Propagation-group inbound listener failed after an accepted merge",e);
 		}
 	}
@@ -774,17 +776,10 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private void dispatchSafely(Message message) {
 		try {
 			handle(message);
-		} catch (StackOverflowError e) {
-			log.warn("Rejected propagation message after stack overflow");
-			closeFaultingConnection(message);
-		} catch (OutOfMemoryError e) {
-			// Only this message's work held the memory, and it is released by here
-			log.warn("Rejected propagation message after running out of memory");
-			closeFaultingConnection(message);
-		} catch (VirtualMachineError e) {
-			throw e;
 		} catch (Error e) {
-			log.warn("Contained propagation endpoint Error",e);
+			Utils.checkRequestFailure(e);
+			log.warn("Rejected propagation message after {}",e.getClass().getSimpleName());
+			log.debug("Propagation message failure",e);
 			closeFaultingConnection(message);
 		}
 	}
@@ -985,7 +980,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 		for (AConnection connection:Set.copyOf(inboundConnections)) {
 			try {
 				connection.close();
-			} catch (RuntimeException | StackOverflowError e) {
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				failure=append(failure,new IOException("Unable to close propagation inbound connection",e));
 			} finally {
 				removeConnection(connection);

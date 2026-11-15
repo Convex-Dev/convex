@@ -17,6 +17,7 @@ import convex.core.Result;
 import convex.core.data.Strings;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
+import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.IncomingHandler;
 import convex.net.impl.netty.NettyServer;
@@ -135,7 +136,8 @@ public final class LatticeListener implements Closeable {
 		for (AConnection connection:connections) {
 			try {
 				connection.close();
-			} catch (RuntimeException | StackOverflowError e) {
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				propagator.recordFailure("listener unregistration",e);
 				log.warn("Unable to close unregistered group's inbound connection",e);
 			} finally {
@@ -253,11 +255,8 @@ public final class LatticeListener implements Closeable {
 				if (propagator==null) return reject(message,selection.rejection());
 				try {
 					target=propagator.accept(connection);
-				} catch (VirtualMachineError e) {
-					// Only this connection's work held the stack or memory
-					if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
-					return containFailure(connection,propagator,e);
 				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
 					// A group removed meanwhile turns connections away as it closes: no failure
 					if (!allowedPropagators.contains(propagator)) return reject(message,UNAVAILABLE_GROUP);
 					return containFailure(connection,propagator,e);
@@ -275,11 +274,8 @@ public final class LatticeListener implements Closeable {
 			}
 			try {
 				return target.handle(message);
-			} catch (VirtualMachineError e) {
-				// Only this message's work held the stack or memory
-				if (!(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) throw e;
-				return containFailure(connection,propagator,e);
 			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				return containFailure(connection,propagator,e);
 			}
 		}
@@ -296,10 +292,8 @@ public final class LatticeListener implements Closeable {
 		assignments.remove(connection,propagator);
 		try {
 			propagator.removeInboundConnection(connection);
-		} catch (VirtualMachineError cleanupFailure) {
-			if (!(cleanupFailure instanceof StackOverflowError)) throw cleanupFailure;
-			if (cleanupFailure!=failure) failure.addSuppressed(cleanupFailure);
 		} catch (Throwable cleanupFailure) {
+			Utils.checkRequestFailure(cleanupFailure);
 			if (cleanupFailure!=failure) failure.addSuppressed(cleanupFailure);
 		}
 		try {
@@ -346,25 +340,13 @@ public final class LatticeListener implements Closeable {
 				return new Selection(null,UNAVAILABLE_GROUP);
 			}
 			return new Selection(selected,null);
-		} catch (StackOverflowError e) {
-			log.warn("Inbound propagation policy overflowed for {}; connection denied",
-				connection.getRemoteAddress());
-			log.debug("Inbound propagation policy overflow",e);
-			return new Selection(null,"Inbound propagation policy exceeded its execution stack");
-		} catch (VirtualMachineError e) {
-			// Only this connection's selection held the memory
-			if (!(e instanceof OutOfMemoryError)) throw e;
-			return policyFailed(connection,e);
 		} catch (Throwable e) {
-			return policyFailed(connection,e);
+			Utils.checkRequestFailure(e);
+			log.warn("Inbound propagation policy failed for {}; connection denied: {}: {}",
+				connection.getRemoteAddress(),e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Inbound propagation policy failure",e);
+			return new Selection(null,"Inbound propagation policy failed");
 		}
-	}
-
-	private Selection policyFailed(AConnection connection,Throwable e) {
-		log.warn("Inbound propagation policy failed for {}; connection denied: {}: {}",
-			connection.getRemoteAddress(),e.getClass().getSimpleName(),e.getMessage());
-		log.debug("Inbound propagation policy failure",e);
-		return new Selection(null,"Inbound propagation policy failed");
 	}
 
 	/** Releases the assignment and delegates all connection cleanup to its owner. */
@@ -374,10 +356,8 @@ public final class LatticeListener implements Closeable {
 		if (propagator==null) return;
 		try {
 			propagator.removeInboundConnection(connection);
-		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
-			log.warn("Propagator group overflowed during connection cleanup",e);
 		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			log.warn("Propagator group failed during connection cleanup",e);
 		}
 	}
