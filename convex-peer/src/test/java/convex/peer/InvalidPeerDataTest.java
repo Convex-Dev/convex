@@ -1,8 +1,10 @@
 package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -10,7 +12,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -43,6 +47,7 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
@@ -466,6 +471,43 @@ public class InvalidPeerDataTest {
 			// From the network, so it takes the peer's query handler as the request did
 			Result ok=other.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS);
 			assertEquals(CVMLong.create(3),ok.getValue(),ok.toString());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A local client, as the REST API uses, acquires a value the peer holds in full
+	 * without storing it again, and is refused at once a value the peer holds only in
+	 * part, as DATA from any connection leaves it.
+	 */
+	@Test
+	public void acquiringAValueHeldInPart() throws Exception {
+		checkAcquireHeldInPart(new MemoryStore());
+		try (EtchStore store=EtchStore.createTemp()) {
+			checkAcquireHeldInPart(store);
+		}
+	}
+
+	private void checkAcquireHeldInPart(AStore store) throws Exception {
+		Server peer=launchPeer(store,LOCAL);
+		try {
+			Convex client=Convex.connect(peer);
+
+			// Held in full, at STORED above a persisted branch
+			Blob part=Blob.createRandom(new Random(1234),200);
+			Cells.persist(part,store);
+			AVector<ACell> whole=Vectors.of(part);
+			Cells.store(whole,store);
+			assertEquals(whole,client.acquire(whole.getHash()).get(WAIT,TimeUnit.SECONDS));
+			assertEquals(Ref.STORED,store.refForHash(whole.getHash()).getStatus());
+
+			// Held in part: its branch is in no store
+			Blob branch=Blob.createRandom(new Random(5678),200);
+			AVector<ACell> partial=Vectors.of(branch).updateRefs(r->Ref.forHash(r.getHash(),store).markEmbedded(false));
+			Cells.store(partial,store);
+			ExecutionException e=assertThrows(ExecutionException.class,()->client.acquire(partial.getHash()).get(WAIT,TimeUnit.SECONDS));
+			assertEquals(branch.getHash(),assertInstanceOf(MissingDataException.class,e.getCause()).getMissingHash());
 		} finally {
 			peer.close();
 		}
