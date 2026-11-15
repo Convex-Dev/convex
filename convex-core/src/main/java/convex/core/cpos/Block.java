@@ -162,7 +162,7 @@ public final class Block extends ARecordGeneric {
 	
 	@Override
 	public void validateStructure() throws InvalidDataException {
-		if (getTransactions()==null) throw new InvalidDataException("Transactions should be a vector",this);
+		if (!(values.get(IX_TRANSACTIONS) instanceof AVector)) throw new InvalidDataException("Transactions should be a vector",this);
 	}
 
 	@Override

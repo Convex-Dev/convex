@@ -2,9 +2,11 @@ package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Stream;
@@ -45,7 +47,8 @@ import convex.etch.EtchStore;
 
 /**
  * A store records a cell as persisted only once the cell has been checked against
- * each of its children (CAD048). These tests decode cells that are each correctly
+ * each of its children (<a href="https://docs.convex.world/docs/cad/stores">CAD048</a>).
+ * These tests decode cells that are each correctly
  * encoded but inconsistent with a child, as a peer could send them, and persist them.
  */
 public class StructureCheckTest {
@@ -81,11 +84,7 @@ public class StructureCheckTest {
 	@ParameterizedTest
 	@MethodSource("stores")
 	public void testVectorTreeWithEmbeddedChildren(AStore store) throws Exception {
-		// 256 elements claimed: sixteen embedded leaves, the last holding 15
-		StringBuilder sb=new StringBuilder("808200");
-		for (int i=0; i<15; i++) sb.append(smallLeaf(16));
-		sb.append(smallLeaf(15));
-		AVector<?> tree=store.decode(Blob.fromHex(sb.toString()));
+		AVector<?> tree=store.decode(Blob.fromHex("80"+badTreeBody()));
 		assertEquals(256,tree.count());
 		assertNotPersisted(tree,store);
 	}
@@ -132,7 +131,7 @@ public class StructureCheckTest {
 	}
 
 	/** Body of a vector tree claiming 256 elements, whose last embedded leaf holds 15 */
-	static String badTreeBody() {
+	public static String badTreeBody() {
 		StringBuilder sb=new StringBuilder("8200");
 		for (int i=0; i<15; i++) sb.append(smallLeaf(16));
 		return sb.append(smallLeaf(15)).toString();
@@ -350,63 +349,43 @@ public class StructureCheckTest {
 
 	@ParameterizedTest
 	@MethodSource("stores")
-	public void testMapTreeChildren(AStore store) throws Exception {
+	public void testHashTreeChildren(AStore store) throws Exception {
 		// Leaves of keys grouped by first digit, as a valid tree at shift 0 holds them
-		TreeMap<Integer,AHashMap<ACell,ACell>> leaves=new TreeMap<>();
+		TreeMap<Integer,AHashMap<ACell,ACell>> mapLeaves=new TreeMap<>();
+		TreeMap<Integer,ASet<ACell>> setLeaves=new TreeMap<>();
+		AHashMap<ACell,ACell> allMap=Maps.empty();
+		ASet<ACell> allSet=Sets.empty();
 		for (int i=1; i<=20; i++) {
 			CVMLong k=CVMLong.create(i);
-			leaves.merge(digit(k),Maps.of(k,k),(a,b)->a.merge(b));
+			mapLeaves.merge(digit(k),Maps.of(k,k),(a,b)->a.merge(b));
+			setLeaves.merge(digit(k),Sets.of(k),(a,b)->a.includeAll(b));
+			allMap=allMap.assoc(k,k);
+			allSet=allSet.conj(k);
 		}
-		TreeMap<Integer,String> children=new TreeMap<>();
-		for (Map.Entry<Integer,AHashMap<ACell,ACell>> e: leaves.entrySet()) children.put(e.getKey(),child(e.getValue(),store));
-		assertTrue(Cells.persist(store.decode(Blob.fromHex(hashTreeHex("82",20,children))),store).getRef().getStatus()>=Ref.PERSISTED);
+		// The lowest first digit, and a key whose first digit is higher
+		int low=mapLeaves.firstKey();
+		CVMLong high=CVMLong.create(100);
+		while (digit(high)<=low) high=CVMLong.create(high.longValue()+1);
 
-		// An empty child at an unused digit
-		int unused=0;
-		while (children.containsKey(unused)) unused++;
-		TreeMap<Integer,String> withEmpty=new TreeMap<>(children);
-		withEmpty.put(unused,"8200");
-		assertNotPersisted(store.decode(Blob.fromHex(hashTreeHex("82",20,withEmpty))),store);
+		for (String tag: new String[] {"82","83"}) {
+			boolean map=tag.equals("82");
+			TreeMap<Integer,String> children=new TreeMap<>();
+			for (int d: mapLeaves.keySet()) children.put(d,child(map?mapLeaves.get(d):setLeaves.get(d),store));
+			assertTrue(Cells.persist(store.decode(Blob.fromHex(hashTreeHex(tag,20,children))),store).getRef().getStatus()>=Ref.PERSISTED);
 
-		// A tree at shift 0 as a child of a tree at shift 0, with keys of every digit
-		AHashMap<ACell,ACell> inner=Maps.empty();
-		for (AHashMap<ACell,ACell> leaf: leaves.values()) inner=inner.merge(leaf);
-		int low=digit(inner.entryAt(0).getKey());
-		CVMLong k=CVMLong.create(100);
-		while (digit(k)<=low) k=CVMLong.create(k.longValue()+1);
-		TreeMap<Integer,String> nested=new TreeMap<>();
-		nested.put(low,child(inner,store));
-		nested.put(digit(k),child(Maps.of(k,k),store));
-		assertNotPersisted(store.decode(Blob.fromHex(hashTreeHex("82",21,nested))),store);
-	}
+			// An empty child at an unused digit
+			int unused=0;
+			while (children.containsKey(unused)) unused++;
+			TreeMap<Integer,String> withEmpty=new TreeMap<>(children);
+			withEmpty.put(unused,tag+"00");
+			assertNotPersisted(store.decode(Blob.fromHex(hashTreeHex(tag,20,withEmpty))),store);
 
-	@ParameterizedTest
-	@MethodSource("stores")
-	public void testSetTreeChildren(AStore store) throws Exception {
-		TreeMap<Integer,ASet<ACell>> leaves=new TreeMap<>();
-		for (int i=1; i<=20; i++) {
-			CVMLong v=CVMLong.create(i);
-			leaves.merge(digit(v),Sets.of(v),(a,b)->a.includeAll(b));
+			// A tree at shift 0 as a child of a tree at shift 0, with keys of every digit
+			TreeMap<Integer,String> nested=new TreeMap<>();
+			nested.put(low,child(map?allMap:allSet,store));
+			nested.put(digit(high),child(map?Maps.of(high,high):Sets.of(high),store));
+			assertNotPersisted(store.decode(Blob.fromHex(hashTreeHex(tag,21,nested))),store);
 		}
-		TreeMap<Integer,String> children=new TreeMap<>();
-		for (Map.Entry<Integer,ASet<ACell>> e: leaves.entrySet()) children.put(e.getKey(),child(e.getValue(),store));
-		assertTrue(Cells.persist(store.decode(Blob.fromHex(hashTreeHex("83",20,children))),store).getRef().getStatus()>=Ref.PERSISTED);
-
-		int unused=0;
-		while (children.containsKey(unused)) unused++;
-		TreeMap<Integer,String> withEmpty=new TreeMap<>(children);
-		withEmpty.put(unused,"8300");
-		assertNotPersisted(store.decode(Blob.fromHex(hashTreeHex("83",20,withEmpty))),store);
-
-		ASet<ACell> inner=Sets.empty();
-		for (ASet<ACell> leaf: leaves.values()) inner=inner.includeAll(leaf);
-		int low=digit(inner.get(0));
-		CVMLong v=CVMLong.create(100);
-		while (digit(v)<=low) v=CVMLong.create(v.longValue()+1);
-		TreeMap<Integer,String> nested=new TreeMap<>();
-		nested.put(low,child(inner,store));
-		nested.put(digit(v),child(Sets.of(v),store));
-		assertNotPersisted(store.decode(Blob.fromHex(hashTreeHex("83",21,nested))),store);
 	}
 
 	@ParameterizedTest
@@ -454,7 +433,9 @@ public class StructureCheckTest {
 	public void testCheckTreeVisitsSharedCellsOnce() {
 		ACell v=Vectors.of(1);
 		for (int i=0; i<64; i++) v=Vectors.of(v,v);
-		Cells.checkTree(v);
+		ACell shared=v;
+		// Visiting each of the 2^64 paths instead would never finish
+		assertTimeoutPreemptively(Duration.ofSeconds(10),() -> Cells.checkTree(shared));
 	}
 
 	/**

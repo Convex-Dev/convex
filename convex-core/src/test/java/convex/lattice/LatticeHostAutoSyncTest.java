@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -116,9 +117,16 @@ class LatticeHostAutoSyncTest {
 		try {
 			Throwable failure=sync.failure().toCompletableFuture().get(10,TimeUnit.SECONDS);
 			assertTrue(failure instanceof OutOfMemoryError,"a fatal failure is reported, not left silent");
-			assertEquals(1,attempts.get(),"a fatal failure stops the schedule");
-		} finally {
+			assertThrows(ExecutionException.class,() -> sync.schedule().get(10,TimeUnit.SECONDS),
+				"a fatal failure ends the schedule");
+			assertEquals(1,attempts.get());
 			assertThrows(OutOfMemoryError.class,sync::close,"closing runs the failing application sync once more");
+		} finally {
+			try {
+				sync.close();
+			} catch (OutOfMemoryError simulated) {
+				// The application sync's simulated failure, run once more as the sync closes
+			}
 		}
 	}
 

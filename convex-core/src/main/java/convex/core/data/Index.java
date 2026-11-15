@@ -1071,8 +1071,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				throw new InvalidDataException("Illegal Index child type: " + Utils.getClass(o), this);
 			Index<K, V> c = (Index<K, V>) o;
 
-			// An empty child has depth 0, so fails the depth check
 			long ccount=c.count();
+			// An empty child has depth 0, so fails the depth check
 			if (c.getDepth() <= getDepth()) {
 				throw new InvalidDataException("Child must have greater depth than parent", this);
 			}

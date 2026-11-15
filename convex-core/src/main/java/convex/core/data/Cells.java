@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.data.impl.DummyCell;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
@@ -207,6 +208,7 @@ public class Cells {
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If a cell persisted for the first time is inconsistent with a child
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
@@ -237,6 +239,7 @@ public class Cells {
 	 * @param store Store to announce in
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If a cell persisted for the first time is inconsistent with a child
 	 */
 	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
 		if (a==null) {
@@ -377,7 +380,8 @@ public class Cells {
 
 	/**
 	 * Checks a cell against each of its direct children, as structural correctness
-	 * requires (CAD003). The children themselves are not checked.
+	 * requires (<a href="https://docs.convex.world/docs/cad/encoding">CAD003</a>).
+	 * The children themselves are not checked.
 	 *
 	 * @param cell Cell to check, may be null
 	 * @throws InvalidStructureException If the cell is inconsistent with a child
@@ -396,8 +400,8 @@ public class Cells {
 
 	/**
 	 * Checks the structure of a value's whole tree, as persisting it would, without
-	 * storing anything: each cell against its direct children. A branch that its store
-	 * holds as persisted has been checked, and is not visited.
+	 * storing anything: each cell against its direct children. A branch referred to by
+	 * a reference into a store that holds it as persisted is not visited.
 	 *
 	 * @param value Value to check, may be null
 	 * @throws InvalidStructureException If a cell is inconsistent with a child
@@ -424,6 +428,41 @@ public class Cells {
 				ACell child=ref.getValue();
 				if (child!=null) stack.add(child);
 			}
+		}
+	}
+
+	/**
+	 * Checks the structure of a value received from outside this process, as
+	 * {@link #checkTree(ACell)} does.
+	 *
+	 * @param value Value to check, may be null
+	 * @throws BadFormatException If a cell is inconsistent with a child
+	 * @throws MissingDataException If a branch of the tree is not available
+	 */
+	public static void checkReceived(ACell value) throws BadFormatException {
+		try {
+			checkTree(value);
+		} catch (InvalidStructureException e) {
+			throw new BadFormatException("Invalid structure: "+e.getMessage(),e);
+		}
+	}
+
+	/**
+	 * Persists a value received from outside this process, as
+	 * {@link #persist(ACell, AStore)} does.
+	 *
+	 * @param <T> Type of value
+	 * @param value Value to persist
+	 * @param store Store to persist in
+	 * @return Value after persisting
+	 * @throws BadFormatException If a cell is inconsistent with a child
+	 * @throws IOException In case of IO error during persistence
+	 */
+	public static <T extends ACell> T persistReceived(T value, AStore store) throws BadFormatException, IOException {
+		try {
+			return persist(value,store);
+		} catch (InvalidStructureException e) {
+			throw new BadFormatException("Invalid structure: "+e.getMessage(),e);
 		}
 	}
 

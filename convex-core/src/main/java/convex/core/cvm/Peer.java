@@ -34,8 +34,8 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -351,18 +351,19 @@ public class Peer {
 	 * @param address Address to use for query execution, or {@code null} for the
 	 *        genesis address
 	 * @param maxJuice Maximum execution Juice, non-negative and capped at the transaction maximum
-	 * @return Query result context
+	 * @return Query result context, with a FORMAT error if the form's structure is invalid
 	 */
 	public ResultContext executeQuery(ACell form, Address address, long maxJuice) {
 		form=CVMEncoder.specialise(form);
 		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
 
-		// The query is received data this Peer does not keep: check it before use
+		// A query can come from any caller, and this Peer does not keep it: check its
+		// structure before use
 		try {
-			Cells.checkTree(form);
-		} catch (InvalidStructureException e) {
-			return ResultContext.error(state,ErrorCodes.FORMAT,"Invalid query structure: "+e.getMessage());
+			Cells.checkReceived(form);
+		} catch (BadFormatException e) {
+			return ResultContext.error(state,ErrorCodes.FORMAT,e.getMessage());
 		}
 
 		if (form instanceof ATransaction tx) {

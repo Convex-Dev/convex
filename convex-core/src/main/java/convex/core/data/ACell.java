@@ -49,11 +49,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	protected abstract void validateCell() throws InvalidDataException;
 	
 	/**
-	 * Validates the structure and invariants of this cell.
-	 * 
-	 * May visit child refs. Should complete in O(1) time.
-	 * 
-	 * @throws InvalidDataException  If the Cell is invalid
+	 * Checks this cell against each of its direct children, as structural correctness
+	 * requires. A store runs this check when it first persists the cell, so it reads
+	 * only this cell and its direct children, and checks no rule beyond structure.
+	 *
+	 * @throws InvalidDataException  If the cell is inconsistent with a direct child
 	 */
 	public void validateStructure() throws InvalidDataException {
 		// nothing by default

@@ -254,18 +254,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	private final long childSize() {
 		return 1L << (shift);
 	}
-	
-	/**
-	 * Get the child size in number of chunks for a specific child
-	 */
-	private static long childSize(long count, int i) {
-		long n=computeArraySize(count);
-		if ((i<0)||(i>=n)) throw new IndexOutOfBoundsException("Bad child: "+i);
-		int shift=computeShift(count);
-		long cs= 1L<<shift;
-		if (i<(n-1)) return cs;
-		return count-(n-1)*cs;
-	}
 
 	@Override
 	public boolean isFullyPacked() {

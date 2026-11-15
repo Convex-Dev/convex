@@ -13,6 +13,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 
 /**
@@ -41,6 +42,8 @@ public abstract class AStore implements Closeable {
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If status is PERSISTED or above, and a cell
+	 *         stored at that status for the first time is inconsistent with a child
 	 */
 	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
@@ -60,6 +63,8 @@ public abstract class AStore implements Closeable {
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If status is PERSISTED or above, and a cell
+	 *         stored at that status for the first time is inconsistent with a child
 	 */
 	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
