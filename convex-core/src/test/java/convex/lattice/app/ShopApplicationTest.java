@@ -1,5 +1,6 @@
 package convex.lattice.app;
 
+import static convex.lattice.app.ShopExample.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,139 +12,24 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.AKeyedRegions.RegionFactory;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
-import convex.lattice.MapComponent;
-import convex.lattice.Regions;
-import convex.lattice.TransactionalComponent;
-import convex.lattice.UnionSet;
-import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.app.ShopExample.Orders;
+import convex.lattice.app.ShopExample.Stock;
 import convex.lattice.cursor.Root;
 
 /**
- * A shop assembled from three regions that know nothing of the shop or of each
- * other: a library {@link UnionSet} catalogue, a stock of counts and an order book.
- * The shop's operations are transactions across its regions; each region still
- * transacts on its own, and how the order book is built, live or staged, is the
- * caller's choice, with no change to the shop.
- *
- * <p>In memory only: no store, persistence or network.</p>
+ * Transactions across independent regions plugged into one application, the
+ * {@link ShopExample}: the shop's operations span its regions, while each region
+ * still transacts on its own and its order book can be built live or staged with
+ * no change to the shop.
  */
 class ShopApplicationTest {
-	private static final Keyword CATALOGUE=Keyword.intern("catalogue");
-	private static final Keyword STOCK=Keyword.intern("stock");
-	private static final Keyword ORDERS=Keyword.intern("orders");
-
-	private static final Keyword TEA=Keyword.intern("tea");
-	private static final Keyword COFFEE=Keyword.intern("coffee");
-
-	/** Counts of items in stock. Concurrent changes to a count both apply. */
-	static final class Stock extends IndexComponent<Keyword,CVMLong>
-			implements TransactionalComponent<Index<Keyword,CVMLong>,Stock> {
-		Stock(AForkableCursor<Index<Keyword,CVMLong>> cursor) { super(cursor); }
-		@Override public Stock rebind(AForkableCursor<Index<Keyword,CVMLong>> cursor) { return new Stock(cursor); }
-
-		long count(Keyword item) { return count(get(),item); }
-
-		void restock(Keyword item,long quantity) {
-			cursor().updateAndGet(stock -> adjust(stock,item,quantity));
-		}
-
-		void take(Keyword item) {
-			cursor().updateAndGet(stock -> {
-				if (count(stock,item)<=0) throw new IllegalStateException("Out of stock: "+item);
-				return adjust(stock,item,-1);
-			});
-		}
-
-		/** Applies each side's change to every count, as a difference from the base. */
-		@Override protected Index<Keyword,CVMLong> mergePublication(Index<Keyword,CVMLong> base,Index<Keyword,CVMLong> own,Index<Keyword,CVMLong> other) {
-			Index<Keyword,CVMLong> merged=other;
-			for (Keyword item:own.keySet()) {
-				long change=count(own,item)-count(base,item);
-				if (change!=0) merged=adjust(merged,item,change);
-			}
-			return merged;
-		}
-
-		private static long count(Index<Keyword,CVMLong> stock,Keyword item) {
-			CVMLong n=(stock==null)?null:stock.get(item);
-			return (n==null)?0:n.longValue();
-		}
-
-		private static Index<Keyword,CVMLong> adjust(Index<Keyword,CVMLong> stock,Keyword item,long change) {
-			Index<Keyword,CVMLong> counts=(stock==null)?Index.none():stock;
-			return counts.assoc(item,CVMLong.create(count(counts,item)+change));
-		}
-	}
-
-	/** Orders by identifier. Identifiers are unique, so two books merge by taking every order. */
-	static final class Orders extends MapComponent<CVMLong,Keyword>
-			implements TransactionalComponent<AHashMap<CVMLong,Keyword>,Orders> {
-		Orders(AForkableCursor<AHashMap<CVMLong,Keyword>> cursor) { super(cursor); }
-		@Override public Orders rebind(AForkableCursor<AHashMap<CVMLong,Keyword>> cursor) { return new Orders(cursor); }
-		@Override public Orders fork() { return rebind(storage.fork()); }
-
-		void record(long id,Keyword item) { put(CVMLong.create(id),item); }
-
-		@Override protected AHashMap<CVMLong,Keyword> mergePublication(AHashMap<CVMLong,Keyword> own,AHashMap<CVMLong,Keyword> other) {
-			if (own==null) return other;
-			if (other==null) return own;
-			AHashMap<CVMLong,Keyword> merged=other;
-			for (var order:own.entrySet()) merged=merged.assoc(order.getKey(),order.getValue());
-			return merged;
-		}
-	}
-
-	/** An order book whose edits land in the shop at once. */
-	private static final RegionFactory<AHashMap<CVMLong,Keyword>,Orders> LIVE_ORDERS=Orders::new;
-
-	/** An order book that keeps its own edits until the shop syncs. */
-	private static final RegionFactory<AHashMap<CVMLong,Keyword>,Orders> STAGED_ORDERS=cursor -> new Orders(cursor).fork();
-
-	/** The application: three regions, and operations that span them. */
-	static final class Shop extends Regions implements TransactionalComponent<Index<Keyword,ACell>,Shop> {
-		Shop(AForkableCursor<Index<Keyword,ACell>> cursor,RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders) {
-			super(cursor);
-			create(CATALOGUE,(AForkableCursor<ASet<Keyword>> c) -> new UnionSet<>(c));
-			create(STOCK,(AForkableCursor<Index<Keyword,CVMLong>> c) -> new Stock(c));
-			create(ORDERS,orders);
-		}
-		private Shop(AForkableCursor<Index<Keyword,ACell>> cursor,Shop source) { super(cursor,source); }
-		@Override public Shop rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new Shop(cursor,this); }
-
-		UnionSet<Keyword> catalogue() { return registered(CATALOGUE); }
-		Stock stock() { return registered(STOCK); }
-		Orders orders() { return registered(ORDERS); }
-
-		/** Adds an item to the catalogue with its opening stock, both or neither. */
-		void list(Keyword item,long quantity) {
-			execute(shop -> {
-				shop.catalogue().add(item);
-				shop.stock().restock(item,quantity);
-			});
-		}
-
-		/** Takes one of a listed item from stock and records the order, both or neither. */
-		void order(long id,Keyword item) {
-			execute(shop -> {
-				if (!shop.catalogue().contains(item)) throw new IllegalArgumentException("Not in the catalogue: "+item);
-				shop.stock().take(item);
-				shop.orders().record(id,item);
-			});
-		}
-	}
-
-	private static Shop open(LatticeHost<Index<Keyword,ACell>> host,RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders) {
-		return host.addApplication(new Shop(host.cursor(),orders));
-	}
 
 	private static RegionFactory<AHashMap<CVMLong,Keyword>,Orders> orders(boolean staged) {
 		return staged?STAGED_ORDERS:LIVE_ORDERS;
@@ -255,7 +141,7 @@ class ShopApplicationTest {
 		assertEquals(stock(TEA,5),at(host,STOCK),"one plus five, less the order");
 	}
 
-	@Test void anExclusiveRestockLeavesTheOtherRegionsFree() throws InterruptedException {
+	@Test void anExclusiveRestockLeavesTheOtherRegionsFree() {
 		var host=LatticeHost.create();
 		var shop=open(host,LIVE_ORDERS);
 		shop.list(TEA,1);
@@ -286,7 +172,7 @@ class ShopApplicationTest {
 		assertEquals(Maps.of(CVMLong.ONE,TEA),at(host,ORDERS));
 	}
 
-	@Test void anExclusiveShopTransactionHoldsUpRegionWritesUntilItCommits() throws InterruptedException {
+	@Test void anExclusiveShopTransactionHoldsUpRegionWritesUntilItCommits() {
 		var host=LatticeHost.create();
 		var shop=open(host,LIVE_ORDERS);
 		shop.list(TEA,1);
@@ -299,6 +185,10 @@ class ShopApplicationTest {
 		});
 		join(restock.get());
 		assertEquals(stock(TEA,5),at(host,STOCK),"the order, then the restock on top");
+	}
+
+	@Test void theExampleRuns() {
+		ShopExample.main(new String[0]);
 	}
 
 	/** Waits until a thread is parked, as one waiting for a claim is, or has finished. */

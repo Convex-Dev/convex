@@ -35,7 +35,8 @@
  *       and path delivery; retries retain concurrent tasks without leaking draft edits.</li>
  *   <li>{@link convex.lattice.app.SharedRegionsTest}: separate staged regions share
  *       a host without publishing or overwriting one another's state.</li>
- *   <li>{@link convex.lattice.app.ShopApplicationTest}: an application built from
+ *   <li>{@link convex.lattice.app.ShopExample}, tested by
+ *       {@link convex.lattice.app.ShopApplicationTest}: an application built from
  *       independent regions, whose operations are transactions across them, while
  *       each region transacts on its own and is built live or staged at the caller's
  *       choice.</li>
