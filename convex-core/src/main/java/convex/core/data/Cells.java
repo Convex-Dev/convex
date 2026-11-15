@@ -4,11 +4,13 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.data.impl.DummyCell;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
@@ -196,16 +198,30 @@ public class Cells {
 	}
 	
 	/**
-	 * Persist a cell in the given store
+	 * Persist a cell in the given store, with everything it refers to
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
+	 * @throws MissingDataException if part of the cell is not available
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
 		Ref<T> sref=store.storeTopRef(ref, Ref.PERSISTED, null);
+		ensureStatus(sref,Ref.PERSISTED,store);
 		return sref.getValue();
+	}
+
+	/**
+	 * Throws MissingDataException if a Ref returned by a store is below the required
+	 * status, naming the first missing branch, or the Ref's own hash if none is found.
+	 */
+	private static void ensureStatus(Ref<?> sref, int status, AStore store) {
+		if (sref.getStatus()>=status) return;
+		HashSet<Hash> missing=new HashSet<>();
+		sref.findMissing(missing,1);
+		Hash h=missing.isEmpty()?sref.getHash():missing.iterator().next();
+		throw new MissingDataException(store,h);
 	}
 	
 	/**
@@ -231,12 +247,14 @@ public class Cells {
 	 * @param store Store to announce in
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
+	 * @throws MissingDataException if part of the cell is not available
 	 */
 	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
 		if (a==null) {
 			return null; // null is never "novelty"
 		};
 		Ref<T> ref=store.storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
+		ensureStatus(ref,Ref.ANNOUNCED,store);
 		return ref.getValue();
 	}
 

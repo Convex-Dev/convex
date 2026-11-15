@@ -27,7 +27,6 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.Index;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -526,17 +525,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					break;
 				}
 
-				Ref<SignedData<Order>> stored=server.getStore().storeTopRef(Ref.get(so),Ref.PERSISTED,null);
-				if (stored.getStatus()<Ref.PERSISTED) {
-					// A store can keep an Order without all of its parts, as an in-memory store does
-					if (source!=null) {
-						fetchMissing(source);
-					} else {
-						log.warn("Locally acquired Belief is incomplete");
-					}
-					continue;
-				}
-				so=stored.getValue();
+				so=Cells.persist(so,server.getStore());
 				observeOrderUpdate(so);
 				orders.put(key,so);
 				changed=true;

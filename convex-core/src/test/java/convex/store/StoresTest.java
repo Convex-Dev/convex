@@ -212,12 +212,21 @@ public class StoresTest {
 	@Test
 	public void testNullStoreStoreOps() throws IOException {
 		NullStore ns = NullStore.INSTANCE;
-		CVMLong val = CVMLong.create(42);
-		Ref<CVMLong> ref = val.getRef();
+		AString val = Samples.NON_EMBEDDED_STRING;
+		Ref<AString> ref = val.getRef();
 
-		// storeRef returns the ref unchanged
-		assertSame(ref, ns.storeRef(ref, Ref.STORED, null));
-		assertSame(ref, ns.storeTopRef(ref, Ref.STORED, null));
+		// Storing succeeds at the requested status, with the same value, and keeps nothing
+		for (int status: new int[] {Ref.STORED, Ref.PERSISTED, Ref.ANNOUNCED}) {
+			Ref<AString> stored = ns.storeRef(ref, status, null);
+			assertSame(val, stored.getValue());
+			assertTrue(stored.getStatus() >= status);
+			Ref<AString> top = ns.storeTopRef(ref, status, null);
+			assertSame(val, top.getValue());
+			assertTrue(top.getStatus() >= status);
+		}
+		assertSame(val, Cells.persist(val, ns));
+		assertSame(val, Cells.announce(val, null, ns));
+		assertNull(ns.refForHash(val.getHash()));
 	}
 
 	@Test

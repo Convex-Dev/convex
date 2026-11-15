@@ -12,7 +12,8 @@ import convex.core.data.Ref;
 /**
  * A store that never persists anything. Ref lookups always return null,
  * so any RefSoft created against this store will throw MissingDataException
- * on resolution.
+ * on resolution. Storing succeeds at any requested status, since keeping
+ * nothing is this store's contract.
  *
  * Useful for decoding messages where only embedded values (e.g. a Result ID)
  * are needed and the decoded cell can be discarded.
@@ -27,12 +28,12 @@ public class NullStore extends AStore {
 
 	@Override
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-		return ref;
+		return ref.withMinimumStatus(status);
 	}
 
 	@Override
 	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-		return ref;
+		return ref.withMinimumStatus(status);
 	}
 
 	@Override
