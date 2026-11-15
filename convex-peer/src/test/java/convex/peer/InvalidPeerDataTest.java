@@ -489,17 +489,34 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * A transaction whose processing runs the peer out of memory is rejected as
-	 * exceeding a resource limit, and later transactions are still processed.
+	 * A transaction whose intake runs the peer out of memory is rejected as the peer
+	 * being busy, and later transactions are still processed.
 	 */
 	@Test
 	public void aTransactionThatRunsThePeerOutOfMemory() throws Exception {
+		checkTransactionIntakeError(new OutOfMemoryError("Test: out of memory storing a transaction"),ErrorCodes.LOAD);
+	}
+
+	/**
+	 * A transaction whose intake overflows the peer's stack is rejected as exceeding a
+	 * limit, and later transactions are still processed.
+	 */
+	@Test
+	public void aTransactionThatOverflowsThePeerStack() throws Exception {
+		checkTransactionIntakeError(new StackOverflowError("Test: stack overflow storing a transaction"),ErrorCodes.LIMIT);
+	}
+
+	/**
+	 * Sends a transaction whose storing at intake throws the given error, and checks the
+	 * error code the client gets and that the next transaction runs.
+	 */
+	private void checkTransactionIntakeError(Error error, Keyword expectedCode) throws Exception {
 		SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
 		Hash failing=tx.getHash();
 		MemoryStore store=new MemoryStore() {
 			@Override
 			public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-				if (ref.getHash().equals(failing)) throw new OutOfMemoryError("Test: out of memory storing a transaction");
+				if (ref.getHash().equals(failing)) throw error;
 				return super.storeTopRef(ref,status,noveltyHandler);
 			}
 		};
@@ -507,7 +524,7 @@ public class InvalidPeerDataTest {
 		try {
 			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
 			Result failed=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
-			assertEquals(ErrorCodes.LIMIT,failed.getErrorCode(),failed.toString());
+			assertEquals(expectedCode,failed.getErrorCode(),failed.toString());
 
 			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 2 3)"));
 			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);

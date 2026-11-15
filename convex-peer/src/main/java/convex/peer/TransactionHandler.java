@@ -163,7 +163,7 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
-	private static final Result ERR_RESOURCES=Result.error(ErrorCodes.LIMIT, Strings.intern("Transaction exceeded peer resources")).withSource(SourceCodes.PEER);
+	private static final Result ERR_STACK=Result.error(ErrorCodes.LIMIT, Strings.intern("Transaction exceeded this peer's stack depth")).withSource(SourceCodes.PEER);
 	
 	private Result checkPeerState() {
 		try {
@@ -221,10 +221,13 @@ public class TransactionHandler extends AThreadedComponent {
 				// Guard for each received transaction, with the one in Phase 3: a payload
 				// that is not as it should be rejects only this transaction
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
-			} catch (StackOverflowError | OutOfMemoryError e) {
-				// Processing it ran this peer out of memory or stack: a resource limit,
-				// not a format error, and again only this transaction is rejected
-				m.returnResult(ERR_RESOURCES);
+			} catch (StackOverflowError e) {
+				// Too deep for this peer: the same transaction would fail again, so a limit
+				m.returnResult(ERR_STACK);
+			} catch (OutOfMemoryError e) {
+				// The peer's heap ran out, which may be its load rather than this
+				// transaction, so busy: a retry may succeed
+				m.returnResult(Result.SERVER_LOADED);
 			}
 		}
 
@@ -283,10 +286,14 @@ public class TransactionHandler extends AThreadedComponent {
 				// that is not as it should be rejects only this transaction
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
-			} catch (StackOverflowError | OutOfMemoryError e) {
-				// Processing it ran this peer out of memory or stack: a resource limit,
-				// not a format error, and again only this transaction is rejected
-				m.returnResult(ERR_RESOURCES);
+			} catch (StackOverflowError e) {
+				// Too deep for this peer: the same transaction would fail again, so a limit
+				m.returnResult(ERR_STACK);
+				continue;
+			} catch (OutOfMemoryError e) {
+				// The peer's heap ran out, which may be its load rather than this
+				// transaction, so busy: a retry may succeed
+				m.returnResult(Result.SERVER_LOADED);
 				continue;
 			}
 			if (!registerInterest(sd.getHash(), m)) continue;
