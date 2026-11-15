@@ -45,7 +45,9 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
@@ -201,6 +203,9 @@ public class TransactionHandler extends AThreadedComponent {
 	private void reject(Message m, Throwable e) {
 		failures.log(e,"Rejected transaction for connection {}",m.getConnection());
 		sendRejection(m,RequestFailures.reply(e));
+		// After the reply, for a local client that stays open; a remote one may be closed
+		// before it is written. Every validation failure here is in the client's own input
+		if (e instanceof ValidationException bad) server.getConnectionManager().handleBadInput(m.getConnection(),bad);
 	}
 
 	/**
@@ -314,14 +319,7 @@ public class TransactionHandler extends AThreadedComponent {
 			Message m=messages.get(i);
 			Hash h=null; // set once this message may have registered an interest
 			try {
-				if (!sd.checkSignature()) {
-					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
-					// A signature that does not verify against its own key is provable misbehaviour.
-					// After the reply, for a local client that stays open; a remote one may be
-					// closed before the reply is written
-					server.getConnectionManager().handleMisbehaviour(m.getConnection(),"Bad transaction signature");
-					continue;
-				}
+				if (!sd.checkSignature()) throw new BadSignatureException("Bad transaction signature",sd);
 				Result affordability=checkTransactionAffordability(
 					server.getPeer().getConsensusState(),sd.getValue());
 				if (affordability!=null) {

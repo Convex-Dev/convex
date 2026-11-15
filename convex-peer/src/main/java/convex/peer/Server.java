@@ -647,13 +647,11 @@ public class Server implements Closeable {
 		AVector<?> payload=RT.ensureVector(message.getPayload());
 		// Bounded by the inbound message length only: novelty has no cell-count limit
 		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
-			manager.handleMisbehaviour(message.getConnection(),"Invalid DATA message format");
 			throw new BadFormatException("Invalid DATA message format");
 		}
 		for (long i=1; i<payload.count(); i++) {
 			ACell cell=payload.get(i);
 			if (cell==null || cell.isEmbedded()) {
-				manager.handleMisbehaviour(message.getConnection(),"DATA message contains invalid cell");
 				throw new BadFormatException("DATA message contains invalid cell");
 			}
 			Cells.store(cell,store);

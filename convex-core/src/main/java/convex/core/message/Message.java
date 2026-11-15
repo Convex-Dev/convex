@@ -32,7 +32,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.PartialMessageException;
 import convex.core.lang.RT;
@@ -412,12 +412,12 @@ public class Message {
 	 * @return The verified remote AccountKey, or null if the response proves no key: an
 	 *         error, a reply of another shape, or one signed by a key other than the one expected
 	 * @throws BadSignatureException If the response's signature does not verify
-	 * @throws InvalidDataException If the response is validly signed for another challenge:
+	 * @throws MisbehaviourException If the response is validly signed for another challenge:
 	 *         its token, audience key or context differs
 	 */
 	@SuppressWarnings("unchecked")
 	public static AccountKey verifyChallengeResponse(Result result, Hash token, AccountKey ownKey, ACell contextID, AccountKey expectedKey)
-			throws BadSignatureException, InvalidDataException {
+			throws MisbehaviourException {
 		if (result == null || result.isError()) return null;
 		ACell rv = result.getValue();
 		if (!(rv instanceof SignedData)) return null;
@@ -436,7 +436,7 @@ public class Message {
 		if (!token.equals(values.get(0)) || !ownKey.equals(values.get(1))
 				|| (contextID != null && !Utils.equals(contextID, values.get(2)))) {
 			// An honest responder signs the challenge it was sent: this one signed another
-			throw new InvalidDataException("Challenge response answers another challenge", response);
+			throw new MisbehaviourException("Challenge response answers another challenge");
 		}
 		return remoteKey;
 	}

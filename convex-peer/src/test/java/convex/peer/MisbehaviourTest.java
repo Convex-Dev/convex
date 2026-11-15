@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
@@ -49,9 +51,9 @@ import convex.net.impl.netty.NettyServer;
 import convex.peer.PeerRequestFailureTest.ReplyConnection;
 
 /**
- * Tests that provable misbehaviour by a remote, such as a signature that does not
- * verify, closes its connection, while a local connection, the process's own client,
- * stays open.
+ * Tests that false input from a remote, such as a signature that does not verify,
+ * closes its connection, while malformed input keeps it, and a local connection, the
+ * process's own client, stays open.
  */
 public class MisbehaviourTest {
 	static final AKeyPair LOCAL=InvalidPeerDataTest.LOCAL;
@@ -247,15 +249,26 @@ public class MisbehaviourTest {
 		}
 	}
 
-	/** DATA that breaks its required shape, here by holding an embedded cell, is disconnected. */
+	/**
+	 * DATA that breaks its required shape, here by holding an embedded cell, is rejected
+	 * and its connection kept: malformed input may be an honest mistake.
+	 */
 	@Test
-	public void badlyShapedDataClosesItsConnection() throws Exception {
+	public void badlyShapedDataKeepsItsConnection() throws Exception {
 		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
 		try {
+			BeliefPropagator propagator=peer.getBeliefPropagator();
 			ReplyConnection remote=new ReplyConnection(null);
-			Message m=Message.create(MessageType.DATA,Vectors.of(MessageTag.DATA,CVMLong.ONE)).withConnection(remote);
-			assertThrows(BadFormatException.class,() -> peer.stageData(m));
-			assertTrue(remote.isClosed());
+			Message bad=Message.create(MessageType.DATA,Vectors.of(MessageTag.DATA,CVMLong.ONE)).withConnection(remote);
+			assertThrows(BadFormatException.class,() -> peer.stageData(bad));
+			// Staged after the bad one, in queue order: once it is, the bad one has been handled
+			Message good=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024).withConnection(remote);
+			CompletableFuture<Message> staged=new CompletableFuture<>();
+			propagator.setDataStageObserver(staged::complete);
+			assertTrue(propagator.queuePropagation(bad));
+			assertTrue(propagator.queuePropagation(good));
+			assertEquals(good,staged.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS));
+			assertFalse(remote.isClosed());
 		} finally {
 			peer.close();
 		}

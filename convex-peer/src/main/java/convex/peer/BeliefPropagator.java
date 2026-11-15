@@ -30,8 +30,10 @@ import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ValidationException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.BoundedMessageQueue;
@@ -539,13 +541,9 @@ public class BeliefPropagator extends AThreadedComponent {
 				}
 
 				if (!so.checkSignature()) {
-					if (source!=null) {
-						// The connection that sent it, not the key the Order names
-						server.getConnectionManager().handleMisbehaviour(source.getConnection(),"Bad Order signature");
-					} else {
-						// A polled Belief's peer is held to account where it was polled
-						log.debug("Bad Order signature in locally acquired Belief");
-					}
+					// Held against the connection that sent it, not the key the Order names. The
+					// rest of a Belief holding a false Order is not trusted either
+					rejectReceived(source,new BadSignatureException("Bad Order signature",so),"Bad Order");
 					break;
 				}
 
@@ -574,12 +572,15 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	/**
 	 * Rejects one received message or Order whose processing failed: it is dropped and
-	 * logged, with nothing held against its sender.
+	 * logged, and bad input goes to the connection manager to handle.
 	 */
 	private void rejectReceived(Message source, Throwable e, String reason) {
-		// Never a disconnect: a failure caught here may be this peer's own, and only an
-		// explicit check proves misbehaviour
 		receiveFailures.log(e,"{}: {}",reason,(source==null)?"polled Belief":source.getConnection());
+		// Every validation failure reaching here is in the received input itself. A polled
+		// Belief's peer is held to account where it was polled
+		if ((source!=null)&&(e instanceof ValidationException bad)) {
+			server.getConnectionManager().handleBadInput(source.getConnection(),bad);
+		}
 	}
 
 	/** Separate logs, so each site warns once of each kind of failure. */

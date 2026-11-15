@@ -47,7 +47,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
@@ -1187,7 +1187,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @return Future for the verified remote key, or null if the remote proves none. It
 	 *         fails with a {@link ValidationException} if the reply proves the remote
 	 *         misbehaved: {@link BadSignatureException} for a signature that does not
-	 *         verify, {@link InvalidDataException} for a validly signed answer to another challenge
+	 *         verify, {@link MisbehaviourException} for a validly signed answer to another challenge
 	 */
 	@SuppressWarnings("unchecked")
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {

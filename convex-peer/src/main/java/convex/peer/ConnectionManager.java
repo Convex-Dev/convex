@@ -36,6 +36,8 @@ import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
@@ -381,16 +383,12 @@ public class ConnectionManager extends AConnectionManager {
 				log.debug("Peer returned non-Belief value for advertised Belief hash {}",h);
 				return;
 			}
-			// Checked here, where the polled peer is known: an Order whose signature fails
-			// in the Belief it publishes is provable misbehaviour
+			// Checked here, where the polled peer is known
 			State state=server.getPeer().getConsensusState();
 			for (SignedData<Order> so: Belief.extractOrders(belief)) {
 				// Only the Orders the merge would check: unstaked keys it drops unchecked
 				if (!BeliefMerge.isValidPeer(state,so.getAccountKey())) continue;
-				if (!so.checkSignature()) {
-					handleMisbehaviour(peerKey,connection,"Bad Order signature in polled Belief");
-					return;
-				}
+				if (!so.checkSignature()) throw new BadSignatureException("Bad Order signature in polled Belief",so);
 			}
 			if (!server.queueBelief(belief)) {
 				log.debug("Discarding acquired Belief because the local queue filled during polling");
@@ -398,6 +396,9 @@ public class ConnectionManager extends AConnectionManager {
 		} catch (InterruptedException e) {
 			// Before the catch-all: an interrupt stops the manager, it is not a failed poll
 			throw e;
+		} catch (ValidationException e) {
+			// The polled peer's own input, and the poll's other steps throw none
+			handleBadInput(peerKey,connection,e);
 		} catch (Throwable e) {
 			Utils.checkRequestFailure(e);
 			// Failures while closing are expected
@@ -475,8 +476,8 @@ public class ConnectionManager extends AConnectionManager {
 			identity.whenComplete((peerKey, ex) -> {
 				pendingConnections.remove(convex);
 				Throwable cause=(ex!=null)?PeerConnectionException.unwrap(ex):null;
-				if (cause instanceof ValidationException) {
-					handleMisbehaviour(null,convex,"Bad challenge reply: "+cause.getMessage());
+				if (cause instanceof MisbehaviourException misbehaviour) {
+					handleBadInput(null,convex,misbehaviour);
 					result.completeExceptionally(new PeerRefusedException("Peer at "+hostAddress+" failed identity challenge",cause));
 					return;
 				}
@@ -527,7 +528,7 @@ public class ConnectionManager extends AConnectionManager {
 			return fallbackIdentify(convex);
 		}).exceptionallyCompose(ex -> {
 			// A reply that proves misbehaviour is never overridden by the remote's own status
-			if (PeerConnectionException.unwrap(ex) instanceof ValidationException) return CompletableFuture.failedFuture(ex);
+			if (PeerConnectionException.unwrap(ex) instanceof MisbehaviourException) return CompletableFuture.failedFuture(ex);
 			log.debug("Peer verification not available at {}: {}", convex.getHostAddress(), ex.getMessage());
 			return fallbackIdentify(convex);
 		});
@@ -561,48 +562,59 @@ public class ConnectionManager extends AConnectionManager {
 			Hash h = RT.ensureHash(ctx);
 			return (h == null) || h.equals(networkID);
 		});
-		// A challenge whose signature does not verify is provable misbehaviour. After the
-		// reply, for a local client that stays open; a remote one may be closed first
+		// After the reply, for a local client that stays open; a remote one may be closed first
 		AVector<ACell> v=RT.ensureVector(m.getPayload());
 		if ((v!=null)&&(v.count()==3)&&(v.get(2) instanceof SignedData<?> challenge)&&!challenge.checkSignature()) {
-			handleMisbehaviour(m.getConnection(),"Bad challenge signature");
+			handleBadInput(m.getConnection(),new BadSignatureException("Bad challenge signature",challenge));
 		}
 	}
 
-	// ========== Misbehaviour ==========
+	// ========== Bad input ==========
 
 	/**
-	 * Handles provable misbehaviour by the remote end of a connection: data that no
-	 * honest, correct implementation sends, such as a signature that does not verify.
-	 * Every such case comes here, so that the response is decided in one place. For
-	 * now the connection is closed, unless it is local.
+	 * Handles bad input that the remote end of a connection sent, given the failure that
+	 * rejected it. False input, a {@link MisbehaviourException}, closes the connection
+	 * unless it is local; malformed input keeps it.
 	 *
-	 * @param connection Connection whose remote end misbehaved
-	 * @param reason What it did
+	 * @param connection Connection the input came on
+	 * @param failure Failure that rejected the input
 	 */
-	public void handleMisbehaviour(AConnection connection, String reason) {
+	public void handleBadInput(AConnection connection, ValidationException failure) {
 		if (connection==null) return;
+		if (!disconnects(failure)) {
+			log.debug("Rejected malformed input from {}: {}",connection.getRemoteAddress(),failure.getMessage());
+			return;
+		}
 		// A local connection is this process's own client, such as the REST API, relaying
 		// for others it must handle itself
 		if (connection instanceof LocalConnection) {
-			log.debug("Misbehaviour on a local connection, kept open: {}",reason);
+			log.debug("Misbehaviour on a local connection, kept open: {}",failure.getMessage());
 			return;
 		}
-		log.debug("Closing connection to {} after misbehaviour: {}",connection.getRemoteAddress(),reason);
+		log.debug("Closing connection to {} after misbehaviour: {}",connection.getRemoteAddress(),failure.getMessage());
 		connection.close();
 	}
 
 	/**
-	 * Handles provable misbehaviour by a peer this peer connected to, as
-	 * {@link #handleMisbehaviour(AConnection, String)} does for any connection.
+	 * Handles bad input from a peer this peer connected to, as
+	 * {@link #handleBadInput(AConnection, ValidationException)} does for any connection.
 	 *
 	 * @param peerKey Key the peer was connected under, or null if it was not yet connected
 	 * @param connection Connection to the peer
-	 * @param reason What it did
+	 * @param failure Failure that rejected the input
 	 */
-	void handleMisbehaviour(AccountKey peerKey, Convex connection, String reason) {
+	void handleBadInput(AccountKey peerKey, Convex connection, ValidationException failure) {
+		if (!disconnects(failure)) {
+			log.debug("Rejected malformed input from peer {}: {}",peerKey,failure.getMessage());
+			return;
+		}
 		// Closed even if no longer mapped to its key: the misbehaving connection must go
-		if (!closeConnection(peerKey,connection,"Misbehaviour: "+reason)) closeSilently(connection);
+		if (!closeConnection(peerKey,connection,"Misbehaviour: "+failure.getMessage())) closeSilently(connection);
+	}
+
+	/** This peer's policy: whether bad input closes the connection it came on. */
+	private static boolean disconnects(ValidationException failure) {
+		return failure instanceof MisbehaviourException;
 	}
 
 	/**

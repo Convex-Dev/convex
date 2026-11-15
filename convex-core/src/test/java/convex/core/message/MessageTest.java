@@ -41,7 +41,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.MemoryStore;
@@ -500,13 +500,13 @@ public class MessageTest {
 		assertEquals(responder.getAccountKey(),Message.verifyChallengeResponse(
 			Result.create(CVMLong.ONE,valid),token,challenger.getAccountKey(),context,
 			responder.getAccountKey()));
-		assertThrows(InvalidDataException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+		assertThrows(MisbehaviourException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			Blob.createRandom(new Random(43),16).getHash(),challenger.getAccountKey(),context,
 			responder.getAccountKey()),"a response cannot be replayed for another nonce");
-		assertThrows(InvalidDataException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+		assertThrows(MisbehaviourException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			token,AKeyPair.generate().getAccountKey(),context,responder.getAccountKey()),
 			"the challenger key is the response audience");
-		assertThrows(InvalidDataException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+		assertThrows(MisbehaviourException.class,() -> Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
 			token,challenger.getAccountKey(),Strings.create("other-context"),
 			responder.getAccountKey()),"the protocol context is bound into the response");
 		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
