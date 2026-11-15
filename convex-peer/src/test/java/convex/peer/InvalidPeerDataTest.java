@@ -32,9 +32,11 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -122,16 +124,25 @@ public class InvalidPeerDataTest {
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	static void checkGoodOrderMergesBeside(Server peer, ACell unusable) throws Exception {
-		BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 		SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
-		Belief received=Belief.create(good,(SignedData)unusable);
+		checkGoodOrderMerges(peer,good,Belief.create(good,(SignedData)unusable));
+	}
 
+	/**
+	 * Sends a Belief holding B's good Order, and checks that the peer merges the good
+	 * Order and keeps running.
+	 *
+	 * @return The peer's Belief after the merge
+	 */
+	static Belief checkGoodOrderMerges(Server peer, SignedData<Order> good, Belief received) throws Exception {
+		BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 		connect(peer).sendMessage(wire(Message.createBelief(received)));
 
 		Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
 		assertNotNull(merged,"the good Order is merged");
 		assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 		assertTrue(peer.isRunning());
+		return merged;
 	}
 
 	/** A staked peer's signed value that is not an Order. */
@@ -140,6 +151,60 @@ public class InvalidPeerDataTest {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			checkGoodOrderMergesBeside(peer,REMOTE_A.signData(CVMLong.ONE));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A Belief whose entry for a staked peer is not a signed value. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void aBeliefEntryThatIsNotASignedValue() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+			Index orders=Index.of(REMOTE_A.getAccountKey(),CVMLong.ONE,REMOTE_B.getAccountKey(),good);
+			checkGoodOrderMerges(peer,good,Belief.create(orders));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * An Error while processing one received Order, such as running out of memory,
+	 * rejects only that Order: the other Order in the same Belief is merged.
+	 */
+	@Test
+	public void anErrorProcessingAnOrderRejectsOnlyThatOrder() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			peer.getBeliefPropagator().setOrderUpdateObserver(so -> {
+				if (REMOTE_A.getAccountKey().equals(so.getAccountKey())) throw new OutOfMemoryError("test");
+			});
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+			SignedData<Order> failing=order(REMOTE_A,1,block(REMOTE_A,blockTime(peer)));
+			Belief merged=checkGoodOrderMerges(peer,good,Belief.create(good,failing));
+			assertNull(merged.getOrders().get(REMOTE_A.getAccountKey()));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * An Error while staging a DATA message, such as running out of memory, drops only
+	 * that message: a good Order sent after it is merged.
+	 */
+	@Test
+	public void anErrorStagingDataDropsOnlyThatMessage() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			peer.getBeliefPropagator().setDataStageObserver(m -> {
+				throw new OutOfMemoryError("test");
+			});
+			Message data=Message.createDataMessage(List.of(Blob.wrap(new byte[200])),(int)CPoSConstants.MAX_MESSAGE_LENGTH);
+			connect(peer).sendMessage(wire(data));
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+			checkGoodOrderMerges(peer,good,Belief.create(good));
 		} finally {
 			peer.close();
 		}

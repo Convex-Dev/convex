@@ -45,7 +45,7 @@ public class MalformedOrderTest {
 	}
 
 	/**
-	 * After A's good Order is merged, A sends a newer Order the merge cannot read beside
+	 * After A's good Order is merged, A sends another Order the merge cannot read beside
 	 * B's good Order: B's Order is merged and A's earlier Order is kept.
 	 */
 	private static void checkEarlierOrderKept(Server peer, SignedData<Order> newer) throws Exception {
@@ -70,6 +70,18 @@ public class MalformedOrderTest {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			Order order=Order.create(Vectors.of(CVMLong.create(2),Vectors.createLongs(1,0,0,0),CVMLong.ONE));
+			checkEarlierOrderKept(peer,REMOTE_A.signData(order));
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** Comparing an Order with the same timestamp as A's earlier one reads its Blocks. */
+	@Test
+	public void anOrderWithTheSameTimestampWhoseBlocksAreNotAVector() throws Exception {
+		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			Order order=Order.create(Vectors.of(CVMLong.ONE,Vectors.createLongs(1,0,0,0),CVMLong.ONE));
 			checkEarlierOrderKept(peer,REMOTE_A.signData(order));
 		} finally {
 			peer.close();

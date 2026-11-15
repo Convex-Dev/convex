@@ -228,6 +228,25 @@ public class BeliefMergeTest {
 	}
 
 	/**
+	 * A received Belief entry the merge fails to process, here one that is not a signed
+	 * value, is ignored, and other Orders in the same Belief are merged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testMergeIgnoresEntryItFailsToProcess() throws InvalidDataException {
+		Peer b0 = initialPeerState(0);
+		Peer b2 = initialPeerState(2);
+		b2 = b2.updateTimestamp(b2.getTimestamp() + 200);
+		b2 = b2.proposeBlock(Block.of(b2.getTimestamp()));
+
+		Index orders = Index.of(KEYS[1], CVMLong.ONE, KEYS[2], b2.getBelief().getOrders().get(KEYS[2]));
+		Peer merged = b0.mergeBeliefs(Belief.create(orders));
+
+		assertNull(merged.getBelief().getOrders().get(KEYS[1]));
+		assertEquals(b2.getPeerOrder().getBlocks(), merged.getPeerOrder().getBlocks());
+	}
+
+	/**
 	 * A staked peer's Order whose Blocks the merge cannot read is ignored, and other
 	 * Orders in the same Belief are merged.
 	 */

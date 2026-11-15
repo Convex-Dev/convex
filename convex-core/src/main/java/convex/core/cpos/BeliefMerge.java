@@ -24,6 +24,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 
@@ -112,33 +113,41 @@ public class BeliefMerge {
 		// Iterate over each Peer's ordering conveyed in this Belief
 		long bcount=bOrders.count();
 		for (long i=0; i<bcount; i++) {
-			MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
-			ABlob key=be.getKey();
-			
-			if (!isValidPeer(key)) continue;
-			
-			SignedData<Order> b=be.getValue();
-			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
-			Order bc = RT.ensureCVM(b.getValue(),Order.class);
-			if (bc == null) continue; // a signed value that is not an Order
-			if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
-			
-			SignedData<Order> a=result.get(key);
-			if (b.equals(a)) continue; // PERF: fast path for no changes
-			if (!hasReadableBlocks(bc)) continue; // an Order the merge cannot read
+			try {
+				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
+				ABlob key=be.getKey();
 
-			if (a == null) {
-				// This is a new order to us, so include if valid
-				result=result.assocEntry(be);
-				continue;
-			}
+				if (!isValidPeer(key)) continue;
 
-			Order ac = RT.ensureCVM(a.getValue(),Order.class);
+				SignedData<Order> b=be.getValue();
+				if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
+				Order bc = RT.ensureCVM(b.getValue(),Order.class);
+				if (bc == null) continue; // a signed value that is not an Order
+				if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
 
-			boolean shouldReplace=compareOrders(ac,bc);
-			if (shouldReplace) {
-				result=result.assocEntry(be);
-				continue;
+				SignedData<Order> a=result.get(key);
+				if (b.equals(a)) continue; // PERF: fast path for no changes
+				if (!hasReadableBlocks(bc)) continue; // an Order the merge cannot read
+
+				if (a == null) {
+					// This is a new order to us, so include if valid
+					result=result.assocEntry(be);
+					continue;
+				}
+
+				Order ac = RT.ensureCVM(a.getValue(),Order.class);
+
+				boolean shouldReplace=compareOrders(ac,bc);
+				if (shouldReplace) {
+					result=result.assocEntry(be);
+					continue;
+				}
+			} catch (MissingDataException e) {
+				// Missing data is the caller's to fetch, as before
+				throw e;
+			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+				// Any other failure processing a received Order: ignore that Order, as for
+				// any other the merge does not adopt
 			}
 		}
 		return result;

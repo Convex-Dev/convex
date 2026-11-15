@@ -182,11 +182,12 @@ public class Belief extends ARecordGeneric {
 	}
 
 	/**
-	 * Extract a collection of Orders from a Cell, suitable for Belief merge
-	 * @param payload Cell to extra orders from
+	 * Extract a collection of Orders from a Cell, suitable for Belief merge. A Belief
+	 * entry that is not a signed value is left out.
+	 * @param payload Cell to extract orders from
 	 * @return Collection of signed orders
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({"unchecked","rawtypes"})
 	public static Collection<SignedData<Order>> extractOrders(ACell payload) {
 		payload=CVMEncoder.specialise(payload);
 		ArrayList<SignedData<Order>> result=new ArrayList<>();
@@ -195,10 +196,10 @@ public class Belief extends ARecordGeneric {
 				result.add((SignedData<Order>) sd);
 			}
 		} else if (payload instanceof Belief b) {
-			Index<AccountKey, SignedData<Order>> porders = b.getOrders();
+			Index<AccountKey, ? extends ACell> porders = b.getOrders();
 			int n=porders.size();
 			for (int i=0; i<n; i++) {
-				result.add(porders.entryAt(i).getValue());
+				if (porders.entryAt(i).getValue() instanceof SignedData sd) result.add(sd);
 			}
 		}
 		return result;
