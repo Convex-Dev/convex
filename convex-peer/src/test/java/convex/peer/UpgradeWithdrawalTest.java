@@ -2,6 +2,7 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,6 +37,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.Core;
@@ -309,7 +311,7 @@ public class UpgradeWithdrawalTest {
 
 			UpgradeError halt = s.awaitConsensusHalt().get(10, TimeUnit.SECONDS);
 			assertEquals(1L, halt.getVersion());
-			assertTrue(halt.isRetryable());
+			assertInstanceOf(MissingDataException.class, halt.getCause());
 		} finally {
 			s.close();
 		}

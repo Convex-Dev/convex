@@ -1225,7 +1225,7 @@ public class Server implements Closeable {
 			if (error.getCause()==null) {
 				upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
 						error.getVersion(), Migrations.MAX_VERSION);
-			} else if (error.isRetryable()) {
+			} else if (error.getCause() instanceof MissingDataException) {
 				upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} needs data missing from this peer's store. Repair or resync the store and restart to rejoin. See UPGRADE.md",
 						error.getVersion(), error);
 			} else {

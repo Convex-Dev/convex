@@ -56,16 +56,4 @@ public class UpgradeError extends Error {
 	public long getVersion() {
 		return version;
 	}
-
-	/**
-	 * Tests whether this is a peer-local (environmental) failure, which the operator
-	 * can recover from without a release change, rather than a deterministic one.
-	 * Neither kind is retried automatically. See UPGRADE.md.
-	 *
-	 * @return true if repairing or resyncing the peer's store and restarting it can
-	 *         recover the peer
-	 */
-	public boolean isRetryable() {
-		return getCause() instanceof MissingDataException;
-	}
 }
