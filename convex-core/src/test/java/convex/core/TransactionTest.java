@@ -11,8 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
@@ -45,6 +47,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
+import convex.test.LogCapture;
 import convex.test.Samples;
 
 /**
@@ -513,5 +516,38 @@ public class TransactionTest extends ACVMTest {
 		assertFalse(br.isError(0));
 		assertEquals(s.getAccount(HERO).getSequence()+1,br.getState().getAccount(HERO).getSequence());
 		assertEquals(ErrorCodes.FORMAT,br.getErrorCode(1));
+	}
+
+	/**
+	 * An unexpected exception in a transaction makes its whole Block invalid, and the
+	 * peer logs it as an error naming that transaction
+	 */
+	@Test
+	@ResourceLock("java.util.logging:convex.core.cvm.State")
+	public void testUnexpectedExceptionInBlock() throws ReflectiveOperationException {
+		State s=state();
+		Transfer good=Transfer.create(HERO, s.getAccount(HERO).getSequence()+1, VILLAIN, 100);
+		IllegalStateException failure=new IllegalStateException("Test failure");
+		Transfer failing=new Transfer(VILLAIN, s.getAccount(VILLAIN).getSequence()+1, HERO, 1) {
+			@Override
+			public Context apply(Context ctx) {
+				throw failure;
+			}
+		};
+		SignedData<ATransaction> signedFailing=VILLAIN_KP.signData(failing);
+		SignedData<Block> signedBlock=InitTest.FIRST_PEER_KEYPAIR.signData(Block.of(s.getTimestamp().longValue()+1000, HERO_KP.signData(good), signedFailing));
+
+		List<LogCapture.Entry> logged=LogCapture.capture(State.class.getName(),()->{
+			BlockResult br=s.applyBlock(signedBlock);
+			assertEquals(s,br.getState());
+			assertEquals(ErrorCodes.PEER,br.getErrorCode(0));
+			assertEquals(ErrorCodes.PEER,br.getErrorCode(1));
+		});
+
+		assertEquals(1,logged.size());
+		LogCapture.Entry e=logged.get(0);
+		assertEquals("SEVERE",e.level());
+		assertSame(failure,e.thrown());
+		assertTrue(e.message().contains(signedFailing.getHash().toString()));
 	}
 }

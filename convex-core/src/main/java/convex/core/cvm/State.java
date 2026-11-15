@@ -63,6 +63,8 @@ public class State extends ARecordGeneric {
 	
 	private static final long FIELD_COUNT=FORMAT.count();
 
+	private static final System.Logger log=System.getLogger(State.class.getName());
+
 	/**
 	 * Symbols for global values in :globals Vector
 	 */
@@ -175,6 +177,7 @@ public class State extends ARecordGeneric {
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
 		Block block=null;
+		TransactionContext tctx=null;
 		try {
 			block=RT.ensureCVM(signedBlock.getValue(),Block.class);
 			Counters.applyBlock++;
@@ -189,15 +192,34 @@ public class State extends ARecordGeneric {
 			State state = prepareBlock(block);
 			
 			// Create TransactionContext after Block is prepared so we have correct timestamp etc.
-			TransactionContext tctx=TransactionContext.create(state);
+			tctx=TransactionContext.create(state);
 			tctx.block=signedBlock;
-		
+
 			BlockResult blockResult= state.applyTransactions(block,tctx);
 			return blockResult;
+		} catch (InvalidBlockException e) {
+			// Invalid block, so no state updates
+			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
 		} catch (Exception e) {
-			// Invalid block, so no state upadtes
+			// Unexpected, but still an invalid block: a peer that does not fail the same
+			// way forks, so this must be loud
+			logUnexpectedException(signedBlock,tctx,e);
 			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
 		}
+	}
+
+	/**
+	 * Logs an unexpected exception that made a Block invalid, as an error.
+	 *
+	 * @param signedBlock Block being applied
+	 * @param tctx Transaction context of the Block, or null if not yet created
+	 * @param e Exception thrown
+	 */
+	private static void logUnexpectedException(SignedData<Block> signedBlock, TransactionContext tctx, Exception e) {
+		String tx=((tctx==null)||(tctx.signedTx==null))?"none":(tctx.txNumber+" "+tctx.signedTx.getHash());
+		log.log(System.Logger.Level.ERROR,"UNEXPECTED EXCEPTION IN STATE TRANSITION: block "+signedBlock.getHash()
+			+" is invalid on this peer. A peer that does not fail the same way forks from this one,"
+			+" so an operator must review this block. Last transaction started: "+tx,e);
 	}
 
 	/**
@@ -421,32 +443,26 @@ public class State extends ARecordGeneric {
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
-			// SECURITY: catch-all exception handler, needs consideration
-			//try {
-				// extract the signed transaction from the block
-				SignedData<ATransaction> signed = transactions.get(i);
-				
-				// Update transaction context
-				tctx.signedTx=signed;
-				tctx.txNumber=i;
-				
-				// execute the transaction using the *latest* state (not necessarily "this")
-				ResultContext rc = state.applyTransaction(signed,tctx);
+			// No catch here: an unexpected exception makes the whole Block invalid (applyBlock)
+			// extract the signed transaction from the block
+			SignedData<ATransaction> signed = transactions.get(i);
+			
+			// Update transaction context
+			tctx.signedTx=signed;
+			tctx.txNumber=i;
+			
+			// execute the transaction using the *latest* state (not necessarily "this")
+			ResultContext rc = state.applyTransaction(signed,tctx);
 
-				// record results from result context
-				results[i] = Result.fromContext(CVMLong.create(i),rc);
-				
-				// Get fees from ResultContext
-				// NOTE: Juice fees includes transaction overhead fees
-				fees+=rc.getJuiceFees();
-				
-				// state update
-				state = rc.context.getState();
-			//} catch (Exception e) {
-			//	String msg= "Unexpected fatal exception applying transaction: "+e.toString();
-			//	results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.FATAL).withSource(SourceCodes.CVM);
-			//	log.error(msg,e);
-			//}
+			// record results from result context
+			results[i] = Result.fromContext(CVMLong.create(i),rc);
+			
+			// Get fees from ResultContext
+			// NOTE: Juice fees includes transaction overhead fees
+			fees+=rc.getJuiceFees();
+			
+			// state update
+			state = rc.context.getState();
 		}
 		
 		state=distributeFees(state,tctx.getPeer(),fees, block);
