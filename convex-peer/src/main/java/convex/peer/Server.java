@@ -902,9 +902,20 @@ public class Server implements Closeable {
 	 * @return Updated Peer value with persisted data, sharing the current Peer's transaction index
 	 * @throws IOException In case of any IO Error
 	 */
-	@SuppressWarnings("unchecked")
 	public Peer persistPeerData() throws IOException {
-		Peer peer=getPeer();
+		return persistPeerData(getPeer());
+	}
+
+	/**
+	 * Writes the given Peer's data to the configured store, as {@link #persistPeerData()}
+	 * does for the current Peer.
+	 *
+	 * @param peer Peer to persist
+	 * @return Peer value with persisted data, sharing the given Peer's transaction index
+	 * @throws IOException In case of any IO Error
+	 */
+	@SuppressWarnings("unchecked")
+	Peer persistPeerData(Peer peer) throws IOException {
 		AMap<Keyword,ACell> peerData = peer.toData();
 
 		// Set up root key for Peer persistence. Default is Peer Account Key
