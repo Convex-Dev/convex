@@ -38,6 +38,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.core.store.Persister;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSDrives;
@@ -262,15 +263,15 @@ public class SharedApplicationInternalsTest {
 		FilesWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
 			this(host.cursor(),host.store(),context(FILES_KEY));
 		}
-		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,LatticeContext context) {
-			super(cursor,store,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
+		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,Persister persister,LatticeContext context) {
+			super(cursor,persister,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
 			policy=context;
 			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
 				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),new IndexComponent<>(cursor).path(key),context));
 			}
 		}
 		@Override public FilesWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(cursor,store(),policy);
+			return new FilesWithP2P(cursor,persister(),policy);
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
 	}

@@ -36,8 +36,8 @@ Subclasses and compositions add behaviour; the base gains no capability hooks th
 every subclass and view would have to forward. A service owned by a transactional
 boundary gets at most one hook, resolved through existing source links: `claim()`,
 for transactions and fork publication, is the only one. Storage, durability and
-publication attach at the host, and a module that needs a store mid-write, such as
-DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
+publication attach at the host, and a module that saves content mid-write, such as
+DLFS writing blob checkpoints, takes a `Persister` as an explicit parameter. `persist` is not a
 hook: it is one method with a store-agnostic `Persister`, which views inherit and
 only the cursors that hold a value, `Root` and `ForkedCursor`, override.
 
