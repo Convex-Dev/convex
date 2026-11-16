@@ -1,6 +1,7 @@
 package convex.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,17 @@ import convex.peer.TestNetwork;
  */
 @Execution(ExecutionMode.CONCURRENT)
 public class ConvexTest {
+
+	/** A client's account key is its key pair's, and it has none without a key pair. */
+	@Test
+	public void testAccountKeyFollowsKeyPair() throws Exception {
+		try (ConvexRemote convex = new ConvexRemote(null, null)) {
+			assertNull(convex.getAccountKey());
+			AKeyPair kp = AKeyPair.generate();
+			convex.setKeyPair(kp);
+			assertEquals(kp.getAccountKey(), convex.getAccountKey());
+		}
+	}
 
 	/** A client without an address still queries, but cannot build a transaction, which needs an origin. */
 	@Test
