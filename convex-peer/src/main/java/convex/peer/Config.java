@@ -197,6 +197,47 @@ public class Config {
 	 */
 	public static final int SERVER_CONNECTION_PENDING_BYTE_LIMIT = 1024 * 1024;
 
+	/**
+	 * Workers of each message ingress, which decode and route received messages off
+	 * the network threads. Each Peer server has one ingress for the connections
+	 * opened to it, and the process one for the connections it opens.
+	 */
+	public static final int INGRESS_WORKERS = 3;
+
+	/**
+	 * Ingress workers kept for connections in the priority lane: connections in the
+	 * ordinary lane are served by at most {@link #INGRESS_WORKERS} minus this many
+	 * workers at once.
+	 */
+	public static final int INGRESS_RESERVED_WORKERS = 1;
+
+	/**
+	 * Received messages one connection may have waiting in ingress before it stops
+	 * being read. Reading resumes at half this many.
+	 */
+	public static final int INGRESS_CONNECTION_MESSAGES = 32;
+
+	/**
+	 * Encoded bytes one connection may have waiting in ingress before it stops being
+	 * read. Reading resumes at half this much.
+	 */
+	public static final long INGRESS_CONNECTION_BYTES = 1024 * 1024;
+
+	/**
+	 * Encoded bytes all connections of one ingress may have waiting before none of
+	 * them is read. Reading resumes at half this much.
+	 */
+	public static final long INGRESS_TOTAL_BYTES = 64L * 1024 * 1024;
+
+	/** Encoded bytes a connection in the priority lane is served per turn. */
+	public static final long INGRESS_PRIORITY_QUANTUM = 64 * 1024;
+
+	/** Encoded bytes a connection in the ordinary lane is served per turn. */
+	public static final long INGRESS_ORDINARY_QUANTUM = 2 * 1024;
+
+	/** Encoded bytes each received message is counted as, at least, for fair service. */
+	public static final long INGRESS_MINIMUM_COST = 512;
+
 	/** Peer configuration key for the maximum encoded belief delta chunk size. */
 	public static final Keyword MAX_BELIEF_DELTA_MESSAGE_SIZE = Keyword.intern("max-belief-delta-message-size");
 

@@ -206,13 +206,16 @@ The model is weighted surplus round-robin:
 - FIFO ordering is preserved within the connection.
 
 Serving the head whenever credit is positive keeps a large message from waiting
-many rounds: under classic deficit round-robin, a 4 MB update would wait about
-64 rounds of a 64 KB quantum before it could be decoded.
+many rounds: under classic deficit round-robin, a 4 MB update in the verified
+lane would wait about 64 rounds of its 64 KB quantum before it could be decoded.
 
-A connection whose message reaches its head waits at most one turn of every
-other active connection. This, not the priority lane, is what stops a client
-burst delaying Peer updates: they are served between client messages instead of
-after the whole burst.
+A turn serves a connection while its credit is positive: at most its quantum
+plus one message. A connection that joins its lane waits at most one turn of
+every other connection in it. With the ordinary quantum about the size of one
+client transaction, a round of 100 busy clients is about 100 transaction
+decodes, a few milliseconds over two workers. This, not the priority lane, is
+what stops a client burst delaying Peer updates: they are served between client
+messages instead of after the whole burst.
 
 Two lanes are required:
 
@@ -222,9 +225,10 @@ Two lanes are required:
   before verification.
 
 A connection's lane is read each time it rejoins the scheduler, so a connection
-verified while active moves at its next turn. Verified Peers receive a larger
-quantum. Strict priority is not acceptable: ordinary challenge and status
-traffic must make progress so a legitimate connection can become verified.
+verified while active moves at its next turn. The lanes take turns while both
+have connections waiting, and verified Peers receive a larger quantum. Strict
+priority is not acceptable: ordinary challenge and status traffic must make
+progress so a legitimate connection can become verified.
 
 Queue weighting alone cannot guarantee verified-Peer latency because decode is
 not pre-emptible. With `N` concurrent decode permits, ordinary work may occupy
@@ -457,7 +461,7 @@ tuning from measurements:
 | per-connection message limit | bounds tiny-message bursts | 32, resuming at 16 |
 | per-connection byte limit | bounds large-message bursts | 1 MB, resuming at 512 KB |
 | global ingress byte limit | bounds total retained encoded data | 64 MB |
-| verified/ordinary quantum | weighted scheduler policy | 1 MB / 64 KB |
+| verified/ordinary quantum | weighted scheduler policy | 64 KB / 2 KB |
 | minimum message cost | prevents tiny-frame monopolisation | 512 bytes |
 | control queue capacity | bounds protocol-control work | as the query queue |
 
