@@ -1,0 +1,14 @@
+<configuration>
+  <!-- Tests write warnings and errors only. A test that causes one on purpose
+       captures it with convex.p2p.ExpectedLogs instead of writing it. -->
+  <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder>
+      <pattern>[%thread] %-5level %logger{0} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="WARN">
+    <appender-ref ref="STDERR"/>
+  </root>
+</configuration>
