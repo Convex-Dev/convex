@@ -11,12 +11,16 @@ Client                          Peer Server
   │  conn.sendMessage(m)
   ▼
 ┌──────────────────┐
-│ Netty I/O Thread  │  decode bytes → Message
-│                   │  server.deliverMessage(m)
-│                   │  processMessage(m) → txMessageQueue.offer()
+│ Netty I/O Thread  │  frame bytes → Message
+│                   │  admit to the peer's ingress
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│ Ingress worker    │  server.receiveMessage(m): decode
+│                   │  processMessage(m) → txMessageQueue.tryOffer()
 └────────┬─────────┘
          │                              txMessageQueue
-         │                         ArrayBlockingQueue (10,000)
+         │                         QueueDestination (10,000)
          ▼
 ┌──────────────────┐
 │ TransactionHandler│  poll(10ms) + sleep(1ms) + drainTo

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
 - Poll the peers a peer has verified first, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
 - Speed up decoding of messages that carry several cells, such as consensus updates. ([Canonical decoding](convex-core/docs/ENCODER_DESIGN.md#canonical-decoding))
+- Decode incoming messages off the network threads, so a busy connection no longer delays others, and keep part of a peer's capacity for verified peers. ([Server-side backpressure](convex-peer/docs/BACKPRESSURE.md))
 
 ### Fixed
 

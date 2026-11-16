@@ -1,16 +1,15 @@
 # Server-Side Backpressure
 
 **See also:** [CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md) — client-side outbound backpressure;
-[PROPAGATION.md](PROPAGATION.md) — peer delta fan-out and backpressure
+[PROPAGATION.md](PROPAGATION.md) — peer delta fan-out and backpressure;
+[peer-ingress-routing.md](../../docs/proposals/peer-ingress-routing.md) — the ingress design
 
 ## Overview
 
-When clients send messages faster than the peer can process them, the server applies
-per-channel backpressure rather than rejecting with immediate `:LOAD` errors. Each
-channel independently pauses its own socket reads and retries delivery on a virtual
-thread, while all other channels continue normally.
-
-The result: under load, clients experience brief blocking instead of errors. Throughput
+When clients send messages faster than the peer can process them, the peer stops
+reading the connections that are ahead of it rather than refusing their requests.
+Each connection is throttled on its own, by TCP, while all other connections continue
+normally. Under load, clients see brief waits instead of errors, and throughput
 matches processing capacity rather than queue capacity.
 
 A full queue is a reason to wait, never on its own a reason to refuse. `:LOAD` means
@@ -23,94 +22,94 @@ waiting is done by its socket, not by a thread of the peer.
 ## Architecture
 
 ```
-                    ┌──────────────────────────────┐
-                    │        Server                 │
-                    │                               │
-                    │  processMessage(m)             │
-                    │    → null (accepted)           │
-                    │    → Predicate (retry fn)      │
-                    │                               │
-                    │  Pre-allocated retry refs:     │
-                    │    txnRetry, queryRetry        │
-                    └──────────┬───────────────────┘
-                               │ Function<Message, Predicate<Message>>
-                    ┌──────────▼───────────────────┐
-                    │   NettyInboundHandler          │
-                    │                               │
-                    │   manages: setAutoRead()       │
-                    │   manages: backpressure gate   │
-                    │   manages: virtual thread      │
-                    └───────────────────────────────┘
+network thread (Netty event loop, or NIO selector)
+   frame bytes → Message → IngressChannel.admit(m)
+                               │
+                  false: stop reading this connection
+                               │
+ingress workers (Config.INGRESS_WORKERS)
+   take the next connection's messages in order
+   decode → Server.receiveMessage(m)
+                               │
+              ┌────────────────┴────────────────┐
+            null                          Destination (queue full)
+              │                                 │
+            done                 hold the message at the head of its
+                                 connection, with no thread waiting
+                                                │
+                                   ┌────────────┴────────────┐
+                              room in queue          deadline passes
+                                   │                         │
+                              place it               :LOAD (requests)
+                                   └────────────┬────────────┘
+                                                ▼
+                                   connection served again;
+                                   reading resumes at half its limits
 ```
 
-### Dispatch
+A network thread only frames bytes into messages: no payload is decoded on it, so a
+costly decode delays only its own connection and occupies one ingress worker, never
+an event loop serving many connections. Each connection's messages are decoded and
+routed in the order they arrived, by one worker at a time.
 
-`Server.processMessage(Message)` returns either **null** (accepted — fast path, zero
-allocation) or a **pre-allocated retry predicate** (queue full — the predicate blocks
-with timeout until space is available).
+### Ingress limits
 
-`Server.deliverMessage(Message)` wraps decode + observe + processMessage for callers
-that need the full pipeline (NettyServer, ConvexLocal).
+| Limit | Value | Effect |
+|-------|-------|--------|
+| Messages waiting per connection | `Config.INGRESS_CONNECTION_MESSAGES` (32) | Reading stops; resumes at half |
+| Bytes waiting per connection | `Config.INGRESS_CONNECTION_BYTES` (1 MB) | Reading stops; resumes at half |
+| Bytes waiting in all | `Config.INGRESS_TOTAL_BYTES` (64 MB) | Each connection that adds to it stops; all resume at half |
+| Wait for a full queue | `Config.DEFAULT_INTERNAL_TIMEOUT` (8 s) | A request is answered `:LOAD`; anything else is dropped |
+
+### Lanes
+
+Connections are served in two lanes. A trusted connection (`AConnection.isTrusted`)
+is in the priority lane: on a peer, one verified as a staked peer's own link
+([PEER_PRIORITY.md](PEER_PRIORITY.md)); among the connections a process opens, one
+whose peer has proved its key. Every other connection is ordinary.
+
+The lanes alternate while both have work. Within a lane connections take turns by
+encoded bytes, a turn allowing `Config.INGRESS_PRIORITY_QUANTUM` (64 KB) in the
+priority lane and `Config.INGRESS_ORDINARY_QUANTUM` (2 KB) in the ordinary one. Each
+message counts as at least `Config.INGRESS_MINIMUM_COST` (512 bytes), so a stream of
+tiny frames cannot take more turns than its share. Ordinary connections are served by
+at most `Config.INGRESS_WORKERS` minus `Config.INGRESS_RESERVED_WORKERS` workers, so a
+flood of clients always leaves verified peers a worker.
 
 ### Message Types
 
-| Type | Backpressure | Reason |
-|------|-------------|--------|
-| TRANSACT | Yes — `txMessageQueue` | Primary client workload |
-| QUERY, DATA_REQUEST | Yes — `queryQueue` | Primary client workload |
-| BELIEF, DATA | No | Best-effort peer propagation; drop if its dedicated queue is full |
-| STATUS | No | Inline response, no queue |
-| CHALLENGE / RESPONSE | No | Authentication protocol, must complete promptly |
-| GOODBYE | No | Connection teardown, must not delay |
+| Type | Destination | When it is full |
+|------|-------------|-----------------|
+| TRANSACT | `txMessageQueue` | Waits |
+| QUERY, DATA_REQUEST | `queryQueue` | Waits |
+| PING, STATUS, CHALLENGE, GOODBYE | control handler queue (`Config.CONTROL_QUEUE_SIZE`) | Waits |
+| BELIEF, DATA | propagator queue | Dropped: best-effort peer propagation |
+| RESULT | the awaiting request on that connection | Never full |
 
-### Backpressure Flow
-
-When a queue is full, the Netty handler pauses socket reads for that channel,
-retries delivery on a virtual thread, and resumes reads when the retry succeeds
-or times out. The I/O thread never blocks. See `NettyInboundHandler` for the
-full lifecycle including cumulation buffer flush on resume.
-
-```
-I/O thread: decode()
-                │
-                ├─ backpressured? → return (stop decode loop)
-                │
-                ▼
-          parse message → deliver(m)
-                │
-       ┌────────┴────────┐
-     null              Predicate
-       │                  │
-     done            pause reads
-   (fast path)       spawn virtual thread → retry
-                          │
-                   ┌──────┴──────┐
-                 success       timeout
-                   │              │
-                   │           return :LOAD
-                   └──────┬───────┘
-                          ▼
-                    resume reads
-                    flush stranded data
-```
+Control messages have their own queue and thread, so a burst of them neither takes
+an ingress worker for long nor waits behind transactions or queries.
 
 ### Connections a Node Opens
 
-A client connection pauses in the same way when its delivery asks to wait
-(`Transport.connectWithDelivery`, used by `ConvexRemote`). Lattice nodes rely on this
+The connections a process opens share one client ingress (`ClientIngress`), whatever
+their transport, and their results are decoded on its workers. A connection pauses in
+the same way when its delivery asks to wait (`Transport.connectWithDelivery`, used by
+`ConvexRemote`); a delivery that returns its own retry, rather than a queue, has the
+retry run on a virtual thread while the connection waits. Lattice nodes rely on this
 for requests and messages a peer sends back over a route the node opened; see
 [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#inbound-pipeline). A transport that
-cannot pause, such as the NIO client whose one selector thread serves every
-connection, answers such a request with `:LOAD` at once and drops anything else.
+cannot pause, such as a factory that implements only `connect`, answers such a
+request with `:LOAD` at once and drops anything else.
 
 ### ConvexLocal
 
-For in-JVM clients (no network), there is no Netty handler. If the queue is full,
-`ConvexLocal` calls the retry predicate directly on the caller's thread, which waits
-for space. A caller on the handler's own thread, such as a local client's callback for
-a result that handler returned, is refused at once instead: only that thread empties
-the queue, so the wait could only time out. `ConvexLocal` queries take no queue: they
-run on the client's own thread ([MESSAGING.md](MESSAGING.md) §4.4).
+For in-JVM clients there is no network thread and no ingress: `ConvexLocal` delivers
+on the caller's thread with `Server.deliverMessage`, handling control messages there
+too. If a queue is full, the caller's thread waits on the queue for space. A caller on
+the queue's own thread, such as a local client's callback for a result that handler
+returned, is refused at once instead: only that thread empties the queue, so the wait
+could only time out. `ConvexLocal` queries take no queue: they run on the client's own
+thread ([MESSAGING.md](MESSAGING.md) §4.4).
 
 ### Reply Backlog
 
@@ -120,15 +119,15 @@ backlog, the bytes of its replies queued or handed to Netty and not yet written:
 
 | Condition | Effect |
 |-----------|--------|
-| Backlog reaches half `Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT` | The handler holds back the next request it decodes and stops reading the socket |
-| Backlog written down to a quarter | The write completion that crosses it delivers the held request and resumes reading |
+| Backlog reaches half `Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT` | The handler holds back the next message it frames and stops reading the socket |
+| Backlog written down to a quarter | The write completion that crosses it admits the held message and resumes reading |
 | More than the whole limit handed to Netty and not yet written | Further replies to that client are refused: it is not reading |
 
 Replies queued but not yet handed to Netty do not count towards the refusal, so a
 burst of results for one client is absorbed by the shared queue.
 
 So a client that sends faster than it reads is slowed by TCP, like one whose requests
-fill a queue, rather than losing results. Pausing always holds a decoded request, so
+fill a queue, rather than losing results. Pausing always holds a framed message, so
 that Netty's decoder does not ask the socket for more input while reads are off.
 
 A verified connection is never paused for its replies: it has a far larger allowance
@@ -145,7 +144,8 @@ to keep up.
 Both `TransactionHandler` and `QueryHandler` use batch-drain processing: block
 until at least one message arrives, then `drainTo()` to grab all queued messages
 in a single lock acquisition. This significantly reduces contention under load
-compared to per-message polling.
+compared to per-message polling. A drain that frees room tells the connections
+waiting for it, which an ingress worker then serves.
 
 The TransactionHandler further batches messages into blocks for consensus. The
 QueryHandler processes each query against the current consensus state independently.
@@ -174,9 +174,10 @@ pushes filling it never stop polling ([PEER_PRIORITY.md](PEER_PRIORITY.md#livene
 | Netty `SocketChannel` + pipeline | ~4 KB | Channel object, handler contexts |
 | Read/write `ByteBuf` | 2–64 KB | Adaptive allocator, grows under load |
 | Kernel socket buffers | ~128 KB | `SO_RCVBUF` + `SO_SNDBUF`, outside JVM heap |
-| Virtual thread (backpressured only) | ~1 KB | Transient — only exists during retry |
+| Ingress messages waiting | up to 1 MB | Encoded bytes awaiting decode; 64 MB across all connections |
 
-**Per connection: ~200 KB idle, ~300 KB under load.**
+**Per connection: ~200 KB idle, ~300 KB under load**, plus whatever it has waiting in
+the ingress.
 
 At 1024 connections: ~200–300 MB total, mostly kernel socket buffers (outside JVM heap).
 Operators can adjust `MAX_CLIENT_CONNECTIONS` for high-traffic or constrained environments.
@@ -188,39 +189,28 @@ Operators can adjust `MAX_CLIENT_CONNECTIONS` for high-traffic or constrained en
 A global backpressure mechanism (e.g. pause all reads when any queue fills) would
 penalise well-behaved clients for a single fast sender. Per-channel backpressure
 isolates the effect: only the specific client that hit the full queue is throttled.
+The one global bound, on bytes waiting in the ingress, stops only the connections
+that add to it.
 
-### Virtual Threads for Retry
+### Waiting Without a Thread
 
-The Netty I/O thread must never block. The blocking retry needs *some* thread to
-park on the queue. Virtual threads are ideal: lightweight (~1 KB), bounded by
-timeout, and don't consume a platform thread while parked.
-
-### Pre-Allocated Predicates
-
-The retry predicates (`txnRetry`, `queryRetry`) are method references bound once
-at server construction. Zero allocation on the reject path — important since
-rejects happen precisely when the server is under load.
+A message whose queue is full stays at the head of its connection, and the queue
+signals when it has room; no thread parks per waiting connection, and the worker
+moves on to other connections. The network threads never block either.
 
 ### Clean Dependency Direction
 
 `Message` is in `convex-core` and carries no Netty-specific references. The server
-exposes `processMessage` as a pure `Function<Message, Predicate<Message>>`. The
-handler orchestrates all channel-level backpressure. The server never sees a channel.
+exposes `receiveMessage` as a `Function<Message, Predicate<Message>>` that returns
+the destination that refused a message. The transport frames and pauses; the ingress
+schedules, decodes and waits. The server never sees a channel.
 
 ### Deadlock Safety
 
 The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not
-apply: no server thread waits to send (a reply is queued or refused at once), and
-virtual threads hold no locks. A client's reads pause for its own reply backlog,
-which drains as soon as that client reads, whatever the server is doing.
-
-## Backward Compatibility
-
-- `:LOAD` error only on timeout — existing retry logic still works but fires rarely
-- Wire protocol unchanged
-- API unchanged (`transact()` / `query()` still return `CompletableFuture<Result>`)
-- Only observable change: calls may take longer to return under load (blocking
-  instead of immediate error)
+apply: no server thread waits to send (a reply is queued or refused at once), and an
+ingress worker never waits for a queue. A client's reads pause for its own reply
+backlog, which drains as soon as that client reads, whatever the server is doing.
 
 ## Performance
 

@@ -26,6 +26,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.util.Utils;
 import convex.net.AServer;
+import convex.net.Transport;
 import convex.net.ingress.Ingress;
 import convex.peer.Config;
 import convex.peer.Server;
@@ -77,7 +78,8 @@ public class NIOServer extends AServer {
 	 * @return New NIOServer instance
 	 */
 	public static NIOServer create(Server server) {
-		return new NIOServer(server.getReceiveAction());
+		// The peer sets its ingress at launch; until then, never wait on the selector thread
+		return new NIOServer(Transport.withoutPausing(server::deliverMessage));
 	}
 
 	/**

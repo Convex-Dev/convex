@@ -1,6 +1,7 @@
 # Peer ingress decode and routing
 
-- Status: Accepted
+- Status: Implemented on `develop`, for Netty and NIO connections;
+  [BACKPRESSURE.md](../../convex-peer/docs/BACKPRESSURE.md) describes it as built
 - Tracking issue: [#608](https://github.com/Convex-Dev/convex/issues/608)
 - Last updated: 2026-11-16
 

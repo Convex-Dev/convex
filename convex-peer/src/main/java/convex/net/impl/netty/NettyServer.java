@@ -128,7 +128,6 @@ public class NettyServer extends AServer {
 
 	public static NettyServer create(Server server) {
 		NettyServer ns=new NettyServer(null);
-		ns.receiveAction=server.getReceiveAction();
 		ns.deliver=server::deliverMessage;
 		Object maxConns=server.getConfig().get(Keywords.MAX_CONNECTIONS);
 		if (maxConns!=null) {

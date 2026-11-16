@@ -124,18 +124,6 @@ public class Server implements Closeable {
 
 	private Consumer<Message> messageReceiveObserver=null;
 
-	/**
-	 * Blocking message consumer for the NIO path and tests. Delegates to
-	 * {@link #deliverMessage} and, if a retry predicate is returned, blocks the
-	 * caller's thread until the message is accepted or times out.
-	 */
-	Consumer<Message> receiveAction = m->{
-		Predicate<Message> retry = deliverMessage(m);
-		if (retry != null) {
-			if (!retry.test(m)) returnBestEffort(m,Result.SERVER_LOADED);
-		}
-	};
-
 	/** One per boundary, so each warns once of each kind of failure that warrants it. */
 	private final RequestFailures dispatchFailures=new RequestFailures(log);
 	private final RequestFailures decodeFailures=new RequestFailures(log);
@@ -1257,14 +1245,6 @@ public class Server implements Closeable {
 
 	public HashMap<Keyword, Object> getConfig() {
 		return config;
-	}
-
-	/**
-	 * Gets the action to perform for an incoming client message
-	 * @return Message consumer
-	 */
-	public Consumer<Message> getReceiveAction() {
-		return receiveAction;
 	}
 
 	/**

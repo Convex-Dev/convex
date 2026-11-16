@@ -213,11 +213,12 @@ AConnection connectWithDelivery(URI endpoint, Function<Message, Predicate<Messag
 ```
 
 `connectWithDelivery` takes a delivery that may ask to wait by returning a retry,
-as a server's delivery does when a queue is full. The built-in Netty transports
-then stop reading that connection until the retry accepts the message or gives
-up ([BACKPRESSURE.md](BACKPRESSURE.md)). The default, used by a factory that
-implements only `connect` and by the NIO client, cannot pause: it answers a request
-it is asked to wait for with `:LOAD` at once and drops anything else.
+as a server's delivery does when a queue is full. The built-in transports (Netty
+and NIO) decode and deliver on the shared client ingress, and stop reading that
+connection until the retry accepts the message or gives up
+([BACKPRESSURE.md](BACKPRESSURE.md)). The default, used by a factory that
+implements only `connect`, cannot pause: it answers a request it is asked to wait
+for with `:LOAD` at once and drops anything else.
 
 The factory installs the receive limit before delivery starts and returns a
 ready connection, including any transport handshake. `AConnection` continues
@@ -326,17 +327,17 @@ An added `orTimeout` on the returned owned future also releases its request.
 In contrast, `get(timeout)` only stops that wait: cancel explicitly to abandon it.
 Neither cancellation nor expiry implies that a submitted transaction did not run.
 
-A reply completes the client's future on the thread that delivers it: a network
-event loop for a remote client, or for `ConvexLocal` the local peer's thread that
+A reply completes the client's future on the thread that delivers it: a client
+ingress worker for a remote client, or for `ConvexLocal` the local peer's thread that
 produced the reply. That is the thread delivering the results of the transaction's
 block, the transaction handler for a transaction refused on arrival, the query
 handler for a raw QUERY message, and the calling thread itself for a status or ping
 request; a `ConvexLocal` query takes no peer thread (§4.4). A timeout or close
 completes it on the timeout scheduler or the closing thread. Stages attached with
 `thenApply`, `thenCompose`, `whenComplete` and the other non-async methods run on
-that thread without a hand-off, so they must not block: an event loop serves many
-connections, and a local peer's threads serve every client, or every client with a
-transaction in the same block. A stage may send a
+that thread without a hand-off, so they must not block: an ingress worker serves
+every connection the process opens, and a local peer's threads serve every client,
+or every client with a transaction in the same block. A stage may send a
 further request: where its thread would wait for queue space that only it frees,
 the send fails at once with `FULL_CLIENT_BUFFER` instead
 ([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md)). A stage that needs another
@@ -419,6 +420,11 @@ Fire-and-forget messages (no request ID) return HTTP 202 Accepted.
 The server sees `AConnection` on incoming messages and uses capabilities
 uniformly. It does not know or care about the transport — a local paired
 connection, a Netty socket, and a future WebSocket connection all look the same.
+
+A message from a network connection is framed on the network thread and decoded
+and routed on one of the peer's ingress workers, in the order its connection sent
+it; a local client's message is delivered on the client's own thread
+([BACKPRESSURE.md](BACKPRESSURE.md)).
 
 ### 5.1 Result Delivery
 
