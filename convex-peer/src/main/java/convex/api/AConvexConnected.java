@@ -24,6 +24,7 @@ import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
+import convex.core.util.Cleanup;
 import convex.core.util.FutureUtils;
 import convex.net.Transport;
 
@@ -336,16 +337,18 @@ public abstract class AConvexConnected extends Convex {
 
 	@Override
 	public void close() {
+		Cleanup cleanup=new Cleanup();
 		AConnection c = this.connection;
 		if (c != null) {
-			c.close();
+			cleanup.run(c::close);
 			// Also support external transports written before connection-owned tracking.
-			c.closeRequests();
+			cleanup.run(c::closeRequests);
 		}
 		connection = null;
 		verifiedPeer = null;
 		dataRequestDelivery = null;
 		unsolicitedMessageDelivery = null;
 		receiveObserver = null;
+		cleanup.finish();
 	}
 }

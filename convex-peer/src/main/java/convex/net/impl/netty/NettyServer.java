@@ -22,6 +22,7 @@ import convex.core.data.ACell;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.NullStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
@@ -286,14 +287,17 @@ public class NettyServer extends AServer {
 			}
 		}
 		channel = null;
+		Cleanup cleanup=new Cleanup();
 		ChannelFuture serverClose = (serverChannel != null) ? serverChannel.close() : null;
 		var clientsClose = clientChannels.close();
 		if (!eventLoopThread) {
-			if (serverClose != null) serverClose.syncUninterruptibly();
-			clientsClose.awaitUninterruptibly();
-			for (AcceptedConnection accepted:incomingHandlers) accepted.finished.join();
+			// A failed close of the listening socket still leaves clients to close
+			if (serverClose != null) cleanup.run(serverClose::syncUninterruptibly);
+			cleanup.run(clientsClose::awaitUninterruptibly);
+			for (AcceptedConnection accepted:incomingHandlers) cleanup.run(accepted.finished::join);
 		}
-		outbound.close();
+		cleanup.run(outbound::close);
+		cleanup.finish();
 	}
 
 	public void waitForClose() throws InterruptedException {

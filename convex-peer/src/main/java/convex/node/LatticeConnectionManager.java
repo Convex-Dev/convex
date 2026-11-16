@@ -46,6 +46,7 @@ import convex.core.exceptions.ValidationException;
 import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 import convex.net.PeerConnectionException;
 import convex.net.PeerRefusedException;
@@ -675,10 +676,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	@Override
 	public void close() {
-		stopMaintenance();
-		closeAllConnections();
-		workers.shutdownNow();
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(this::stopMaintenance);
+		cleanup.run(this::closeAllConnections);
+		cleanup.run(workers::shutdownNow);
 		log.debug("LatticeConnectionManager closed");
+		cleanup.finish();
 	}
 
 	/**
@@ -778,10 +781,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 			dialling.clear();
 			health.clear();
 		}
-		for (Convex connection : active) closeSilently(connection);
+		// An Error closing one connection leaves the rest to close and every waiter to complete
+		Cleanup cleanup=new Cleanup();
+		for (Convex connection : active) cleanup.run(() -> closeSilently(connection));
 		for (PendingConnection pc : pending) {
 			pc.admission.completeExceptionally(new CancellationException("Connection manager closed"));
-			closeSilently(pc.connection);
+			cleanup.run(() -> closeSilently(pc.connection));
 		}
 		for (CompletableFuture<Convex> waiter : waiters) {
 			waiter.completeExceptionally(new CancellationException("Connection manager closed"));
@@ -797,6 +802,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		// Every route this manager opened is now closed
 		for (CompletableFuture<Void> waiter : disconnected) waiter.complete(null);
+		cleanup.finish();
 	}
 
 	// ========== Desired Peer Intent ==========

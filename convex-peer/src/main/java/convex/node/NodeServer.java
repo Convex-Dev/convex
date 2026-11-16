@@ -20,6 +20,7 @@ import convex.core.data.ACell;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -633,26 +634,22 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void closeResources() throws IOException {
 		if (lifecycleState==LifecycleState.STOPPED) return;
-		if (lifecycleState==LifecycleState.NEW) {
-			// Attachment transfers lifecycle ownership even before launch. This matters
-			// when an application has already supplied manager-owned peer connections.
-			lifecycleState=LifecycleState.STOPPING;
-			for (LatticePropagator propagator:propagators) {
-				runIsolated(propagator,"pre-launch shutdown",propagator::close);
-			}
-			lifecycleState=LifecycleState.STOPPED;
-			return;
-		}
 		if (lifecycleState==LifecycleState.STARTING) {
 			throw new IllegalStateException(
 				"Cannot close NodeServer while launch is in progress");
 		}
+		// Attachment transfers lifecycle ownership even before launch. This matters
+		// when an application has already supplied manager-owned peer connections.
+		String operation=(lifecycleState==LifecycleState.NEW) ? "pre-launch shutdown" : "shutdown";
 		lifecycleState=LifecycleState.STOPPING;
+		// A JVM failure that one group's isolation rethrows still leaves every other
+		// group to close
+		Cleanup cleanup=new Cleanup();
 		for (LatticePropagator propagator:propagators) {
-			runIsolated(propagator,"shutdown",propagator::close);
+			cleanup.run(() -> runIsolated(propagator,operation,propagator::close));
 		}
-
 		lifecycleState=LifecycleState.STOPPED;
 		log.debug("NodeServer closed");
+		cleanup.finish(IOException.class);
 	}
 }

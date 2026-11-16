@@ -46,6 +46,7 @@ import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.PeerConnectionException;
@@ -174,15 +175,13 @@ public class ConnectionManager extends AConnectionManager {
 		}
 
 		// Broadcast GOODBYE after maintenance has stopped, then close every route.
-		try {
-			Message msg = Message.createGoodBye();
-			broadcast(msg);
-		} finally {
-			for (Convex pending : pendingConnections) closeSilently(pending);
-			pendingConnections.clear();
-			closeAllConnections();
-			unresponsiveSince.clear();
-		}
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(() -> broadcast(Message.createGoodBye()));
+		for (Convex pending : pendingConnections) cleanup.run(() -> closeSilently(pending));
+		pendingConnections.clear();
+		cleanup.run(this::closeAllConnections);
+		unresponsiveSince.clear();
+		cleanup.finish();
 	}
 
 	public double getLoad() {

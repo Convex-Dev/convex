@@ -43,6 +43,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 import convex.core.util.FutureUtils;
 import convex.lattice.cursor.Root;
@@ -931,72 +932,62 @@ final class LatticeProtocolEndpoint implements Closeable {
 		// this is turned away by its own check
 		acceptingInbound=false;
 		inboundRunning=false;
-		inboundVerifier.close();
-		IOException failure=null;
-		try {
-			stopAcquisitions();
-		} catch (IOException e) {
-			failure=e;
-		}
 
-		// Continue every independent cleanup step even when one acquisition or
-		// worker refuses to stop. NodeServer isolates the eventual group failure,
-		// but the group should still release everything else that it can.
-		// Closing the queue wakes the worker once it has drained. Never interrupt
-		// it: it may be inside store I/O, and NIO closes an interrupted thread's
-		// file channel for every user of the store (#776).
-		inboundQueue.close();
-		Thread worker=inboundThread;
-		if (worker!=null) {
-			try {
-				worker.join(config.getInboundShutdownTimeout());
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				failure=append(failure,new IOException(
-					"Interrupted while draining propagation ingress",e));
-			}
-			if (worker.isAlive()) {
-				failure=append(failure,new IOException(
-					"Propagation ingress did not drain before timeout"));
-			} else {
-				inboundThread=null;
-			}
-		}
-		Thread maintenance=maintenanceThread;
-		if (maintenance!=null) {
-			maintenance.interrupt();
-			try {
-				maintenance.join(config.getInboundShutdownTimeout());
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				failure=append(failure,new IOException(
-					"Interrupted while stopping propagation maintenance",e));
-			}
-			if (maintenance.isAlive()) {
-				failure=append(failure,new IOException(
-					"Propagation maintenance did not stop before timeout"));
-			} else {
-				maintenanceThread=null;
-			}
-		}
+		// Every cleanup step runs even when one acquisition or worker refuses to
+		// stop. NodeServer isolates the eventual group failure, but the group should
+		// still release everything else that it can.
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(inboundVerifier::close);
+		cleanup.run(this::stopAcquisitions);
+		cleanup.run(this::stopInboundWorker);
+		cleanup.run(this::stopMaintenance);
 		for (AConnection connection:Set.copyOf(inboundConnections)) {
-			try {
-				connection.close();
-			} catch (Throwable e) {
-				Utils.checkRequestFailure(e);
-				failure=append(failure,new IOException("Unable to close propagation inbound connection",e));
-			} finally {
-				removeConnection(connection);
-			}
+			cleanup.run(() -> closeInboundConnection(connection));
 		}
 		connectionStats.clear();
-		if (failure!=null) throw failure;
+		cleanup.finish(IOException.class);
 	}
 
-	private static IOException append(IOException current,IOException additional) {
-		if (current==null) return additional;
-		current.addSuppressed(additional);
-		return current;
+	/** Closes the queue, which wakes the worker once it has drained, and waits for it. */
+	private void stopInboundWorker() throws IOException {
+		// Never interrupt the worker: it may be inside store I/O, and NIO closes an
+		// interrupted thread's file channel for every user of the store (#776).
+		inboundQueue.close();
+		Thread worker=inboundThread;
+		if (worker==null) return;
+		try {
+			worker.join(config.getInboundShutdownTimeout());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while draining propagation ingress",e);
+		}
+		if (worker.isAlive()) throw new IOException("Propagation ingress did not drain before timeout");
+		inboundThread=null;
+	}
+
+	private void stopMaintenance() throws IOException {
+		Thread maintenance=maintenanceThread;
+		if (maintenance==null) return;
+		maintenance.interrupt();
+		try {
+			maintenance.join(config.getInboundShutdownTimeout());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while stopping propagation maintenance",e);
+		}
+		if (maintenance.isAlive()) throw new IOException("Propagation maintenance did not stop before timeout");
+		maintenanceThread=null;
+	}
+
+	private void closeInboundConnection(AConnection connection) throws IOException {
+		try {
+			connection.close();
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			throw new IOException("Unable to close propagation inbound connection",e);
+		} finally {
+			removeConnection(connection);
+		}
 	}
 
 	/** Immutable aggregate of connection-scoped ingress counters for one group. */

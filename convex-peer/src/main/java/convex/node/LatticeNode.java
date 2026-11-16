@@ -21,6 +21,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
+import convex.core.util.Cleanup;
 import convex.lattice.LatticeHost;
 import convex.net.PeerConnectionException;
 import convex.net.PeerName;
@@ -353,19 +354,6 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	public InetSocketAddress getHostAddress() { return listener.getHostAddress(); }
 
 	/** Closes every listener, each even if another fails, and returns the first failure, with any later one suppressed. */
-	private Throwable closeListeners() {
-		Throwable failure=null;
-		for (LatticeListener each:listeners) {
-			try {
-				each.close();
-			} catch (RuntimeException | Error e) {
-				if (failure==null) failure=e;
-				else failure.addSuppressed(e);
-			}
-		}
-		return failure;
-	}
-
 	/**
 	 * Closes every listener for good, then the server, which sends what the host has
 	 * published and detaches from the host. Both steps always run; the first failure
@@ -374,16 +362,10 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 */
 	@Override
 	public void close() throws IOException {
-		stopKeeping(null);
-		Throwable failure=closeListeners();
-		try {
-			server.close();
-		} catch (IOException | RuntimeException | Error e) {
-			// Report the first failure; a later one must not hide it
-			if (failure==null) throw e;
-			failure.addSuppressed(e);
-		}
-		if (failure instanceof RuntimeException e) throw e;
-		if (failure instanceof Error e) throw e;
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(() -> stopKeeping(null));
+		for (LatticeListener each:listeners) cleanup.run(each::close);
+		cleanup.run(server::close);
+		cleanup.finish(IOException.class);
 	}
 }

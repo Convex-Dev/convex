@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.data.AccountKey;
 import convex.core.message.Message;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 
 /**
@@ -124,10 +125,13 @@ public abstract class AConnectionManager implements Closeable {
 	 * Closes all connections managed by this manager.
 	 */
 	public void closeAllConnections() {
+		// An Error closing one connection leaves the rest to close
+		Cleanup cleanup=new Cleanup();
 		for (Map.Entry<AccountKey, Convex> entry : connections.entrySet()) {
 			Convex conn=entry.getValue();
-			if (connections.remove(entry.getKey(),conn)) closeSilently(conn);
+			if (connections.remove(entry.getKey(),conn)) cleanup.run(() -> closeSilently(conn));
 		}
+		cleanup.finish();
 	}
 
 	/**

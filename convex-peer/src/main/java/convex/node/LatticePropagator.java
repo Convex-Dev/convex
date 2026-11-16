@@ -37,6 +37,7 @@ import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.store.AStore;
 import convex.core.store.Persister;
+import convex.core.util.Cleanup;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
@@ -920,19 +921,16 @@ public class LatticePropagator implements Closeable {
 		} catch (RuntimeException | Error failure) {
 			running=false;
 			recordFailure("launch",failure);
-			if (protocol!=null) {
-				try {
-					protocol.close();
-				} catch (IOException cleanupFailure) {
-					failure.addSuppressed(cleanupFailure);
-				}
-			}
+			Cleanup cleanup=new Cleanup();
+			if (protocol!=null) cleanup.run(protocol::close);
+			cleanup.run(connectionManager::close);
+			cleanup.run(() -> transition(State.STOPPED));
 			try {
-				connectionManager.close();
-			} catch (RuntimeException cleanupFailure) {
+				cleanup.finish(IOException.class);
+			} catch (Throwable cleanupFailure) {
+				// The launch failure stays primary
 				failure.addSuppressed(cleanupFailure);
 			}
-			transition(State.STOPPED);
 			throw failure;
 		}
 
@@ -953,9 +951,11 @@ public class LatticePropagator implements Closeable {
 	 */
 	public void triggerAndClose(ACell finalValue) {
 		transition(State.STOPPING);
+		Cleanup cleanup=new Cleanup();
 		if (!running && propagationThread == null) {
-			closeRoutes(0L);
+			cleanup.run(() -> closeRoutes(0L));
 			transition(State.STOPPED);
+			cleanup.finish();
 			return;
 		}
 		long timeout=config.getInboundShutdownTimeout();
@@ -991,18 +991,23 @@ public class LatticePropagator implements Closeable {
 		// processSnapshot is callable from any thread (serialised by writeLock),
 		// so this drain is safe even if the thread had to be abandoned after the
 		// join timeout.
-		ACell remaining;
-		while ((remaining = triggerQueue.poll()) != null) {
-			processSnapshotSafe(remaining);
-		}
+		cleanup.run(this::drainTriggerQueue);
 
 		// Let the final broadcasts leave: closing a route discards what it still queues
-		long left=Math.max(0L,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
-		closeRoutes(left);
+		cleanup.run(() -> closeRoutes(Math.max(0L,
+			TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()))));
 
 		transition(State.STOPPED);
 		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root announcements)",
 			broadcastCount, rootAnnouncementCount);
+		cleanup.finish();
+	}
+
+	private void drainTriggerQueue() {
+		ACell remaining;
+		while ((remaining = triggerQueue.poll()) != null) {
+			processSnapshotSafe(remaining);
+		}
 	}
 
 	/**
@@ -1013,10 +1018,18 @@ public class LatticePropagator implements Closeable {
 	 */
 	@Override
 	public void close() {
+		Cleanup cleanup=new Cleanup();
+		// Stop admitting protocol work and drain what was accepted, while the
+		// publication worker still runs so those merges are announced
+		cleanup.run(this::closeEndpoint);
+		cleanup.run(() -> triggerAndClose(null));
+		cleanup.finish();
+	}
+
+	private void closeEndpoint() {
+		if (endpoint==null) return;
 		try {
-			// Stop admitting protocol work and drain what was accepted, while the
-			// publication worker still runs so those merges are announced
-			if (endpoint!=null) endpoint.close();
+			endpoint.close();
 		} catch (IOException e) {
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to drain propagation protocol endpoint cleanly",e);
@@ -1025,7 +1038,6 @@ public class LatticePropagator implements Closeable {
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to stop propagation protocol endpoint cleanly",e);
 		}
-		triggerAndClose(null);
 	}
 
 	/**

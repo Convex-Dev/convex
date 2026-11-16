@@ -268,6 +268,27 @@ public class NodeServerTest {
 		assertEquals(NodeServer.LifecycleState.STOPPED,maxNodeServer.getLifecycleState());
 	}
 
+	/** A JVM failure closing one group still closes the others and stops the server. */
+	@Test
+	public void testJvmFailureClosingOneGroupClosesTheRest() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		InternalError failure=new InternalError("simulated close");
+		LatticePropagator broken=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public void close() {
+				super.close();
+				throw failure;
+			}
+		};
+		CloseTrackingPropagator healthy=new CloseTrackingPropagator(store);
+		maxNodeServer.addPropagator(broken);
+		maxNodeServer.addPropagator(healthy);
+		maxNodeServer.launch();
+
+		assertSame(failure,assertThrows(InternalError.class,maxNodeServer::close));
+		assertTrue(healthy.closed);
+		assertEquals(NodeServer.LifecycleState.STOPPED,maxNodeServer.getLifecycleState());
+	}
+
 	/** Running out of memory notifying one group fails that group's notification alone. */
 	@Test
 	public void testGroupOutOfMemoryOnNotificationIsIsolated() throws Exception {

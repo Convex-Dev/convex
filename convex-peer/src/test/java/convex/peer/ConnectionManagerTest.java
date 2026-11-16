@@ -570,6 +570,31 @@ public class ConnectionManagerTest {
 	}
 
 	@Test
+	public void testErrorClosingOneConnectionClosesTheRest() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(223));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AssertionError failure=new AssertionError("simulated close");
+			SequencedConvex failing=new SequencedConvex(-1) {
+				@Override public void close() {
+					super.close();
+					throw failure;
+				}
+			};
+			SequencedConvex other=new SequencedConvex(-1);
+			assertTrue(manager.addConnection(AKeyPair.createSeeded(224).getAccountKey(),failing));
+			assertTrue(manager.addConnection(AKeyPair.createSeeded(225).getAccountKey(),other));
+
+			assertSame(failure,assertThrows(AssertionError.class,manager::close));
+			assertEquals(1,failing.closeCount);
+			assertEquals(1,other.closeCount);
+			assertEquals(0,manager.getConnectionCount());
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
 	public void testTCPRetainsUnverifiedStatusFallbackForKnownPeer() throws Exception {
 		try (Server server=createPollingServer(AKeyPair.createSeeded(220));
 				NettyServer remote=new NettyServer(0)) {

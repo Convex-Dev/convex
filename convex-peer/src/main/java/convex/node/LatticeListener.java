@@ -17,6 +17,7 @@ import convex.core.Result;
 import convex.core.data.Strings;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.IncomingHandler;
@@ -221,8 +222,13 @@ public final class LatticeListener implements Closeable {
 			port=netty.getPort();
 			running=true;
 		} catch (IOException | InterruptedException | RuntimeException | Error e) {
-			netty.close();
 			server=null;
+			try {
+				netty.close();
+			} catch (Throwable closeFailure) {
+				// The launch failure stays primary
+				e.addSuppressed(closeFailure);
+			}
 			throw e;
 		}
 	}
@@ -387,9 +393,13 @@ public final class LatticeListener implements Closeable {
 	public void close() {
 		closed=true;
 		AServer current=server;
-		if (current!=null) current.close();
-		for (AConnection connection:Set.copyOf(assignments.keySet())) removeConnection(connection);
 		server=null;
 		running=false;
+		Cleanup cleanup=new Cleanup();
+		if (current!=null) cleanup.run(current::close);
+		for (AConnection connection:Set.copyOf(assignments.keySet())) {
+			cleanup.run(() -> removeConnection(connection));
+		}
+		cleanup.finish();
 	}
 }
