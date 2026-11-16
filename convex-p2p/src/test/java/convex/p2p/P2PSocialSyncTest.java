@@ -1,10 +1,13 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +17,7 @@ import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.Convex;
 import convex.auth.did.DID;
@@ -64,6 +68,8 @@ public class P2PSocialSyncTest {
 
 	private MemoryStore aliceStore,bobStore,carolStore,daveStore;
 	private P2PNode aliceNode,bobNode,carolNode,daveNode;
+	// Bob's node closes the views; their stores stay the test's
+	private MemoryStore bobInfrastructureStore,bobBrokenStore;
 	private LatticePropagator bobInfrastructureView,bobBrokenView;
 
 	@BeforeEach
@@ -83,15 +89,17 @@ public class P2PSocialSyncTest {
 	}
 
 	@AfterEach
-	public void tearDown() throws Exception {
-		if (daveNode!=null) daveNode.close();
-		if (aliceNode!=null) aliceNode.close();
-		if (bobNode!=null) bobNode.close();
-		if (carolNode!=null) carolNode.close();
-		if (daveStore!=null) daveStore.close();
-		if (aliceStore!=null) aliceStore.close();
-		if (bobStore!=null) bobStore.close();
-		if (carolStore!=null) carolStore.close();
+	public void tearDown() {
+		List<Executable> closes=new ArrayList<>();
+		P2PNode[] nodes={daveNode,aliceNode,bobNode,carolNode};
+		for (P2PNode node:nodes) if (node!=null) closes.add(node::close);
+		// Each node leaves open the host it opened
+		for (P2PNode node:nodes) if (node!=null) closes.add(node.getNodeServer().getHost()::close);
+		for (MemoryStore store:new MemoryStore[] {daveStore,aliceStore,bobStore,carolStore,
+				bobInfrastructureStore,bobBrokenStore}) {
+			if (store!=null) closes.add(store::close);
+		}
+		assertAll("Close the nodes, their hosts and their stores",closes);
 	}
 
 	@Test
@@ -115,11 +123,13 @@ public class P2PSocialSyncTest {
 		// Bob also publishes an infrastructure-only view from a separate serving
 		// store. A third transiently broken view proves failure containment and
 		// recovery without replacing the real follow-aware propagator group.
-		bobInfrastructureView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
+		bobInfrastructureStore=new MemoryStore();
+		bobInfrastructureView=new LatticePropagator(bobInfrastructureStore,LatticePropagatorConfig.create());
 		bobInfrastructureView.<Index<Keyword,ACell>>setPublicationFilter(
 			value -> value.dissoc(Social.KEY_SOCIAL));
 		AtomicBoolean failBrokenViewOnce=new AtomicBoolean();
-		bobBrokenView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
+		bobBrokenStore=new MemoryStore();
+		bobBrokenView=new LatticePropagator(bobBrokenStore,LatticePropagatorConfig.create());
 		bobBrokenView.<Index<Keyword,ACell>>setPublicationFilter(value -> {
 			if (failBrokenViewOnce.compareAndSet(false,true)) {
 				throw new IllegalStateException("simulated filtered-view failure");

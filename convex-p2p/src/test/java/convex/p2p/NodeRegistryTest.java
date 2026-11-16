@@ -68,14 +68,18 @@ public class NodeRegistryTest {
 
 	@Test void aNodeKeepsTheRecordsOfItsPointsOfPresence() throws Exception {
 		AKeyPair pop=key(100),other=key(101);
-		try (P2PNode node=P2PNode.create(new MemoryStore(),config(0),ALICE)) {
-			node.pointsOfPresence(pop.getAccountKey());
-			P2PApplication application=node.getApplication();
-			application.merge(registry(record(pop,1).merge(record(other,1))));
-			ACell nodes=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-			AHashMap<?,?> held=(AHashMap<?,?>)nodes;
-			assertNotNull(held.get(pop.getAccountKey()));
-			assertNull(held.get(other.getAccountKey()),"a full registry turns other nodes away");
+		try (MemoryStore store=new MemoryStore()) {
+			P2PNode node=P2PNode.create(store,config(0),ALICE);
+			// Closed in reverse: the node, then the host it opened
+			try (var nodeHost=node.getNodeServer().getHost(); node) {
+				node.pointsOfPresence(pop.getAccountKey());
+				P2PApplication application=node.getApplication();
+				application.merge(registry(record(pop,1).merge(record(other,1))));
+				ACell nodes=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+				AHashMap<?,?> held=(AHashMap<?,?>)nodes;
+				assertNotNull(held.get(pop.getAccountKey()));
+				assertNull(held.get(other.getAccountKey()),"a full registry turns other nodes away");
+			}
 		}
 	}
 

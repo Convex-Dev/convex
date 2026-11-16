@@ -1,13 +1,17 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -43,13 +47,14 @@ public class P2PDiscoveryTest {
 	private P2PNode hub,peer,leaf;
 
 	@AfterEach
-	public void tearDown() throws Exception {
-		if (leaf!=null) leaf.close();
-		if (peer!=null) peer.close();
-		if (hub!=null) hub.close();
-		if (leafStore!=null) leafStore.close();
-		if (peerStore!=null) peerStore.close();
-		if (hubStore!=null) hubStore.close();
+	public void tearDown() {
+		List<Executable> closes=new ArrayList<>();
+		P2PNode[] nodes={leaf,peer,hub};
+		for (P2PNode node:nodes) if (node!=null) closes.add(node::close);
+		// Each node leaves open the host it opened
+		for (P2PNode node:nodes) if (node!=null) closes.add(node.getNodeServer().getHost()::close);
+		for (MemoryStore store:new MemoryStore[] {leafStore,peerStore,hubStore}) if (store!=null) closes.add(store::close);
+		assertAll("Close the nodes, their hosts and their stores",closes);
 	}
 
 	@Test

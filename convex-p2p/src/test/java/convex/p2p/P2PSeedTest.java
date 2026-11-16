@@ -1,5 +1,6 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.Convex;
 import convex.auth.did.DID;
@@ -64,9 +66,11 @@ public class P2PSeedTest {
 	private final List<AutoCloseable> resources=new ArrayList<>();
 
 	@AfterEach
-	public void tearDown() throws Exception {
+	public void tearDown() {
 		Collections.reverse(resources);
-		for (AutoCloseable resource:resources) resource.close();
+		List<Executable> closes=new ArrayList<>();
+		for (AutoCloseable resource:resources) closes.add(resource::close);
+		assertAll("Close what the test opened",closes);
 	}
 
 	/** One ambient slot for the joiner; none for the others, so only the joiner dials. */
@@ -87,9 +91,15 @@ public class P2PSeedTest {
 		return store;
 	}
 
-	private P2PNode launch(AStore store,NodeConfig config,int slots,AKeyPair key) throws Exception {
-		P2PNode node=P2PNode.create(store,config,ambient(slots),key).serveAllInbound();
+	/** Closes the node after the test, then the host it opened, which closing the node leaves open */
+	private P2PNode track(P2PNode node) {
+		resources.add(node.getNodeServer().getHost());
 		resources.add(node);
+		return node;
+	}
+
+	private P2PNode launch(AStore store,NodeConfig config,int slots,AKeyPair key) throws Exception {
+		P2PNode node=track(P2PNode.create(store,config,ambient(slots),key)).serveAllInbound();
 		node.launch();
 		return node;
 	}
@@ -223,7 +233,7 @@ public class P2PSeedTest {
 	public void testRestartedNodeSeedsFromTheListItKept() throws Exception {
 		P2PNode hub=launch(store(),NodeConfig.localNetwork(),0,hubKey);
 		EtchStore joinerStore=restartableStore("seed-joiner");
-		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		P2PNode first=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey)).serveAllInbound();
 		first.launch();
 		PeerName seed=new PeerName(URI.create(address(hub).toString()),hubKey.getAccountKey());
 		assertTrue(first.addSeed(seed));
@@ -232,8 +242,7 @@ public class P2PSeedTest {
 			"a node does not seed from itself");
 		shutDown(first);
 
-		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),ambient(1),joinerKey).serveAllInbound();
-		resources.add(restarted);
+		P2PNode restarted=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),ambient(1),joinerKey)).serveAllInbound();
 		assertEquals(List.of(seed),restarted.getSeeds());
 		restarted.launch();
 		restarted.seed(List.of());
@@ -276,8 +285,7 @@ public class P2PSeedTest {
 		LatticePropagatorConfig group=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.ONE,
 			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.ONE));
-		P2PNode joiner=P2PNode.create(store(),config,group,joinerKey).serveAllInbound();
-		resources.add(joiner);
+		P2PNode joiner=track(P2PNode.create(store(),config,group,joinerKey)).serveAllInbound();
 		joiner.launch();
 
 		joiner.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
@@ -285,7 +293,6 @@ public class P2PSeedTest {
 		assertFalse(manager.getDesiredPeers().containsKey(hubKey.getAccountKey()),"only seeding dials the hub again");
 
 		// The joiner's only route goes, so it seeds again
-		resources.remove(other);
 		other.close();
 		joiner.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
 	}
@@ -296,14 +303,13 @@ public class P2PSeedTest {
 		P2PNode hub=launch(store(),NodeConfig.localNetwork(),0,hubKey);
 		P2PNode other=launch(store(),NodeConfig.localNetwork(),0,otherKey);
 		EtchStore joinerStore=restartableStore("seed-joiner");
-		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		P2PNode first=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey)).serveAllInbound();
 		first.launch();
 		first.getApplication().contacts().contacted(otherKey.getAccountKey(),address(other));
 		shutDown(first);
 
 		NodeConfig config=withSeeds(seedList(hubKey.getAccountKey(),hub));
-		P2PNode restarted=P2PNode.create(joinerStore,config,ambient(1),joinerKey).serveAllInbound();
-		resources.add(restarted);
+		P2PNode restarted=track(P2PNode.create(joinerStore,config,ambient(1),joinerKey)).serveAllInbound();
 		restarted.launch();
 		restarted.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
 		LatticeConnectionManager manager=restarted.propagationGroup().getConnectionManager();
@@ -314,8 +320,7 @@ public class P2PSeedTest {
 	/** Only nodes that answered and have not failed since, at an address this node does not refuse, join the seeds. */
 	@Test
 	public void testKnownGoodNodesAnsweredAndHaveNotFailedSince() throws Exception {
-		P2PNode joiner=P2PNode.create(store(),NodeConfig.localNetwork(),joinerKey);
-		resources.add(joiner);
+		P2PNode joiner=track(P2PNode.create(store(),NodeConfig.localNetwork(),joinerKey));
 		ContactRecords contacts=joiner.getApplication().contacts();
 		AString address=Strings.create("tcp://localhost:18888");
 		AccountKey good=AKeyPair.createSeeded(1).getAccountKey();
@@ -346,13 +351,12 @@ public class P2PSeedTest {
 	public void testRestartedNodeRejoinsFromRetainedRecordsWithoutSeeds() throws Exception {
 		P2PNode hub=launch(store(),NodeConfig.localNetwork(),0,hubKey);
 		EtchStore joinerStore=restartableStore("seed-joiner");
-		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		P2PNode first=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey)).serveAllInbound();
 		first.launch();
 		first.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
 		shutDown(first);
 
-		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
-		resources.add(restarted);
+		P2PNode restarted=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey)).serveAllInbound();
 		AHashMap<Keyword,ACell> contact=restarted.getApplication().contacts().get(hubKey.getAccountKey());
 		assertTrue(ContactRecords.answered(contact),"the contact record survived the restart");
 		assertEquals(address(hub),ContactRecords.address(contact),"with the address the hub proved its key at");
@@ -365,13 +369,12 @@ public class P2PSeedTest {
 	public void testRestartedNodeDialsTheAddressItRecordedForAContact() throws Exception {
 		P2PNode hub=launch(store(),NodeConfig.localNetwork(),0,hubKey);
 		EtchStore joinerStore=restartableStore("seed-joiner");
-		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		P2PNode first=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey)).serveAllInbound();
 		first.launch();
 		first.getApplication().contacts().contacted(hubKey.getAccountKey(),address(hub));
 		shutDown(first);
 
-		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
-		resources.add(restarted);
+		P2PNode restarted=track(P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey)).serveAllInbound();
 		assertNull(registry(restarted).get(hubKey.getAccountKey()));
 		restarted.launch();
 		restarted.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
@@ -379,7 +382,8 @@ public class P2PSeedTest {
 
 	/** Shuts a node down as a service does, keeping its store for a restart. */
 	private static void shutDown(P2PNode node) throws Exception {
-		try (node; var host=node.getNodeServer().getHost()) {
+		// Closed in reverse: the node, then its host
+		try (var host=node.getNodeServer().getHost(); node) {
 			node.getApplication().sync();
 		}
 	}

@@ -1,5 +1,6 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -8,10 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -47,9 +51,15 @@ public class P2PUserTest {
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		if (node != null) node.close();
-		if (store != null) store.close();
+	public void tearDown() {
+		List<Executable> closes=new ArrayList<>();
+		if (node != null) {
+			closes.add(node::close);
+			// The node leaves open the host it opened
+			closes.add(node.getNodeServer().getHost()::close);
+		}
+		if (store != null) closes.add(store::close);
+		assertAll("Close the node, its host and its store",closes);
 	}
 
 	/** Reads the raw signed slot straight from the root, bypassing the user view. */
@@ -130,9 +140,12 @@ public class P2PUserTest {
 
 	@Test
 	public void testOwnUserShorthandRequiresKeyPair() throws IOException {
-		try (MemoryStore keylessStore = new MemoryStore();
-				P2PNode keyless = P2PNode.create(keylessStore, NodeConfig.port(-1), null)) {
-			assertThrows(IllegalStateException.class, keyless::p2p);
+		try (MemoryStore keylessStore = new MemoryStore()) {
+			P2PNode keyless = P2PNode.create(keylessStore, NodeConfig.port(-1), null);
+			// Closed in reverse: the node, then the host it opened
+			try (var keylessHost = keyless.getNodeServer().getHost(); keyless) {
+				assertThrows(IllegalStateException.class, keyless::p2p);
+			}
 		}
 	}
 
