@@ -107,7 +107,7 @@ Lattice nodes verify connections opened to them in their own way; see
 | `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |
-| `Convex.setDialledPeer()` | The peer a client was opened to reach. While set, the client answers a challenge in the bound form naming it |
+| `Convex.setDialledPeer()` / `getDialledPeer()` | The peer a client was opened to reach. While set, the client answers a challenge in the bound form naming it |
 | `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted), unless the reply proves misbehaviour |
 | `LatticeConnectionManager` | Holds a dialled client in limbo until it proves its key ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md)) |
 | `ConnectionManager.processChallenge()` | Answers via `respondToChallenge()` with networkID context; disconnects a challenge whose signature does not verify |
@@ -153,6 +153,12 @@ accepts only this form when it verifies a connection opened to it
 Peers send Beliefs only on connections added in step 7, so the dialled peer is recorded
 before any challenge they bring.
 
+A link that proves its key only after it is added (the launch source, or a link whose
+remote proved no key in step 4) records that key as its dialled peer on the next
+maintenance pass after it is verified ([Polling and Back-off](#polling-and-back-off)), again
+only if no key was chosen before dialling. A challenge the far end sent before then had a
+plain answer and failed; the far end challenges again after its wait.
+
 **Lattice `LatticeConnectionManager`** holds a dialled client in limbo until it proves its
 key; see [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).
 
@@ -164,7 +170,11 @@ the plain form.
 
 A consensus peer's outbound links come from the peers `tryRandomConnect` picks by stake,
 the peers an operator dials with `connectToPeer`, and the peer it was launched from
-(`:source`). Every link carries the peer's key pair, so every link can be verified.
+(`:source`). Every link carries the peer's key pair, so every link can be verified, and
+can answer the far end's challenges: a `Server` given as the source is reached through an
+in-process client opened with the peer's key pair. A client passed as the source keeps its
+own connection, which the source can challenge only if the client was opened with a key
+pair.
 
 | A remote peer that is | Is |
 |---|---|

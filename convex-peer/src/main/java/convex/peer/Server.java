@@ -243,7 +243,7 @@ public class Server implements Closeable {
 				Convex c=null;
 				boolean synced=false;
 				try {
-					c=Convex.connect(source);
+					c=connectToSource(source,keyPair);
 					c.setStore(getStore());
 					Peer peer=syncPeer(keyPair,c);
 					synced=true;
@@ -290,6 +290,21 @@ public class Server implements Closeable {
 		} catch (IOException e) {
 			throw new LaunchException("IO Exception while establishing peer: "+e,e);
 		}
+	}
+
+	/**
+	 * Opens the client a peer syncs from and keeps as its link to its launch source. A
+	 * Server source gets an in-process client with this peer's key pair, so that the
+	 * source can challenge the link; any other source is connected as
+	 * {@link Convex#connect(Object)} does.
+	 *
+	 * @param source Launch source: a Convex client, a Server, or a peer address
+	 * @param keyPair This peer's key pair
+	 * @return Client connected to the source
+	 */
+	static Convex connectToSource(Object source, AKeyPair keyPair) throws IOException, TimeoutException, InterruptedException {
+		if (source instanceof Server s) return Convex.connect(s,null,keyPair);
+		return Convex.connect(source);
 	}
 
 	public Peer syncPeer(AKeyPair keyPair, Convex convex) throws LaunchException, InterruptedException {

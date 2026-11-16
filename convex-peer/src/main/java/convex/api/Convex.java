@@ -193,6 +193,15 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Gets the key of the peer this client was opened to reach.
+	 *
+	 * @return Peer key, or null if none is recorded
+	 */
+	public AccountKey getDialledPeer() {
+		return dialledPeer;
+	}
+
+	/**
 	 * Gets the store for this client instance.
 	 * @return Store, or null if no store is configured
 	 */

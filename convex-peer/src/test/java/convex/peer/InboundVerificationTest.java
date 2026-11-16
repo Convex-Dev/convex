@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,7 @@ import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
+import convex.core.util.Utils;
 import convex.net.Transports;
 
 /**
@@ -155,6 +158,56 @@ public class InboundVerificationTest {
 
 	static Message belief(Belief b) {
 		return MissingBeliefDataTest.wire(Message.createBelief(b));
+	}
+
+	/**
+	 * A peer's link to its launch source, which proves the source's key only after it is
+	 * filed, is trusted by the source once proved, even after a first challenge failed:
+	 * over the network, and in process when the source is a Server.
+	 */
+	@Test
+	public void aLaunchSourceLinkIsTrustedOnceProved() throws Exception {
+		checkLaunchSourceLinkTrusted(false);
+		checkLaunchSourceLinkTrusted(true);
+	}
+
+	private void checkLaunchSourceLinkTrusted(boolean inProcess) throws Exception {
+		Server source=launch(LOCAL);
+		AtomicLong offset=new AtomicLong();
+		source.setTimeSource(() -> Utils.getCurrentTimestamp()+offset.get());
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,REMOTE_A);
+		config.put(Keywords.STORE,new MemoryStore());
+		Server joiner=Server.create(config);
+		Convex link=null;
+		try {
+			link=Server.connectToSource(inProcess?source:source.getHostAddress(),REMOTE_A);
+			link.setStore(joiner.getStore());
+			joiner.getCVMExecutor().setPeer(joiner.syncPeer(REMOTE_A,link));
+			AccountKey sourceKey=LOCAL.getAccountKey();
+			assertSame(link,joiner.getConnectionManager().getConnection(sourceKey));
+			Message belief=Message.createBelief(source.getBelief());
+
+			// Before the link has proved the source's key, its answer names no peer
+			CompletableFuture<AConnection> refused=nextOutcome(source,false);
+			assertTrue(link.trySend(belief));
+			refused.get(WAIT,TimeUnit.SECONDS);
+
+			Hash networkID=source.getPeer().getNetworkID();
+			assertEquals(sourceKey,link.verifyPeer(sourceKey,networkID).get(WAIT,TimeUnit.SECONDS));
+			joiner.getConnectionManager().verifyDueLinks();
+			assertEquals(sourceKey,link.getDialledPeer());
+
+			// Once the wait after the failure has passed, the source challenges again
+			offset.addAndGet(source.getConnectionManager().getPollDelay());
+			CompletableFuture<AConnection> trusted=nextOutcome(source,true);
+			assertTrue(link.trySend(belief));
+			assertEquals(REMOTE_A.getAccountKey(),trusted.get(WAIT,TimeUnit.SECONDS).getTrustedKey());
+		} finally {
+			if (link!=null) link.close();
+			joiner.close();
+			source.close();
+		}
 	}
 
 	/**
