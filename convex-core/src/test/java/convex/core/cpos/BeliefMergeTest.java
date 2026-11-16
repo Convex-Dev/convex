@@ -530,7 +530,9 @@ public class BeliefMergeTest {
 	public void testGossipConsensus() throws Exception {
 		boolean ANALYSIS = false;
 		int GOSSIP_NUM = 1;
-		final int TX_ROUNDS = 180;
+		// Enough rounds for the Order to pass 256 Blocks, 9*(3+30)=297, so its Block
+		// Vector grows another tree level
+		final int TX_ROUNDS = 30;
 		final int SETTLE_ROUNDS = 25;
 		final int NUM_INITIAL_TRANS = 3;
 
