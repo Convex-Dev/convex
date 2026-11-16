@@ -124,6 +124,7 @@ public class RTTest {
 		assertEquals(CVMDouble.create(0.17), RT.cvm(0.17));
 		assertEquals(Strings.create("foo"), RT.cvm("foo"));
 		assertEquals(Vectors.empty(), RT.cvm(new ArrayList<Object>()));
+		assertEquals(Vectors.of(1, 2, 3), RT.cvm(new long[] {1, 2, 3}));
 
 		// CVM objects shouldn't change
 		Keyword k = Keyword.create("test-key");
