@@ -39,9 +39,11 @@ public class ConvexDirectTest {
 	static final AKeyPair peerKey=AKeyPair.createSeeded(5675675);
 	static final AKeyPair otherKey=AKeyPair.createSeeded(8686868);
 
+	/** Genesis with peerKey's peer alone. Immutable, so each test's client starts from it. */
+	static final State SINGLE=Init.createState(List.of(peerKey.getAccountKey()));
+
 	private static ConvexDirect createSingle() {
-		State state=Init.createTestState(List.of(peerKey.getAccountKey()));
-		return ConvexDirect.create(peerKey,state);
+		return ConvexDirect.create(peerKey,SINGLE);
 	}
 
 	@Test public void testSetup() throws InterruptedException {
@@ -95,7 +97,7 @@ public class ConvexDirectTest {
 	}
 
 	@Test public void testBeliefExchangeReachesConsensus() throws Exception {
-		State state=Init.createTestState(List.of(peerKey.getAccountKey(),otherKey.getAccountKey()));
+		State state=Init.createState(List.of(peerKey.getAccountKey(),otherKey.getAccountKey()));
 		ConvexDirect a=ConvexDirect.create(peerKey,state);
 		ConvexDirect b=ConvexDirect.create(otherKey,state);
 		AccountKey aKey=peerKey.getAccountKey();
