@@ -1,5 +1,6 @@
 package convex.db;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,15 +48,21 @@ public class ConvexDBPersistenceTest {
 	private static final String TABLE_NAME = "T";
 
 	private NodeServer<AHashMap<AString,Index<Keyword,ACell>>> server;
+	private LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host;
 	private EtchStore store;
 	private File etchFile;
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		ConvexDB cdb = ConvexDB.lookup(dbName);
-		if (cdb != null) cdb.unregister(dbName);
-		if (server != null) { server.close(); server = null; }
-		if (store != null) { store.close(); store = null; }
+	public void tearDown() {
+		// The node closes before its host, and the host saves before its store closes
+		assertAll("Close this test's database, node, host and store",
+			() -> {
+				ConvexDB cdb = ConvexDB.lookup(dbName);
+				if (cdb != null) cdb.unregister(dbName);
+			},
+			() -> { if (server != null) server.close(); },
+			() -> { if (host != null) host.close(); },
+			() -> { if (store != null) store.close(); });
 	}
 
 	// ========== Helpers ==========
@@ -72,7 +79,7 @@ public class ConvexDBPersistenceTest {
 		if (store == null) {
 			store = EtchStore.create(etchFile);
 		}
-		var host = open(store);
+		host = open(store);
 		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 		server = new NodeServer<>(host);
 		server.launch();
@@ -89,7 +96,7 @@ public class ConvexDBPersistenceTest {
 	private void persistAndClose() throws Exception {
 		ConvexDB cdb = ConvexDB.lookup(dbName);
 		if (cdb != null) cdb.unregister(dbName);
-		server.getHost().close();
+		host.close(); host = null;
 		server.close(); server = null;
 		store.close(); store = null;
 	}
@@ -156,8 +163,7 @@ public class ConvexDBPersistenceTest {
 			createTable(db.database(dbName));
 			insertViaLattice(db.database(dbName).tables(),0,10);
 		}
-		try (var reopenedStore=EtchStore.create(file)) {
-			var host=open(reopenedStore);
+		try (var reopenedStore=EtchStore.create(file); var host=open(reopenedStore)) {
 			var db=host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 			db.register(dbName);
 			try { verifyJdbcCount(10); verifyJdbcRow(9); }

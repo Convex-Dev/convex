@@ -1,5 +1,6 @@
 package convex.restapi.handler;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,15 +60,18 @@ public class ContentResponseTest {
 		app = Javalin.create(config -> {
 			config.routes.get("/content", ctx -> ContentResponse.send(ctx, ETAG, TYPE, new ClosingChannel(Files.newByteChannel(file))));
 			config.routes.head("/content", ctx -> ContentResponse.send(ctx, ETAG, TYPE, new ClosingChannel(Files.newByteChannel(file))));
-		}).start(0);
+		});
+		// Started once assigned, so teardown stops a server that fails to start
+		app.start(0);
 		url = "http://localhost:" + app.port() + "/content";
 		client = HttpClient.newHttpClient();
 	}
 
 	@AfterAll
 	static void teardown() {
-		app.stop();
-		client.close();
+		assertAll("Stop the content server and close the client",
+				() -> { if (app != null) app.stop(); },
+				() -> { if (client != null) client.close(); });
 	}
 
 	@Test

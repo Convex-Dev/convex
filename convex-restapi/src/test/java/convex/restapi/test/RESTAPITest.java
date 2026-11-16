@@ -327,10 +327,11 @@ public class RESTAPITest extends ARESTTest {
 	
 	@Test public void testBlock() throws Exception {
 		// Own account, so a transaction in flight elsewhere cannot invalidate this one
-		ConvexHTTP convex = newClient();
-		
-		// Submit a transaction
-		convex.core.Result result = convex.transactSync("(+ 2 3)");
+		convex.core.Result result;
+		try (ConvexHTTP convex = newClient()) {
+			// Submit a transaction
+			result = convex.transactSync("(+ 2 3)");
+		}
 		assertNotNull(result);
 		assertSucceeded(result);
 		

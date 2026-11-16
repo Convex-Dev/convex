@@ -26,8 +26,7 @@ public class DlfsStartTest {
 	@Test
 	public void testServiceMutationsPublishBeforeShutdown() throws Exception {
 		var key=AKeyPair.createSeeded(9241);
-		try (var store=new MemoryStore()) {
-			var host=LatticeHost.create(store);
+		try (var store=new MemoryStore(); var host=LatticeHost.create(store)) {
 			var application=host.addApplication(new DLFSApplication(host,key::signData));
 			var drives=DlfsStart.createDriveManager(host,application,key.getAccountKey());
 			assertTrue(drives.createDrive(null,"home"));
@@ -41,9 +40,12 @@ public class DlfsStartTest {
 					.PUT(HttpRequest.BodyPublishers.ofString("published before shutdown")).build();
 				assertEquals(201,client.send(put,HttpResponse.BodyHandlers.ofString()).statusCode());
 				assertEquals(host.cursor().get(),store.getRootData(),"file completion must publish the host");
-				var restored=new DLFSApplication(LatticeHost.open(store));
-				assertEquals("published before shutdown",java.nio.file.Files.readString(
-					restored.drives(key.getAccountKey()).drive("home").fileSystem().getPath("/file")));
+				// Closing a host saves its root, so this one closes before the store is checked again
+				try (var restoredHost=LatticeHost.open(store)) {
+					var restored=new DLFSApplication(restoredHost);
+					assertEquals("published before shutdown",java.nio.file.Files.readString(
+						restored.drives(key.getAccountKey()).drive("home").fileSystem().getPath("/file")));
+				}
 
 				var create=HttpRequest.newBuilder(base.resolve("extra/"))
 					.method("MKCOL",HttpRequest.BodyPublishers.noBody()).build();

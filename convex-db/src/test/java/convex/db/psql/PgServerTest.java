@@ -65,12 +65,17 @@ public class PgServerTest {
 
 	@AfterAll
 	public static void tearDown() {
-		if (server != null && server.isRunning()) {
-			server.stop();
-		}
-		if (cdb != null) {
-			cdb.unregister(dbName);
-		}
+		assertAll("Stop the class's server and close its database",
+			() -> {
+				if (server != null && server.isRunning()) {
+					server.stop();
+				}
+			},
+			() -> {
+				if (cdb != null) {
+					cdb.unregister(dbName);
+				}
+			});
 	}
 
 	/**
@@ -427,8 +432,9 @@ public class PgServerTest {
 			}
 			assertTrue(own.tables().tableExists("ORDERS"));
 		} finally {
-			ownServer.stop();
-			ownCdb.unregister(ownName);
+			assertAll("Stop this test's server and close its database",
+				ownServer::stop,
+				() -> ownCdb.unregister(ownName));
 		}
 	}
 

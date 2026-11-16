@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -87,8 +88,9 @@ class DIDNamedAPITest {
 
 	@AfterAll
 	static void closeServer() {
-		if (restServer != null) restServer.close();
-		if (peerServer != null) peerServer.close();
+		assertAll("Close the REST server and its peer",
+				() -> { if (restServer != null) restServer.close(); },
+				() -> { if (peerServer != null) peerServer.close(); });
 	}
 
 	@Test

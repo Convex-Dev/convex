@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -66,12 +67,10 @@ class RESTRuntimeConfigTest {
 
 	@AfterAll
 	static void closePeer() {
-		try {
-			if (peer!=null) peer.close();
-		} finally {
-			// The peer borrows the store, so it is closed here, after the peer
-			if (store!=null) store.close();
-		}
+		// The peer borrows the store, so the store closes after the peer
+		assertAll("Close the shared peer and its store",
+				() -> { if (peer!=null) peer.close(); },
+				() -> { if (store!=null) store.close(); });
 	}
 
 	@Test
@@ -272,18 +271,24 @@ class RESTRuntimeConfigTest {
 		RESTConfig config=RESTConfig.parse(json5);
 		var launchConfig=config.toLegacy();
 		MemoryStore ownStore=new MemoryStore();
-		launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
-		launchConfig.put(Keywords.STORE,ownStore);
-		launchConfig.put(Keywords.PORT,0);
-		Server ownPeer=API.launchPeer(launchConfig);
-		RESTServer rest=RESTServer.create(ownPeer);
-		RunningServer running=new RunningServer(ownPeer,rest,ownStore);
+		Server ownPeer=null;
+		RESTServer rest=null;
 		try {
+			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
+			launchConfig.put(Keywords.STORE,ownStore);
+			launchConfig.put(Keywords.PORT,0);
+			ownPeer=API.launchPeer(launchConfig);
+			rest=RESTServer.create(ownPeer);
 			rest.start(0);
 			assertNotNull(rest.getRESTConfig());
-			return running;
-		} catch (RuntimeException | Error t) {
-			running.close();
+			return new RunningServer(ownPeer,rest,ownStore);
+		} catch (Exception | Error t) {
+			// Closes whatever opened before the failure
+			try {
+				new RunningServer(ownPeer,rest,ownStore).close();
+			} catch (Throwable closeFailure) {
+				t.addSuppressed(closeFailure);
+			}
 			throw t;
 		}
 	}
@@ -361,7 +366,10 @@ class RESTRuntimeConfigTest {
 		return false;
 	}
 
-	/** A REST server and its Peer; ownStore is set only when the Peer was launched for it. */
+	/**
+	 * A REST server and its Peer; ownStore is set only when the Peer was launched for it.
+	 * The Peer and server are null only in one that closes after a failed launch.
+	 */
 	private record RunningServer(Server peer,RESTServer rest,MemoryStore ownStore) implements AutoCloseable {
 		String url(String path) {
 			return "http://localhost:"+rest.getPort()+path;
@@ -369,18 +377,12 @@ class RESTRuntimeConfigTest {
 
 		@Override
 		public void close() {
-			try {
-				rest.close();
-			} finally {
-				// The shared Peer outlives this server; a Peer of its own does not
-				if (ownStore!=null) {
-					try {
-						peer.close();
-					} finally {
-						ownStore.close();
-					}
-				}
-			}
+			// The shared Peer outlives this server; a Peer of its own does not, and
+			// closes before the store it borrows
+			assertAll("Close the REST server",
+					() -> { if (rest!=null) rest.close(); },
+					() -> { if (ownStore!=null && peer!=null) peer.close(); },
+					() -> { if (ownStore!=null) ownStore.close(); });
 		}
 	}
 }

@@ -97,12 +97,10 @@ public class EtchCLITest {
 		convex.core.data.AString garbage=convex.core.data.Strings.create("GC CLI garbage value. ".repeat(10));
 		Hash rootHash=root.getHash();
 		Hash garbageHash=garbage.getHash();
-		{
-			convex.etch.EtchStore s=convex.etch.EtchStore.create(f);
+		try (convex.etch.EtchStore s=convex.etch.EtchStore.create(f)) {
 			convex.core.data.Cells.persist(garbage, s);
 			s.setRootData(root);
 			s.flush();
-			s.close();
 		}
 
 		// In-place GC
@@ -112,12 +110,10 @@ public class EtchCLITest {
 		// Collected store: root intact, garbage gone. (The data may still live
 		// on the generational file until adoption completes; EtchStore.create
 		// resolves that transparently)
-		{
-			convex.etch.EtchStore s=convex.etch.EtchStore.create(f);
+		try (convex.etch.EtchStore s=convex.etch.EtchStore.create(f)) {
 			assertEquals(rootHash, s.getRootHash());
 			assertEquals(root, s.getRootData());
 			assertNull(s.getEtch().read(garbageHash));
-			s.close();
 		}
 
 		// Migrate into a fresh destination, adopting the source root
@@ -125,11 +121,9 @@ public class EtchCLITest {
 		t=CLTester.run("etch", "migrate", "--etch", f.getCanonicalPath(),
 				"--into", dest.getCanonicalPath(), "--set-root");
 		t.assertExitCode(ExitCodes.SUCCESS);
-		{
-			convex.etch.EtchStore d=convex.etch.EtchStore.create(dest);
+		try (convex.etch.EtchStore d=convex.etch.EtchStore.create(dest)) {
 			assertEquals(rootHash, d.getRootHash());
 			assertEquals(root, d.getRootData());
-			d.close();
 		}
 
 		// Explicit recovery run reports success
@@ -141,11 +135,9 @@ public class EtchCLITest {
 		t=CLTester.run("etch", "repair", "--etch", f.getCanonicalPath(),
 				"--into", repaired.getCanonicalPath());
 		t.assertExitCode(ExitCodes.SUCCESS);
-		{
-			convex.etch.EtchStore r=convex.etch.EtchStore.create(repaired);
+		try (convex.etch.EtchStore r=convex.etch.EtchStore.create(repaired)) {
 			assertEquals(rootHash,r.getRootHash());
 			assertEquals(root,r.getRootData());
-			r.close();
 		}
 
 		// GC --output: collect into a fresh file, source untouched
@@ -153,11 +145,9 @@ public class EtchCLITest {
 		t=CLTester.run("etch", "gc", "--etch", dest.getCanonicalPath(),
 				"--output", out.getCanonicalPath());
 		t.assertExitCode(ExitCodes.SUCCESS);
-		{
-			convex.etch.EtchStore o=convex.etch.EtchStore.create(out);
+		try (convex.etch.EtchStore o=convex.etch.EtchStore.create(out)) {
 			assertEquals(rootHash, o.getRootHash());
 			assertEquals(root, o.getRootData());
-			o.close();
 		}
 	}
 
@@ -195,10 +185,10 @@ public class EtchCLITest {
 		File file=Helpers.createTempFile("strictValidateCli", ".db");
 		convex.core.data.AString root=convex.core.data.Strings.create(
 				"Strict CLI validation root. ".repeat(12));
-		convex.etch.EtchStore store=convex.etch.EtchStore.create(file);
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (convex.etch.EtchStore store=convex.etch.EtchStore.create(file)) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		CLTester tester=CLTester.run("etch", "validate", "--etch", file.getCanonicalPath());
 		tester.assertExitCode(ExitCodes.SUCCESS);

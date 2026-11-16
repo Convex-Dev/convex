@@ -42,7 +42,9 @@ public class AObserverQueueTest {
 			closeReturned.set(true);
 			assertTrue(waited,"the queue thread ended before close returned");
 		} finally {
+			// Lets the queue thread end, then stops it if the test failed before closing; closing again does nothing
 			closeReturned.set(true);
+			queue.close();
 		}
 	}
 

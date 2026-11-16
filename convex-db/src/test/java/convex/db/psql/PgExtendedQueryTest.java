@@ -73,8 +73,9 @@ public class PgExtendedQueryTest {
 
 	@AfterEach
 	public void tearDown() {
-		channel.finishAndReleaseAll();
-		cdb.unregister(dbName);
+		assertAll("Close this test's channel and database",
+			() -> { if (channel != null) channel.finishAndReleaseAll(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	@Test

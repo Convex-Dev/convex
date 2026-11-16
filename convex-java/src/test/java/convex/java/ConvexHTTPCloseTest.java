@@ -35,15 +35,18 @@ public class ConvexHTTPCloseTest {
 		final CompletableFuture<Void> clientClosed=new CompletableFuture<>();
 		private final String answer;
 		private volatile Socket accepted;
+		private final Thread serving;
 
 		OneConnectionServer(String answer) throws IOException {
 			this.answer=answer;
-			Thread.ofVirtual().start(this::serve);
+			serving=Thread.ofVirtual().start(this::serve);
 		}
 
 		private void serve() {
 			try (Socket s=socket.accept()) {
 				accepted=s;
+				// Accepted as close ran: close may have missed this socket, so it closes here
+				if (socket.isClosed()) return;
 				InputStream in=s.getInputStream();
 				StringBuilder request=new StringBuilder();
 				byte[] buffer=new byte[4096];
@@ -71,17 +74,27 @@ public class ConvexHTTPCloseTest {
 		}
 
 		@Override
-		public void close() throws IOException {
-			Socket s=accepted;
-			if (s!=null) s.close();
-			socket.close();
+		public void close() throws IOException, InterruptedException {
+			try {
+				// The listener closes first, so a connection accepted from now on is closed by serve
+				socket.close();
+			} finally {
+				try {
+					Socket s=accepted;
+					if (s!=null) s.close();
+				} finally {
+					// Closing the sockets ends the serving thread
+					serving.join();
+				}
+			}
 		}
 	}
 
 	@Test
 	public void closingEndsAWaitingRequestAndItsConnection() throws Exception {
-		try (OneConnectionServer server=new OneConnectionServer(null)) {
-			ConvexHTTP client=ConvexHTTP.connect(server.uri());
+		// The client closes again on the way out, which does nothing
+		try (OneConnectionServer server=new OneConnectionServer(null);
+				ConvexHTTP client=ConvexHTTP.connect(server.uri())) {
 			CompletableFuture<Result> status=client.requestStatus();
 			assertTrue(server.received.await(5,TimeUnit.SECONDS),"the server has the request");
 			assertEquals(1,client.getPendingExchangeCount());
@@ -97,8 +110,9 @@ public class ConvexHTTPCloseTest {
 
 	@Test
 	public void aRequestAfterCloseIsNeverSent() throws Exception {
-		try (OneConnectionServer server=new OneConnectionServer(null)) {
-			ConvexHTTP client=ConvexHTTP.connect(server.uri());
+		// The client closes again on the way out, which does nothing
+		try (OneConnectionServer server=new OneConnectionServer(null);
+				ConvexHTTP client=ConvexHTTP.connect(server.uri())) {
 			client.close();
 			CompletableFuture<Result> status=client.requestStatus();
 			assertTrue(status.isDone(),"answered without a round trip");
@@ -111,12 +125,11 @@ public class ConvexHTTPCloseTest {
 	@Test
 	public void anAnsweredRequestIsNoLongerTracked() throws Exception {
 		String answer="HTTP/1.1 200 OK\r\nContent-Type: application/cvx\r\nContent-Length: 2\r\n\r\n{}";
-		try (OneConnectionServer server=new OneConnectionServer(answer)) {
-			ConvexHTTP client=ConvexHTTP.connect(server.uri());
+		try (OneConnectionServer server=new OneConnectionServer(answer);
+				ConvexHTTP client=ConvexHTTP.connect(server.uri())) {
 			Result status=client.requestStatus().get(5,TimeUnit.SECONDS);
 			assertFalse(status.isError(),status.toString());
 			assertEquals(0,client.getPendingExchangeCount());
-			client.close();
 		}
 	}
 
@@ -127,10 +140,10 @@ public class ConvexHTTPCloseTest {
 		try (ServerSocket unused=new ServerSocket(0)) {
 			port=unused.getLocalPort();
 		}
-		ConvexHTTP client=ConvexHTTP.connect(URI.create("http://localhost:"+port));
-		Result status=client.requestStatus().get(5,TimeUnit.SECONDS);
-		assertTrue(status.isError(),status.toString());
-		assertEquals(0,client.getPendingExchangeCount());
-		client.close();
+		try (ConvexHTTP client=ConvexHTTP.connect(URI.create("http://localhost:"+port))) {
+			Result status=client.requestStatus().get(5,TimeUnit.SECONDS);
+			assertTrue(status.isError(),status.toString());
+			assertEquals(0,client.getPendingExchangeCount());
+		}
 	}
 }

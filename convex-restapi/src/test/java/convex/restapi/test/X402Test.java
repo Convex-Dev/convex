@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -75,7 +76,9 @@ public class X402Test extends ARESTTest {
 
 	@AfterAll
 	static void tearDown() {
-		if (restServer != null) restServer.close();
+		assertAll("Close the x402 REST server and the client",
+				() -> { if (restServer != null) restServer.close(); },
+				() -> { if (convex != null) convex.close(); });
 	}
 
 	static URI gatedUri() {
@@ -264,36 +267,37 @@ public class X402Test extends ARESTTest {
 	public void testCad29TokenPayment() throws Exception {
 		// Fresh connection: its sequence tracking must not be confused by payments
 		// settled out-of-band in other tests
-		Convex deployer = Convex.connect(peerServer);
-		deployer.setAddress(payer, kp);
-		convex.core.Result deployed = deployer
-				.transactSync("(deploy (@convex.fungible/build-token {:supply 1000000}))");
-		assertFalse(deployed.isError(), "token deploy failed: " + deployed);
-		Address token = deployed.getValue();
+		try (Convex deployer = Convex.connect(peerServer)) {
+			deployer.setAddress(payer, kp);
+			convex.core.Result deployed = deployer
+					.transactSync("(deploy (@convex.fungible/build-token {:supply 1000000}))");
+			assertFalse(deployed.isError(), "token deploy failed: " + deployed);
+			Address token = deployed.getValue();
 
-		String network = fetchDemand().accepts().get(0).network();
-		PaymentRequirements req = new PaymentRequirements(X402.SCHEME_EXACT, network, "500",
-				"cad29:" + token.longValue(), "#13", 30, null);
-		X402Client client = X402Client.create(httpClient, deployer, kp);
-		PaymentPayload payment = client.buildPayment(req);
+			String network = fetchDemand().accepts().get(0).network();
+			PaymentRequirements req = new PaymentRequirements(X402.SCHEME_EXACT, network, "500",
+					"cad29:" + token.longValue(), "#13", 30, null);
+			X402Client client = X402Client.create(httpClient, deployer, kp);
+			PaymentPayload payment = client.buildPayment(req);
 
-		String body = JSON.toString(Maps.of(
-				Fields.X402_VERSION, CVMLong.create(X402.VERSION),
-				Fields.PAYMENT_PAYLOAD, payment.toJSON(),
-				Fields.PAYMENT_REQUIREMENTS, req.toJSON()));
-		HttpResponse<String> settleResponse = httpClient.send(
-				HttpRequest.newBuilder(URI.create(hostPath + "/x402/settle"))
-						.header("Content-Type", "application/json")
-						.POST(HttpRequest.BodyPublishers.ofString(body)).build(),
-				HttpResponse.BodyHandlers.ofString());
-		assertEquals(200, settleResponse.statusCode());
-		SettlementResponse settled = SettlementResponse
-				.fromJSON(RT.castMap(JSON.parse(settleResponse.body())));
-		assertTrue(settled.success(), "token settle failed: " + settleResponse.body());
+			String body = JSON.toString(Maps.of(
+					Fields.X402_VERSION, CVMLong.create(X402.VERSION),
+					Fields.PAYMENT_PAYLOAD, payment.toJSON(),
+					Fields.PAYMENT_REQUIREMENTS, req.toJSON()));
+			HttpResponse<String> settleResponse = httpClient.send(
+					HttpRequest.newBuilder(URI.create(hostPath + "/x402/settle"))
+							.header("Content-Type", "application/json")
+							.POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+					HttpResponse.BodyHandlers.ofString());
+			assertEquals(200, settleResponse.statusCode());
+			SettlementResponse settled = SettlementResponse
+					.fromJSON(RT.castMap(JSON.parse(settleResponse.body())));
+			assertTrue(settled.success(), "token settle failed: " + settleResponse.body());
 
-		convex.core.Result balance = deployer
-				.querySync("(@convex.fungible/balance " + token + " #13)");
-		assertEquals(CVMLong.create(500), balance.getValue());
+			convex.core.Result balance = deployer
+					.querySync("(@convex.fungible/balance " + token + " #13)");
+			assertEquals(CVMLong.create(500), balance.getValue());
+		}
 	}
 
 	@Test

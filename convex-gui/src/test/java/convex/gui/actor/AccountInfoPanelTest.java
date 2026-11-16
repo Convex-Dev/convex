@@ -1,16 +1,20 @@
 package convex.gui.actor;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.EventQueue;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.auth.did.DID;
 import convex.core.cvm.AccountStatus;
@@ -63,9 +67,9 @@ public class AccountInfoPanelTest {
 			component.cursor().set((AccountStatus)null);
 			expectText(panels,getInfoText(null));
 		} finally {
-			EventQueue.invokeAndWait(() -> {
-				for (var panel:panels) { panel.close(); panel.removeNotify(); }
-			});
+			List<Executable> closes=new ArrayList<>();
+			for (var panel:panels) closes.add(() -> EventQueue.invokeAndWait(() -> { panel.close(); panel.removeNotify(); }));
+			assertAll("Close the panels",closes);
 		}
 	}
 

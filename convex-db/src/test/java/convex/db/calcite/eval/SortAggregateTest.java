@@ -61,8 +61,9 @@ class SortAggregateTest {
 
 	@AfterEach
 	void tearDown() throws Exception {
-		if (conn != null) conn.close();
-		if (cdb != null) cdb.unregister(dbName);
+		assertAll("Close this test's connection and database",
+			() -> { if (conn != null) conn.close(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	// ========== Sort Tests ==========

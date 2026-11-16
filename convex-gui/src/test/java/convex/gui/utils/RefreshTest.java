@@ -27,18 +27,22 @@ public class RefreshTest {
 	public void testRunsOnlyWhileShowing() throws Exception {
 		CountDownLatch ran=new CountDownLatch(1);
 		Refresh refresh=Refresh.whileShowing(new JPanel(), 10, ran::countDown);
+		try {
+			// A component that isn't showing isn't refreshed
+			assertFalse(isActive(refresh));
 
-		// A component that isn't showing isn't refreshed
-		assertFalse(isActive(refresh));
+			// Showing starts refreshing straight away
+			EventQueue.invokeAndWait(()->refresh.showing(true));
+			assertTrue(isActive(refresh));
+			assertTrue(ran.await(10, TimeUnit.SECONDS));
 
-		// Showing starts refreshing straight away
-		EventQueue.invokeAndWait(()->refresh.showing(true));
-		assertTrue(isActive(refresh));
-		assertTrue(ran.await(10, TimeUnit.SECONDS));
-
-		// Hiding stops it
-		EventQueue.invokeAndWait(()->refresh.showing(false));
-		assertFalse(isActive(refresh));
+			// Hiding stops it
+			EventQueue.invokeAndWait(()->refresh.showing(false));
+			assertFalse(isActive(refresh));
+		} finally {
+			// Hiding again does nothing
+			EventQueue.invokeAndWait(()->refresh.showing(false));
+		}
 	}
 
 	@Test
@@ -49,8 +53,11 @@ public class RefreshTest {
 			throw new IllegalStateException("Deliberate test failure");
 		});
 
-		EventQueue.invokeAndWait(()->refresh.showing(true));
-		assertTrue(ranTwice.await(10, TimeUnit.SECONDS));
-		EventQueue.invokeAndWait(()->refresh.showing(false));
+		try {
+			EventQueue.invokeAndWait(()->refresh.showing(true));
+			assertTrue(ranTwice.await(10, TimeUnit.SECONDS));
+		} finally {
+			EventQueue.invokeAndWait(()->refresh.showing(false));
+		}
 	}
 }

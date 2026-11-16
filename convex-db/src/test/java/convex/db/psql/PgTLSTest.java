@@ -77,8 +77,9 @@ public class PgTLSTest {
 
 	@AfterEach
 	public void tearDown() {
-		if (server != null) server.stop();
-		cdb.unregister(dbName);
+		assertAll("Stop this test's server and close its database",
+			() -> { if (server != null) server.stop(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	private void start(SSLContext context, boolean allowPlaintext) throws InterruptedException {

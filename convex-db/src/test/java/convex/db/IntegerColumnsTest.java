@@ -87,8 +87,9 @@ public class IntegerColumnsTest {
 
 	@AfterAll
 	public static synchronized void tearDown() {
-		if (server != null && server.isRunning()) server.stop();
-		if (cdb != null) cdb.unregister(dbName);
+		assertAll("Stop the class's server and close its database",
+			() -> { if (server != null && server.isRunning()) server.stop(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	private Connection jdbc() throws SQLException {

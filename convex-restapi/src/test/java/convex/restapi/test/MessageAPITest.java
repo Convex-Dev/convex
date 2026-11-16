@@ -104,7 +104,10 @@ public class MessageAPITest extends ARESTTest {
 	@Test
 	public void testTransactViaMessage() throws Exception {
 		Address addr = newAccount();
-		long seq = connect().getSequence(addr) + 1;
+		long seq;
+		try (convex.api.Convex convex = connect()) {
+			seq = convex.getSequence(addr) + 1;
+		}
 		Invoke tx = Invoke.create(addr, seq, Reader.read("(+ 10 20)"));
 		SignedData<ATransaction> signed = CLIENT_KP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);
@@ -116,13 +119,14 @@ public class MessageAPITest extends ARESTTest {
 	@Test
 	public void testChallengeViaMessage() throws Exception {
 		AKeyPair clientKP = AKeyPair.createSeeded(99999);
-		convex.api.Convex convex = connect();
-		convex.setKeyPair(clientKP);
+		try (convex.api.Convex convex = connect()) {
+			convex.setKeyPair(clientKP);
 
-		convex.core.data.AccountKey serverKey = server.getServer().getPeerKey();
-		convex.core.data.AccountKey result = convex.verifyPeer(serverKey).get(5, java.util.concurrent.TimeUnit.SECONDS);
-		assertEquals(serverKey, result);
-		assertEquals(serverKey, convex.getVerifiedPeer());
+			convex.core.data.AccountKey serverKey = server.getServer().getPeerKey();
+			convex.core.data.AccountKey result = convex.verifyPeer(serverKey).get(5, java.util.concurrent.TimeUnit.SECONDS);
+			assertEquals(serverKey, result);
+			assertEquals(serverKey, convex.getVerifiedPeer());
+		}
 	}
 
 	@Test
@@ -314,7 +318,10 @@ public class MessageAPITest extends ARESTTest {
 	public void testTransactBadSignature() throws Exception {
 		Address addr = newAccount();
 		AKeyPair wrongKP = AKeyPair.createSeeded(777);
-		long seq = connect().getSequence(addr) + 1;
+		long seq;
+		try (convex.api.Convex convex = connect()) {
+			seq = convex.getSequence(addr) + 1;
+		}
 		Invoke tx = Invoke.create(addr, seq, Reader.read("(+ 1 1)"));
 		SignedData<ATransaction> signed = wrongKP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);

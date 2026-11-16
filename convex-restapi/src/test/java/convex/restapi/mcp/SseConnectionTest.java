@@ -1,5 +1,6 @@
 package convex.restapi.mcp;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,13 +41,13 @@ class SseConnectionTest {
 			assertTrue(fastWriteSeen.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
 		} finally {
 			releaseSlowWrite.countDown();
-			try {
-				slow.close();
-				fast.close();
-			} finally {
-				executor.shutdownNow();
-				assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"distributor did not stop");
-			}
+			assertAll("Close the connections, then stop the distributor",
+				slow::close,
+				fast::close,
+				()-> {
+					executor.shutdownNow();
+					assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"distributor did not stop");
+				});
 		}
 	}
 

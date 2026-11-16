@@ -95,12 +95,13 @@ public class DLFSDrivesTest {
 	}
 
 	@Test
-	public void testHostedDrivesUseSuppliedClock() {
-		var host=LatticeHost.create(DLFSDrives.LATTICE.zero(),new MemoryStore());
-		var time=CVMLong.create(123);
-		var drives=DLFSDrives.connect(host.cursor(),host.store(),() -> time);
-		var drive=drives.getOrCreateDrive("home");
-		assertEquals(time,DLFSNode.getUTime(drive.cursor().get()));
+	public void testHostedDrivesUseSuppliedClock() throws Exception {
+		try (var host=LatticeHost.create(DLFSDrives.LATTICE.zero(),new MemoryStore())) {
+			var time=CVMLong.create(123);
+			var drives=DLFSDrives.connect(host.cursor(),host.store(),() -> time);
+			var drive=drives.getOrCreateDrive("home");
+			assertEquals(time,DLFSNode.getUTime(drive.cursor().get()));
+		}
 	}
 
 	@Test

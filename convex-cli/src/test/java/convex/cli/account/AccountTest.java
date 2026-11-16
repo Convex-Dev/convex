@@ -1,5 +1,6 @@
 package convex.cli.account;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.HashMap;
@@ -83,7 +84,8 @@ public class AccountTest {
 	@AfterAll
 	public static void closePeer() {
 		// The server borrows the store, so it closes first
-		if (SERVER!=null) SERVER.close();
-		if (STORE!=null) STORE.close();
+		assertAll("Close the test peer and its store",
+			() -> { if (SERVER!=null) SERVER.close(); },
+			() -> { if (STORE!=null) STORE.close(); });
 	}
 }

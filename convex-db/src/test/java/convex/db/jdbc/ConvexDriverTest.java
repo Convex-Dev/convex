@@ -348,11 +348,11 @@ public class ConvexDriverTest {
 		tempFile.deleteOnExit();
 		// A root stored without the cell it refers to: the store opens and locks its
 		// file, then the node cannot save the root it starts from
-		EtchStore broken = EtchStore.create(tempFile);
-		AVector<ACell> root = Vectors.of(Blobs.createRandom(new Random(1), 1000));
-		broken.storeTopRef(root.getRef(), Ref.STORED, null);
-		broken.getEtch().setRootHash(root.getHash());
-		broken.close();
+		try (EtchStore broken = EtchStore.create(tempFile)) {
+			AVector<ACell> root = Vectors.of(Blobs.createRandom(new Random(1), 1000));
+			broken.storeTopRef(root.getRef(), Ref.STORED, null);
+			broken.getEtch().setRootHash(root.getHash());
+		}
 		String url = "jdbc:convex:file:" + tempFile.getAbsolutePath().replace('\\', '/');
 
 		SQLException first = assertThrows(SQLException.class, () -> connect(url));

@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,7 +118,10 @@ public class X402PolicyTest extends ARESTTest {
 
 	@AfterAll
 	static void tearDown() {
-		if (app != null) app.stop();
+		// The gate's facilitator pays through the client, so the client closes last
+		assertAll("Close the gate and the client",
+				() -> { if (app != null) app.stop(); },
+				() -> { if (convex != null) convex.close(); });
 	}
 
 	static HttpResponse<String> plainGet() throws Exception {

@@ -1,5 +1,6 @@
 package convex.db;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -7,7 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -29,8 +35,20 @@ public class ConvexDBComponentTest {
 	private static final String DB_NAME="component-test";
 	private static final String TABLE_NAME="items";
 
-	private static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host() {
-		return LatticeHost.create(Maps.empty(),new MemoryStore());
+	/** Hosts this test created, closed after it */
+	private final List<LatticeHost<?>> hosts=new ArrayList<>();
+
+	@AfterEach
+	public void closeHosts() {
+		List<Executable> cleanup=new ArrayList<>();
+		for (LatticeHost<?> host:hosts) cleanup.add(host::close);
+		assertAll("Close this test's hosts",cleanup);
+	}
+
+	private LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host() {
+		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host=LatticeHost.create(Maps.empty(),new MemoryStore());
+		hosts.add(host);
+		return host;
 	}
 
 	private static SQLDatabase createDatabase(ConvexDB cdb) {

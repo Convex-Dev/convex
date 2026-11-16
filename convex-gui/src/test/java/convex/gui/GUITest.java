@@ -1,5 +1,6 @@
 package convex.gui;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -60,8 +61,21 @@ public class GUITest {
 			// ensure null manager
 			manager=null;
 		} catch (PeerException e) {
+			closeAfterFailedSetup(e);
 			throw new Error(e);
-		} 
+		} catch (RuntimeException | Error e) {
+			closeAfterFailedSetup(e);
+			throw e;
+		}
+	}
+
+	/** A class that fails to initialise never reaches closeFixture, so its setup closes what it opened */
+	private static void closeAfterFailedSetup(Throwable failure) {
+		try {
+			closeFixture();
+		} catch (Throwable closeFailure) {
+			failure.addSuppressed(closeFailure);
+		}
 	}
 	
 	/**
@@ -74,11 +88,15 @@ public class GUITest {
 	}
 
 	static synchronized void closeFixture() {
-		if (manager==null) return;
-		manager.close();
+		Convex convex=CONVEX;
+		PeerGUI gui=manager;
 		manager=null;
 		CONVEX=null;
 		SERVER=null;
+		// The client closes before the network it connects to
+		assertAll("Close the shared GUI network",
+			() -> { if (convex!=null) convex.close(); },
+			() -> { if (gui!=null) gui.close(); });
 	}
 
 	/**
@@ -106,8 +124,8 @@ public class GUITest {
 		AKeyPair genesis=AKeyPair.generate();
 		AWalletEntry existing=HotWalletEntry.create(genesis,"Test genesis key");
 		keyRing.add(existing);
-		try {
-			PeerGUI gui=PeerGUI.create(1,genesis,0);
+		// Closing again after the window has closed it does nothing
+		try (PeerGUI gui=PeerGUI.create(1,genesis,0)) {
 			Server server=gui.getPrimaryServer();
 			AccountKey peerKey=server.getKeyPair().getAccountKey();
 			assertTrue(server.isLive());
@@ -154,15 +172,18 @@ public class GUITest {
 	public void testHackerTools() {
 		GUITest.assumeGUI();
 		
-		HackerTools tools=new HackerTools();
-		assertNotNull(tools.tabs);
+		try (HackerTools tools=new HackerTools()) {
+			assertNotNull(tools.tabs);
+		}
 	}
-	
+
 	@Test
 	public void testClientTools() {
 		GUITest.assumeGUI();
-		
-		REPLClient client=new REPLClient(CONVEX);
-		assertNotNull(client.tabs);
+
+		// Closing the client leaves the shared connection open: the caller owns it
+		try (REPLClient client=new REPLClient(CONVEX)) {
+			assertNotNull(client.tabs);
+		}
 	}
 }

@@ -1,5 +1,6 @@
 package convex.cli.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -211,17 +212,22 @@ public class LocalTest {
 	}
 
 	@AfterAll
-	public static void tearDown() throws InterruptedException {
-		if (process!=null) {
-			process.destroy();
-			if (!process.waitFor(5,TimeUnit.SECONDS)) {
-				process.destroyForcibly();
-				assertTrue(process.waitFor(5,TimeUnit.SECONDS),"Local peer process did not stop");
-			}
-		}
-		if (checker!=null) {
-			checker.join(5000);
-			assertFalse(checker.isAlive(),"Startup reader did not stop");
-		}
+	public static void tearDown() {
+		assertAll("Stop the local network and its reader",
+			() -> {
+				if (process!=null) {
+					process.destroy();
+					if (!process.waitFor(5,TimeUnit.SECONDS)) {
+						process.destroyForcibly();
+						assertTrue(process.waitFor(5,TimeUnit.SECONDS),"Local peer process did not stop");
+					}
+				}
+			},
+			() -> {
+				if (checker!=null) {
+					checker.join(5000);
+					assertFalse(checker.isAlive(),"Startup reader did not stop");
+				}
+			});
 	}
 }

@@ -30,11 +30,11 @@ public class EtchExplorerTest {
 
 	@Test
 	public void closesTheStoresItOpenedAndNoOther() throws Exception {
-		EtchExplorer explorer=new EtchExplorer();
-		EtchStore shownFirst=explorer.getStore();
-		EtchStore opened=EtchStore.createTemp();
-		EtchStore openedNext=EtchStore.createTemp();
-		try {
+		// Closing the explorer or a store again does nothing
+		try (EtchExplorer explorer=new EtchExplorer();
+				EtchStore opened=EtchStore.createTemp();
+				EtchStore openedNext=EtchStore.createTemp()) {
+			EtchStore shownFirst=explorer.getStore();
 			explorer.setStore(opened);
 			assertTrue(isOpen(shownFirst),"the store it did not open was closed");
 			explorer.setStore(openedNext);
@@ -42,10 +42,6 @@ public class EtchExplorerTest {
 			explorer.close();
 			assertFalse(isOpen(openedNext),"the store it showed when closed was left open");
 			assertTrue(isOpen(shownFirst),"the store it did not open was closed");
-		} finally {
-			explorer.close();
-			opened.close();
-			openedNext.close();
 		}
 	}
 }

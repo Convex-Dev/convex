@@ -38,9 +38,9 @@ class DLFSLifecycleExampleTest {
 	@Test void customPathAndDidOwnershipReopenWithoutPrivateKeys() throws Exception {
 		var owner=DID.forKey(OWNER.getAccountKey());
 		File file;
-		try (var store=EtchStore.createTemp("dlfs-did-lifecycle")) {
+		// The host closes first: its final checkpoint, before the store closes.
+		try (var store=EtchStore.createTemp("dlfs-did-lifecycle"); var host=LatticeHost.open(store)) {
 			file=store.getFile();
-			var host=LatticeHost.open(store);
 			var files=host.addApplication(new DLFSApplication(host,
 				(subject,key) -> owner.equals(subject) && OWNER.getAccountKey().equals(key),
 				(subject,value) -> owner.equals(subject)?OWNER.signData(value):null,
@@ -49,10 +49,8 @@ class DLFSLifecycleExampleTest {
 			assertNotNull(drive);
 			Files.writeString(drive.fileSystem().getPath("/hello.txt"),"Hello");
 			files.sync();
-			host.close(); // Final checkpoint, before the store closes.
 		}
-		try (var store=EtchStore.create(file)) {
-			var host=LatticeHost.open(store);
+		try (var store=EtchStore.create(file); var host=LatticeHost.open(store)) {
 			// Reopening a reader requires verification policy but no private signer.
 			var files=host.addApplication(new DLFSApplication(host,
 				(subject,key) -> owner.equals(subject) && OWNER.getAccountKey().equals(key),
@@ -71,8 +69,7 @@ class DLFSLifecycleExampleTest {
 				if (flushes.getAndIncrement()==0) throw expected;
 				super.flush();
 			}
-		}; var client=HttpClient.newHttpClient()) {
-			var host=LatticeHost.open(store);
+		}; var client=HttpClient.newHttpClient(); var host=LatticeHost.open(store)) {
 			var app=host.addApplication(new DLFSApplication(host,OWNER::signData));
 			var drives=app.drives(OWNER.getAccountKey());
 			assertNotNull(drives.getOrCreateDrive("home"));
@@ -96,10 +93,11 @@ class DLFSLifecycleExampleTest {
 				server.close();
 				assertTrue(failures.isEmpty(),"No additional request failures");
 			}
-			var restored=LatticeHost.open(store);
-			var reader=restored.addApplication(new DLFSApplication(restored));
-			assertEquals("Hello",Files.readString(reader.drives(OWNER.getAccountKey()).drive("home")
-				.fileSystem().getPath("/hello.txt")));
+			try (var restored=LatticeHost.open(store)) {
+				var reader=restored.addApplication(new DLFSApplication(restored));
+				assertEquals("Hello",Files.readString(reader.drives(OWNER.getAccountKey()).drive("home")
+					.fileSystem().getPath("/hello.txt")));
+			}
 		}
 	}
 }

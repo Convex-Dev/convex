@@ -45,8 +45,9 @@ class DdlNameResolutionTest {
 
 	@AfterEach
 	void tearDown() throws Exception {
-		if (conn != null) conn.close();
-		cdb.unregister(dbName);
+		assertAll("Close this test's connection and database",
+			() -> { if (conn != null) conn.close(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	private long count(String table) throws Exception {

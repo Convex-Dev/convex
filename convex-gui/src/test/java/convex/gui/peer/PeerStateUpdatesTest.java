@@ -1,5 +1,6 @@
 package convex.gui.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.awt.EventQueue;
@@ -51,8 +52,9 @@ public class PeerStateUpdatesTest {
 	@AfterAll
 	static void closePeer() {
 		// The server borrows the store, so it closes first
-		if (server!=null) server.close();
-		if (store!=null) store.close();
+		assertAll("Close the shared peer and its store",
+			() -> { if (server!=null) server.close(); },
+			() -> { if (store!=null) store.close(); });
 	}
 
 	/** Waits until the EDT has run everything posted so far */
@@ -63,12 +65,11 @@ public class PeerStateUpdatesTest {
 	@Test
 	public void testUpdatesOnEDT() throws Exception {
 		List<Boolean> runs=Collections.synchronizedList(new ArrayList<>());
-		PeerStateUpdates updates=new PeerStateUpdates(server, ()->runs.add(EventQueue.isDispatchThread()));
-
-		// Registering delivers the current state, so one update runs straight away
-		flushEDT();
-		assertEquals(List.of(true), runs);
-		updates.close();
+		try (PeerStateUpdates updates=new PeerStateUpdates(server, ()->runs.add(EventQueue.isDispatchThread()))) {
+			// Registering delivers the current state, so one update runs straight away
+			flushEDT();
+			assertEquals(List.of(true), runs);
+		}
 	}
 
 	@Test

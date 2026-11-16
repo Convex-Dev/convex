@@ -1,5 +1,6 @@
 package convex.gui.repl;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +19,7 @@ import javax.swing.JButton;
 import javax.swing.SwingUtilities;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.ConvexDirect;
 import convex.core.Result;
@@ -95,11 +98,18 @@ public class REPLPanelTest {
 		}
 	}
 
-	/** Closes every closeable component in a panel, as its window would on close */
-	private static void closeAll(Container parent) throws Exception {
+	/** Closes every closeable component in a panel, as its window would on close, whatever one of them throws */
+	private static void closeAll(Container parent) {
+		List<Executable> closes=new ArrayList<>();
+		collectCloses(parent,closes);
+		assertAll("Close the panel's components",closes);
+	}
+
+	/** Gathers the closes of a panel's closeable components, children before parents */
+	private static void collectCloses(Container parent, List<Executable> closes) {
 		for (Component component: parent.getComponents()) {
-			if (component instanceof Container container) closeAll(container);
-			if (component instanceof AutoCloseable closeable) closeable.close();
+			if (component instanceof Container container) collectCloses(container,closes);
+			if (component instanceof AutoCloseable closeable) closes.add(closeable::close);
 		}
 	}
 

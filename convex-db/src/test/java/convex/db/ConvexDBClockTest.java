@@ -1,15 +1,20 @@
 package convex.db;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -55,8 +60,20 @@ public class ConvexDBClockTest {
 		return host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge, clock));
 	}
 
-	private static LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host() {
-		return LatticeHost.create(Maps.empty(), null);
+	/** Hosts this test created, closed after it */
+	private final List<LatticeHost<?>> hosts = new ArrayList<>();
+
+	@AfterEach
+	public void closeHosts() {
+		List<Executable> cleanup = new ArrayList<>();
+		for (LatticeHost<?> host : hosts) cleanup.add(host::close);
+		assertAll("Close this test's hosts", cleanup);
+	}
+
+	private LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host() {
+		LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.create(Maps.empty(), null);
+		hosts.add(host);
+		return host;
 	}
 
 	private static AVector<ACell> row(SQLSchema tables, long id) {
