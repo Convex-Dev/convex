@@ -216,6 +216,22 @@ public class MemoryStoreTest {
 		assertEquals(Ref.PERSISTED, stored.getStatus());
 	}
 
+	/**
+	 * A write records only the status it achieved in this store, not one the
+	 * incoming Ref carries from elsewhere.
+	 */
+	@Test
+	public void testWriteIgnoresIncomingStatus() {
+		MemoryStore ms = new MemoryStore();
+		Blob value = Blob.createRandom(new Random(7713), 300);
+		assertFalse(value.isEmbedded());
+		Ref<ACell> claimed = Ref.get((ACell) value).withMinimumStatus(Ref.ANNOUNCED);
+
+		Ref<ACell> stored = ms.storeTopRef(claimed, Ref.STORED, null);
+		assertEquals(Ref.STORED, stored.getStatus());
+		assertEquals(Ref.STORED, ms.refForHash(value.getHash()).getStatus());
+	}
+
 	@Test
 	public void testGetRootHashNull() throws IOException {
 		try (MemoryStore ms = new MemoryStore()) {

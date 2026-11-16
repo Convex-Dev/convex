@@ -134,13 +134,16 @@ public class MemoryStore extends AStore {
 		// Children are now persisted: check this cell against them before it is
 		// recorded as persisted for the first time
 		if (!checked && (achievedStatus>=Ref.PERSISTED) && (cell.getRefCount()>0)) Cells.checkStructure(cell);
-		ref=ref.withMinimumStatus(achievedStatus);
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
 
+			// Only what this write achieved: a status carried in on the ref is another store's
+			ref=ref.withStatus(achievedStatus);
 			// Another write of this value may have recorded it since the check above
 			ref=(Ref<T>) hashRefs.merge(fHash, (Ref<ACell>) ref, MemoryStore::higher);
+		} else {
+			ref=ref.withMinimumStatus(achievedStatus);
 		}
 		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
 		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore
