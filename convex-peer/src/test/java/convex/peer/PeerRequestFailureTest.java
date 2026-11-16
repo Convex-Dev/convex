@@ -383,7 +383,10 @@ public class PeerRequestFailureTest {
 		// Each round produces a Block at once, however soon after the last
 		config.put(Keywords.MIN_BLOCK_TIME,0);
 		Server peer=Server.create(config);
-		peer.haltConsensus(UpgradeError.missing(99));
+		// The halt is logged on this thread, as an error for the operator
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(Server.upgradeLog.getName(),Thread.currentThread()).open()) {
+			peer.haltConsensus(UpgradeError.missing(99));
+		}
 		peer.launch();
 		return peer;
 	}

@@ -145,7 +145,10 @@ public class JoinNetworkTest {
 			destinationConfig.put(Keywords.STORE,EtchStore.createTemp());
 			destinationConfig.put(Keywords.PORT,0);
 			destinationConfig.put(Keywords.SOURCE,source.getHostAddress());
-			destination=API.launchPeer(destinationConfig);
+			// Joining warns on this thread that its replay differs from the state advertised
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(Server.class.getName(),Thread.currentThread()).open()) {
+				destination=API.launchPeer(destinationConfig);
+			}
 
 			// Wait on the real signal rather than reading the live peer: the executor thread
 			// advances state asynchronously once launched, and a peer whose finality point is

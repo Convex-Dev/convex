@@ -18,6 +18,7 @@ import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.slf4j.event.Level;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -64,12 +65,10 @@ public class UpgradeWithdrawalTest {
 	}
 
 	/**
-	 * Launches an isolated single peer that reads the given clock from the outset, so no
-	 * block or self-management decision ever sees the wall clock. Like launchLocalPeers it
-	 * sets the peer's hostname, which the peer registers with its own transaction in its
-	 * first block.
+	 * Creates an isolated single peer that reads the given clock from the outset, so no
+	 * block or self-management decision ever sees the wall clock.
 	 */
-	private Server launchIsolatedPeer(State genesis, LongSupplier clock) throws Exception {
+	private Server createIsolatedPeer(State genesis, LongSupplier clock) throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, PEER_KP);
 		config.put(Keywords.STATE, genesis);
@@ -77,9 +76,43 @@ public class UpgradeWithdrawalTest {
 		config.put(Keywords.AUTO_MANAGE, true);
 		Server s=Server.create(config);
 		s.setTimeSource(clock);
+		return s;
+	}
+
+	/**
+	 * Launches a peer from createIsolatedPeer. Like launchLocalPeers it sets the peer's
+	 * hostname, which the peer registers with its own transaction in its first block.
+	 */
+	private static void launchIsolated(Server s) throws Exception {
 		s.launch();
 		s.setHostname("localhost:"+s.getPort());
-		return s;
+	}
+
+	/**
+	 * Expects the upgrade alerts a peer logs as it runs: its executor warns of an upgrade
+	 * it cannot apply and halts at it, and its Belief propagator, preparing its own
+	 * transactions, warns of withdrawing its stake. Opened before the peer launches, since
+	 * its threads exist once it is created.
+	 */
+	private static ExpectedLogs upgradeAlerts(Server s) {
+		return ExpectedLogs.onThreads(Server.upgradeLog.getName(),
+			s.getCVMExecutor().thread,s.getBeliefPropagator().thread).open();
+	}
+
+	/** Closes a peer and waits for the threads that log its upgrade alerts to stop. */
+	private static void stop(Server s) throws InterruptedException {
+		s.close();
+		s.getCVMExecutor().awaitStopped();
+		s.getBeliefPropagator().awaitStopped();
+	}
+
+	/** Halts a peer's consensus from the test thread, which logs the halt as an error. */
+	private static void halt(Server s, UpgradeError error) {
+		ExpectedLogs logs=ExpectedLogs.onThreads(Server.upgradeLog.getName(),Thread.currentThread()).open();
+		try (logs) {
+			s.haltConsensus(error);
+		}
+		assertEquals(Level.ERROR,logs.records().get(0).level());
 	}
 
 	/**
@@ -130,7 +163,7 @@ public class UpgradeWithdrawalTest {
 			assertFalse(s.isConsensusHalted());
 			assertNull(s.getConsensusHalt());
 
-			s.haltConsensus(UpgradeError.missing(5));
+			halt(s, UpgradeError.missing(5));
 			assertTrue(s.isConsensusHalted());
 			assertEquals(5L, s.getConsensusHalt().getVersion());
 
@@ -161,8 +194,11 @@ public class UpgradeWithdrawalTest {
 		// The peer reads this clock from launch. Start comfortably before the
 		// activation so the peer operates normally.
 		AtomicLong clock = new AtomicLong(t0 + 1000);
-		Server s = launchIsolatedPeer(genesis, clock::get);
-		try {
+		Server s = createIsolatedPeer(genesis, clock::get);
+		ExpectedLogs alerts = upgradeAlerts(s);
+		// The peer stops before the scope closes
+		try (alerts; AutoCloseable stopping = () -> stop(s)) {
+			launchIsolated(s);
 			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
 
 			// Early detection: the peer already knows an unsupported upgrade is
@@ -197,9 +233,13 @@ public class UpgradeWithdrawalTest {
 			// Still alive for queries against the frozen state; b was never defined
 			assertFalse(convex.querySync("a").isError());
 			assertTrue(convex.querySync("b").isError());
-		} finally {
-			s.close();
 		}
+		assertHaltLogged(alerts);
+	}
+
+	/** Checks the operator was told of the halt, as an error. */
+	private static void assertHaltLogged(ExpectedLogs alerts) {
+		assertTrue(alerts.records().stream().anyMatch(e -> e.level()==Level.ERROR), alerts.records()::toString);
 	}
 
 	@Test
@@ -218,8 +258,11 @@ public class UpgradeWithdrawalTest {
 		State genesis = upgraded.withProtocolGlobals(supported, upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
 
 		AtomicLong clock = new AtomicLong(t0 + 1000);
-		Server s = launchIsolatedPeer(genesis, clock::get);
-		try {
+		Server s = createIsolatedPeer(genesis, clock::get);
+		ExpectedLogs alerts = upgradeAlerts(s);
+		// The peer stops before the scope closes
+		try (alerts; AutoCloseable stopping = () -> stop(s)) {
+			launchIsolated(s);
 			long stake0 = s.getPeer().getConsensusState().getPeer(myKey).getPeerStake();
 			assertTrue(stake0 > 0);
 
@@ -244,9 +287,8 @@ public class UpgradeWithdrawalTest {
 			convex.transact("(def b 2)");
 			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
 			assertEquals(unsupported, halt.getVersion());
-		} finally {
-			s.close();
 		}
+		assertHaltLogged(alerts);
 	}
 
 	@Test
@@ -260,7 +302,7 @@ public class UpgradeWithdrawalTest {
 			assertFalse(r.isError(), () -> "Setup transaction failed: " + r);
 
 			// Freeze consensus exactly as the executor would on an unsupported upgrade
-			s.haltConsensus(UpgradeError.missing(2));
+			halt(s, UpgradeError.missing(2));
 			assertTrue(s.isConsensusHalted());
 
 			// Server stays alive: queries still resolve against the frozen state
@@ -290,7 +332,9 @@ public class UpgradeWithdrawalTest {
 	@Test
 	public void testMissingDataAtUpgradeWithdraws() throws Exception {
 		Server s = launchIsolatedPeer();
-		try (MemoryStore hollowStore = new MemoryStore()) {
+		ExpectedLogs alerts = upgradeAlerts(s);
+		// The peer stops before the scope closes
+		try (alerts; AutoCloseable stopping = () -> stop(s); MemoryStore hollowStore = new MemoryStore()) {
 			// Stop Belief updates, so the executor computes only the Belief given here
 			BeliefPropagator propagator = s.getBeliefPropagator();
 			propagator.close();
@@ -312,8 +356,7 @@ public class UpgradeWithdrawalTest {
 			UpgradeError halt = s.awaitConsensusHalt().get(10, TimeUnit.SECONDS);
 			assertEquals(1L, halt.getVersion());
 			assertInstanceOf(MissingDataException.class, halt.getCause());
-		} finally {
-			s.close();
 		}
+		assertHaltLogged(alerts);
 	}
 }
