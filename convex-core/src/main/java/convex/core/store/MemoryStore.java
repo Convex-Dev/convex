@@ -39,7 +39,8 @@ public class MemoryStore extends AStore {
 	 */
 	private final ConcurrentHashMap<Hash, Ref<ACell>> hashRefs = new ConcurrentHashMap<>();
 
-	private ACell rootData;
+	// Set and read on different peer threads
+	private volatile ACell rootData;
 
 	@Override
 	@SuppressWarnings("unchecked")
