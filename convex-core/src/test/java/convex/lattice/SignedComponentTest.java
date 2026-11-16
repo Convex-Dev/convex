@@ -247,6 +247,19 @@ public class SignedComponentTest {
 	}
 
 	@Test
+	public void testADestinationEnvelopeTheOwnerRuleRejectsIsNeitherTakenNorMerged() {
+		var stranger=AKeyPair.createSeeded(7312);
+		var signatures=new AtomicInteger();
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer(signatures::incrementAndGet));
+		var base=KEY.signData(Sets.of(1));
+		var foreign=stranger.signData(Sets.of(1,3));
+		assertSame(base,component.reconcileStored(base,base,foreign),"an unchanged working envelope does not take it");
+		var own=KEY.signData(Sets.of(1,2));
+		assertSame(own,component.reconcileStored(base,own,foreign),"nor is its payload merged into a changed one");
+		assertEquals(0,signatures.get());
+	}
+
+	@Test
 	public void testStoredEnvelopesBothChangedConflictWhereThePayloadCannotMerge() {
 		var component=new SignedComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),KEY::signData);
 		assertThrows(MergeConflictException.class,() ->

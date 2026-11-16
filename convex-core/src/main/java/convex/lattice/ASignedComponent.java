@@ -98,11 +98,14 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	}
 
 	/**
-	 * Reconciles stored envelopes. A side that changed nothing takes the other's
-	 * envelope. Otherwise the payloads are reconciled by
-	 * {@link #reconcile(ACell,ACell,ACell)}: a result equal to one side's payload
-	 * keeps that side's envelope, an absent result is absent, and any other result
-	 * is signed by this component's signer under {@link #lattice}.
+	 * Reconciles stored envelopes. An unchanged destination keeps the working
+	 * envelope. A changed destination envelope that {@link #lattice} does not accept
+	 * for its owner is never taken or merged: the working envelope stands, as in the
+	 * lattice's own merge. An unchanged working envelope takes the destination's.
+	 * Otherwise the payloads are reconciled by {@link #reconcile(ACell,ACell,ACell)}:
+	 * a result equal to one side's payload keeps that side's envelope, an absent
+	 * result is absent, and any other result is signed by this component's signer
+	 * under {@link #lattice}.
 	 *
 	 * @throws MergeConflictException If the payloads cannot be reconciled, or a new
 	 *         payload has no authorised signer
@@ -110,8 +113,10 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	@SuppressWarnings("unchecked")
 	@Override
 	protected ACell reconcileStored(ACell base,ACell own,ACell other) {
-		if (Utils.equals(own,base)) return other;
 		if (Utils.equals(other,base)) return own;
+		// Every path below takes the destination's envelope or merges its payload
+		if (other!=null && !lattice.checkForeign((SignedData<V>)other)) return own;
+		if (Utils.equals(own,base)) return other;
 		V ownValue=payload((SignedData<V>)own);
 		V otherValue=payload((SignedData<V>)other);
 		V merged=reconcile(payload((SignedData<V>)base),ownValue,otherValue);
