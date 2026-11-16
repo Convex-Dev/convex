@@ -116,6 +116,8 @@ public class ConnectionManager extends AConnectionManager {
 	/** Also read by the Belief propagator, to bound a fetch of missing data. */
 	private volatile long pollDelay = SERVER_POLL_DELAY;
 	private long lastPollTime;
+	/** Wait from the end of the latest poll to the next: half the poll delay after one that went well. */
+	private long pollGap = SERVER_POLL_DELAY;
 	private long lastConnectionUpdate = Utils.getCurrentTimestamp();
 
 	/** First request without a reply for each connection which has not replied since. */
@@ -154,6 +156,7 @@ public class ConnectionManager extends AConnectionManager {
 		if (thread != null) return;
 		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
 		this.pollDelay = (_pollDelay == null) ? SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
+		pollGap = pollDelay;
 		lastPollTime = server.getTimestamp();
 
 		thread = Thread.ofVirtual().name("Connection Manager thread at " + server.getPort()).start(() -> {
@@ -577,12 +580,13 @@ public class ConnectionManager extends AConnectionManager {
 	// ========== Belief Polling ==========
 
 	/**
-	 * Polls one outbound peer once the poll delay has passed since the last poll: a verified
-	 * link whose wait has passed, or an unverified link if there is none.
+	 * Polls one outbound peer, a verified link whose wait has passed or an unverified link
+	 * if there is none, once the time since the last poll ended has reached the poll delay,
+	 * or half of it if that poll went well. Polls never overlap.
 	 */
 	void maybePollBelief() throws InterruptedException {
 		long now=server.getTimestamp();
-		if (now-lastPollTime<pollDelay) return;
+		if (now-lastPollTime<pollGap) return;
 		if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
 
 		ArrayList<AccountKey> verified = new ArrayList<>();
@@ -605,34 +609,40 @@ public class ConnectionManager extends AConnectionManager {
 		Convex connection = getConnection(peerKey);
 		if (connection==null) return;
 
+		boolean good=false;
 		try {
-			pollBelief(peerKey,connection);
+			good=pollBelief(peerKey,connection);
 		} finally {
-			// Space attempts from completion, including slow or failed acquisitions.
+			// Space attempts from completion, including slow or failed acquisitions
 			lastPollTime=server.getTimestamp();
+			// Little to catch up on after a poll that went well, and polls are cheap then
+			pollGap=good ? pollDelay/2 : pollDelay;
 		}
 	}
 
 	/**
 	 * Polls one outbound peer for anti-entropy and connection health, counting the outcome
 	 * towards the peer's back-off if the link is verified or the reply is false input.
+	 *
+	 * @return true if the poll went well: the peer answered, and its Belief was this peer's
+	 *         or was fetched in time
 	 */
-	void pollBelief(AccountKey peerKey, Convex connection) throws InterruptedException {
+	boolean pollBelief(AccountKey peerKey, Convex connection) throws InterruptedException {
 		boolean verified=isVerified(peerKey,connection);
 		PollOutcome outcome=poll(peerKey,connection);
-		// On any link: redialling the same address soon would reach the same answerer
 		if (outcome==PollOutcome.FALSE_INPUT) {
+			// On any link: redialling the same address soon would reach the same answerer
 			recordFalseInput(peerKey);
-			return;
+		} else if (verified) {
+			// An unverified link only fills an idle slot: its back-off is for getting it verified
+			switch (outcome) {
+				case GOOD -> backoffs.remove(peerKey);
+				case UNREACHABLE -> failLink(peerKey,connection,true);
+				case ANSWERED_WRONGLY -> failLink(peerKey,connection,false);
+				case FALSE_INPUT, NO_FAULT -> {}
+			}
 		}
-		// An unverified link only fills an idle slot: its back-off is for getting it verified
-		if (!verified) return;
-		switch (outcome) {
-			case GOOD -> backoffs.remove(peerKey);
-			case UNREACHABLE -> failLink(peerKey,connection,true);
-			case ANSWERED_WRONGLY -> failLink(peerKey,connection,false);
-			case FALSE_INPUT, NO_FAULT -> {}
-		}
+		return outcome==PollOutcome.GOOD;
 	}
 
 	private PollOutcome poll(AccountKey peerKey, Convex connection) throws InterruptedException {

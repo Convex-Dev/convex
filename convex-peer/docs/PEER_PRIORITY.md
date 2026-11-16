@@ -131,6 +131,11 @@ A Belief is judged by its signed Orders, not by its sender ([Principle](#princip
 polling an unverified link is safe; verified links are preferred, as CAD015 asks of
 trusted sources.
 
+**Poll interval.** One poll runs at a time, across all links. The next starts once the
+`:poll-delay` has passed since the previous one ended, or half of it if that poll went
+well: the peer answered, and its Belief matched this peer's or was fetched in time. A
+fetch not done in time is cancelled, so it never outlives its poll.
+
 **Back-off.** Each failure by a remote peer doubles its wait, from one poll interval up to
 256 of them (512 s at the default `:poll-delay`). A failure is:
 

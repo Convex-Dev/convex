@@ -530,6 +530,49 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/**
+	 * After a poll that went well the next follows after half the poll delay; after one
+	 * that failed, after the full delay, even when another link could be polled sooner.
+	 */
+	@Test
+	public void testPollFollowsSoonerAfterAGoodPoll() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(235));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			long delay=manager.getPollDelay();
+			AccountKey firstKey=AKeyPair.createSeeded(236).getAccountKey();
+			PollingConvex first=pollingLink(server);
+			first.markVerified(firstKey);
+			manager.addConnection(firstKey,first);
+
+			manager.maybePollBelief();
+			clock.addAndGet(delay/2);
+			manager.maybePollBelief();
+			assertEquals(2,first.statusCount,"a poll that went well is followed after half the delay");
+
+			first.statusResult=Result.error(ErrorCodes.LOAD,"busy");
+			clock.addAndGet(delay/2);
+			manager.maybePollBelief();
+			assertEquals(3,first.statusCount);
+
+			// A link due at once, so only the gap after the failed poll holds the next one back
+			AccountKey secondKey=AKeyPair.createSeeded(237).getAccountKey();
+			PollingConvex second=pollingLink(server);
+			second.markVerified(secondKey);
+			manager.addConnection(secondKey,second);
+			clock.addAndGet(delay/2);
+			manager.maybePollBelief();
+			assertEquals(0,second.statusCount,"a poll that failed is followed after the full delay");
+			clock.addAndGet(delay/2);
+			manager.maybePollBelief();
+			assertEquals(4,first.statusCount+second.statusCount);
+		} finally {
+			server.close();
+		}
+	}
+
 	@Test
 	public void testUnverifiedPollLeavesBackoffAlone() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(233));
