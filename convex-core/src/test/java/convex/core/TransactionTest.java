@@ -554,6 +554,30 @@ public class TransactionTest extends ACVMTest {
 	}
 
 	/**
+	 * An entry of a Block that is not a signed value makes the whole Block invalid, as
+	 * an invalid Block and not an unexpected exception, so nothing is logged
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	@ResourceLock("java.util.logging:convex.core.cvm.State")
+	public void testUnsignedEntryInBlock() throws ReflectiveOperationException {
+		State s=state();
+		Transfer good=Transfer.create(HERO, s.getAccount(HERO).getSequence()+1, VILLAIN, 100);
+		for (ACell entry: new ACell[] {CVMLong.ONE, null}) {
+			AVector entries=Vectors.of(HERO_KP.signData(good), entry);
+			SignedData<Block> signedBlock=InitTest.FIRST_PEER_KEYPAIR.signData(Block.create(s.getTimestamp().longValue()+1000, entries));
+
+			List<LogCapture.Entry> logged=LogCapture.capture(State.class.getName(),()->{
+				BlockResult br=s.applyBlock(signedBlock);
+				assertEquals(s,br.getState());
+				assertEquals(ErrorCodes.PEER,br.getErrorCode(0));
+				assertEquals(ErrorCodes.PEER,br.getErrorCode(1));
+			});
+			assertEquals(List.of(),logged,"entry "+entry);
+		}
+	}
+
+	/**
 	 * Data missing from this peer's store fails applying a Block instead of making the
 	 * Block invalid: a peer holds all of every Block in its Order
 	 */
