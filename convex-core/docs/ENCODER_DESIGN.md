@@ -115,8 +115,9 @@ ID; an inline cell's encoding length is the number of bytes it consumed, which s
 whether it was entitled to be inline without measuring it. A reader that accepted a
 second form of some value would give that value two IDs, and peers holding different
 forms would disagree about it. `CanonicalDecodeTest` checks the property over every cell
-of the committed genesis, Belief and DLFS snapshots, mutations of them and every
-one- and two-byte sequence; a new cell type needs seeds there.
+of the committed genesis, Belief and DLFS snapshots, mutations of a spread of them by
+class and length, and every one- and two-byte sequence; a new cell type needs seeds
+there.
 
 ### Store binding
 

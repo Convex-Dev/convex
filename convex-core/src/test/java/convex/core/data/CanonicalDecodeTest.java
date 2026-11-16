@@ -155,22 +155,37 @@ public class CanonicalDecodeTest {
 		} catch (BadFormatException | IndexOutOfBoundsException e) {
 			return;
 		}
-		// Readers may keep slices of their input as encodings: re-encode from fields
-		clearEncodings(c, Collections.newSetFromMap(new IdentityHashMap<>()));
-		Blob fresh = Cells.encode(c);
+		Blob fresh;
+		try {
+			fresh = (c == null) ? Blob.NULL_ENCODING : freshEncoding(c);
+		} catch (RuntimeException e) {
+			throw new AssertionError("Cannot re-encode " + Utils.getClassName(c) + " decoded from " + input.toHexString(), e);
+		}
 		if (!fresh.equalsBytes(input)) {
 			fail(Utils.getClassName(c) + " decoded from " + input.toHexString() + " re-encodes as " + fresh.toHexString());
 		}
 	}
 
-	private static void clearEncodings(ACell c, Set<ACell> seen) {
-		if (c == null || !seen.add(c)) return;
-		c.encoding = null;
+	/**
+	 * Writes a cell's encoding from its fields. Readers may keep slices of their input as
+	 * encodings, and writing a cell copies its embedded children's cached encodings, so
+	 * each of those is first checked against one written the same way. Cells are left
+	 * untouched: decoders return shared instances, and tests run in parallel.
+	 */
+	private static Blob freshEncoding(ACell c) {
 		int n = c.getRefCount();
 		for (int i = 0; i < n; i++) {
 			Ref<ACell> ref = c.getRef(i);
-			if (ref.isDirect()) clearEncodings(ref.getValue(), seen);
+			if (!ref.isDirect()) continue;
+			ACell child = ref.getValue();
+			if (child == null) continue;
+			Blob fresh = freshEncoding(child);
+			Blob cached = child.cachedEncoding();
+			if ((cached != null) && !cached.equalsBytes(fresh)) {
+				fail(Utils.getClassName(child) + " holds encoding " + cached.toHexString() + " but re-encodes as " + fresh.toHexString());
+			}
 		}
+		return c.createEncoding();
 	}
 
 	private static void collectSeeds() throws IOException, BadFormatException {
@@ -226,16 +241,19 @@ public class CanonicalDecodeTest {
 		vs.add(Samples.LONG_MAP_100);
 		vs.add(Samples.INT_INDEX_7);
 		vs.add(Samples.INT_INDEX_256);
-		vs.add(Samples.BIG_BLOB_TREE);
-		vs.add(Samples.FULL_BLOB_PLUS);
-		vs.add(Samples.MAX_EMBEDDED_BLOB);
-		vs.add(Samples.NON_EMBEDDED_BLOB);
+		// Random content from a fixed seed, so every run has the same seeds
+		Random r = new Random(1234);
+		int maxEmbeddedBlobLength = Format.MAX_EMBEDDED_LENGTH - Format.getVLQCountLength(Format.MAX_EMBEDDED_LENGTH) - 1;
+		vs.add(Blobs.createRandom(r, 10000));
+		vs.add(Blobs.createRandom(r, Blob.CHUNK_LENGTH + 1));
+		vs.add(Blobs.createRandom(r, maxEmbeddedBlobLength));
+		vs.add(Blobs.createRandom(r, maxEmbeddedBlobLength + 1));
+		vs.add(Vectors.of(Blobs.createRandom(r, 106), 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15));
 		vs.add(Samples.MAX_EMBEDDED_STRING);
 		vs.add(Samples.NON_EMBEDDED_STRING);
 		vs.add(Samples.MAX_SHORT_STRING);
 		vs.add(Samples.MIN_TREE_STRING);
 		vs.add(Samples.RUSSIAN_STRING);
-		vs.add(Samples.MAX_EMBEDDED_VECTOR);
 		vs.add(Samples.MAX_BIGINT);
 		vs.add(Samples.MIN_BIGINT);
 		vs.add(Samples.INVOKE_TRANSACTION);
