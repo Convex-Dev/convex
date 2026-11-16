@@ -46,6 +46,7 @@ import convex.core.init.Init;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.FutureUtils;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
@@ -776,7 +777,7 @@ public class VerifyNetworkUpgrade {
 		}
 		try {
 			long start = System.currentTimeMillis();
-			ACell cell = convex.acquire(hash).get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			ACell cell = FutureUtils.getOrCancel(convex.acquire(hash), TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 			info("Acquired " + desc + " in " + (System.currentTimeMillis() - start) + "ms"
 					+ " (memory size " + cell.getMemorySize() + " bytes)");
 			return (T) cell;

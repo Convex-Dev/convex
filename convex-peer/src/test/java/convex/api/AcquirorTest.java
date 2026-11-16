@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,30 @@ public class AcquirorTest {
 			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
 			assertTrue(response.isCancelled(),
 				"future cancellation must cancel the owned transport request");
+		}
+	}
+
+	/** A caller's timeout, which completes the public future exceptionally, also ends the work. */
+	@Test
+	public void testTimeoutOnFutureTerminatesWorker() throws Exception {
+		Blob expected = Blobs.createRandom(400);
+		CompletableFuture<Result> response = new CompletableFuture<>();
+		CountDownLatch requested = new CountDownLatch(1);
+
+		try (MemoryStore store = new MemoryStore();
+				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> {
+					requested.countDown();
+					return response;
+				})) {
+			CompletableFuture<ACell> acquired = acquiror.getFuture();
+			assertTrue(requested.await(5, TimeUnit.SECONDS));
+
+			// As orTimeout does once the time is up
+			assertTrue(acquired.completeExceptionally(new TimeoutException()));
+
+			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+			assertTrue(response.isCancelled(),
+				"a caller's timeout must cancel the owned transport request");
 		}
 	}
 

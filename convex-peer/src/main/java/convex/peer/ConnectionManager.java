@@ -51,6 +51,7 @@ import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Cleanup;
+import convex.core.util.FutureUtils;
 import convex.core.util.LoadMonitor;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
@@ -651,7 +652,8 @@ public class ConnectionManager extends AConnectionManager {
 
 			ACell acquired;
 			try {
-				acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+				// Cancelled if it is not done in time, so no acquisition outlives its poll
+				acquired = FutureUtils.getOrCancel(connection.acquire(h), POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 			} catch (ExecutionException | TimeoutException e) {
 				// Bad input in the polled peer's reply goes to the handler below
 				if (e.getCause() instanceof ValidationException bad) throw bad;

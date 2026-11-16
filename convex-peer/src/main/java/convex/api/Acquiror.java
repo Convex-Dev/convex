@@ -33,7 +33,8 @@ import convex.net.RequestFailures;
 /**
  * One-shot, lifecycle-aware acquisition of a complete CAD3 value tree.
  *
- * <p>An Acquiror owns its virtual worker. Cancelling its future or calling
+ * <p>An Acquiror owns its virtual worker. Cancelling its future, completing it
+ * exceptionally (as a timeout added with {@code orTimeout} does), or calling
  * {@link #close()} cancels the current request, and the worker stops at its next
  * step. The worker is never interrupted: it may be inside store I/O, which an
  * interrupt can break for every user of the store. Callers that must know the
@@ -99,7 +100,8 @@ public final class Acquiror implements AutoCloseable {
 		this.store = Objects.requireNonNull(store, "Acquisition store");
 		this.request = request;
 		future.whenComplete((value, error) -> {
-			if (future.isCancelled()) cancelOwnedWork();
+			// A caller's timeout completes the future too, and no one is left to want the value
+			if (error != null) cancelOwnedWork();
 		});
 	}
 

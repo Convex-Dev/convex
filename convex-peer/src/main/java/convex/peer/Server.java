@@ -63,6 +63,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Cleanup;
+import convex.core.util.FutureUtils;
 import convex.core.util.Shutdown;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
@@ -318,7 +319,7 @@ public class Server implements Closeable {
 			}
 			
 			log.debug("Attempting to sync remote state: "+stateHash + " on network: "+genesisHash);
-			State genF=RT.ensureCVM(awaitAcquired(convex.acquire(genesisHash),timeout),State.class);
+			State genF=RT.ensureCVM(FutureUtils.getOrCancel(convex.acquire(genesisHash),timeout,TimeUnit.MILLISECONDS),State.class);
 			log.debug("Retrieved Genesis State: "+genesisHash);
 			
 			// Belief acquisition
@@ -327,7 +328,8 @@ public class Server implements Closeable {
 			long timeElapsed=0;
 			while (belF==null) {
 				try {
-					belF=RT.ensureCVM(awaitAcquired(convex.acquire(beliefHash),timeout),Belief.class);
+					// Cancelled on timeout: a retry resumes from the cells already stored
+					belF=RT.ensureCVM(FutureUtils.getOrCancel(convex.acquire(beliefHash),timeout,TimeUnit.MILLISECONDS),Belief.class);
 				} catch (TimeoutException te) {
 					timeElapsed+=timeout;
 					log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
@@ -385,19 +387,6 @@ public class Server implements Closeable {
 			throw new LaunchException("Erring while trying to sync peer",e);
 		}  catch (TimeoutException e) {
 			throw new LaunchException("Timeout attempting to sync peer",e);
-		}
-	}
-
-	/**
-	 * Waits at most the given time for an acquisition, then cancels it unless it has
-	 * completed: one left running would go on writing to the store.
-	 */
-	private static <T extends ACell> T awaitAcquired(CompletableFuture<T> acquisition,long timeout)
-			throws InterruptedException, ExecutionException, TimeoutException {
-		try {
-			return acquisition.get(timeout,TimeUnit.MILLISECONDS);
-		} finally {
-			acquisition.cancel(false);
 		}
 	}
 
