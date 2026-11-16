@@ -29,6 +29,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.ThreadUtils;
+import convex.net.ingress.Ingress;
 import convex.peer.Config;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.EventExecutor;
@@ -77,26 +78,17 @@ public class NettyConnectionTest {
 		}
 	}
 
-	/** Close returns at once while the connection's event loop is busy delivering a message. */
+	/** Close returns at once while the connection's event loop is busy. */
 	@Test
 	@Timeout(60)
 	public void testCloseDoesNotWaitForBusyEventLoop() throws Exception {
 		try (NettyServer server=new NettyServer(0)) {
 			server.setReceiveAction(NettyConnectionTest::replyOne);
 			server.launch();
-			CountDownLatch delivering=new CountDownLatch(1);
 			CountDownLatch release=new CountDownLatch(1);
-			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {
-				delivering.countDown();
-				try {
-					release.await();
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
-			});
+			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {});
 			try {
-				assertTrue(client.trySendMessage(Message.createPing(1)));
-				delivering.await();
+				occupy(client,release);
 
 				// Close on another thread, so a timeout interrupts this one and the loop is released
 				Thread closer=Thread.ofVirtual().start(client::close);
@@ -108,6 +100,27 @@ public class NettyConnectionTest {
 		}
 	}
 
+	/** Whether a send found the queue full, whether it sent, and how long it took. */
+	private record Outcome(boolean full, boolean sent, long nanos) {}
+
+	/**
+	 * Fills a queue of one message that nothing empties meanwhile, then times a send.
+	 * The caller's limit of one message must already be set.
+	 */
+	private static Outcome sendToFullQueue(NettyConnection c) throws IOException, InterruptedException {
+		boolean full=c.trySendMessage(Message.createPing(2)) && !c.trySendMessage(Message.createPing(3));
+		long start=System.nanoTime();
+		boolean sent=c.sendMessage(Message.createPing(4));
+		return new Outcome(full,sent,System.nanoTime()-start);
+	}
+
+	private static void assertFailedAtOnce(Outcome result) {
+		assertTrue(result.full(),"Nothing leaves the queue while its event loop is busy");
+		assertFalse(result.sent());
+		// A wait would have lasted the whole timeout
+		assertTrue(result.nanos()<TimeUnit.MILLISECONDS.toNanos(Config.DEFAULT_INTERNAL_TIMEOUT));
+	}
+
 	/**
 	 * On its event loop a send to a full queue fails at once: that loop is what empties
 	 * the queue, so a wait for space could only time out.
@@ -115,37 +128,67 @@ public class NettyConnectionTest {
 	@Test
 	@Timeout(60)
 	public void testSendOnEventLoopDoesNotWait() throws Exception {
-		record Outcome(boolean full, boolean sent, long nanos) {}
 		try (NettyServer server=new NettyServer(0)) {
 			server.setReceiveAction(NettyConnectionTest::replyOne);
 			server.launch();
+			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {});
+			try {
+				client.setOutboundLimits(1,Long.MAX_VALUE);
+				assertFailedAtOnce(client.eventLoop().submit(() -> sendToFullQueue(client)).get());
+			} finally {
+				client.close();
+			}
+		}
+	}
+
+	/**
+	 * On the ingress worker delivering a reply, a send to a full queue fails at once:
+	 * the worker serves every connection the process opens, so it must not wait.
+	 */
+	@Test
+	@Timeout(60)
+	public void testSendOnIngressWorkerDoesNotWait() throws Exception {
+		try (NettyServer server=new NettyServer(0)) {
+			server.setReceiveAction(NettyConnectionTest::replyOne);
+			server.launch();
+			CountDownLatch release=new CountDownLatch(1);
 			CompletableFuture<NettyConnection> self=new CompletableFuture<>();
 			CompletableFuture<Outcome> outcome=new CompletableFuture<>();
 			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {
 				if (outcome.isDone()) return;
-				NettyConnection c=self.join();
-				c.setOutboundLimits(1,Long.MAX_VALUE);
-				boolean full=c.trySendMessage(Message.createPing(2)) && !c.trySendMessage(Message.createPing(3));
-				long start=System.nanoTime();
 				try {
-					boolean sent=c.sendMessage(Message.createPing(4));
-					outcome.complete(new Outcome(full,sent,System.nanoTime()-start));
-				} catch (Exception e) {
+					assertTrue(Ingress.isWorkerThread(),"a reply is delivered on an ingress worker");
+					NettyConnection c=self.join();
+					occupy(c,release);
+					c.setOutboundLimits(1,Long.MAX_VALUE);
+					outcome.complete(sendToFullQueue(c));
+				} catch (Throwable e) {
 					outcome.completeExceptionally(e);
 				}
 			});
 			try {
 				self.complete(client);
 				assertTrue(client.trySendMessage(Message.createPing(1)));
-				Outcome result=outcome.get();
-				assertTrue(result.full(),"Nothing leaves the queue while its event loop is busy");
-				assertFalse(result.sent());
-				// A wait would have lasted the whole timeout
-				assertTrue(result.nanos()<TimeUnit.MILLISECONDS.toNanos(Config.DEFAULT_INTERNAL_TIMEOUT));
+				assertFailedAtOnce(outcome.get());
 			} finally {
+				release.countDown();
 				client.close();
 			}
 		}
+	}
+
+	/** Holds a connection's event loop until released, returning once it holds it. */
+	private static void occupy(NettyConnection c, CountDownLatch release) throws InterruptedException {
+		CountDownLatch held=new CountDownLatch(1);
+		c.eventLoop().execute(() -> {
+			held.countDown();
+			try {
+				release.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		});
+		assertTrue(held.await(10,TimeUnit.SECONDS));
 	}
 
 	/**
@@ -159,24 +202,15 @@ public class NettyConnectionTest {
 		try (NettyServer server=new NettyServer(0)) {
 			server.setReceiveAction(NettyConnectionTest::replyOne);
 			server.launch();
-			CountDownLatch delivering=new CountDownLatch(1);
 			CountDownLatch release=new CountDownLatch(1);
-			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {
-				delivering.countDown();
-				try {
-					release.await();
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
-			});
+			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {});
 			try {
 				Message oversized=oversizedMessage();
 				assertThrows(IllegalArgumentException.class,() -> client.sendMessage(oversized));
 				assertFalse(client.trySendMessage(oversized));
 
-				// The reply holds the event loop, so nothing leaves the queue
-				assertTrue(client.sendMessage(Message.createPing(1)));
-				delivering.await();
+				// While the event loop is held, nothing leaves the queue
+				occupy(client,release);
 				client.setOutboundLimits(1,Long.MAX_VALUE);
 				assertTrue(client.trySendMessage(Message.createPing(2)));
 				assertFalse(client.trySendMessage(Message.createPing(3)),"the queue is full");

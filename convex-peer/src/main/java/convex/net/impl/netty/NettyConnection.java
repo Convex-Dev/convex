@@ -38,6 +38,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
@@ -273,6 +274,12 @@ public class NettyConnection extends AConnection {
 		// Closing clears the queue, which also wakes a waiting send
 		if (!ch.isActive()) throw new ClosedChannelException();
 		return false;
+	}
+
+	/** The event loop serving this connection's channel, or null before it connects. */
+	EventLoop eventLoop() {
+		Channel ch = channel;
+		return (ch == null) ? null : ch.eventLoop();
 	}
 
 	/**
