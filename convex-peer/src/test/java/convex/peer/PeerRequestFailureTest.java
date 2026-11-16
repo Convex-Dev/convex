@@ -25,6 +25,7 @@ import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.slf4j.event.Level;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -144,28 +145,42 @@ public class PeerRequestFailureTest {
 	}
 
 	/**
+	 * The given failures with the one of the same class as the given failure replaced by
+	 * it. A test that checks how that failure is logged injects its own, so that a scope
+	 * of its own takes the record rather than the class's scope.
+	 */
+	static <T extends Throwable> List<T> withOwn(List<T> failures, T own) {
+		return failures.stream().map(f -> (f.getClass()==own.getClass())?own:f).toList();
+	}
+
+	/**
 	 * A query whose handling fails, here as its result is sent, fails alone: its
 	 * connection is kept, as the failure proves nothing against the sender, and the next
-	 * query in the same batch is answered.
+	 * query in the same batch is answered. Running out of memory is logged at warn.
 	 */
 	@Test
 	public void aQueryThatFailsLeavesTheRestOfItsBatch() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
-		try {
-			for (Error error: CONTAINED) {
-				// Not started: this test thread runs it
-				QueryHandler handler=new QueryHandler(peer);
-				ReplyConnection failing=new ReplyConnection(error);
-				ReplyConnection healthy=new ReplyConnection(null);
-				assertTrue(handler.offerQuery(Message.createQuery(1,"(+ 1 2)",ORIGIN).withConnection(failing)));
-				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",ORIGIN).withConnection(healthy)));
-				handler.loop();
-				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-				assertFalse(failing.isClosed(),error.toString());
+		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
+		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
+		try (logs) {
+			Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+			try {
+				for (Error error: withOwn(CONTAINED,outOfMemory)) {
+					// Not started: this test thread runs it
+					QueryHandler handler=new QueryHandler(peer);
+					ReplyConnection failing=new ReplyConnection(error);
+					ReplyConnection healthy=new ReplyConnection(null);
+					assertTrue(handler.offerQuery(Message.createQuery(1,"(+ 1 2)",ORIGIN).withConnection(failing)));
+					assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",ORIGIN).withConnection(healthy)));
+					handler.loop();
+					assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
+					assertFalse(failing.isClosed(),error.toString());
+				}
+			} finally {
+				peer.close();
 			}
-		} finally {
-			peer.close();
 		}
+		logs.assertLogged(Level.WARN,outOfMemory);
 	}
 
 	/** A query whose handling fails is answered with the failure's code, and its connection is kept. */
@@ -208,25 +223,31 @@ public class PeerRequestFailureTest {
 	/**
 	 * A data request whose handling fails, here as its response is sent, fails alone:
 	 * its connection stays open and the next request in the same batch is answered.
+	 * Running out of memory is logged at warn.
 	 */
 	@Test
 	public void aDataRequestThatFailsLeavesTheRestOfItsBatch() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
-		try {
-			for (Error error: CONTAINED) {
-				QueryHandler handler=new QueryHandler(peer);
-				ReplyConnection failing=new ReplyConnection(error);
-				ReplyConnection healthy=new ReplyConnection(null);
-				Hash held=peer.getBelief().getHash();
-				assertTrue(handler.offerQuery(Message.createDataRequest(CVMLong.create(1),held).withConnection(failing)));
-				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",ORIGIN).withConnection(healthy)));
-				handler.loop();
-				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-				assertFalse(failing.isClosed(),error.toString());
+		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
+		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
+		try (logs) {
+			Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+			try {
+				for (Error error: withOwn(CONTAINED,outOfMemory)) {
+					QueryHandler handler=new QueryHandler(peer);
+					ReplyConnection failing=new ReplyConnection(error);
+					ReplyConnection healthy=new ReplyConnection(null);
+					Hash held=peer.getBelief().getHash();
+					assertTrue(handler.offerQuery(Message.createDataRequest(CVMLong.create(1),held).withConnection(failing)));
+					assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",ORIGIN).withConnection(healthy)));
+					handler.loop();
+					assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
+					assertFalse(failing.isClosed(),error.toString());
+				}
+			} finally {
+				peer.close();
 			}
-		} finally {
-			peer.close();
 		}
+		logs.assertLogged(Level.WARN,outOfMemory);
 	}
 
 	/** Failures of the peer's own handling of client transactions, each answered as load or a peer error. */
@@ -279,30 +300,39 @@ public class PeerRequestFailureTest {
 
 	/**
 	 * A transaction whose intake fails is rejected alone: running out of memory is
-	 * answered as load, a stack overflow as a limit and any other failure as a peer
-	 * error, never as bad format. Later transactions are still executed.
+	 * answered as load and logged at warn, a stack overflow answered as a limit and any
+	 * other failure as a peer error, never as bad format. Later transactions are still
+	 * executed.
 	 */
 	@Test
 	public void aTransactionThatFailsIsRejectedWithItsCause() throws Exception {
-		FaultingStore store=new FaultingStore();
-		Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
-			int i=0;
-			for (Throwable failure: FAILURES) {
-				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
-				// The handler persists each transaction before queueing it
-				store.failOnce(tx.getHash(),failure);
-				Result rejected=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
-				assertEquals(failureCode(failure),rejected.getErrorCode(),failure+": "+rejected);
-				assertTrue(store.fired(),failure+" fired");
+		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
+		// Open for the life of the peer, whose handler logs it on its own thread
+		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
+		try (logs) {
+			FaultingStore store=new FaultingStore();
+			Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
+			try {
+				Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+				int i=0;
+				// The handler warns only of the first running out of memory: here, this test's own
+				for (Throwable failure: withOwn(FAILURES,outOfMemory)) {
+					SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
+					// The handler persists each transaction before queueing it
+					store.failOnce(tx.getHash(),failure);
+					Result rejected=client.transact(tx).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+					assertEquals(failureCode(failure),rejected.getErrorCode(),failure+": "+rejected);
+					assertTrue(store.fired(),failure+" fired");
+				}
+				SignedData<ATransaction> next=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"));
+				Result ok=client.transact(next).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
+				assertTrue(peer.isLive());
+			} finally {
+				peer.close();
 			}
-			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"));
-			Result ok=client.transact(next).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
-			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
-		} finally {
-			peer.close();
 		}
+		logs.assertLogged(Level.WARN,outOfMemory);
 	}
 
 	/**
