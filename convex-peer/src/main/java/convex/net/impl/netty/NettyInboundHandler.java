@@ -15,6 +15,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.util.Utils;
+import convex.net.ingress.IngressChannel;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -61,6 +62,26 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 		/** Releases the sink once the channel has closed. */
 		void disconnected();
+	}
+
+	/**
+	 * Gets a sink that admits framed messages to an ingress channel.
+	 *
+	 * @param channel Ingress channel of the connection
+	 * @return Sink
+	 */
+	static InboundSink sinkOf(IngressChannel channel) {
+		return new InboundSink() {
+			@Override
+			public boolean admit(Message m) {
+				return channel.admit(m);
+			}
+
+			@Override
+			public void disconnected() {
+				channel.disconnect();
+			}
+		};
 	}
 
 	/** Where framed messages go; replaced only before the channel's first read. */

@@ -27,7 +27,6 @@ import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.IncomingHandler;
 import convex.net.ingress.Ingress;
-import convex.net.ingress.IngressChannel;
 import convex.peer.Config;
 import convex.peer.Server;
 import io.netty.bootstrap.ServerBootstrap;
@@ -193,7 +192,7 @@ public class NettyServer extends AServer {
             	 inbound.setConnection(conn);
 				 Ingress in=ingress;
 				 // A connection handler's own dispatch replaces the ingress
-				 if (accepted==null && in!=null) inbound.setSink(ingressSink(in.register(conn,ingressRoute,inbound::resume)));
+				 if (accepted==null && in!=null) inbound.setSink(NettyInboundHandler.sinkOf(in.register(conn,ingressRoute,inbound::resume)));
 				 inbound.setDisconnectAction((accepted==null) ? getDisconnectAction() : accepted);
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
 				 if (accepted!=null) {
@@ -343,20 +342,6 @@ public class NettyServer extends AServer {
 	public void setIngress(Ingress ingress, Function<Message, Predicate<Message>> route) {
 		this.ingressRoute=route;
 		this.ingress=ingress;
-	}
-
-	private static NettyInboundHandler.InboundSink ingressSink(IngressChannel channel) {
-		return new NettyInboundHandler.InboundSink() {
-			@Override
-			public boolean admit(Message m) {
-				return channel.admit(m);
-			}
-
-			@Override
-			public void disconnected() {
-				channel.disconnect();
-			}
-		};
 	}
 
 	/**

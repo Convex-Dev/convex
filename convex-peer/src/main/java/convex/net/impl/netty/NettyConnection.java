@@ -27,6 +27,9 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
 import convex.core.message.AConnection;
+import convex.net.ingress.Ingress;
+import convex.net.ingress.IngressChannel;
+import convex.net.ingress.IngressLimits;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -55,6 +58,9 @@ public class NettyConnection extends AConnection {
 	static volatile EventLoopGroup workerGroup = null;
 
 	static volatile Bootstrap clientBootstrap = null;
+
+	/** Ingress that decodes and routes what every client connection receives */
+	private static volatile Ingress clientIngress = null;
 
 	private volatile Channel channel;
 
@@ -106,6 +112,27 @@ public class NettyConnection extends AConnection {
 				}
 			});
 			return workerGroup;
+		}
+	}
+
+	/**
+	 * Gets the ingress shared by the client connections of this process, which
+	 * serves verified peers' connections in its priority lane.
+	 */
+	static Ingress getClientIngress() {
+		Ingress ingress = clientIngress;
+		if (ingress != null) return ingress;
+
+		synchronized (NettyConnection.class) {
+			if (clientIngress != null) return clientIngress;
+			clientIngress = new Ingress("Client", IngressLimits.defaults(), AConnection::isTrusted,
+				e -> log.error("JVM failure in client ingress", e));
+			Shutdown.addHook(Shutdown.CONNECTION, () -> {
+				Ingress ci = clientIngress;
+				clientIngress = null;
+				if (ci != null) ci.close();
+			});
+			return clientIngress;
 		}
 	}
 
@@ -161,14 +188,17 @@ public class NettyConnection extends AConnection {
 
 	/**
 	 * Connects with a delivery that may ask to wait by returning a retry, as a
-	 * server connection's does: this connection then stops reading until the retry,
-	 * run on a virtual thread, accepts the message or gives up.
+	 * server connection's does: this connection then stops reading until the retry
+	 * accepts the message or gives up. The delivery is called on a worker of the
+	 * client ingress, never on the event loop, one message at a time in order.
 	 */
 	public static NettyConnection connectWithDelivery(SocketAddress sa, Function<Message, Predicate<Message>> delivery,
 			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
 		NettyInboundHandler inbound=new NettyInboundHandler(delivery,null,maxMessageLength);
 		NettyConnection client=new NettyConnection(null,inbound);
 		inbound.setConnection(client);
+		IngressChannel ingress=getClientIngress().register(client,delivery,inbound::resume);
+		inbound.setSink(NettyInboundHandler.sinkOf(ingress));
 		SslHandler ssl;
 		if (sslContext==null) {
 			ssl=null;
@@ -227,7 +257,11 @@ public class NettyConnection extends AConnection {
 			connected=true;
 			return client;
 		} finally {
-			if (!connected) chan.close();
+			if (!connected) {
+				chan.close();
+				// A channel that never became active reports no close to its handler
+				ingress.disconnect();
+			}
 		}
 	}
 
@@ -247,8 +281,9 @@ public class NettyConnection extends AConnection {
 	 *
 	 * <p>This is an outbound client connection, so blocking with a bounded
 	 * timeout is acceptable — the caller's virtual thread parks while the
-	 * outbound queue drains. On an event loop it does not wait: those threads
-	 * drain this queue and every other, so a full queue fails the send at once.</p>
+	 * outbound queue drains. On an event loop or an ingress worker it does not
+	 * wait: those threads serve every connection, so a full queue fails the send
+	 * at once.</p>
 	 */
 	@Override
 	public boolean sendMessage(Message m) throws IOException, InterruptedException {
@@ -256,7 +291,7 @@ public class NettyConnection extends AConnection {
 		if (ch == null || !ch.isActive()) throw new ClosedChannelException();
 		m.getMessageData(); // encodes on this thread, or throws if too large for a frame
 		boolean queued = outbound.offer(m)
-			|| (!inEventLoop(ch.eventLoop().parent())
+			|| (!inEventLoop(ch.eventLoop().parent()) && !Ingress.isWorkerThread()
 				&& outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS));
 		if (queued && afterQueue(ch, m)) return true;
 		// Closing clears the queue, which also wakes a waiting send

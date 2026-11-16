@@ -63,8 +63,8 @@ public abstract class AConvexConnected extends Convex {
 
 	/**
 	 * Observes decoded incoming traffic for a connection owner's liveness policy. Runs
-	 * on the thread delivering a message, which may be a network event loop, so it
-	 * must not block.
+	 * on the thread delivering a message, which may be an ingress worker shared by
+	 * many connections, so it must not block.
 	 */
 	public void setReceiveObserver(Runnable observer) {
 		receiveObserver=observer;
@@ -181,8 +181,9 @@ public abstract class AConvexConnected extends Convex {
 	 * This is deliberately separate from {@link #setStore(convex.core.store.AStore)}:
 	 * a local acquisition store must not implicitly become remotely readable.
 	 *
-	 * <p>The handler runs on the connection's receive thread, which may be a network
-	 * event loop, so it must not block: hand off any work that may wait.
+	 * <p>The handler runs on the connection's receive thread, which may be an ingress
+	 * worker shared by many connections, so it must not block: hand off any work that
+	 * may wait.
 	 *
 	 * @param handler Data request handler, or null to deny reverse data requests
 	 */

@@ -107,6 +107,24 @@ public class PeerIngressTest {
 	}
 
 	@Test
+	public void testClientDecodesResultsOffEventLoop() throws Exception {
+		Server server = launch(new MemoryStore());
+		RecordingStore clientStore = new RecordingStore();
+		try (Convex client = Convex.connect(server.getHostAddress(), HERO, KP)) {
+			client.setStore(clientStore);
+			Result q = client.query("(+ 1 2)").get(WAIT, TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(3), q.getValue());
+			Result t = client.transactSync("(def y 2)");
+			assertFalse(t.isError(), t.toString());
+
+			assertEquals(0, clientStore.onEventLoop.get(), "no result decoded on a network thread");
+			assertTrue(clientStore.elsewhere.get() >= 2, "results are decoded by the client");
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
 	public void testHeldDecodeLeavesOtherConnectionsServed() throws Exception {
 		Server server = launch(new MemoryStore());
 		Keyword held = Keyword.intern("held");
