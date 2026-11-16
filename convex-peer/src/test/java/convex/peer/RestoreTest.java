@@ -61,27 +61,35 @@ public class RestoreTest {
 //		   }
 //		}
 
-		AStore store=EtchStore.createTemp();
+		// Etch: the test checks the index of the store it restores from
+		try (AStore store=EtchStore.createTemp()) {
+			checkRestore(store);
+		}
+	}
+
+	private void checkRestore(AStore store) throws InterruptedException, ExecutionException, TimeoutException, ResultException, IOException, PeerException {
 		Map<Keyword, Object> config = Maps.hashMapOf(
 				Keywords.KEYPAIR,KP,
 				Keywords.STATE,GENESIS,
 				Keywords.STORE,store,
+				Keywords.PORT,0,
 				Keywords.URL,null,
 				Keywords.PERSIST,true
 		);
-		Server s1=API.launchPeer(config);
+		Long balance1;
+		Peer original;
+		Peer expected;
+		try (Server s1=API.launchPeer(config);
+				// Connect with HERO Account
+				Convex cvx1=Convex.connect(s1,HERO,KP)) {
+			Result tx1=cvx1.transactSync(Invoke.create(HERO,1, Symbols.STAR_ADDRESS));
+			assertEquals(HERO,tx1.getValue());
 
-		// Connect with HERO Account
-		Convex cvx1=Convex.connect(s1,HERO,KP);
-
-		Result tx1=cvx1.transactSync(Invoke.create(HERO,1, Symbols.STAR_ADDRESS));
-		assertEquals(HERO,tx1.getValue());
-		
-		Long balance1=cvx1.getBalance(HERO);
-		assertTrue(balance1>0);
-		Peer original=s1.getPeer();
-		Peer expected=original.recalcState(0);
-		s1.close();
+			balance1=cvx1.getBalance(HERO);
+			assertTrue(balance1>0);
+			original=s1.getPeer();
+			expected=original.recalcState(0);
+		}
 
 		// Simulate a persisted state produced by an older, faulty implementation.
 		// Startup replay must replace it both in memory and at the store root.
@@ -97,30 +105,29 @@ public class RestoreTest {
 		config.remove(Keywords.STATE);
 		config.put(Keywords.RESTORE,true);
 		config.put(Keywords.RECALC,0L);
-		Server s2=API.launchPeer(config);
+		try (Server s2=API.launchPeer(config)) {
+			Peer persisted=Peer.restorePeer(store,KP,KP.getAccountKey());
+			assertEquals(expected.getConsensusState().getHash(),s2.getPeer().getConsensusState().getHash());
+			assertEquals(s2.getPeer().getConsensusState().getHash(),persisted.getConsensusState().getHash());
+			assertEquals(s2.getPeer().getStatePosition(),persisted.getStatePosition());
 
-		Peer persisted=Peer.restorePeer(store,KP,KP.getAccountKey());
-		assertEquals(expected.getConsensusState().getHash(),s2.getPeer().getConsensusState().getHash());
-		assertEquals(s2.getPeer().getConsensusState().getHash(),persisted.getConsensusState().getHash());
-		assertEquals(s2.getPeer().getStatePosition(),persisted.getStatePosition());
-		
-		assertNull(s2.getHostname());
-		
-		Convex cvx2=Convex.connect(s2.getHostAddress(), HERO,KP);
+			assertNull(s2.getHostname());
 
-		// TODO: check this?
-		Long balance2=cvx2.getBalance(HERO);
-		assertEquals(balance1,balance2);
+			try (Convex cvx2=Convex.connect(s2.getHostAddress(), HERO,KP)) {
+				// TODO: check this?
+				Long balance2=cvx2.getBalance(HERO);
+				assertEquals(balance1,balance2);
 
-		Result tx2=cvx2.transactSync(Invoke.create(HERO,2, Symbols.BALANCE));
-		assertFalse(tx2.isError());
-		cvx2.close();
+				Result tx2=cvx2.transactSync(Invoke.create(HERO,2, Symbols.BALANCE));
+				assertFalse(tx2.isError());
+			}
 
-		State state=s2.getPeer().getConsensusState();
-		assertNotNull(state);
-		
-		Etch e=((EtchStore)s2.getStore()).getEtch();
-		IndexVisitor vd = new EtchVerifier.IndexVisitor();
-		e.visitIndex(vd);
+			State state=s2.getPeer().getConsensusState();
+			assertNotNull(state);
+
+			Etch e=((EtchStore)s2.getStore()).getEtch();
+			IndexVisitor vd = new EtchVerifier.IndexVisitor();
+			e.visitIndex(vd);
+		}
 	}
 }
