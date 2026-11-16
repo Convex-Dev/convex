@@ -4,14 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
@@ -28,8 +31,12 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.EncodingTest;
+import convex.core.data.Hash;
 import convex.core.data.Index;
+import convex.core.data.MapEntry;
 import convex.core.data.RecordTest;
+import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -37,7 +44,10 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 import convex.core.text.Text;
+import convex.test.LogCapture;
 
 @Execution(value = ExecutionMode.CONCURRENT)
 public class BeliefMergeTest {
@@ -273,6 +283,68 @@ public class BeliefMergeTest {
 			assertNull(merged.getBelief().getOrders().get(KEYS[1]));
 			assertEquals(b2.getPeerOrder().getBlocks(), merged.getPeerOrder().getBlocks());
 		}
+	}
+
+	/**
+	 * A received Order that fails to read with a contained Error is ignored, and other
+	 * Orders in the same Belief are merged. A probable defect is logged as a warning the
+	 * first time in the JVM, which may have been in an earlier test.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	@ResourceLock("java.util.logging:convex.core.cpos.BeliefMerge")
+	public void testMergeIgnoresOrderThatFailsToRead() throws InvalidDataException, ReflectiveOperationException {
+		Peer b0 = initialPeerState(0);
+		Peer proposer = initialPeerState(2);
+		proposer = proposer.updateTimestamp(proposer.getTimestamp() + 200);
+		Peer b2 = proposer.proposeBlock(Block.of(proposer.getTimestamp()));
+		SignedData<Order> good = b2.getBelief().getOrders().get(KEYS[2]);
+
+		// Stack overflow first: an out of memory reaching JUnit would abort the whole run
+		List<Error> errors=List.of(new StackOverflowError(), new OutOfMemoryError(),
+				new NoClassDefFoundError(), new AssertionError());
+		List<LogCapture.Entry> logged=LogCapture.capture(BeliefMerge.class.getName(), () -> {
+			for (Error error: errors) {
+				Index orders = Index.create(KEYS[2], good).assocEntry(MapEntry.fromRefs(KEYS[1].getRef(), unreadable(error)));
+				Peer merged = merge(b0, Belief.create(orders));
+				assertNull(merged.getBelief().getOrders().get(KEYS[1]), error.toString());
+				assertEquals(b2.getPeerOrder().getBlocks(), merged.getPeerOrder().getBlocks(), error.toString());
+			}
+		});
+		for (LogCapture.Entry e: logged) {
+			assertEquals("WARNING", e.level());
+			assertTrue(errors.contains(e.thrown()), e.toString());
+		}
+	}
+
+	/** Merges a Belief into a Peer, as an action that throws no checked exception. */
+	private static Peer merge(Peer peer, Belief belief) {
+		try {
+			return peer.mergeBeliefs(belief);
+		} catch (InvalidDataException e) {
+			throw new AssertionError(e);
+		}
+	}
+
+	/** A failure of the JVM itself while reading a received Order is not contained by the merge. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testMergeLetsJvmFailureThrough() {
+		Peer b0 = initialPeerState(0);
+		Index orders = Index.create(MapEntry.fromRefs(KEYS[1].getRef(), unreadable(new InternalError("simulated"))));
+		assertThrows(InternalError.class, () -> b0.mergeBeliefs(Belief.create(orders)));
+	}
+
+	/** A reference to a signed Order whose read from the store fails with the given Error. */
+	private static Ref<SignedData<Order>> unreadable(Error error) {
+		AStore failing = new MemoryStore() {
+			@Override
+			public <T extends ACell> Ref<T> refForHash(Hash hash) {
+				throw error;
+			}
+		};
+		SignedData<Order> order = KEY_PAIRS[1].signData(Order.create());
+		return RefSoft.createForHash(order.getHash(), failing);
 	}
 
 	/**

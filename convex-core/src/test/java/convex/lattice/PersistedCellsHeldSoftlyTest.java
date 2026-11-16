@@ -189,11 +189,6 @@ public class PersistedCellsHeldSoftlyTest {
 			}))));
 	}
 
-	/** Edits by a transaction, whose commit carries the run's changes onto the cells held then. */
-	static Stream<Edit> transactions() {
-		return edits().filter(edit -> edit.name().contains("transaction"));
-	}
-
 	/** One way of writing a whole value. */
 	private record Write(String name,BiConsumer<AForkableCursor<AHashMap<ACell,ACell>>,AHashMap<ACell,ACell>> action) {
 		@Override public String toString() { return name; }
@@ -235,7 +230,12 @@ public class PersistedCellsHeldSoftlyTest {
 				AHashMap<ACell,ACell> base,AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
 			mergedBase=base;
 			mergedOwn=own;
-			return LatticeOps.mergeChanges(base,own,other);
+			return super.reconcile(base,own,other);
+		}
+
+		/** Entries are written once, so each side's additions combine. */
+		@Override protected AHashMap<ACell,ACell> reconcile(AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
+			return LatticeComponent.reconcile(NESTED,LatticeContext.EMPTY,own,other);
 		}
 	}
 
@@ -265,9 +265,21 @@ public class PersistedCellsHeldSoftlyTest {
 			child.sync();
 		}
 
+		/** Top-level keys are regions, each published by one side, so they combine key by key. */
 		@Override protected AHashMap<ACell,ACell> reconcile(
 				AHashMap<ACell,ACell> base,AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
-			return LatticeOps.mergeChanges(base,own,other);
+			AHashMap<ACell,ACell> result=other;
+			for (AHashMap<ACell,ACell> side:List.of(base,own)) {
+				for (ACell key:side.keySet()) {
+					ACell mine=own.get(key);
+					ACell before=base.get(key);
+					if (Cells.equals(mine,before)) continue;
+					ACell held=other.get(key);
+					if (!Cells.equals(held,before)) throw new MergeConflictException();
+					result=own.containsKey(key)?result.assoc(key,mine):result.dissoc(key);
+				}
+			}
+			return result;
 		}
 	}
 
@@ -438,32 +450,37 @@ public class PersistedCellsHeldSoftlyTest {
 		assertTrue(holds(host.cursor().get(),9000));
 	}
 
-	/** A fork taken before the destination's save brings only its own change back to it. */
-	@Test void aSyncWhereOnlyTheForkChangedKeepsTheDestinationsSavedCells() {
+	/**
+	 * A fork taken before the destination's save publishes a value built on the unsaved
+	 * cells; the destination's next save finds what is already stored.
+	 */
+	@Test void aSyncWhereOnlyTheForkChangedIsHeldSoftlyAfterTheDestinationsNextSave() {
 		var host=LatticeHost.create(tree(),hostStore());
 		var component=new Plain(host.cursor().fork());
 		host.sync();
 		component.cursor().updateAndGet(root -> with(root,9000));
-
 		component.sync();
 
+		host.sync();
+
 		assertTrue(holds(host.cursor().get(),9000));
-		assertOnlyStrongAround(host.cursor().get(),blob(9000));
+		assertHeldSoftly(store,host.cursor().get());
 	}
 
-	/** A lattice join where both sides changed is built on the fork's cells, then carried onto the destination's. */
-	@Test void aLatticeJoinKeepsTheDestinationsSavedCells() {
+	/** A lattice join decides the value only; the destination's next save holds it softly. */
+	@Test void aLatticeJoinIsHeldSoftlyAfterTheDestinationsNextSave() {
 		var host=LatticeHost.create(tree(),hostStore());
 		var component=new LatticeComponent<>(NESTED,host.cursor().fork());
 		component.cursor().updateAndGet(root -> with(root,9000));
 		write(host,9001);
 		host.sync();
-
 		component.sync();
+
+		host.sync();
 
 		assertTrue(holds(host.cursor().get(),9000));
 		assertTrue(holds(host.cursor().get(),9001));
-		assertOnlyStrongAround(host.cursor().get(),blob(9000));
+		assertHeldSoftly(store,host.cursor().get());
 	}
 
 	@Test void cellsBuiltByAMergeAreHeldSoftlyAfterTheSameSync() {
@@ -671,20 +688,10 @@ public class PersistedCellsHeldSoftlyTest {
 		assertOnlyStrongAround(root.get(),blob(9000));
 	}
 
-	@ParameterizedTest(name="{0}")
-	@MethodSource("transactions")
-	void aPersistLandingDuringATransactionLeavesOnlyTheEditStrong(Edit edit) {
-		Root<AHashMap<ACell,ACell>> root=Cursors.root(tree());
-
-		edit.apply(root,9000,once(() -> persist(root)));
-
-		assertTrue(holds(root.get(),9000),"The edit is kept");
-		assertOnlyStrongAround(root.get(),blob(9000));
-	}
-
 	/**
-	 * A finished value, from a compare-and-set, is built on the cells read before the
-	 * persist and goes in as it is, so those cells are held again until the next persist.
+	 * A finished value, from a compare-and-set or a transaction's run, is built on the
+	 * cells read before the persist and goes in as it is, so those cells are held again
+	 * until the next persist.
 	 */
 	@ParameterizedTest(name="{0}")
 	@MethodSource("edits")

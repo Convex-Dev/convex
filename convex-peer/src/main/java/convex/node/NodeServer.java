@@ -20,9 +20,11 @@ import convex.core.data.ACell;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.util.Utils;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.net.PeerConnectionException;
+import convex.net.RequestFailures;
 
 /**
  * Replicates one host's published root.
@@ -71,6 +73,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(NodeServer.class);
 
+	private final RequestFailures mergeFailures=new RequestFailures(log);
 	private final AStore store;
 	private final NodeConfig config;
 	private final AForkableCursor<V> cursor;
@@ -545,13 +548,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ThrowingRunnable action) {
 		try {
 			action.run();
-		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
-			propagator.recordFailure(operation,e);
-			log.warn("Contained propagation-group stack overflow during {}; isolated {}",
-				operation,propagator);
-			log.debug("Contained propagation-group stack overflow",e);
 		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			propagator.recordFailure(operation,e);
 			log.warn("Propagator group failed during {}; isolated {}: {}: {}",
 				operation,propagator,e.getClass().getSimpleName(),e.getMessage());
@@ -566,8 +564,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/** Completed delivery; changed describes host state, not private application edits.
 	 * An ignored value is still a completed delivery. Exceptions reject the delivery. */
-	static record MergeOutcome(boolean accepted,boolean changed) {
-		static final MergeOutcome REJECTED=new MergeOutcome(false,false);
+	/** The outcome of merging a received value. */
+	static record MergeOutcome(boolean accepted,boolean changed,boolean senderFault) {
+		/** The value cannot be merged, which is its sender's fault */
+		static final MergeOutcome REJECTED=new MergeOutcome(false,false,true);
+		/** This node ran out of memory merging the value, which is not its sender's fault */
+		static final MergeOutcome FAILED=new MergeOutcome(false,false,false);
 	}
 
 	/**
@@ -576,27 +578,39 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	MergeOutcome mergeInbound(ACell[] path,ACell value) {
 		ACell before=cursor.get();
-		if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
+		MergeOutcome failure=merge(value,path);
+		if (failure!=null) return failure;
 		ACell after=cursor.get();
 		boolean changed=before!=after && (before==null || !before.equals(after));
 		if (changed) host.sync();
-		return new MergeOutcome(true,changed);
+		return new MergeOutcome(true,changed,false);
 	}
 
 	boolean mergeIncoming(ACell value,ACell... path) {
+		return merge(value,path)==null;
+	}
+
+	/**
+	 * Merges a received value into the host.
+	 *
+	 * @return null if the value was merged, otherwise the outcome
+	 */
+	private MergeOutcome merge(ACell value,ACell[] path) {
 		try {
 			host.mergeAt(value,path);
-			return true;
+			return null;
 		} catch (ClassCastException e) {
-			log.warn("Rejected inbound lattice value of wrong type: {}",
+			mergeFailures.log(e,"Rejected inbound lattice value of wrong type: {}",
 				(value==null) ? "null" : value.getClass().getSimpleName());
-			return false;
-		} catch (StackOverflowError e) {
-			log.warn("Rejected inbound lattice value after stack overflow");
-			return false;
-		} catch (Exception e) {
-			log.warn("Rejected inbound lattice value",e);
-			return false;
+			return MergeOutcome.REJECTED;
+		} catch (OutOfMemoryError e) {
+			// The memory may be held by other work, so this says nothing about the sender
+			mergeFailures.log(e,"Unable to merge inbound lattice value");
+			return MergeOutcome.FAILED;
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			mergeFailures.log(e,"Rejected inbound lattice value");
+			return MergeOutcome.REJECTED;
 		}
 	}
 

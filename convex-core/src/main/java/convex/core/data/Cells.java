@@ -2,14 +2,20 @@ package convex.core.data;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.data.impl.DummyCell;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.TODOException;
@@ -204,6 +210,7 @@ public class Cells {
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If a cell persisted for the first time is inconsistent with a child
 	 * @throws MissingDataException if part of the cell is not available
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) throws IOException {
@@ -250,6 +257,7 @@ public class Cells {
 	 * @param store Store to announce in
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If a cell persisted for the first time is inconsistent with a child
 	 * @throws MissingDataException if part of the cell is not available
 	 */
 	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
@@ -377,16 +385,103 @@ public class Cells {
 		return value;
 	}
 
+	/**
+	 * Validates a cell as {@link ACell#validate()} does.
+	 *
+	 * @param cell Cell to validate, may be null
+	 * @throws InvalidDataException If a cell checked is invalid
+	 */
 	public static void validate(ACell cell) throws InvalidDataException {
 		if (cell==null) return; // OK, this is the null value
-		Ref<?> ref=cell.getRef();
-		if (ref.isValidated()) return;
+		cell.validate();
+	}
+
+	/**
+	 * Checks a cell against each of its direct children, as structural correctness
+	 * requires (<a href="https://docs.convex.world/docs/cad/encoding">CAD003</a>).
+	 * The children themselves are not checked.
+	 *
+	 * @param cell Cell to check, may be null
+	 * @throws InvalidStructureException If the cell is inconsistent with a child
+	 * @throws MissingDataException If a child needed for the check is not available
+	 */
+	public static void checkStructure(ACell cell) {
+		if (cell==null) return;
 		try {
-			cell.validateCell();
 			cell.validateStructure();
-			// Cells.markValidated(cell);
-		} catch (Exception e) {
-			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
+		} catch (MissingDataException e) {
+			throw e;
+		} catch (InvalidDataException | RuntimeException e) {
+			throw new InvalidStructureException(e.getMessage(),e);
+		}
+	}
+
+	/**
+	 * Checks the structure of a value's whole tree, as persisting it would, without
+	 * storing anything: each cell against its direct children. A branch referred to by
+	 * a reference into a store that holds it as persisted is not visited.
+	 *
+	 * @param value Value to check, may be null
+	 * @throws InvalidStructureException If a cell is inconsistent with a child
+	 * @throws MissingDataException If a branch of the tree is not available
+	 */
+	public static void checkTree(ACell value) {
+		if (value==null) return;
+		ArrayList<ACell> stack=new ArrayList<>();
+		// Each cell once, however often the tree refers to it
+		Set<ACell> seen=Collections.newSetFromMap(new IdentityHashMap<>());
+		stack.add(value);
+		while (!stack.isEmpty()) {
+			ACell cell=stack.remove(stack.size()-1);
+			int n=cell.getRefCount();
+			if ((n==0)||!seen.add(cell)) continue;
+			checkStructure(cell);
+			for (int i=0; i<n; i++) {
+				Ref<ACell> ref=cell.getRef(i);
+				if (ref instanceof RefSoft<ACell> soft) {
+					AStore store=soft.getStore();
+					Ref<ACell> stored=(store==null)?null:store.refForHash(soft.getHash());
+					if ((stored!=null)&&(stored.getStatus()>=Ref.PERSISTED)) continue;
+				}
+				ACell child=ref.getValue();
+				if (child!=null) stack.add(child);
+			}
+		}
+	}
+
+	/**
+	 * Checks the structure of a value received from outside this process, as
+	 * {@link #checkTree(ACell)} does.
+	 *
+	 * @param value Value to check, may be null
+	 * @throws BadFormatException If a cell is inconsistent with a child
+	 * @throws MissingDataException If a branch of the tree is not available
+	 */
+	public static void checkReceived(ACell value) throws BadFormatException {
+		try {
+			checkTree(value);
+		} catch (InvalidStructureException e) {
+			throw new BadFormatException("Invalid structure: "+e.getMessage(),e);
+		}
+	}
+
+	/**
+	 * Persists a value received from outside this process, as
+	 * {@link #persist(ACell, AStore)} does.
+	 *
+	 * @param <T> Type of value
+	 * @param value Value to persist
+	 * @param store Store to persist in
+	 * @return Value after persisting
+	 * @throws BadFormatException If a cell is inconsistent with a child
+	 * @throws MissingDataException If part of the value is not available
+	 * @throws IOException In case of IO error during persistence
+	 */
+	public static <T extends ACell> T persistReceived(T value, AStore store) throws BadFormatException, IOException {
+		try {
+			return persist(value,store);
+		} catch (InvalidStructureException e) {
+			throw new BadFormatException("Invalid structure: "+e.getMessage(),e);
 		}
 	}
 

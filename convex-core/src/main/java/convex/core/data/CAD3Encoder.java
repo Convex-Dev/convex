@@ -590,6 +590,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		short mask = (short) ((ds.data[ds.pos] << 8) | (ds.data[ds.pos + 1] & 0xFF));
 		ds.pos += 2;
 		int n = Integer.bitCount(mask & 0xFFFF);
+		// With more than one entry: an entry needs children, and no entry needs two or more
+		if (n < ((me == null) ? 2 : 1)) throw new BadFormatException("Too few Index children: " + n);
 		Ref<Index>[] children = new Ref[n];
 		for (int i = 0; i < n; i++) {
 			children[i] = readRef(ds);

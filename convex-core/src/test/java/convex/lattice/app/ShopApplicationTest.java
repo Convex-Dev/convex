@@ -118,7 +118,7 @@ class ShopApplicationTest {
 			if (runs.incrementAndGet()==1) shop.stock().restock(TEA,5);
 			s.order(1,TEA);
 		});
-		assertEquals(2,runs.get(),"the restock landed during the first run");
+		assertEquals(1,runs.get(),"the restock landed during the run");
 		assertEquals(stock(TEA,5),at(shop,STOCK),"one plus five, less the order");
 	}
 

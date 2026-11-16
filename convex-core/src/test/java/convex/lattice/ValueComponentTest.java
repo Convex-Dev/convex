@@ -27,6 +27,7 @@ import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Transactions;
+import convex.lattice.cursor.PathCursor;
 
 class ValueComponentTest {
 	private static final AString DATA=Strings.create("data");
@@ -127,7 +128,7 @@ class ValueComponentTest {
 		var root=Root.<ACell>create(Maps.of(DATA,Maps.of(NAME,CVMLong.ONE),RAW,CVMLong.ZERO));
 		var component=new ValueComponent<ACell>(root) {
 			private final AForkableCursor<ACell> exposed=ProjectionCursor.create(root,
-				stored -> RT.getIn(stored,DATA),(stored,value) -> LatticeOps.assocExisting(stored,value,DATA));
+				stored -> RT.getIn(stored,DATA),(stored,value) -> PathCursor.assocExisting(stored,value,DATA));
 			@Override public AForkableCursor<ACell> cursor() { return exposed; }
 		};
 		assertEquals(Maps.of(NAME,CVMLong.ONE),component.value());
@@ -306,6 +307,6 @@ class ValueComponentTest {
 		var conflicting=live.fork();
 		conflicting.cursor().set(CVMLong.ONE);
 		live.cursor().set(CVMLong.TWO);
-		assertThrows(UnsupportedOperationException.class,conflicting::sync);
+		assertThrows(MergeConflictException.class,conflicting::sync);
 	}
 }

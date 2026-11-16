@@ -40,7 +40,8 @@ class SignedDomainComponentTest {
 		@Override public Count fork() { return rebind(storage.fork()); }
 		@Override protected AInteger reconcile(AInteger own,AInteger other) {
 			reconciliations++;
-			return super.reconcile(own,other);
+			// A count only rises, so changes on both sides keep the larger
+			return MaxLattice.INSTANCE.merge(own,other);
 		}
 		void set(long value) { cursor().set(CVMLong.create(value)); }
 	}

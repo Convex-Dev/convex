@@ -192,7 +192,8 @@ public class ErrorCodes {
 	public static final Keyword FATAL = Keyword.intern("FATAL");
 
 	/**
-	 * ErrorCode for a message format error.
+	 * ErrorCode for a badly formatted message: an invalid CAD3 encoding, or a message
+	 * without the shape its type requires. Not for any other failure.
 	 */
 	public static final Keyword FORMAT = Keyword.intern("FORMAT");
 

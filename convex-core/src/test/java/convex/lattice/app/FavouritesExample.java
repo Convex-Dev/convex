@@ -46,7 +46,9 @@ import convex.lattice.generic.SignedLattice;
  * atomic storage operation. Repeated user handles share that signed working state.
  * A user handle can fork the same domain API for a batch: edits then stamp private
  * unsigned state, and sync signs the reconciled record into the region. A nested
- * draft sync stops at its enclosing draft, without signing early.
+ * draft sync stops at its enclosing draft, without signing early. Local changes on
+ * both sides conflict, at a draft's sync or a transaction's commit, since keeping one
+ * whole record would lose the other's edits.
  * Incoming envelopes are verified and compared by their signed timestamps; a selected
  * envelope keeps its signature and is never stamped with the receiver's clock.
  * The newer record replaces the entire older record, so removed items stay removed.

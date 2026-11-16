@@ -11,9 +11,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
@@ -41,8 +45,11 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Transaction;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
+import convex.core.store.MemoryStore;
+import convex.test.LogCapture;
 import convex.test.Samples;
 
 /**
@@ -488,7 +495,107 @@ public class TransactionTest extends ACVMTest {
 		
 		RecordTest.doRecordTests(t);
 	}
-	
-	
 
+	/** A Transfer whose target field is not an Address fails with :FORMAT */
+	@Test
+	public void testTransferTargetNotAddress() {
+		long seq=state().getAccount(HERO).getSequence()+1;
+		for (ACell target: new ACell[] {null, CVMLong.create(7)}) {
+			Transfer t=Transfer.create(Vectors.of(HERO, seq, target, 1L));
+			ResultContext rc=state().applyTransaction(t);
+			assertEquals(ErrorCodes.FORMAT,rc.getErrorCode());
+		}
+	}
+
+	/** A Transfer without an Address target fails with :FORMAT within a Block too */
+	@Test
+	public void testTransferTargetNotAddressInBlock() {
+		State s=state();
+		Transfer good=Transfer.create(HERO, s.getAccount(HERO).getSequence()+1, VILLAIN, 100);
+		Transfer bad=Transfer.create(Vectors.of(VILLAIN, s.getAccount(VILLAIN).getSequence()+1, null, 1L));
+		Block b=Block.of(s.getTimestamp().longValue()+1000, HERO_KP.signData(good), VILLAIN_KP.signData(bad));
+		BlockResult br=s.applyBlock(InitTest.FIRST_PEER_KEYPAIR.signData(b));
+		assertFalse(br.isError(0));
+		assertEquals(s.getAccount(HERO).getSequence()+1,br.getState().getAccount(HERO).getSequence());
+		assertEquals(ErrorCodes.FORMAT,br.getErrorCode(1));
+	}
+
+	/**
+	 * An unexpected exception in a transaction makes its whole Block invalid, and the
+	 * peer logs it as an error naming that transaction
+	 */
+	@Test
+	@ResourceLock("java.util.logging:convex.core.cvm.State")
+	public void testUnexpectedExceptionInBlock() throws ReflectiveOperationException {
+		State s=state();
+		Transfer good=Transfer.create(HERO, s.getAccount(HERO).getSequence()+1, VILLAIN, 100);
+		IllegalStateException failure=new IllegalStateException("Test failure");
+		Transfer failing=new Transfer(VILLAIN, s.getAccount(VILLAIN).getSequence()+1, HERO, 1) {
+			@Override
+			public Context apply(Context ctx) {
+				throw failure;
+			}
+		};
+		SignedData<ATransaction> signedFailing=VILLAIN_KP.signData(failing);
+		SignedData<Block> signedBlock=InitTest.FIRST_PEER_KEYPAIR.signData(Block.of(s.getTimestamp().longValue()+1000, HERO_KP.signData(good), signedFailing));
+
+		List<LogCapture.Entry> logged=LogCapture.capture(State.class.getName(),()->{
+			BlockResult br=s.applyBlock(signedBlock);
+			assertEquals(s,br.getState());
+			assertEquals(ErrorCodes.PEER,br.getErrorCode(0));
+			assertEquals(ErrorCodes.PEER,br.getErrorCode(1));
+		});
+
+		assertEquals(1,logged.size());
+		LogCapture.Entry e=logged.get(0);
+		assertEquals("SEVERE",e.level());
+		assertSame(failure,e.thrown());
+		assertTrue(e.message().contains(signedFailing.getHash().toString()));
+	}
+
+	/**
+	 * An entry of a Block that is not a signed value makes the whole Block invalid, as
+	 * an invalid Block and not an unexpected exception, so nothing is logged
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	@ResourceLock("java.util.logging:convex.core.cvm.State")
+	public void testUnsignedEntryInBlock() throws ReflectiveOperationException {
+		State s=state();
+		Transfer good=Transfer.create(HERO, s.getAccount(HERO).getSequence()+1, VILLAIN, 100);
+		for (ACell entry: new ACell[] {CVMLong.ONE, null}) {
+			AVector entries=Vectors.of(HERO_KP.signData(good), entry);
+			SignedData<Block> signedBlock=InitTest.FIRST_PEER_KEYPAIR.signData(Block.create(s.getTimestamp().longValue()+1000, entries));
+
+			List<LogCapture.Entry> logged=LogCapture.capture(State.class.getName(),()->{
+				BlockResult br=s.applyBlock(signedBlock);
+				assertEquals(s,br.getState());
+				assertEquals(ErrorCodes.PEER,br.getErrorCode(0));
+				assertEquals(ErrorCodes.PEER,br.getErrorCode(1));
+			});
+			assertEquals(List.of(),logged,"entry "+entry);
+		}
+	}
+
+	/**
+	 * Data missing from this peer's store fails applying a Block instead of making the
+	 * Block invalid: a peer holds all of every Block in its Order
+	 */
+	@Test
+	public void testMissingDataInBlock() throws Exception {
+		State s=state();
+		Invoke tx=Invoke.create(VILLAIN, s.getAccount(VILLAIN).getSequence()+1, Samples.INT_VECTOR_300);
+		assertFalse(tx.getCommand().isEmbedded());
+		Block block=Block.of(s.getTimestamp().longValue()+1000, VILLAIN_KP.signData(tx));
+		try (MemoryStore empty=new MemoryStore()) {
+			// A Block decoded alone lacks its transaction; a transaction decoded alone lacks its command
+			Block noTransaction=empty.decode(block.getEncoding());
+			Invoke noCommand=empty.decode(tx.getEncoding());
+			Block withNoCommand=Block.of(block.getTimeStamp(), VILLAIN_KP.signData(noCommand));
+			for (Block b: List.of(noTransaction,withNoCommand)) {
+				SignedData<Block> signed=InitTest.FIRST_PEER_KEYPAIR.signData(b);
+				assertThrows(MissingDataException.class,()->s.applyBlock(signed));
+			}
+		}
+	}
 }

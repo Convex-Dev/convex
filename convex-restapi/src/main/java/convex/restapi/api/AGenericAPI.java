@@ -1,33 +1,24 @@
 package convex.restapi.api;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Map;
 
 import convex.api.ContentTypes;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.data.ACell;
-import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Cells;
 import convex.core.data.Blob;
 import convex.core.data.Format;
-import convex.core.store.AStore;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.util.BlobBuilder;
 import convex.core.text.StringUtils;
-import convex.core.exceptions.ParseException;
-import convex.core.json.JSONReader;
 import convex.core.lang.RT;
-import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import convex.restapi.handler.RequestBody;
 import io.javalin.config.RoutesConfig;
-import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 
 /**
@@ -64,77 +55,6 @@ public abstract class AGenericAPI {
 			}
 		}
 		return type;
-	}
-	
-	/**
-	 * Gets JSON body from a Context as a Java Object
-	 * @param ctx Request context
-	 * @return JSON Object
-	 * @throws BadRequestResponse if the JSON body is invalid
-	 */
-	protected Map<String, Object> getJSONBody(Context ctx) {
-		try {
-			Map<String, Object> req= RT.jvm(JSON.parse(ctx.body()));
-			return req;
-		} catch (IllegalArgumentException | ParseException e) {
-			throw new BadRequestResponse("Invalid JSON body");
-		}
-	}
-
-	/**
-	 * Gets JSON body from a Context as a CVM Value
-	 * @param ctx Request context
-	 * @return JSON AMap
-	 * @throws BadRequestResponse if the JSON body is invalid
-	 */
-	protected AMap<AString, ACell> readJSONBody(Context ctx) {
-		try {
-			AMap<AString, ACell> req= JSONReader.readObject(RequestBody.boundedInputStream(ctx));
-			return req;
-		} catch (IllegalArgumentException | ParseException | IOException e) {
-			throw new BadRequestResponse("Invalid JSON body: "+e.getMessage());
-		}
-	}
-
-	/**
-	 * Gets CVX body from a Context as a cell
-	 * @param ctx Request context
-	 * @return CVM Value
-	 * @throws BadRequestResponse if the body is invalid
-	 */
-	@SuppressWarnings("unchecked")
-	protected <T extends ACell> T getCVXBody(Context ctx) {
-		try {
-			String contentType = ctx.contentType();
-			T req;
-
-			// Check for JSON content type and use JSON.parse
-			if (ContentTypes.JSON.equals(contentType)) {
-				req = (T) JSON.parse(ctx.body());
-			} else {
-				// Default to Reader.read for other content types
-				req = (T) Reader.read(ctx.body());
-			}
-			return req;
-		} catch (Exception e) {
-			throw new BadRequestResponse("Invalid CVX body");
-		}
-	}
-
-	/**
-	 * Gets body from a Context as a cell
-	 * @param ctx Request context
-	 * @return CVM Value
-	 * @throws BadRequestResponse if the body is invalid
-	 */
-	protected <T extends ACell> T getRawBody(Context ctx, AStore store) {
-		try {
-			byte[] bs=ctx.bodyAsBytes();
-			T result=store.decodeMultiCell(Blob.wrap(bs));
-			return result;
-		} catch (Exception e) {
-			throw new BadRequestResponse("Invalid Raw body");
-		}
 	}
 	
 	/**

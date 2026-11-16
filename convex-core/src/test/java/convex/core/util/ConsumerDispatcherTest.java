@@ -2,6 +2,7 @@ package convex.core.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -39,5 +40,27 @@ class ConsumerDispatcherTest {
 
 		dispatcher.accept(7);
 		assertEquals(java.util.List.of(7),values);
+	}
+
+	@Test
+	void consumerErrorDoesNotPreventRemainingDelivery() {
+		// Stack overflow first: an out of memory reaching JUnit would abort the whole run
+		for (Error error: java.util.List.of(new StackOverflowError(),new OutOfMemoryError(),
+				new NoClassDefFoundError(),new AssertionError())) {
+			ConsumerDispatcher<Integer> dispatcher=new ConsumerDispatcher<>();
+			ArrayList<Integer> values=new ArrayList<>();
+			dispatcher.add(v->{ throw error; });
+			dispatcher.add(values::add);
+
+			dispatcher.accept(7);
+			assertEquals(java.util.List.of(7),values,error.toString());
+		}
+	}
+
+	@Test
+	void jvmFailureIsNotContained() {
+		ConsumerDispatcher<Integer> dispatcher=new ConsumerDispatcher<>();
+		dispatcher.add(v->{ throw new InternalError("simulated"); });
+		assertThrows(InternalError.class,() -> dispatcher.accept(7));
 	}
 }

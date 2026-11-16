@@ -112,6 +112,41 @@ public class AdversarialDataTest {
 		assertEquals(d,b.get(0).getHash().getHexDigit(0)); // d should be first digit of Hash
 		assertEquals(1,b.shift);
 	}
+
+	/** A map or set tree needs at least two children and a shift from 0 to 63 (CAD003) */
+	@Test public void testBadHashTreeEncodings() {
+		// A map tree at shift 0 with one child: a valid tree of keys sharing a first digit
+		int d=CVMLong.ZERO.getHash().getHexDigit(0);
+		AHashMap<CVMLong,CVMLong> shared=Maps.empty();
+		for (long i=0; shared.count()<16; i++) {
+			CVMLong k=CVMLong.create(i);
+			if (k.getHash().getHexDigit(0)==d) shared=shared.assoc(k, k);
+		}
+		assertEquals(1,shared.getEncoding().byteAt(2)); // a tree at shift 1
+		String child=shared.isEmbedded()?shared.getEncoding().toHexString():"20"+shared.getHash().toHexString();
+		invalidEncoding(String.format("8210%02x%04x",0,1<<d)+child);
+
+		// Valid trees of 20 entries at shift 0, with the shift byte replaced
+		AHashMap<CVMLong,CVMLong> map=Maps.empty();
+		ASet<CVMLong> set=Sets.empty();
+		for (long i=0; i<20; i++) {
+			map=map.assoc(CVMLong.create(i), CVMLong.ONE);
+			set=set.conj(CVMLong.create(i));
+		}
+		for (ACell tree: new ACell[] {map,set}) {
+			for (int shift: new int[] {0x40,0x7f,0x80,0xff}) {
+				invalidEncoding(withShift(tree,shift));
+			}
+		}
+	}
+
+	/** Encoding of a hash tree of under 128 entries at shift 0, with its shift byte replaced */
+	private static Blob withShift(ACell tree, int shift) {
+		byte[] bs=tree.getEncoding().getBytes();
+		assertEquals(0,bs[2]);
+		bs[2]=(byte)shift;
+		return Blob.wrap(bs);
+	}
 	
 	@Test public void testBadSetLeafs() throws InvalidDataException {
 		CVMLong a=CVMLong.ZERO;

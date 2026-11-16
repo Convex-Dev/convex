@@ -8,8 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.reflect.Proxy;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
@@ -28,10 +27,15 @@ import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
+import convex.test.LogCapture;
 import convex.test.Samples;
 
 public class ResultTest {
@@ -99,6 +103,14 @@ public class ResultTest {
 		// This should round trip efficiently
 		Result a=Result.error(Keywords.FOO, "Blah").withSource(SourceCodes.CLIENT);
 		assertSame(a,Result.fromException(new ResultException(a)));
+
+		// Invalid data keeps its meaning, with no stack trace
+		for (ValidationException e: List.of(new InvalidDataException("simulated",null),new MisbehaviourException("simulated"))) {
+			Result r=Result.fromException(e);
+			assertEquals(ErrorCodes.FORMAT,r.getErrorCode(),e.toString());
+			assertTrue(r.getInfo()==null || r.getInfo().get(Keywords.TRACE)==null,e.toString());
+		}
+		assertEquals(ErrorCodes.SIGNATURE,Result.fromException(new BadSignatureException("simulated",null)).getErrorCode());
 	}
 
 	@Test
@@ -134,34 +146,11 @@ public class ResultTest {
 	/** Capture this test's expected JUL diagnostics without muting other threads or loggers. */
 	private static void assertInterruptDiagnostics(Runnable action, InterruptedException... expected)
 			throws ReflectiveOperationException {
-		// System.Logger uses JUL in the JDK. Access it reflectively so tests patched
-		// into convex.core don't require a production dependency on java.logging,
-		// or Maven/Eclipse-specific --add-reads launch options.
-		Class<?> loggerClass=Class.forName("java.util.logging.Logger");
-		Class<?> filterClass=Class.forName("java.util.logging.Filter");
-		Class<?> recordClass=Class.forName("java.util.logging.LogRecord");
-		Object logger=loggerClass.getMethod("getLogger",String.class).invoke(null,Result.class.getName());
-		Object previous=loggerClass.getMethod("getFilter").invoke(logger);
-		Thread owner=Thread.currentThread();
-		ArrayList<Object> records=new ArrayList<>();
-		Object filter=Proxy.newProxyInstance(filterClass.getClassLoader(),new Class<?>[] {filterClass},(proxy,method,args)->{
-			if (Thread.currentThread()==owner) {
-				records.add(args[0]);
-				return false;
-			}
-			return (previous==null)||((Boolean)method.invoke(previous,args));
-		});
-		loggerClass.getMethod("setFilter",filterClass).invoke(logger,filter);
-		try {
-			action.run();
-		} finally {
-			loggerClass.getMethod("setFilter",filterClass).invoke(logger,previous);
-		}
+		List<LogCapture.Entry> records=LogCapture.capture(Result.class.getName(),action);
 		assertEquals(expected.length,records.size(),"Interrupt diagnostics");
 		for (int i=0;i<expected.length;i++) {
-			Object record=records.get(i);
-			assertEquals("SEVERE",recordClass.getMethod("getLevel").invoke(record).toString());
-			assertSame(expected[i],recordClass.getMethod("getThrown").invoke(record));
+			assertEquals("SEVERE",records.get(i).level());
+			assertSame(expected[i],records.get(i).thrown());
 		}
 	}
 

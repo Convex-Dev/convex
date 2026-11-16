@@ -21,12 +21,14 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
+import convex.net.RequestFailures;
 
 /**
  * One-shot, lifecycle-aware acquisition of a complete CAD3 value tree.
@@ -45,6 +47,7 @@ import convex.core.util.Utils;
 public final class Acquiror implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(Acquiror.class.getName());
+	private static final RequestFailures failures = new RequestFailures(log);
 
 	/** Transport hook for requesting an ordered batch of content hashes. */
 	@FunctionalInterface
@@ -128,7 +131,11 @@ public final class Acquiror implements AutoCloseable {
 	 * Starts acquisition once and returns its stable completion future.
 	 *
 	 * @param <T> expected acquired cell type
-	 * @return future for the complete store-backed value
+	 * @return future for the complete store-backed value. It fails with a
+	 *         {@link BadFormatException} if a reply is malformed, a
+	 *         {@link MisbehaviourException} if it holds a cell other than the one
+	 *         requested, a {@link ResultException} for an error reply, and a
+	 *         {@link MissingDataException} if the source does not hold a requested cell
 	 */
 	@SuppressWarnings("unchecked")
 	public synchronized <T extends ACell> CompletableFuture<T> getFuture() {
@@ -158,14 +165,11 @@ public final class Acquiror implements AutoCloseable {
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause();
 			future.completeExceptionally((cause != null) ? cause : e);
-		} catch (StackOverflowError e) {
+		} catch (Throwable e) {
+			// Completed before anything can rethrow, so no failure leaves the caller waiting
 			future.completeExceptionally(e);
-		} catch (VirtualMachineError e) {
-			future.completeExceptionally(e);
-			throw e;
-		} catch (Exception e) {
-			log.warn("Acquisition failed for {}: {}", hash, e.getMessage());
-			future.completeExceptionally(e);
+			Utils.checkRequestFailure(e);
+			failures.log(e, "Acquisition of {} failed", hash);
 		} finally {
 			currentRequest = null;
 			termination.complete(null);
@@ -185,9 +189,7 @@ public final class Acquiror implements AutoCloseable {
 				missing.add(hash);
 			} else {
 				ref.findMissing(missing, CPoSConstants.MISSING_LIMIT);
-				if (missing.isEmpty()) {
-					return Cells.persist(ref.getValue(), store);
-				}
+				if (missing.isEmpty()) return Cells.persistReceived(ref.getValue(), store);
 			}
 
 			Hash[] requested = missing.toArray(Utils.EMPTY_HASHES);
@@ -215,7 +217,7 @@ public final class Acquiror implements AutoCloseable {
 	}
 
 	private void acceptResponse(Hash[] requested, Result result)
-			throws BadFormatException, IOException, ResultException {
+			throws BadFormatException, MisbehaviourException, IOException, ResultException {
 		if (result == null) throw new BadFormatException("Missing acquisition result");
 		if (result.isError()) throw new ResultException(result);
 
@@ -233,7 +235,7 @@ public final class Acquiror implements AutoCloseable {
 				throw new MissingDataException(store, requested[i]);
 			}
 			if (!requested[i].equals(value.getHash())) {
-				throw new BadFormatException("Acquisition response hash mismatch at index " + i);
+				throw new MisbehaviourException("Acquisition response holds a cell other than the one requested at index " + i);
 			}
 			// DATA response cells may themselves be partial. Store the top cell and
 			// let the normal missing-reference loop request its absent branches.

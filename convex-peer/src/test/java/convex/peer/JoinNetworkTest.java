@@ -14,6 +14,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -145,7 +146,13 @@ public class JoinNetworkTest {
 			destinationConfig.put(Keywords.STORE,EtchStore.createTemp());
 			destinationConfig.put(Keywords.PORT,0);
 			destinationConfig.put(Keywords.SOURCE,source.getHostAddress());
-			destination=API.launchPeer(destinationConfig);
+			// Joining warns on this thread that its replay differs from the state advertised
+			ExpectedLogs logs=ExpectedLogs.onThreads(Server.class.getName(),Thread.currentThread()).open();
+			try (logs) {
+				destination=API.launchPeer(destinationConfig);
+			}
+			assertEquals(List.of(Level.WARN),logs.records().stream().map(ExpectedLogs.Entry::level).toList(),
+				"the divergence warning, and nothing else");
 
 			// Wait on the real signal rather than reading the live peer: the executor thread
 			// advances state asynchronously once launched, and a peer whose finality point is

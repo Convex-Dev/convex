@@ -21,6 +21,7 @@ import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLTable;
 import convex.lattice.LatticeHost;
+import convex.lattice.MergeConflictException;
 
 /** Tests Convex DB components over a hosted root: state and forks travel through cursors. */
 public class ConvexDBComponentTest {
@@ -98,7 +99,7 @@ public class ConvexDBComponentTest {
 		assertTrue(db.tables().insert(TABLE_NAME,2,"concurrent"));
 		var current=cdb.cursor().get();
 
-		assertThrows(UnsupportedOperationException.class,fork::sync);
+		assertThrows(MergeConflictException.class,fork::sync);
 		assertSame(current,cdb.cursor().get());
 
 		ConvexDB alone=cdb.fork();

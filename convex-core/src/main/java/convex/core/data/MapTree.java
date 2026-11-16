@@ -13,7 +13,6 @@ import java.util.function.Function;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.RT;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -805,72 +804,51 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return create(newChildren, shift, mask, computeCount(newChildren));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		
-		try {
-			Hash firstHash=getFirstHash();
-			// Perform child validation
-			validateWithPrefix(firstHash,shift);
-		} catch (ClassCastException e) {
-			throw new InvalidDataException("Can't get first hash of map: "+e.getMessage(),this,e);
-		}
-	}
-
-	@Override
-	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
-		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		int bsize = children.length;
-		if (bsize<2) {
-			throw new InvalidDataException("Non-canonical MapTree with child count "+bsize,this);
-		}
-
-		long childCount=0;;
-		for (int i = 0; i < bsize; i++) {
-			if (children[i] == null)
-				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
+	public void validateStructure() throws InvalidDataException {
+		Hash firstHash=getFirstHash();
+		long childCount=0;
+		for (int i = 0; i < children.length; i++) {
 			ACell o = children[i].getValue();
-			if (!(o instanceof AHashMap)) {
-				throw new InvalidDataException(
-						"Expected AHashMap child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
-			}
-			AHashMap<K, V> child = RT.ensureHashMap(o);
-			if (child==null) {
-				throw new InvalidDataException("Non-hashmap child at position "+i,this);
-			}
-			if (child.isEmpty())
-				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
+			if (!(o instanceof AHashMap)) throw new InvalidDataException("Child "+i+" is not a hash map",this);
+			AHashMap<K, V> child=(AHashMap<K, V>) o;
+			if (child.isEmpty()) throw new InvalidDataException("Empty child "+i,this);
 			int d = digitForIndex(i, mask);
-			Hash ch=child.getFirstHash();
-			if (ch.getHexDigit(shift)!=d) {
-				throw new InvalidDataException("Wrong child digit at position "+i,this);
+			if (child instanceof MapTree<K, V> tree) {
+				if (tree.shift<=shift) throw new InvalidDataException("Child "+i+" shift not greater than "+shift,this);
+				checkChildHash(tree.getFirstHash(),firstHash,d,i);
+			} else {
+				MapLeaf<K, V> leaf=(MapLeaf<K, V>) child;
+				long n=leaf.count();
+				for (long j=0; j<n; j++) {
+					checkChildHash(leaf.entryAt(j).getKeyHash(),firstHash,d,i);
+				}
 			}
-			if (prefix.commonHexPrefixLength(ch, Hash.HEX_LENGTH)<shift) {
-				throw new InvalidDataException("Inconsistent child at position "+i,this);
-			}
-			// TODO: remove recursion here?
-			if (child instanceof MapLeaf) {
-				child.validateWithPrefix(ch, shift+1);
-			}
-			
 			childCount += child.count();
 		}
-		
 		if (count != childCount) {
 			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
 	}
 
 	/**
+	 * Checks that a key hash in child i shares this tree's prefix and has the child's digit
+	 */
+	private void checkChildHash(Hash h, Hash firstHash, int digit, int i) throws InvalidDataException {
+		if ((h.commonHexPrefixLength(firstHash, shift) < shift) || (h.getHexDigit(shift) != digit)) {
+			throw new InvalidDataException("Child "+i+" holds a key outside its digit",this);
+		}
+	}
+
+	/**
 	 * Check for top level structural integrity. Does not traverse branch refs.
-	 * @return
+	 * @return true if valid, false otherwise
 	 */
 	boolean isValidStructure() {
-		if (shift<0) return false;
+		if ((shift<0)||(shift>=Hash.HEX_LENGTH)) return false;
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
+		if (children.length<2) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			Ref<AHashMap<K,V>> cref=children[i];

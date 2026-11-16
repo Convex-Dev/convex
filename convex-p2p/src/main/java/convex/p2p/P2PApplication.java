@@ -25,7 +25,6 @@ import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
-import convex.lattice.LatticeOps;
 import convex.lattice.LocalLattice;
 import convex.lattice.MapComponent;
 import convex.lattice.OwnedMap;
@@ -33,6 +32,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
+import convex.lattice.LatticeComponent;
 
 /**
  * Root-level application component for the P2P lattice regions.
@@ -187,7 +187,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	/** Reduces a path delivery to a root with this application's lattice, then merges that root. */
 	@Override
 	protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
-		Index<Keyword,ACell> reduced=LatticeOps.reduce(lattice,value,path);
+		Index<Keyword,ACell> reduced=LatticeComponent.reduce(lattice,value,path);
 		return reduced==null?cursor().get():merge(reduced);
 	}
 

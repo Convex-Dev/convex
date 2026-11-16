@@ -22,9 +22,11 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
@@ -400,13 +402,46 @@ public class PeerTest {
 	public void testUnsignedTransactionInBlock() throws InvalidDataException {
 		Peer p=Peer.create(KP, GENESIS);
 		SignedData<ATransaction> tx = KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "*address*"));
-		p = finalise(p, Block.create(p.getTimestamp(), (AVector)Vectors.of(tx, CVMLong.ONE, null)));
+		Block block = Block.create(p.getTimestamp(), (AVector)Vectors.of(tx, CVMLong.ONE, null));
+		p = finalise(p, block);
 
 		p = p.updateState();
 		assertEquals(1, p.getStatePosition());
 		assertEquals(GENESIS, p.getConsensusState());
 		assertTrue(p.getBlockResult(0).isError(0));
+		assertEquals(block, p.getOwnBlock(0));
 		doPeerTest(p);
+	}
+
+	/**
+	 * A finalised Order entry that is not a signed Block is applied as an invalid
+	 * Block, leaving the State unchanged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testUnsignedBlockInOrder() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		Order order=Order.create().withBlocks((AVector)Vectors.of(CVMLong.ONE)).withConsensusPoints(new long[] {1,1,1,1});
+		p = p.updateBelief(Belief.create(KP.signData(order)));
+		assertEquals(1, p.getFinalityPoint());
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertNull(p.getTransactionLocation(Hash.NULL_HASH));
+		assertNull(p.getOwnBlock(0));
+
+		doPeerTest(p);
+	}
+
+	/** A Peer whose Belief holds no Order of its own has no finality point to compute its State to. */
+	@Test
+	public void testUpdateStateWithoutOwnOrder() {
+		Peer p=Peer.create(KP, GENESIS);
+		Peer other=p.updateBelief(Belief.create(AKeyPair.generate().signData(Order.create())));
+		assertNull(other.getPeerOrder());
+		assertThrows(IllegalStateException.class,()->other.updateState());
+		assertThrows(IllegalStateException.class,()->other.updateState(0));
 	}
 
 	/**

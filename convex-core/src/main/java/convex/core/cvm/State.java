@@ -19,6 +19,7 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
@@ -33,6 +34,7 @@ import convex.core.data.Vectors;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -62,6 +64,8 @@ public class State extends ARecordGeneric {
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
 	
 	private static final long FIELD_COUNT=FORMAT.count();
+
+	private static final System.Logger log=System.getLogger(State.class.getName());
 
 	/**
 	 * Symbols for global values in :globals Vector
@@ -172,9 +176,11 @@ public class State extends ARecordGeneric {
 	 * 
 	 * @param signedBlock Signed Block to apply
 	 * @return The BlockResult from applying the given Block to this State
+	 * @throws MissingDataException If the Block or this State is not wholly held
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
 		Block block=null;
+		TransactionContext tctx=null;
 		try {
 			block=RT.ensureCVM(signedBlock.getValue(),Block.class);
 			Counters.applyBlock++;
@@ -189,15 +195,38 @@ public class State extends ARecordGeneric {
 			State state = prepareBlock(block);
 			
 			// Create TransactionContext after Block is prepared so we have correct timestamp etc.
-			TransactionContext tctx=TransactionContext.create(state);
+			tctx=TransactionContext.create(state);
 			tctx.block=signedBlock;
-		
+
 			BlockResult blockResult= state.applyTransactions(block,tctx);
 			return blockResult;
+		} catch (InvalidBlockException e) {
+			// Invalid block, so no state updates
+			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
+		} catch (MissingDataException e) {
+			// Before the catch-all: this peer failed to hold what it must, a fault of the
+			// peer and never a result of the block
+			throw e;
 		} catch (Exception e) {
-			// Invalid block, so no state upadtes
+			// Unexpected, but still an invalid block: a peer that does not fail the same
+			// way forks, so this must be loud
+			logUnexpectedException(signedBlock,tctx,e);
 			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
 		}
+	}
+
+	/**
+	 * Logs an unexpected exception that made a Block invalid, as an error.
+	 *
+	 * @param signedBlock Block being applied
+	 * @param tctx Transaction context of the Block, or null if not yet created
+	 * @param e Exception thrown
+	 */
+	private static void logUnexpectedException(SignedData<Block> signedBlock, TransactionContext tctx, Exception e) {
+		String tx=((tctx==null)||(tctx.signedTx==null))?"none":(tctx.txNumber+" "+tctx.signedTx.getHash());
+		log.log(System.Logger.Level.ERROR,"UNEXPECTED EXCEPTION IN STATE TRANSITION: block "+signedBlock.getHash()
+			+" is invalid on this peer. A peer that does not fail the same way forks from this one,"
+			+" so an operator must review this block. Last transaction started: "+tx,e);
 	}
 
 	/**
@@ -207,9 +236,14 @@ public class State extends ARecordGeneric {
 	 */
 	public BlockResult checkBlock(SignedData<Block> signedBlock) {
 		Block block=RT.ensureCVM(signedBlock.getValue(),Block.class);
+		// Before the checks below, which read the Block: a value that is not a readable
+		// Block is invalid whoever signed it
+		if ((block==null)||(block.getTransactions()==null)) return BlockResult.createInvalidBlock(this,block,UNREADABLE_BLOCK);
+		// First of the remaining checks: the key below means nothing until the signature verifies
+		if (!signedBlock.checkSignature()) return BlockResult.createInvalidBlock(this,block,Strings.BAD_SIGNATURE);
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=getPeer(peerKey);
-		
+
 		// If no current peer for this block, dump it
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
 		
@@ -235,6 +269,8 @@ public class State extends ARecordGeneric {
 		
 		return null;
 	}
+
+	private static final AString UNREADABLE_BLOCK=Strings.intern("Signed value is not a readable Block");
 
 	/**
 	 * Apply state updates consistent with time advancing to a given timestamp
@@ -421,32 +457,30 @@ public class State extends ARecordGeneric {
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
-			// SECURITY: catch-all exception handler, needs consideration
-			//try {
-				// extract the signed transaction from the block
-				SignedData<ATransaction> signed = transactions.get(i);
-				
-				// Update transaction context
-				tctx.signedTx=signed;
-				tctx.txNumber=i;
-				
-				// execute the transaction using the *latest* state (not necessarily "this")
-				ResultContext rc = state.applyTransaction(signed,tctx);
+			// No catch here: an unexpected exception makes the whole Block invalid (applyBlock)
+			// extract the signed transaction from the block
+			if (!(transactions.get(i) instanceof SignedData<?> entry)) {
+				throw new InvalidBlockException("Not a signed transaction at position "+i);
+			}
+			@SuppressWarnings("unchecked")
+			SignedData<ATransaction> signed = (SignedData<ATransaction>)entry;
 
-				// record results from result context
-				results[i] = Result.fromContext(CVMLong.create(i),rc);
-				
-				// Get fees from ResultContext
-				// NOTE: Juice fees includes transaction overhead fees
-				fees+=rc.getJuiceFees();
-				
-				// state update
-				state = rc.context.getState();
-			//} catch (Exception e) {
-			//	String msg= "Unexpected fatal exception applying transaction: "+e.toString();
-			//	results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.FATAL).withSource(SourceCodes.CVM);
-			//	log.error(msg,e);
-			//}
+			// Update transaction context
+			tctx.signedTx=signed;
+			tctx.txNumber=i;
+			
+			// execute the transaction using the *latest* state (not necessarily "this")
+			ResultContext rc = state.applyTransaction(signed,tctx);
+
+			// record results from result context
+			results[i] = Result.fromContext(CVMLong.create(i),rc);
+			
+			// Get fees from ResultContext
+			// NOTE: Juice fees includes transaction overhead fees
+			fees+=rc.getJuiceFees();
+			
+			// state update
+			state = rc.context.getState();
 		}
 		
 		state=distributeFees(state,tctx.getPeer(),fees, block);

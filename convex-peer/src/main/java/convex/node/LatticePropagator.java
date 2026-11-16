@@ -27,6 +27,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
@@ -337,7 +338,8 @@ public class LatticePropagator implements Closeable {
 		}
 		try {
 			signal.complete(failure);
-		} catch (RuntimeException | StackOverflowError observerFailure) {
+		} catch (Throwable observerFailure) {
+			Utils.checkRequestFailure(observerFailure);
 			// Health observers are application policy too. Reporting degradation must
 			// not turn it into a NodeServer failure.
 			log.warn("Propagation failure observer failed",observerFailure);
@@ -793,9 +795,9 @@ public class LatticePropagator implements Closeable {
 			boolean matched;
 			try {
 				matched=condition.test(value);
-			} catch (VirtualMachineError e) {
-				throw e;
 			} catch (Throwable e) {
+				// The caller's condition failed: that fails the caller's wait alone
+				Utils.checkRequestFailure(e);
 				future.completeExceptionally(e);
 				return;
 			}
@@ -1018,7 +1020,8 @@ public class LatticePropagator implements Closeable {
 		} catch (IOException e) {
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to drain propagation protocol endpoint cleanly",e);
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to stop propagation protocol endpoint cleanly",e);
 		}
@@ -1032,7 +1035,8 @@ public class LatticePropagator implements Closeable {
 	private void closeRoutes(long timeout) {
 		try {
 			connectionManager.close(timeout);
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			recordFailure("route shutdown",e);
 			log.warn("Unable to close propagation routes cleanly",e);
 		}
@@ -1067,60 +1071,65 @@ public class LatticePropagator implements Closeable {
 	 * remaining queued values without waiting, then exits.
 	 */
 	private void propagationLoop() {
-		while (running || !triggerQueue.isEmpty()) {
-			try {
-				ACell value;
-				if (running) {
-					// A timed poll even with announcements off: closing the queue ends it
-					long wait=(rootAnnouncementInterval>0) ? rootAnnouncementInterval : Long.MAX_VALUE;
-					value = triggerQueue.poll(wait, TimeUnit.MILLISECONDS);
-				} else {
-					// Drain mode: non-blocking poll, exit when empty
-					value = triggerQueue.poll();
-					if (value == null) break;
-				}
+		try {
+			while (running || !triggerQueue.isEmpty()) {
+				try {
+					ACell value;
+					if (running) {
+						// A timed poll even with announcements off: closing the queue ends it
+						long wait=(rootAnnouncementInterval>0) ? rootAnnouncementInterval : Long.MAX_VALUE;
+						value = triggerQueue.poll(wait, TimeUnit.MILLISECONDS);
+					} else {
+						// Drain mode: non-blocking poll, exit when empty
+						value = triggerQueue.poll();
+						if (value == null) break;
+					}
 
-				if (value != null) {
-					processSnapshotSafe(value);
-				}
+					if (value != null) {
+						processSnapshotSafe(value);
+					}
 
-				// Periodic root announcement only while running
-				if (running) {
-					maybeAnnounceRoot(Utils.getCurrentTimestamp());
-				}
+					// Periodic root announcement only while running
+					if (running) {
+						maybeAnnounceRoot(Utils.getCurrentTimestamp());
+					}
 
-			} catch (InterruptedException e) {
-				// Drain remaining items before exiting
-				ACell remaining;
-				while ((remaining = triggerQueue.poll()) != null) {
-					processSnapshotSafe(remaining);
+				} catch (InterruptedException e) {
+					// Drain remaining items before exiting
+					ACell remaining;
+					while ((remaining = triggerQueue.poll()) != null) {
+						processSnapshotSafe(remaining);
+					}
+					break;
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					log.warn("Unexpected propagation loop failure: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+					log.debug("Propagation loop failure",e);
+					if (!running) break;
 				}
-				break;
-			} catch (Exception e) {
-				log.warn("Unexpected error in propagation loop", e);
-				if (!running) break;
 			}
+		} catch (Error e) {
+			// A failure of the JVM itself: stop publishing, and say so
+			log.error("Propagation group stopped publishing",e);
+			recordFailure("publication processing",e);
 		}
 		log.debug("LatticePropagator loop ended");
 	}
 
 	/**
-	 * Background-thread wrapper around {@link #processSnapshot}. IOException
-	 * is logged rather than propagated — the background path is best-effort.
+	 * Publishes one value as {@link #processSnapshot} does, recording a failure as this
+	 * group's instead of throwing it, unless it is a failure of the JVM itself.
 	 */
 	private void processSnapshotSafe(ACell value) {
 		try {
 			processSnapshot(value);
-		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
-			recordFailure("publication",e);
-			log.warn("Contained stack overflow in propagator group",e);
 		} catch (Throwable e) {
-			// A broken filter, store cache or connection implementation belongs to
-			// this policy group. It must never terminate NodeServer publication or
-			// another propagator's worker.
+			// A failure publishing one value belongs to this policy group. It must never
+			// terminate NodeServer publication or another propagator's worker.
+			Utils.checkRequestFailure(e);
 			recordFailure("publication",e);
-			log.warn("Isolated propagation policy failure",e);
+			log.warn("Isolated propagation policy failure: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Propagation policy failure",e);
 		}
 	}
 
@@ -1354,8 +1363,9 @@ public class LatticePropagator implements Closeable {
 	 * {@link PeerConnectionException} if the peer is not connected,
 	 * {@link ResultException} if the peer answers with an error or the request fails,
 	 * as when the connection closes or the reply does not arrive within the client's
-	 * timeout, and {@link java.util.concurrent.TimeoutException} if missing cells are
-	 * not acquired in time. It fails with an unchecked exception only for a fault, and
+	 * timeout, {@link BadFormatException} if the peer's value or the cells it supplies
+	 * are not valid, and {@link java.util.concurrent.TimeoutException} if missing cells
+	 * are not acquired in time. It fails with an unchecked exception only for a fault, and
 	 * is cancelled if the work is abandoned. No thread waits for the peer.</p>
 	 */
 	public CompletableFuture<ACell> pullPath(Convex peer,boolean background,ACell... path) {
@@ -1408,7 +1418,10 @@ public class LatticePropagator implements Closeable {
 			// Not announced: the value has not been through this node's merge, and
 			// announcing it would mark its cells as already shared, leaving them out of
 			// the novelty of this node's next publication.
-			return CompletableFuture.completedFuture(Cells.persist(receivedValue, store));
+			return CompletableFuture.completedFuture(Cells.persistReceived(receivedValue, store));
+		} catch (BadFormatException e) {
+			// The peer's reply is not a valid value: an outcome of the pull, not a fault
+			return CompletableFuture.failedFuture(e);
 		} catch (IOException e) {
 			// This node's own store failed: a fault, not an outcome of the pull
 			return CompletableFuture.failedFuture(new StoreException("Unable to store a pulled lattice value", e));

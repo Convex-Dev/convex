@@ -37,8 +37,10 @@ import convex.lattice.cursor.BoundaryCursor;
  * and an exclusive one claims only that region's boundary, so regions transact
  * exclusively at the same time. A transaction
  * on the whole container, by a subclass that implements {@link TransactionalComponent},
- * spans its regions and works on their values published into the container; a region
- * write landing there during an attempt makes it retry on top. An exclusive
+ * spans its regions and works on their values published into the container. A region
+ * write landing there during an attempt merges with its run region by region
+ * ({@link #reconcile(Index,Index,Index)}); a region both changed whose component
+ * cannot reconcile it reruns it under the claim. An exclusive
  * transaction on the container holds the claim beneath every region's boundary, so region writes wait
  * for it. Work a region keeps in a working copy of its own, including transactions
  * committed into that fork, has not yet been published into the container. It is
@@ -53,8 +55,9 @@ import convex.lattice.cursor.BoundaryCursor;
  * <p>A fork of this container, or a container built over a fork, reconciles at sync
  * region by region ({@link #reconcile(Index,Index,Index)}): a region changed
  * on only one side takes that side, so regions that update independently never
- * conflict, and a region this container does not serve that both sides changed
- * keeps the destination's value.</p>
+ * conflict. A region both sides changed is reconciled by its own component, which
+ * may refuse. A key this container does not serve that both sides changed keeps
+ * the destination's value.</p>
  *
  * <p>Register children during construction, before any delivery or sync;
  * registration takes no lock. The first merge, path delivery or sync freezes
@@ -156,6 +159,14 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 			// A factory only constructs, so the loser of a race is simply dropped
 			ALatticeComponent<?> winner=component.compareAndExchange(null,created);
 			return (winner==null)?created:winner;
+		}
+
+		/** Reconciles this region's stored values, changed on both sides, by its child. */
+		ACell reconcile(ACell base,ACell own,ACell other) {
+			if (factory==null && component.get()==null) {
+				throw new MergeConflictException("Region "+key+" changed on both sides, and its explicit child is not here to reconcile it");
+			}
+			return child().reconcileStored(base,own,other);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -310,10 +321,11 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 
 	/**
 	 * Reconciles this container's working copy with a destination that also changed,
-	 * key by key. A key changed on only one side, or changed to the same value on
-	 * both, takes that value. A key this container does not serve keeps the
-	 * destination's value. A region it serves that the two sides changed differently
-	 * goes to {@link #mergeRegion}.
+	 * key by key. A key changed on only one side takes that side's value. A key this
+	 * container does not serve keeps the destination's value. A region it serves that
+	 * both sides changed, even to equal values, is reconciled by the region's component
+	 * ({@link ALatticeComponent#reconcileStored}); a region whose explicit child this
+	 * container cannot make is a conflict.
 	 */
 	@Override
 	protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
@@ -330,44 +342,23 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				if (same(ownHas,ownValue,has(base,key),get(base,key))) continue;
 				boolean otherHas=has(other,key);
 				ACell otherValue=get(other,key);
-				// Equal changes keep the destination's cells, which may be persisted
-				if (same(ownHas,ownValue,otherHas,otherValue)) continue;
 				if (same(otherHas,otherValue,has(base,key),get(base,key))) {
-					// Only own changed: carried onto the destination's cells where they are equal
-					result=put(result,key,ownHas,(ownHas && otherHas)?LatticeOps.mergeChanges(get(base,key),ownValue,otherValue):ownValue);
+					result=put(result,key,ownHas,ownValue);
 				} else {
-					Keyword region=served(key);
-					if (region!=null) result=put(result,key,true,mergeRegion(region,get(base,key),ownValue,otherValue));
+					Region region=served(key);
+					if (region!=null) result=put(result,key,true,region.reconcile(get(base,key),ownValue,otherValue));
 				}
 			}
 		}
 		return result;
 	}
 
-	/** Returns the registered key matching a stored key, by the index's blob comparison, or null. */
-	private Keyword served(ABlobLike<?> key) {
-		for (Keyword registered:regions().keySet()) {
-			if (registered.toBlob().equals(key.toBlob())) return registered;
+	/** Returns the region matching a stored key, by the index's blob comparison, or null. */
+	private Region served(ABlobLike<?> key) {
+		for (Map.Entry<Keyword,Region> entry:regions().entrySet()) {
+			if (entry.getKey().toBlob().equals(key.toBlob())) return entry.getValue();
 		}
 		return null;
-	}
-
-	/**
-	 * Reconciles one region that this container's working copy and its destination
-	 * changed differently. Called within the destination's atomic update, so it must
-	 * use only the values given. The default refuses: a region's own merge works on
-	 * its component's working type, which may differ from what is stored here, so a
-	 * subclass that forks itself while such conflicts can arise supplies the rule.
-	 *
-	 * @param key Region key
-	 * @param base Stored value both sides last agreed on, or null
-	 * @param own Stored value in this working copy, or null if absent
-	 * @param other Stored value at the destination, or null if absent
-	 * @return Reconciled stored value
-	 */
-	protected ACell mergeRegion(Keyword key,ACell base,ACell own,ACell other) {
-		throw new UnsupportedOperationException("Region "+key+" changed both in "+getClass().getSimpleName()
-			+" and at its destination, and no region merge is defined");
 	}
 
 	private static boolean has(Index<Keyword,ACell> index,ACell key) {

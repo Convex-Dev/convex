@@ -4,7 +4,7 @@ import static convex.peer.InvalidPeerDataTest.LOCAL;
 import static convex.peer.InvalidPeerDataTest.REMOTE_A;
 import static convex.peer.InvalidPeerDataTest.REMOTE_B;
 import static convex.peer.InvalidPeerDataTest.blockTime;
-import static convex.peer.InvalidPeerDataTest.checkGoodOrderMergesBeside;
+import static convex.peer.InvalidPeerDataTest.checkDroppedBeside;
 import static convex.peer.InvalidPeerDataTest.WAIT;
 import static convex.peer.InvalidPeerDataTest.block;
 import static convex.peer.InvalidPeerDataTest.launchPeer;
@@ -125,7 +125,7 @@ public class MalformedOrderTest {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			Order order=Order.create(Vectors.of(CVMLong.create(1),Vectors.createLongs(1,0,0,0),CVMLong.ONE));
-			checkGoodOrderMergesBeside(peer,REMOTE_A.signData(order));
+			checkDroppedBeside(peer,REMOTE_A.signData(order));
 		} finally {
 			peer.close();
 		}
@@ -136,7 +136,7 @@ public class MalformedOrderTest {
 	public void anOrderWithAnUnsignedBlock() throws Exception {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
-			checkGoodOrderMergesBeside(peer,orderOf(REMOTE_A,1,CVMLong.ONE));
+			checkDroppedBeside(peer,orderOf(REMOTE_A,1,CVMLong.ONE));
 		} finally {
 			peer.close();
 		}
@@ -147,7 +147,7 @@ public class MalformedOrderTest {
 	public void anOrderWithASignedValueThatIsNotABlock() throws Exception {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
-			checkGoodOrderMergesBeside(peer,orderOf(REMOTE_A,1,REMOTE_A.signData(CVMLong.ONE)));
+			checkDroppedBeside(peer,orderOf(REMOTE_A,1,REMOTE_A.signData(CVMLong.ONE)));
 		} finally {
 			peer.close();
 		}
@@ -159,7 +159,7 @@ public class MalformedOrderTest {
 		Server peer=launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			Block malformed=Block.create(Vectors.of(CVMLong.create(blockTime(peer)),CVMLong.ONE));
-			checkGoodOrderMergesBeside(peer,orderOf(REMOTE_A,1,REMOTE_A.signData(malformed)));
+			checkDroppedBeside(peer,orderOf(REMOTE_A,1,REMOTE_A.signData(malformed)));
 		} finally {
 			peer.close();
 		}

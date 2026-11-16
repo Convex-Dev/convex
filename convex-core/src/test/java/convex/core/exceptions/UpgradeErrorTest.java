@@ -1,18 +1,16 @@
 package convex.core.exceptions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
 
 /**
- * Tests for UpgradeError classification, which drives the peer's freeze-vs-retry
- * decision. See UPGRADE.md.
+ * Tests that UpgradeError keeps the version and the cause, which tells the operator
+ * of a halted peer how to recover it. See UPGRADE.md.
  */
 public class UpgradeErrorTest {
 
@@ -20,9 +18,8 @@ public class UpgradeErrorTest {
 	public void testMissing() {
 		UpgradeError e = UpgradeError.missing(3);
 		assertEquals(3L, e.getVersion());
+		// A missing migration has no cause: a release update is required
 		assertNull(e.getCause());
-		// A missing migration is deterministic: retrying the same release refails
-		assertFalse(e.isRetryable());
 	}
 
 	@Test
@@ -30,8 +27,6 @@ public class UpgradeErrorTest {
 		UpgradeError e = UpgradeError.failed(4, new IllegalStateException("bug"));
 		assertEquals(4L, e.getVersion());
 		assertInstanceOf(IllegalStateException.class, e.getCause());
-		// A deterministic migration bug is not retryable
-		assertFalse(e.isRetryable());
 	}
 
 	@Test
@@ -40,7 +35,5 @@ public class UpgradeErrorTest {
 		UpgradeError e = UpgradeError.failed(4, mde);
 		assertEquals(4L, e.getVersion());
 		assertInstanceOf(MissingDataException.class, e.getCause());
-		// A peer-local condition may succeed on resync-and-retry: retryable
-		assertTrue(e.isRetryable());
 	}
 }

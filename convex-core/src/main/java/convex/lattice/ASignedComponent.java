@@ -5,6 +5,7 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
+import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
@@ -16,9 +17,11 @@ import convex.lattice.generic.SignedLattice;
  * into its supplied destination using its explicit signer. Live instances over
  * the same path share edits immediately. Construction and reads create no state.
  *
- * <p>The owner-bound lattice supplies the same rule for local authoring and
- * incoming envelopes. Incoming merges preserve accepted signatures and cannot
- * navigate inside the envelope. A live view's sync only reads. A domain subclass
+ * <p>The owner-bound lattice supplies the rule for incoming envelopes. Incoming
+ * merges preserve accepted signatures and cannot navigate inside the envelope. Local
+ * changes on both sides, at a draft's sync or a transaction's commit, are a conflict
+ * unless a subclass reconciles them (see {@link #reconcile(ACell,ACell)}): the
+ * payload's lattice may keep one whole side. A live view's sync only reads. A domain subclass
  * can implement {@link #rebind} to retain its API on an unsigned fork: edits then
  * stay private and sync signs the reconciled batch into the original destination.
  * Neither lifecycle publishes the containing map. {@link SignedComponent} supplies
@@ -32,6 +35,7 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	private final ACursor<SignedData<V>> destination;
 	/** Bound owner and payload rule retained when rebinding unsigned storage. */
 	protected final SignedLattice<V> lattice;
+	/** Signs a payload this component authors, checked by {@link #lattice}; null where it has none. */
 	private final Function<V,SignedData<V>> signer;
 
 	/** Constructs a domain view at a signed path with an explicit owner rule. */
@@ -49,15 +53,34 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	 * this constructor neither forks nor adds another signing boundary.
 	 */
 	protected ASignedComponent(SignedLattice<V> lattice,AForkableCursor<V> cursor) {
+		this(lattice,cursor,null);
+	}
+
+	/**
+	 * Binds unsigned working storage with the same owner rule and a signer for
+	 * payloads it reconciles in stored form (see {@link #reconcileStored}).
+	 * Publication is still determined by the supplied cursor.
+	 *
+	 * @param lattice Owner-bound rule
+	 * @param cursor Unsigned working storage
+	 * @param signer Signer, or null for none
+	 */
+	protected ASignedComponent(SignedLattice<V> lattice,AForkableCursor<V> cursor,Function<V,SignedData<V>> signer) {
 		super(cursor);
 		this.lattice=Objects.requireNonNull(lattice);
 		this.destination=null;
-		this.signer=null;
+		this.signer=signer;
 	}
 
-	/** Reconciles unsigned drafts using the payload policy bound to their owner. */
-	@Override protected V reconcile(V own,V other) {
-		return lattice.getValueLattice().merge(own,other);
+	/**
+	 * Binds unsigned working storage with a source's owner rule and signer, for a
+	 * {@link #rebind}. Publication is determined by the supplied cursor.
+	 *
+	 * @param source Component whose rule and signer to keep
+	 * @param cursor Unsigned working storage
+	 */
+	protected ASignedComponent(ASignedComponent<V> source,AForkableCursor<V> cursor) {
+		this(source.lattice,cursor,source.signer);
 	}
 
 	/**
@@ -72,6 +95,43 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 		}
 		if (incoming==null || lattice.merge(null,incoming)==null) return storage.getOrDefault(null);
 		return storage.updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
+	}
+
+	/**
+	 * Reconciles stored envelopes. An unchanged destination keeps the working
+	 * envelope. A changed destination envelope that {@link #lattice} does not accept
+	 * for its owner is never taken or merged: the working envelope stands, as in the
+	 * lattice's own merge. An unchanged working envelope takes the destination's.
+	 * Otherwise the payloads are reconciled by {@link #reconcile(ACell,ACell,ACell)}:
+	 * a result equal to one side's payload keeps that side's envelope, an absent
+	 * result is absent, and any other result is signed by this component's signer
+	 * under {@link #lattice}.
+	 *
+	 * @throws MergeConflictException If the payloads cannot be reconciled, or a new
+	 *         payload has no authorised signer
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	protected ACell reconcileStored(ACell base,ACell own,ACell other) {
+		if (Utils.equals(other,base)) return own;
+		// Every path below takes the destination's envelope or merges its payload
+		if (other!=null && !lattice.checkForeign((SignedData<V>)other)) return own;
+		if (Utils.equals(own,base)) return other;
+		V ownValue=payload((SignedData<V>)own);
+		V otherValue=payload((SignedData<V>)other);
+		V merged=reconcile(payload((SignedData<V>)base),ownValue,otherValue);
+		if (Utils.equals(merged,ownValue)) return own;
+		if (Utils.equals(merged,otherValue)) return other;
+		if (merged==null) return null;
+		SignedData<V> signed=(signer==null)?null:lattice.sign(merged,signer);
+		if (signed==null) {
+			throw new MergeConflictException(getClass().getSimpleName()+" has no authorised signer for a reconciled payload");
+		}
+		return signed;
+	}
+
+	private static <V extends ACell> V payload(SignedData<V> envelope) {
+		return (envelope==null)?null:envelope.getValue();
 	}
 
 	/** Incoming delivery stops at the signed boundary; interior paths introduce no data. */

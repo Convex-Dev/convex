@@ -17,6 +17,7 @@ import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.lattice.LatticeHost;
 import convex.lattice.SignedComponent;
+import convex.lattice.SignedSetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.SetComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -84,6 +85,11 @@ class ApplicationPublicationTest {
 			return new Notebook(owner,cursor);
 		}
 		@Override public Notebook fork() { return rebind(storage.fork()); }
+
+		/** Notes only accumulate, so local changes on both sides combine. */
+		@Override protected ASet<ACell> reconcile(ASet<ACell> own,ASet<ACell> other) {
+			return SignedSetComponent.union(own,other);
+		}
 
 		void add(String text) { notes.add(Strings.create(text)); }
 		ASet<ACell> all() { return notes.get(); }

@@ -113,6 +113,24 @@ A test run that hangs at near-zero CPU is a class-initialisation deadlock: run
 `ClassInitCycles` (`convex-integration/src/test/java/convex/tools`) to find the
 cycle.
 
+### Expected log records
+
+Tests write warnings and errors only, and the test logging configuration sets no
+logger's level: a warning a test does not expect is written. A test that causes
+one on purpose captures it, so it is asserted and not written:
+
+- Core tests use `convex.test.LogCapture`, which takes what a `System.Logger` logs
+  on the test's own thread.
+- Peer tests use `convex.peer.ExpectedLogs`. A scope takes the records carrying an
+  object the test created, such as the exception it injects or the component it
+  isolates, or the records of one logger on threads the test owns: its own, or
+  the threads of a component it created. Code a test injects into a component
+  that runs on a shared thread, such as a network event loop, calls
+  `expectOnThisThread()` before failing, so the scope takes the next record of
+  its logger there. A scope is open for the whole life of what logs, and fails if
+  nothing was logged; `ifLogged()` makes one for a site that warns only the first
+  time in the JVM. It needs logback as the test logging backend.
+
 ## CI Workflows
 
 Four GitHub Actions workflows handle continuous integration:
@@ -171,6 +189,8 @@ release:
   constant names, dependency bumps, build plumbing, test-only refactors and agent
   tooling. Embedders read the code, so Java API changes share one entry pointing
   at the design notes.
+- A fix for an exploitable flaw gets no entry of its own: at most one general
+  hardening headline, never the flaw or what it allowed.
 - A breaking change gets one entry pointing at its doc.
 
 Then:

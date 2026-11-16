@@ -32,9 +32,11 @@ Peers push Beliefs only on connections they opened, so every pushed Belief arriv
 inbound connection that anyone could have opened. Three things keep junk from stopping
 consensus:
 
-1. **Polling.** `ConnectionManager` polls one of the peers it chose by stake and verified
-   every poll interval, and acquires that peer's Belief into a queue of its own. Polling
-   waits only for room in that queue (`BeliefPropagator.hasBeliefPollCapacity`), so pushes
+1. **Polling.** `ConnectionManager` polls one of the peers it connected to every poll
+   interval, preferring those that have proved their key
+   ([Polling and Back-off](#polling-and-back-off)), and acquires that peer's Belief into a
+   queue of its own. Polling waits for room in that queue
+   (`BeliefPropagator.hasBeliefPollCapacity`), never for the propagation queue, so pushes
    filling the propagation queue cannot stop it.
 2. **Cheap rejection.** `BeliefPropagator` drops an Order from a key that is not a staked
    peer before checking its signature or storing it, and an Order no newer than the one
@@ -103,10 +105,10 @@ Lattice nodes verify connections opened to them in their own way; see
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |
 | `Convex.setDialledPeer()` | The peer a client was opened to reach. While set, the client answers a challenge in the bound form naming it |
-| `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted) |
-| `LatticeConnectionManager.tryVerifyPeer()` | Async fire-and-forget verification |
-| `ConnectionManager.processChallenge()` | One-liner via `respondToChallenge()` with networkID context |
-| `NodeServer.processChallenge()` | One-liner via `respondToChallenge()` |
+| `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted), unless the reply proves misbehaviour |
+| `LatticeConnectionManager` | Holds a dialled client in limbo until it proves its key ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md)) |
+| `ConnectionManager.processChallenge()` | Answers via `respondToChallenge()` with networkID context; disconnects a challenge whose signature does not verify |
+| `LatticeProtocolEndpoint.processChallenge()` | Answers via `respondToChallenge()` with the transport key |
 | `ConvexLocal.sendChallenge()` | Routes through server message delivery |
 | `ConvexDirect.sendChallenge()` | Optimised direct path using local peer key |
 | `ConvexHTTP.sendChallenge()` | Via generic `/api/v1/message` endpoint |
@@ -122,7 +124,7 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 
 - **token** — random 16-byte nonce, proves response matches this challenge
 - **otherKey** — the key of the other party
-- **contextID** — optional; peer Server uses networkID (genesis hash), NodeServer uses null
+- **contextID** — optional; peer Server uses networkID (genesis hash), lattice nodes use `Message.LATTICE_PEER_CHALLENGE_CONTEXT`
 - CHALLENGE messages use ID-based correlation like QUERY/STATUS/TRANSACT
 
 A client with a dialled peer answers in the bound form instead,
@@ -139,21 +141,69 @@ accepts only this form when it verifies a connection opened to it
 2. Try `verifyPeer(null, networkID)` — discovery mode with network context (over TLS, the
    expected key)
 3. If verified → `verifiedPeer` set, `AConnection.trustedKey` set, peer key proven
-4. If verification fails → fall back to `requestStatus()` (untrusted, self-reported key)
-5. With no key chosen before dialling, record the verified key, if any, as the dialled peer
-6. Add connection keyed by peer identity
+4. If the remote proves no key → fall back to `requestStatus()` (untrusted, self-reported key)
+5. If the reply proves misbehaviour (a forged signature, or a reply signed for another
+   challenge) → close the connection and fail with `PeerRefusedException`; no fallback
+6. With no key chosen before dialling, record the verified key, if any, as the dialled peer
+7. Add connection keyed by peer identity
 
-Peers send Beliefs only on connections added in step 6, so the dialled peer is recorded
+Peers send Beliefs only on connections added in step 7, so the dialled peer is recorded
 before any challenge they bring.
 
-**Lattice `LatticeConnectionManager`**:
-1. Connect to remote address
-2. If key pair available, fire async `verifyPeer(peerKey)` — non-blocking
-3. Connection immediately usable; `verifiedPeer` set when verification completes
+**Lattice `LatticeConnectionManager`** holds a dialled client in limbo until it proves its
+key; see [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).
 
 A peer's outbound connection answers a CHALLENGE sent back on it in the bound form, naming
 its dialled peer, so that peer can verify the link. Other clients with a key pair answer in
 the plain form.
+
+### Polling and Back-off
+
+A consensus peer's outbound links come from the peers `tryRandomConnect` picks by stake,
+the peers an operator dials with `connectToPeer`, and the peer it was launched from
+(`:source`). Every link carries the peer's key pair, so every link can be verified.
+
+| A remote peer that is | Is |
+|---|---|
+| Not linked | Dialled when picked by stake and its wait has passed |
+| Linked, not verified | Challenged again on the same link, for the key the link is filed under, when its wait has passed. Polled only when no verified link is due |
+| Verified | Polled: each poll interval polls one verified link whose wait has passed, picked at random, or, if there is none, one unverified link |
+
+A Belief is judged by its signed Orders, not by its sender ([Principle](#principle)), so
+polling an unverified link is safe; verified links are preferred, as CAD015 asks of
+trusted sources.
+
+**Back-off.** Each failure by a remote peer doubles its wait, from one poll interval up to
+256 of them (512 s at the default `:poll-delay`). A failure is:
+
+- a dial that fails, that is refused for the peer's answer to the identity challenge, or
+  that reaches a peer with another key;
+- a challenge that is not passed, or not answered within 2 s;
+- a STATUS error or a malformed status;
+- a Belief acquisition that fails, times out or yields something other than a Belief.
+
+A full queue of polled Beliefs is not a failure. Only a good poll of a verified link
+clears the count. A dial or a challenge that succeeds makes the peer due at once but keeps
+its count, so a peer that connects but never serves a poll keeps backing off. Polling an
+unverified link leaves its count alone, unless the reply is false input.
+
+While no link is verified, a peer that could not be reached (its dial reached no one, or it
+did not reply) is dialled whatever its wait, so a peer whose own network failed reconnects as soon
+as it returns. A peer that answered wrongly still waits.
+
+**False input.** A reply that is false rather than malformed, such as a challenge answer
+signed for another challenge or a polled Belief with a forged Order signature, closes the
+link at once, as [Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment)
+describes. It also sends the peer straight to the longest wait, from where its next failure
+closes its link again. This holds on an unverified link and for a dial refused for it: the
+sender there may not be the peer, but redialling the same address sooner would reach the
+same sender.
+
+**Closing.** A link with no reply to STATUS or to a challenge for a minute is closed; any
+reply restarts the minute. A failure that leaves a peer's wait at its cap, the ninth in a
+row, also closes its link. An unverified link is kept while no link is verified, since it
+is then all there is to poll. A remote peer keeps its count when its link closes, so a
+redial waits too.
 
 ## Generic Message API
 

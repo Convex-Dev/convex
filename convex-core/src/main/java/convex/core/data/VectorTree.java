@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Arrays;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.function.BiFunction;
@@ -253,18 +254,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	 */
 	private final long childSize() {
 		return 1L << (shift);
-	}
-	
-	/**
-	 * Get the child size in number of chunks for a specific child
-	 */
-	private static long childSize(long count, int i) {
-		long n=computeArraySize(count);
-		if ((i<0)||(i>=n)) throw new IndexOutOfBoundsException("Bad child: "+i);
-		int shift=computeShift(count);
-		long cs= 1L<<shift;
-		if (i<(n-1)) return cs;
-		return count-(n-1)*cs;
 	}
 
 	@Override
@@ -630,6 +619,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	@Override
 	public AVector<T> slice(long start, long end) {
 		if (!checkRange(start, end)) return null;
+		if (start==0) return prefix(end);
 		long length=end-start;
 		if ((start & Vectors.BITMASK) == 0) {
 			// Starting at a chunk boundary, so this can be fast by re-using existing chunks
@@ -654,6 +644,46 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		}
 	}
 
+	/**
+	 * Gets the first n elements of this vector, sharing every complete subtree
+	 * before the n-th element.
+	 *
+	 * @param n Number of elements, at most the count of this vector
+	 * @return Canonical vector of the first n elements
+	 */
+	private AVector<T> prefix(long n) {
+		if (n==count) return this;
+		if (n==0) return Vectors.empty();
+		long cs=childSize();
+		int kept=(int)(n/cs);
+		long rest=n-kept*cs;
+		if (rest==0) return (kept==1)?getChild(0):new VectorTree<T>(Arrays.copyOf(children,kept),n);
+
+		// The rest is a prefix of the next child
+		AVector<T> next=getChild(kept).slice(0,rest);
+		if (kept==0) return next;
+		long whole=rest&~(long)Vectors.BITMASK;
+		if (whole==rest) return new VectorTree<T>(withLastChild(kept,next),n);
+
+		// A partial chunk can only end a canonical vector as a VectorLeaf on top, so
+		// it moves up onto the complete children and the next child's whole chunks
+		AVector<T> head=(whole==0)?prefix(kept*cs):new VectorTree<T>(withLastChild(kept,next.slice(0,whole)),kept*cs+whole);
+		return ((VectorLeaf<T>)next).withPrefix(head);
+	}
+
+	/**
+	 * Gets the first given number of this vector's children, followed by another
+	 *
+	 * @param kept Number of children to keep
+	 * @param last Child to follow them
+	 * @return Child refs for a new VectorTree
+	 */
+	private Ref<AVector<T>>[] withLastChild(int kept, AVector<T> last) {
+		Ref<AVector<T>>[] newChildren=Arrays.copyOf(children,kept+1);
+		newChildren[kept]=last.getRef();
+		return newChildren;
+	}
+
 	@Override
 	public AVector<T> next() {
 		return slice(1L, count);
@@ -669,27 +699,18 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public void validateStructure() throws InvalidDataException {
-		super.validateStructure();
-		long c = 0;
+		// Decoding sizes the tree from its count: every child but the last is full, so
+		// child sizes as checked here always sum to the count
 		int blen = children.length;
-		if (count < MINIMUM_SIZE) throw new InvalidDataException("Insufficient elements: " + blen, this);
 		long bsize = childSize();
 		for (int i = 0; i < blen; i++) {
 			ACell ch = getChild(i);
 			if (!(ch instanceof AVector)) throw new InvalidDataException("Child "+i+" is not a vector!",this);
-			@SuppressWarnings("unchecked")
-			AVector<T> b=(AVector<T>)ch;
-			
-			long expectedChildSize=childSize(count,i);	
-			if (expectedChildSize != b.count()) {
-				throw new InvalidDataException("Expected block size: " + bsize + " for blocks[" + i + "] but was: "
-						+ b.count() + " in BlockVector of size: " + count, this);
+			long expected = (i < blen - 1) ? bsize : count - (blen - 1) * bsize;
+			long actual = ((AVector<?>) ch).count();
+			if (expected != actual) {
+				throw new InvalidDataException("Expected size " + expected + " for child " + i + " but was " + actual, this);
 			}
-
-			c += b.count();
-		}
-		if (c != count) {
-			throw new InvalidDataException("Expected count: " + count + " but sum of child sizes was: " + c, this);
 		}
 	}
 

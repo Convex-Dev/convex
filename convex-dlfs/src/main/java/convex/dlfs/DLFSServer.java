@@ -142,6 +142,7 @@ public class DLFSServer implements Closeable {
 	 */
 	public void start(int port) {
 		if (app != null) throw new IllegalStateException("Server already started");
+		mcpServer.setMaxRequestBytes(maxRequestSize);
 		Javalin newApp = Javalin.create(config -> {
 			config.http.maxRequestSize = maxRequestSize;
 			config.concurrency.useVirtualThreads = true;

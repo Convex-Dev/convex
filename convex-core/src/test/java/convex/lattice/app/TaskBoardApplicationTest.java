@@ -218,7 +218,7 @@ class TaskBoardApplicationTest {
 				assertTrue(host.cursor().get().isEmpty());
 			});
 		}
-		assertEquals(2,attempts.get());
+		assertEquals(1,attempts.get());
 		assertTrue(board.task("review").isDone());
 		assertEquals(Sets.of("publish","other"),board.pending());
 		assertTrue(host.cursor().get().isEmpty());

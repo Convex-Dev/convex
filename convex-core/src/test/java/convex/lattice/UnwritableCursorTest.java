@@ -328,7 +328,7 @@ public class UnwritableCursorTest {
 		var fork=root.<ACell>path(A,B).fork();
 		root.set(Maps.empty());
 
-		assertThrows(PathWriteException.class,() -> fork.sync((own,other) -> own));
+		assertThrows(PathWriteException.class,() -> fork.reconcile((base,own,other) -> own));
 
 		assertEquals(Maps.empty(),root.get());
 	}
@@ -339,7 +339,7 @@ public class UnwritableCursorTest {
 		fork.set(NEW);
 		root.path(A).set(Maps.empty());
 
-		assertThrows(PathWriteException.class,() -> fork.sync((own,other) -> own));
+		assertThrows(PathWriteException.class,() -> fork.reconcile((base,own,other) -> own));
 
 		assertEquals(NEW,fork.get());
 		assertEquals(Maps.of(A,Maps.empty()),root.get(),"The deleted entry does not come back");
@@ -351,7 +351,7 @@ public class UnwritableCursorTest {
 		fork.set(NEW);
 		root.set(Maps.empty());
 
-		assertThrows(PathWriteException.class,() -> fork.sync((own,other) -> own));
+		assertThrows(PathWriteException.class,() -> fork.reconcile((base,own,other) -> own));
 
 		assertEquals(NEW,fork.get());
 		assertEquals(Maps.empty(),root.get());

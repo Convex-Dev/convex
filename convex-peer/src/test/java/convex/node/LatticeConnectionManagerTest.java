@@ -35,6 +35,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
@@ -828,6 +829,44 @@ public class LatticeConnectionManagerTest {
 		assertTrue(manager.getDesiredPeers().isEmpty());
 	}
 
+	/** A node whose challenge reply proves it misbehaved, as a forged signature does, is refused with that evidence. */
+	@Test public void testEndpointWithForgedChallengeReplyIsRefused() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey claimed=AKeyPair.createSeeded(201).getAccountKey();
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		for (int attempt=1;attempt<=LatticeConnectionManager.MAX_ENDPOINT_ATTEMPTS;attempt++) {
+			manager.maintainConnections();
+			ForgingPeer forging=new ForgingPeer(claimed);
+			manager.endpointDials.remove(ENDPOINT).complete(forging);
+			assertFalse(forging.isConnected(),"the client that sent a forged reply is closed");
+			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		}
+		Throwable failure=failure(connecting);
+		assertInstanceOf(PeerRefusedException.class,failure);
+		assertTrue(causedBy(failure,BadSignatureException.class),"the forged reply is the cause");
+		assertNull(manager.getConnection(claimed));
+	}
+
+	/** A peer offered for admission whose challenge reply is forged is refused with that evidence. */
+	@Test public void testAdmissionWithForgedChallengeReplyIsRefused() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey key=AKeyPair.createSeeded(201).getAccountKey();
+		ForgingPeer forging=new ForgingPeer(key);
+		Throwable failure=failure(manager.addPeer(key,forging));
+		assertInstanceOf(PeerRefusedException.class,failure);
+		assertTrue(causedBy(failure,BadSignatureException.class),"the forged reply is the cause");
+		assertFalse(forging.isConnected());
+		assertNull(manager.getConnection(key));
+	}
+
+	/** Whether the failure or any of its causes is of the given type. */
+	private static boolean causedBy(Throwable failure,Class<? extends Throwable> type) {
+		for (Throwable t=failure;t!=null;t=t.getCause()) {
+			if (type.isInstance(t)) return true;
+		}
+		return false;
+	}
+
 	/** A node that proves its key but drops before admission fails the caller and leaves nothing to dial. */
 	@Test public void testEndpointDroppedBeforeAdmissionLeavesNoIntent() {
 		manager.setKeyPair(AKeyPair.createSeeded(200));
@@ -1135,6 +1174,15 @@ public class LatticeConnectionManagerTest {
 			AccountKey proved=(expected==null || expected.equals(proves)) ? proves : null;
 			if (proved!=null) setVerifiedPeer(proved);
 			return CompletableFuture.completedFuture(proved);
+		}
+	}
+
+	/** A newly opened client whose challenge reply has a forged signature, as its verification reports. */
+	private static class ForgingPeer extends IdentifyingPeer {
+		ForgingPeer(AccountKey claims) { super(claims); }
+		@Override public CompletableFuture<AccountKey> verifyPeer(AccountKey expected,ACell context) {
+			return CompletableFuture.failedFuture(new CompletionException(
+				new BadSignatureException("Challenge response signature does not verify",null)));
 		}
 	}
 

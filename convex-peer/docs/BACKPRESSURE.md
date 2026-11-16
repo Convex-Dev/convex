@@ -155,14 +155,15 @@ message queue for wire DATA/BELIEF sequences, and a count-bounded FIFO for compl
 Beliefs already acquired into the local store by status polling. Local Beliefs are
 never encoded merely to measure their queue footprint. Either queue drops a new
 entry when full; neither applies connection backpressure. Periodic status polling
-is deferred only while the queue of polled Beliefs is full, and a changed remote
-Belief is acquired only while it has room: pushes filling the message queue never
-stop polling ([PEER_PRIORITY.md](PEER_PRIORITY.md#liveness)).
+waits for room in the queue of polled Beliefs, and a changed remote Belief is
+acquired only while it has room; polling never waits for the message queue, so
+pushes filling it never stop polling ([PEER_PRIORITY.md](PEER_PRIORITY.md#liveness)).
 
 ## Connection Limiting
 
 - **Limit:** `Config.MAX_CLIENT_CONNECTIONS` (default 1024)
-- **Enforcement:** `NettyServer.initChannel()` rejects and closes if limit reached
+- **Enforcement:** `NettyServer.initChannel()` rejects and closes if limit reached,
+  logging at debug, since any remote can cause it
 - **Cleanup:** `DefaultChannelGroup` auto-removes channels on close
 - **Shutdown:** `clientChannels.close()` provides clean bulk teardown
 

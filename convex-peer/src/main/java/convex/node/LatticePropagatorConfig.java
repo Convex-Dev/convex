@@ -36,6 +36,12 @@ public final class LatticePropagatorConfig {
 	 */
 	public static final AString MAX_CONSECUTIVE_REJECTS=Strings.intern("maxConsecutiveRejects");
 
+	/**
+	 * Maximum number of keys in a lattice path this group accepts. A LATTICE_VALUE
+	 * with a longer path is rejected as malformed; a LATTICE_QUERY for one is refused.
+	 */
+	public static final AString MAX_PATH_LENGTH=Strings.intern("maxPathLength");
+
 	/** Maximum encoded message size on an unverified manager-owned route. */
 	public static final AString MAX_MESSAGE_SIZE=Strings.intern("maxMessageSize");
 
@@ -137,6 +143,9 @@ public final class LatticePropagatorConfig {
 	/** Default encoded bytes awaiting ordered processing. */
 	public static final int DEFAULT_MAX_INBOUND_QUEUE_BYTES=16*1024*1024;
 
+	/** Default maximum number of keys in an accepted lattice path. */
+	public static final int DEFAULT_MAX_PATH_LENGTH=1024;
+
 	/** Default DATA_REQUESTs served at once over the group's own routes. */
 	public static final int DEFAULT_MAX_DATA_REQUESTS=16;
 
@@ -204,6 +213,11 @@ public final class LatticePropagatorConfig {
 	public long getMaxConsecutiveRejects() {
 		CVMLong value=RT.ensureLong(config.get(MAX_CONSECUTIVE_REJECTS));
 		return (value==null) ? 100L : value.longValue();
+	}
+
+	/** Returns the maximum number of keys in a lattice path this group accepts (zero accepts only the root). */
+	public int getMaxPathLength() {
+		return getNonNegativeInt(MAX_PATH_LENGTH,DEFAULT_MAX_PATH_LENGTH);
 	}
 
 	/** Returns the encoded-message limit before route verification. */

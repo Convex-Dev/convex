@@ -1029,13 +1029,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 		if (entry != null) {
 			entry.validateCell();
-			ACell ek=entry.getKey();
-			if (!(ek instanceof ABlobLike)) throw new InvalidDataException("Entry key not blob-like: "+Utils.getClassName(ek),this);
-			long entryKeyLength=((ABlobLike<?>)ek).hexLength();
-			if (entryKeyLength<pDepth) throw new InvalidDataException("Key too short for prefix depth",this);
-			if (entryKeyLength>MAX_DEPTH) {
-				if (pDepth!=MAX_DEPTH) throw new InvalidDataException("Key too long at this prefix depth",this);
-			}
 			if (cn == 0)
 				throw new InvalidDataException("Index with entry and count=" + count + " must have children", this);
 		} else {
@@ -1046,19 +1039,16 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		
-		if ((getDepth()<0)||(getDepth()>MAX_DEPTH)) throw new InvalidDataException("Invalid index depth",this);
-		
+	public void validateStructure() throws InvalidDataException {
+		// Decoding bounds the depth. A child deeper than this node holds a longer prefix,
+		// so this node's prefix is at least as long as its depth.
 		if (entry!=null) {
 			ABlobLike<K> k=RT.ensureBlobLike(entry.getKey());
 			if (k==null) throw new InvalidDataException("Invalid entry key type: "+Utils.getClassName(entry.getKey()),this);
 			if (getDepth()!=effectiveLength(k)) throw new InvalidDataException("Entry at inconsistent depth",this);
 		}
-		
+
 		ABlobLike<?> prefix=getPrefix();
-		if (getDepth()>effectiveLength(prefix)) throw new InvalidDataException("depth longer than common prefix",this);
 
 		long ecount = (entry == null) ? 0 : 1;
 		int n = children.length;
@@ -1067,12 +1057,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (!(o instanceof Index))
 				throw new InvalidDataException("Illegal Index child type: " + Utils.getClass(o), this);
 			Index<K, V> c = (Index<K, V>) o;
-			
+
 			long ccount=c.count();
-			if (ccount==0) {
-				throw new InvalidDataException("Child "+i+" should not be empty! At depth "+getDepth(),this);
-			}
-			
+			// An empty child has depth 0, so fails the depth check
 			if (c.getDepth() <= getDepth()) {
 				throw new InvalidDataException("Child must have greater depth than parent", this);
 			}

@@ -101,26 +101,26 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Resolves a working snapshot that conflicts with a concurrently changed
 	 * destination. Called by {@link #reconcile(ACell,ACell,ACell)} only when both sides
 	 * changed, within the destination's atomic update. Implementations must use the
-	 * supplied values without mutating working state. Staged components must define
-	 * this operation; live views do not need it.
+	 * supplied values without mutating working state. A component that can merge the
+	 * destination's changes, such as a CRDT, overrides this; by default a change on both
+	 * sides is a conflict.
 	 *
 	 * @param own Working value
 	 * @param other Destination value
 	 * @return Reconciled value
+	 * @throws MergeConflictException If the two values cannot be reconciled
 	 */
 	protected V reconcile(V own,V other) {
-		throw new UnsupportedOperationException(getClass().getSimpleName()+" cannot reconcile changes on both sides");
+		throw new MergeConflictException(getClass().getSimpleName()+" cannot reconcile changes on both sides");
 	}
 
 	/**
 	 * Reconciles this component's working value with its destination, given the value
 	 * both sides last agreed on. Called whatever changed: a side that changed nothing
-	 * contributes nothing. The result is built on {@code other}, the value held there, so
-	 * cells the destination holds, which may be persisted, stay held wherever the result
-	 * equals them. By default only own's changes are carried onto other, and
-	 * {@link #reconcile(ACell,ACell)} resolves changes on both sides. Experimental: a
-	 * merge with no better way of handling conflicts can override this with
-	 * {@link LatticeOps#mergeChanges}.
+	 * contributes nothing. By default a side that changed nothing takes the other's value, and
+	 * {@link #reconcile(ACell,ACell)} resolves changes on both sides. Changes in
+	 * different places combine only where the component's value is independent place
+	 * by place, as a CRDT's is: an override that combines them must hold to that.
 	 *
 	 * @param base Value both sides last agreed on, or null if there was none
 	 * @param own Working value
@@ -128,10 +128,28 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * @return Reconciled value
 	 */
 	protected V reconcile(V base,V own,V other) {
-		if (Utils.equals(own,base) || Utils.equals(own,other)) return other;
-		// Other changed nothing, so this never conflicts
-		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		if (Utils.equals(own,base)) return other;
+		if (Utils.equals(other,base)) return own;
+		// Both changed, even to equal values: two increments to the same count are two changes
 		return reconcile(own,other);
+	}
+
+	/**
+	 * Reconciles values in the form stored at this component's place, for a parent
+	 * that reconciles its own value place by place. Called within the parent's atomic
+	 * update, so it uses only the values given. By default the stored form is the
+	 * working form and this is {@link #reconcile(ACell,ACell,ACell)}; a component
+	 * whose storage stores another form overrides this.
+	 *
+	 * @param base Stored value both sides last agreed on, or null if there was none
+	 * @param own Stored working value
+	 * @param other Stored destination value
+	 * @return Reconciled stored value
+	 * @throws MergeConflictException If the two values cannot be reconciled
+	 */
+	@SuppressWarnings("unchecked")
+	protected ACell reconcileStored(ACell base,ACell own,ACell other) {
+		return reconcile((V)base,(V)own,(V)other);
 	}
 
 	/**
@@ -311,7 +329,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Returns the reconciliation of a transacting component, which reconciles a change
 	 * made under its claim without passing through it, or null if it is not a lattice
 	 * component. A component that cannot reconcile changes on both sides fails that
-	 * commit with an {@link UnsupportedOperationException} naming it.
+	 * commit with a {@link MergeConflictException} naming it.
 	 */
 	@SuppressWarnings("unchecked")
 	static <V extends ACell> ThreeWayMerge<V> reconciler(TransactionalComponent<V,?> source) {

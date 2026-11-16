@@ -133,7 +133,10 @@ public class P2PSocialSyncTest {
 			bobBrokenView.nextFailure();
 
 		aliceNode.launch();
-		bobNode.launch();
+		// Bob's node warns, as it launches, of the view it isolates
+		try (ExpectedLogs logs=ExpectedLogs.carrying(bobBrokenView)) {
+			bobNode.launch();
+		}
 		carolNode.launch();
 		LatticePropagator.Failure contained=brokenViewFailure.get(5,TimeUnit.SECONDS);
 		assertEquals("initial view materialisation",contained.operation());

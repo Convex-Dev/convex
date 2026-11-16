@@ -367,7 +367,8 @@ up and reported; each lost route starts a new period.
 A connection future reports an expected failure as a checked exception: a
 `PeerConnectionException` when the name cannot be resolved or the peer reached, with
 the network error as its cause, or its subtype `PeerRefusedException` when the peer is
-reached but not admitted, because it fails the challenge, proves a key other than
+reached but not admitted, because it fails the challenge (with the invalid reply's
+exception in its cause chain, where it sent one), proves a key other than
 the one expected, turns out to be this node, or the application refuses it. A wait or
 attempt that is abandoned, because the manager closes or the peer is released,
 removed or replaced, is cancelled. Misuse, such as an invalid argument or identifying
@@ -482,6 +483,12 @@ remaining steps.
 Store failures while the node runs are surfaced by `NodeServer` and host sync;
 saving failures by the host's `checkpoint()` or `flush()`. Listener failures are
 surfaced independently to the application that owns the transport.
+
+A received value that fails to merge, or a message whose handling fails with an
+`Error`, is logged as a peer logs a failed request
+([failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment)): at
+debug, except that the first out-of-memory failure and the first probable defect
+of each node, and of each group's message handling, warn.
 
 ### Removing a group while the node runs
 

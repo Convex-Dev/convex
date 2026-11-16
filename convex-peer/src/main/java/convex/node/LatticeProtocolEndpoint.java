@@ -34,6 +34,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.BoundedMessageQueue;
@@ -45,6 +46,7 @@ import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.core.util.FutureUtils;
 import convex.lattice.cursor.Root;
+import convex.net.RequestFailures;
 import convex.peer.Config;
 
 /**
@@ -69,6 +71,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private static final Logger log=LoggerFactory.getLogger(LatticeProtocolEndpoint.class);
 	private static final long CONNECTION_SWEEP_INTERVAL=30_000L;
 
+	private final RequestFailures messageFailures=new RequestFailures(log);
 	private final LatticePropagator propagator;
 	private final NodeServer<?> node;
 	private final LatticePropagatorConfig config;
@@ -356,6 +359,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 				ErrorCodes.ARGUMENT));
 			return;
 		}
+		try {
+			checkPath(path);
+		} catch (BadFormatException e) {
+			message.returnResult(Result.create(id,Strings.create(e.getMessage()),ErrorCodes.ARGUMENT));
+			return;
+		}
 		Root<ACell> announced=propagator.getAnnouncedCursor();
 		ACell value=(path.count()==0) ? announced.get()
 			: convex.core.lang.RT.getIn(announced.get(),path.toCellArray());
@@ -497,10 +506,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		try {
 			if (handler!=null && handler.test(message)) recordNonMergeAccept(context.stats());
 			else recordMergeReject(context.connection(),context.stats());
-		} catch (RuntimeException | StackOverflowError e) {
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			recordMergeReject(context.connection(),context.stats());
 			propagator.recordFailure("application message handler",e);
-			log.warn("Propagation-group application handler failed",e);
+			log.warn("Propagation-group application handler failed: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Application handler failure",e);
 		}
 	}
 
@@ -525,14 +536,28 @@ final class LatticeProtocolEndpoint implements Closeable {
 		}
 	}
 
+	/**
+	 * Checks a received lattice path before it is read: its length within this
+	 * group's limit, then its structure.
+	 *
+	 * @param path Path from a received message
+	 * @throws BadFormatException if the path is too long or its structure is invalid
+	 */
+	private void checkPath(AVector<?> path) throws BadFormatException {
+		int limit=config.getMaxPathLength();
+		if (path.count()>limit) throw new BadFormatException("Lattice path longer than "+limit+" keys");
+		Cells.checkReceived(path);
+	}
+
 	private Message completeLatticeMessage(Message message) throws BadFormatException,IOException {
 		LatticeValuePayload payload=parseLatticeValuePayload(message);
+		checkPath(payload.path());
 		ACell value=payload.value();
 		HashSet<Hash> missing=new HashSet<>();
 		Ref.get(value).findMissing(missing,1);
 		if (!missing.isEmpty()) throw new MissingDataException(store,missing.iterator().next());
 		// What the host's applications take from the value is theirs to decide
-		ACell complete=Cells.persist(value,store);
+		ACell complete=Cells.persistReceived(value,store);
 		AVector<?> completePayload=Vectors.create(
 			MessageTag.LATTICE_VALUE,payload.id(),payload.path(),complete);
 		return Message.create(MessageType.LATTICE_VALUE,completePayload)
@@ -546,8 +571,13 @@ final class LatticeProtocolEndpoint implements Closeable {
 		ACell[] path=payload.path().toCellArray();
 		NodeServer.MergeOutcome outcome=node.mergeInbound(path,value);
 		if (!outcome.accepted()) {
-			recordMergeReject(message.getConnection(),stats);
-			returnLatticeResult(message,Result.error(ErrorCodes.ARGUMENT,"Lattice merge rejected"));
+			if (outcome.senderFault()) {
+				recordMergeReject(message.getConnection(),stats);
+				returnLatticeResult(message,Result.error(ErrorCodes.ARGUMENT,"Lattice merge rejected"));
+			} else {
+				// This node could not take the work: the sender may try again
+				returnLatticeResult(message,Result.SERVER_LOADED);
+			}
 			return;
 		}
 		recordAccept(stats);
@@ -564,8 +594,11 @@ final class LatticeProtocolEndpoint implements Closeable {
 		if (listener==null) return;
 		try {
 			listener.onAccepted(connection,propagator,path,value,changed);
-		} catch (RuntimeException | StackOverflowError e) {
-			log.warn("Propagation-group inbound listener failed after an accepted merge",e);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			log.warn("Propagation-group inbound listener failed after an accepted merge: {}: {}",
+				e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Inbound listener failure",e);
 		}
 	}
 
@@ -699,13 +732,13 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	/**
-	 * Whether a failed acquisition shows the sender at fault: its value was
-	 * malformed, or it answered a data request with an error other than :LOAD.
+	 * Whether a failed acquisition shows the sender at fault: its value or its reply
+	 * was bad, or it answered a data request with an error other than :LOAD.
 	 * Load on either side, an unanswered request and local failures count
 	 * neither way, as {@code convex.peer.ConnectionManager} treats a peer's :LOAD.
 	 */
 	private static boolean isSenderFault(Throwable failure) {
-		if (failure instanceof BadFormatException) return true;
+		if (failure instanceof ValidationException) return true;
 		if (failure instanceof ResultException e) return !ErrorCodes.LOAD.equals(e.getResult().getErrorCode());
 		return false;
 	}
@@ -726,10 +759,18 @@ final class LatticeProtocolEndpoint implements Closeable {
 					if (message!=null) dispatchSafely(message);
 				} catch (InterruptedException e) {
 					if (inboundRunning) continue;
-				} catch (Exception e) {
-					log.warn("Unexpected propagation ingress failure",e);
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					log.warn("Unexpected propagation ingress failure: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+					log.debug("Propagation ingress failure",e);
 				}
 			}
+		} catch (Error e) {
+			// A failure of the JVM itself: stop taking messages, and say so. Refuse them
+			// before recording, so whoever the failure wakes sees the group refusing.
+			acceptingInbound=false;
+			log.error("Propagation group stopped processing inbound messages",e);
+			propagator.recordFailure("inbound processing",e);
 		} finally {
 			acceptingInbound=false;
 			inboundRunning=false;
@@ -739,13 +780,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private void dispatchSafely(Message message) {
 		try {
 			handle(message);
-		} catch (StackOverflowError e) {
-			log.warn("Rejected propagation message after stack overflow");
-			closeFaultingConnection(message);
-		} catch (VirtualMachineError e) {
-			throw e;
 		} catch (Error e) {
-			log.warn("Contained propagation endpoint Error",e);
+			Utils.checkRequestFailure(e);
+			messageFailures.log(e,"Rejected propagation message");
 			closeFaultingConnection(message);
 		}
 	}
@@ -946,7 +983,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 		for (AConnection connection:Set.copyOf(inboundConnections)) {
 			try {
 				connection.close();
-			} catch (RuntimeException | StackOverflowError e) {
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				failure=append(failure,new IOException("Unable to close propagation inbound connection",e));
 			} finally {
 				removeConnection(connection);

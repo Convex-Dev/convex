@@ -46,7 +46,11 @@ import convex.core.data.Lists;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.ChallengeSigner;
@@ -1186,7 +1190,7 @@ public abstract class Convex implements AutoCloseable {
 	 * <p>Works with both NodeServer (lattice) and peer Server (consensus).
 	 *
 	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
-	 * @return Future that completes with the verified remote AccountKey, or null on failure
+	 * @return As {@link #verifyPeer(AccountKey, ACell)} returns
 	 */
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey) {
 		return verifyPeer(expectedKey, null);
@@ -1198,7 +1202,11 @@ public abstract class Convex implements AutoCloseable {
 	 *
 	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
 	 * @param contextID   Optional context (e.g. network ID for consensus peers), or null
-	 * @return Future that completes with the verified remote AccountKey, or null on failure
+	 * @return Future for the verified remote key, or null if the remote proves none. It
+	 *         fails with a {@link ValidationException} if the reply is bad: a
+	 *         {@link BadFormatException} if it is malformed, a {@link BadSignatureException}
+	 *         if its signature does not verify, and a {@link MisbehaviourException} if it is
+	 *         validly signed for another challenge
 	 */
 	@SuppressWarnings("unchecked")
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
@@ -1225,6 +1233,9 @@ public abstract class Convex implements AutoCloseable {
 
 				setVerifiedPeer(remoteKey);
 				return remoteKey;
+			} catch (ValidationException e) {
+				// Proves the remote misbehaved, which only the caller can act on
+				throw new CompletionException(e);
 			} catch (Exception e) {
 				log.debug("verifyPeer failed: {}", e.getMessage());
 				return null;
