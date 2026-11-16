@@ -128,7 +128,7 @@ public class DLFSComponentTest {
 	@Test
 	public void testCompleteNodeHostedServerStack() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
-		try (EtchStore store=EtchStore.createTemp("dlfs-complete-stack");
+		try (MemoryStore store=new MemoryStore();
 				NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(LatticeHost.open(store),NodeConfig.port(-1))) {
 			var application=node.getHost().addApplication(new DLFSApplication(node.getHost(),keyPair::signData));
 			node.launch();
@@ -173,7 +173,7 @@ public class DLFSComponentTest {
 	@Test
 	public void testRegionAtArbitraryRootPath() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
-		try (EtchStore store=EtchStore.createTemp("dlfs-components");
+		try (MemoryStore store=new MemoryStore();
 				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(LatticeHost.open(store),NodeConfig.port(-1))) {
 			var application=server.getHost().addApplication(new DLFSApplication(server.getHost(),keyPair::signData,KEY_DOCUMENTS));
 			server.launch();
