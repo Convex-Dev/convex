@@ -87,6 +87,11 @@ public abstract class AObserverQueue<T> {
 	}
 
 
+	/** The queue thread while started, for tests */
+	synchronized Thread getThread() {
+		return thread;
+	}
+
 	public abstract void loop() throws InterruptedException;
 
 }

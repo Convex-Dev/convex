@@ -1428,6 +1428,19 @@ public class Server implements Closeable {
 		}
 	}
 
+	/**
+	 * Gets a future that completes once this Server has shut down, as
+	 * {@link #waitForShutdown()} waits for. Completing or cancelling the future has no
+	 * effect on the Server. A dependent action that is not asynchronous may run on the
+	 * thread closing the Server while it holds the Server's lock, so an action that waits
+	 * for anything should be asynchronous.
+	 *
+	 * @return Future completing on shutdown
+	 */
+	public CompletableFuture<Void> whenShutDown() {
+		return shutdownFuture.thenApply(time -> null);
+	}
+
 	public static Server fromPeerData(AKeyPair kp, AMap<Keyword,ACell> peerData) throws LaunchException, ConfigException, InterruptedException {
 		HashMap<Keyword, Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, kp);

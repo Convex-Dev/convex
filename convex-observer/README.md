@@ -65,6 +65,9 @@ th.setRequestObserver(observer.getTransactionRequestObserver(server));
 th.setResponseObserver(observer.getTransactionResponseObserver(server));
 ```
 
+`StrimziKafka.get` returns a server's one Kafka observer, starting it on first use;
+it is closed when that server shuts down.
+
 Set either observer to `null` to stop observing.
 
 > The Convex Desktop GUI exposes these observers interactively under its peer
