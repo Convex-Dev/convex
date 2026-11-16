@@ -27,8 +27,8 @@ import ch.qos.logback.core.spi.FilterReply;
  * every other record is written as usual. A scope matches a record that carries one of
  * the objects the test created to cause it, as the record's throwable, among that
  * throwable's causes and suppressed throwables, or as a message argument; or a record
- * logged on one of the threads given to it. If several open scopes match a record, the
- * one opened first keeps it.
+ * of the logger given to it, logged on one of the threads given to it. If several open
+ * scopes match a record, the one opened first keeps it.
  *
  * <p>Open a scope before starting what logs and close it after stopping that, since a
  * component's threads log after the test's own work returns. Closing fails if the
@@ -77,7 +77,7 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 		public FilterReply decide(Marker marker, Logger logger, ch.qos.logback.classic.Level level, String format, Object[] params, Throwable t) {
 			if ((level==null)||!level.isGreaterOrEqual(ch.qos.logback.classic.Level.WARN)) return FilterReply.NEUTRAL;
 			for (ExpectedLogs scope: OPEN) {
-				if (scope.matches(params,t)) {
+				if (scope.matches(logger.getName(),params,t)) {
 					Level slf4jLevel=Level.intToLevel(ch.qos.logback.classic.Level.toLocationAwareLoggerInteger(level));
 					scope.keep(slf4jLevel,logger.getName(),thrown(params,t));
 					return FilterReply.DENY;
@@ -88,12 +88,16 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 	}
 
 	private final Set<Object> carried=Collections.newSetFromMap(new IdentityHashMap<>());
+	private final String threadLogger;
 	private final Set<Thread> threads=Collections.newSetFromMap(new IdentityHashMap<>());
 	private final List<Entry> kept=Collections.synchronizedList(new ArrayList<>());
+	private final boolean required;
 
-	private ExpectedLogs(Collection<?> carried, Collection<Thread> threads) {
+	private ExpectedLogs(Collection<?> carried, String threadLogger, Collection<Thread> threads, boolean required) {
 		this.carried.addAll(carried);
+		this.threadLogger=threadLogger;
 		this.threads.addAll(threads);
+		this.required=required;
 	}
 
 	/**
@@ -108,18 +112,29 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 		for (Object o: objects) {
 			if (o instanceof Collection<?> c) all.addAll(c); else all.add(o);
 		}
-		return new ExpectedLogs(all,List.of());
+		return new ExpectedLogs(all,null,List.of(),true);
 	}
 
 	/**
-	 * Creates a scope, not yet open, matching records logged on any of the given
-	 * threads: the test's own, or those of a component it started.
+	 * Creates a scope, not yet open, matching the records of one logger logged on any of
+	 * the given threads: the test's own, or those of a component it started.
 	 *
+	 * @param logger Name of the logger
 	 * @param threads Threads whose records the test expects
 	 * @return New scope, to open with {@link #open()}
 	 */
-	public static ExpectedLogs onThreads(Thread... threads) {
-		return new ExpectedLogs(List.of(),List.of(threads));
+	public static ExpectedLogs onThreads(String logger, Thread... threads) {
+		return new ExpectedLogs(List.of(),logger,List.of(threads),true);
+	}
+
+	/**
+	 * Gets a scope like this one that closes without failing if it kept no record, for a
+	 * site that logs above debug only once in the JVM, which an earlier test may have used.
+	 *
+	 * @return New scope, not yet open
+	 */
+	public ExpectedLogs ifLogged() {
+		return new ExpectedLogs(carried,threadLogger,threads,false);
 	}
 
 	/**
@@ -146,12 +161,12 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 	/**
 	 * Closes this scope.
 	 *
-	 * @throws AssertionError if the scope kept no record
+	 * @throws AssertionError if the scope kept no record, unless made with {@link #ifLogged()}
 	 */
 	@Override
 	public void close() {
 		OPEN.remove(this);
-		if (kept.isEmpty()) throw new AssertionError("Expected a log record that was not logged");
+		if (required&&kept.isEmpty()) throw new AssertionError("Expected a log record that was not logged");
 	}
 
 	/**
@@ -189,8 +204,8 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 		close();
 	}
 
-	private boolean matches(Object[] params, Throwable t) {
-		if (threads.contains(Thread.currentThread())) return true;
+	private boolean matches(String logger, Object[] params, Throwable t) {
+		if (logger.equals(threadLogger)&&threads.contains(Thread.currentThread())) return true;
 		if (carries(t)) return true;
 		if (params!=null) {
 			for (Object p: params) {

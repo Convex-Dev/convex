@@ -1002,7 +1002,7 @@ public class InvalidPeerDataTest {
 			merger.belief=Belief.create(hollow);
 			assertTrue(merger.queueBelief(Belief.create(good)));
 			// The shutdown the merge causes is logged on this thread
-			ExpectedLogs logs=ExpectedLogs.onThreads(Thread.currentThread()).open();
+			ExpectedLogs logs=ExpectedLogs.onThreads(Server.class.getName(),Thread.currentThread()).open();
 			try (logs) {
 				merger.loop();
 			}
@@ -1225,7 +1225,7 @@ public class InvalidPeerDataTest {
 		propagator.close();
 		propagator.awaitStopped();
 		CVMExecutor executor=peer.getCVMExecutor();
-		ExpectedLogs logs=ExpectedLogs.onThreads(executor.thread).open();
+		ExpectedLogs logs=ExpectedLogs.onThreads(Server.class.getName(),executor.thread).open();
 		try (logs) {
 			executor.queueUpdate(belief);
 			awaitShutdown(peer);

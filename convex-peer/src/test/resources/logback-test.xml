@@ -8,17 +8,6 @@
     </encoder>
   </appender>
 
-  <!-- Robustness tests deliberately inject failed acquisition responses,
-       application policy exceptions, stack overflows and store failures. -->
-  <logger name="convex.peer.Server" level="ERROR"/>
-  <logger name="convex.api.Acquiror" level="ERROR"/>
-  <logger name="convex.node.LatticeListener" level="ERROR"/>
-  <logger name="convex.node.LatticeProtocolEndpoint" level="ERROR"/>
-  <logger name="convex.node.LatticePropagator" level="ERROR"/>
-  <logger name="convex.peer.upgrade" level="OFF"/>
-  <logger name="convex.node.NodeServer" level="ERROR"/>
-  <logger name="convex.net.impl.netty.NettyServer" level="ERROR"/>
-
   <root level="WARN">
     <appender-ref ref="STDERR"/>
   </root>

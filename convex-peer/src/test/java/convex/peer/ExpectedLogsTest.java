@@ -36,12 +36,16 @@ public class ExpectedLogsTest {
 	}
 
 	@Test
-	public void keepsRecordsLoggedOnItsThreads() {
-		ExpectedLogs logs=ExpectedLogs.onThreads(Thread.currentThread()).open();
-		try (logs) {
+	public void keepsRecordsOfItsLoggerLoggedOnItsThreads() {
+		Logger other=LoggerFactory.getLogger(ExpectedLogsTest.class.getName()+".other");
+		ExpectedLogs logs=ExpectedLogs.onThreads(log.getName(),Thread.currentThread()).open();
+		// Keeps the other logger's record out of the test output
+		ExpectedLogs otherLogs=ExpectedLogs.onThreads(other.getName(),Thread.currentThread()).open();
+		try (logs; otherLogs) {
 			log.warn("This thread");
+			other.warn("This thread, another logger");
 		}
-		assertEquals(Level.WARN,logs.records().get(0).level());
+		assertEquals(List.of(log.getName()),logs.records().stream().map(ExpectedLogs.Entry::logger).toList());
 	}
 
 	@Test
@@ -50,7 +54,7 @@ public class ExpectedLogsTest {
 		ExpectedLogs carrying=ExpectedLogs.carrying(failure).open();
 		Thread other=new Thread(() -> log.warn("Unrelated",new IllegalStateException("other")));
 		// Opened second, so it keeps only what the first leaves; keeps the unrelated record out of the test output
-		ExpectedLogs elsewhere=ExpectedLogs.onThreads(other).open();
+		ExpectedLogs elsewhere=ExpectedLogs.onThreads(log.getName(),other).open();
 		try (carrying; elsewhere) {
 			log.warn("Expected",failure);
 			other.start();
