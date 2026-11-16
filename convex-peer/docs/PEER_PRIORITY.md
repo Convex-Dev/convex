@@ -134,7 +134,8 @@ trusted sources.
 **Back-off.** Each failure by a remote peer doubles its wait, from one poll interval up to
 256 of them (512 s at the default `:poll-delay`). A failure is:
 
-- a dial that fails, or that reaches a peer with another key;
+- a dial that fails, that is refused for the peer's answer to the identity challenge, or
+  that reaches a peer with another key;
 - a challenge that is not passed, or not answered within 2 s;
 - a STATUS error or a malformed status;
 - a Belief acquisition that fails, times out or yields something other than a Belief.
@@ -144,8 +145,8 @@ clears the count. A dial or a challenge that succeeds makes the peer due at once
 its count, so a peer that connects but never serves a poll keeps backing off. Polling an
 unverified link leaves its count alone.
 
-While no link is verified, a peer that could not be reached (its dial failed, or it did not
-reply) is dialled whatever its wait, so a peer whose own network failed reconnects as soon
+While no link is verified, a peer that could not be reached (its dial reached no one, or it
+did not reply) is dialled whatever its wait, so a peer whose own network failed reconnects as soon
 as it returns. A peer that answered wrongly still waits.
 
 **Closing.** A link with no reply to STATUS or to a challenge for a minute is closed; any
@@ -153,9 +154,9 @@ reply restarts the minute. A failure that leaves a peer's wait at its cap, the n
 row, also closes its link. An unverified link is kept while no link is verified, since it
 is then all there is to poll. False input in a reply, such as a challenge answer signed for
 another challenge, closes the link at once, as
-[Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment) describes,
-and counts as a failure. A remote peer keeps its count when its link closes, so a redial
-waits too.
+[Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment) describes;
+in a challenge answer or a poll of a verified link it also counts as a failure. A remote
+peer keeps its count when its link closes, so a redial waits too.
 
 ## Generic Message API
 

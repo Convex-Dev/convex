@@ -370,7 +370,8 @@ public class ConnectionManager extends AConnectionManager {
 			if (closed) return;
 			if (e != null) {
 				connectFailures.log(e,"Failed to connect to Peer at {}",connectTarget);
-				recordFailure(chosen,true);
+				// A refused peer was reached and answered wrongly; any other failure reached no one
+				recordFailure(chosen,!(PeerConnectionException.unwrap(e) instanceof PeerRefusedException));
 			} else if (connections.get(chosen) != linked) {
 				// Identification filed the link under the key that answered, not the one chosen
 				log.debug("Peer at {} did not identify as {}", connectTarget, chosen);

@@ -35,6 +35,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Order;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
@@ -59,6 +60,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.net.PeerRefusedException;
 import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 
@@ -591,6 +593,34 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/** False data in a polled Belief closes a verified link at once and counts as a failure. */
+	@Test
+	public void testFalseBeliefClosesVerifiedLink() throws Exception {
+		AKeyPair keyPair=AKeyPair.createSeeded(275);
+		Server server=createPollingServer(keyPair);
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			// An Order from a staked peer, which the merge would check, with a signature that does not verify
+			SignedData<Order> forged=SignedData.create(keyPair.getAccountKey(),Ed25519Signature.ZERO,Order.create().getRef());
+			Belief polled=Belief.create(forged);
+			AccountKey key=AKeyPair.createSeeded(276).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.markVerified(key);
+			link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData().assoc(0,polled.getHash()));
+			link.acquired=polled;
+			manager.addConnection(key,link);
+
+			manager.pollBelief(key,link);
+			assertFalse(link.isConnected());
+			assertNull(manager.getConnection(key));
+			assertFalse(manager.isDue(key),"the false data counts as a failure");
+		} finally {
+			server.close();
+		}
+	}
+
 	@Test
 	public void testFullPolledBeliefQueueIsNoFailure() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(244));
@@ -858,6 +888,13 @@ public class ConnectionManagerTest {
 			assertEquals(4,manager.dials);
 			assertFalse(manager.isDue(remoteKey));
 			assertNull(manager.tryRandomConnect(state),"a peer that answered wrongly is not redialled at once");
+
+			// So is a peer refused for its answer to the identity challenge
+			advanceUntilDue(manager,clock,remoteKey);
+			manager.next=() -> CompletableFuture.failedFuture(new PeerRefusedException("failed identity challenge"));
+			assertNotNull(manager.tryRandomConnect(state));
+			assertEquals(5,manager.dials);
+			assertNull(manager.tryRandomConnect(state),"a refused peer is not redialled at once");
 		} finally {
 			manager.close();
 			server.close();
