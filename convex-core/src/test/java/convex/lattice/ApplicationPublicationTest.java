@@ -55,7 +55,7 @@ public class ApplicationPublicationTest {
 	}
 
 	private static final class Application extends ALatticeApplication<Index<Keyword,ACell>> {
-		final SignedComponent<ASet<CVMLong>> owner;
+		final SignedSetComponent<CVMLong> owner;
 		final AtomicInteger signatures=new AtomicInteger();
 		Runnable onSign=() -> {};
 		volatile AKeyPair signingKey=KEY;
@@ -64,7 +64,7 @@ public class ApplicationPublicationTest {
 			super(host.cursor().fork(),host::persist);
 			// The owned subtree publishes through its own fork of the host, beside this
 			// application's staged root, so each fork reconciles only what it owns.
-			owner=new SignedComponent<>(SIGNED,
+			owner=new SignedSetComponent<>(SIGNED,
 				LatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED),
 				value -> {
 					signatures.incrementAndGet();

@@ -584,9 +584,14 @@ public class DLFSLocal extends DLFileSystem {
 			this.working=working;
 		}
 
+		/** Publishes by the drive lattice's join where both sides changed. */
 		@Override public void sync() {
 			checkOpen();
-			working.sync(DLFSLattice.INSTANCE::merge);
+			working.reconcile((base,own,other) -> {
+				if (Utils.equals(own,base)) return other;
+				if (Utils.equals(other,base)) return own;
+				return DLFSLattice.INSTANCE.merge(own,other);
+			});
 		}
 	}
 

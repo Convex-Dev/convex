@@ -36,11 +36,11 @@ import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.LatticeOps;
 import convex.lattice.Regions;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
+import convex.lattice.LatticeComponent;
 
 /** The mail components: atomic sends, open, receive and hosting. */
 public class MailTest {
@@ -459,7 +459,7 @@ public class MailTest {
 			return cursor().updateAndGet(own -> lattice.merge(own,other));
 		}
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.reconcile(lattice,LatticeContext.EMPTY,own,other);
+			return LatticeComponent.reconcile(lattice,LatticeContext.EMPTY,own,other);
 		}
 	}
 

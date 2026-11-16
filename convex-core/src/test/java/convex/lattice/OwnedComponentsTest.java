@@ -55,6 +55,21 @@ class OwnedComponentsTest {
 		void set(long value) { cursor().set(CVMLong.create(value)); }
 	}
 
+	/** A key-owned index of sets, whose drafts combine local changes on both sides by union. */
+	private static final class SetIndex extends KeyOwnedIndex<ASet<CVMLong>> {
+		SetIndex(AForkableCursor<Index<AccountKey,SignedData<ASet<CVMLong>>>> cursor) {
+			super(cursor,SetLattice.<CVMLong>create());
+		}
+		@Override protected SignedComponent<ASet<CVMLong>> createDraft(SignedLattice<ASet<CVMLong>> rule,
+				AForkableCursor<SignedData<ASet<CVMLong>>> slot,Function<ASet<CVMLong>,SignedData<ASet<CVMLong>>> signer) {
+			return new SignedSetComponent<>(rule,slot,signer);
+		}
+		@Override public SetIndex rebind(AForkableCursor<Index<AccountKey,SignedData<ASet<CVMLong>>>> cursor) {
+			return new SetIndex(cursor);
+		}
+		@Override public SetIndex fork() { return rebind(storage.fork()); }
+	}
+
 	private static AOwnedMap<AString,AInteger,?> collection(boolean indexed) {
 		return indexed
 			?new OwnedIndex<AString,AInteger>(new Root<>(),MaxLattice.INSTANCE,VERIFIER)
@@ -168,7 +183,7 @@ class OwnedComponentsTest {
 			var draft=edits.fork();
 			draft.set(CVMLong.TWO);
 			assertSame(signed,owners.get(A));
-			draft.sync(MaxLattice.INSTANCE::merge);
+			draft.reconcile((base,own,other) -> MaxLattice.INSTANCE.merge(own,other));
 			assertEquals(CVMLong.TWO,owners.get(A).getValue());
 		}
 	}
@@ -306,7 +321,7 @@ class OwnedComponentsTest {
 
 	@Test void independentDraftsPublishOnlyAtTheirOwnBoundaryAndReconcile() {
 		var destination=new Root<Index<AccountKey,SignedData<ASet<CVMLong>>>>();
-		var map=new KeyOwnedIndex<>(destination,SetLattice.<CVMLong>create()).fork();
+		var map=new SetIndex(destination).fork();
 		var first=map.draft(ALICE.getAccountKey(),ALICE::signData);
 		var second=map.draft(ALICE.getAccountKey(),ALICE::signData);
 		first.cursor().set(Sets.of(1));

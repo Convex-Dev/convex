@@ -12,9 +12,9 @@ component-owned working state and batched signing.
 
 ```text
 ACursor<V>                                get / atomic update / persist / path
-└── AForkableCursor<V>                    typed paths; fork(); sync(merge)
+└── AForkableCursor<V>                    typed paths; fork(); reconcile(merge)
     ├── Root<V>                           atomic value holder; the outermost boundary
-    ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
+    ├── ForkedCursor<V>                   working copy; reconciles with a plug-in three-way merge
     ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
     ├── BoundaryCursor<V>                 writes pass through; claims stop here
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
@@ -65,7 +65,7 @@ reads throw `MissingValueException`; optional reads return their fallback, and
 presence checks return false.
 
 `path(keys...)` creates a view without reading or changing state. Writes
-use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. A plain
+use `PathCursor.assocExisting` to rebuild existing ancestors atomically. A plain
 path write through a signed envelope is refused with `IllegalArgumentException`.
 
 A write lands only where the cursor's place exists. For a path that is where its
@@ -164,7 +164,9 @@ kept and needed again when the value is saved ([Equality](EQUALITY.md)).
 
 A finished value built before a persist landed puts the cells it was built on
 back, so they stay in memory until the holder is next persisted. Prefer an update
-function for an edit to a large value.
+function for an edit to a large value. A merge result is such a value: merges
+decide values only, and the holder's next persist finds whatever it shares with the
+saved value already stored.
 
 ## Persistence
 
@@ -239,7 +241,7 @@ and for update functions, without any merge definition; a plain path below it
 still writes only to an entry that exists. The optional adapter helper
 `LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
 lattice key, using an explicit lattice. It reads as any path does, so a missing
-key is absent. Its writes use `LatticeOps.assocIn` to insert its key, constructing an
+key is absent. Its writes use `LatticeComponent.assocIn` to insert its key, constructing an
 absent container from the lattice's zero at that level.
 Unknown missing container types fail; keys never determine container types.
 JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
@@ -260,19 +262,13 @@ working root. Sync is the separate reconciliation of that fork with its
 publication destination. Neither step implies publication beyond its destination.
 
 `fork()` creates an isolated working copy, a `ForkedCursor`, retaining its
-destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
-that publication: an unchanged copy adopts the destination, an unchanged destination
-accepts the working value, and divergent changes invoke the supplied function.
-Both tests are by value, so a destination persisted since the last sync counts as
-unchanged, and the working value's changes are carried onto its persisted cells.
-`reconcile(merge)` is the same with a `ThreeWayMerge`, which also receives the value
-both sides last agreed on.
+destination and reconciliation baseline. Each `reconcile(merge)` supplies the policy
+for that publication as a `ThreeWayMerge`, which receives the value both sides last
+agreed on, the working value and the destination's value.
 
 A three-way merge is total: it is given every case, and a side that changed nothing
-contributes nothing. Its result is built on `other`, the value the destination holds,
-so cells held there, which may be persisted, stay held wherever the result equals
-them, and only what `own` changed comes in as new cells. Where the result is known
-by reference, the update that applies the merge skips it: a destination still
+contributes nothing. It decides the value only, whatever the value's structure.
+Where the result is known by reference, the update that applies the merge skips it: a destination still
 holding the base takes `own`, which was built from it, and an unchanged `own` takes
 the destination's value. These checks cost nothing, so a sync or commit that meets
 no concurrent change does no merge work. The fork retains no merge callback. Ordinary roots, paths
@@ -305,21 +301,17 @@ or re-entrancy guards.
 
 A component with an independent publication boundary owns such a fork and supplies
 its own reconciliation rule. `ALatticeComponent.reconcile(base, own, other)` is
-that component's three-way merge. By default it carries own's changes onto the
-destination's cells where only own changed, and calls `reconcile(own, other)`, the
-component's rule for a real conflict, only when both sides changed. No `ALattice` is
+that component's three-way merge. By default a side that changed nothing takes the
+other's value, and `reconcile(own, other)`, the component's rule for a real conflict,
+is called only when both sides changed. No `ALattice` is
 required. `LatticeComponent` adapts a lattice for components that choose to use one. An application overrides it
 to take regions that its own components publish from the destination; each such
 component publishes through its own fork of the host.
 A lattice join takes `own` first, since tie rules such as `LWWLattice`'s prefer that
-side, so it is built on own's cells; `LatticeOps.reconcile` then carries the joined
-value onto the destination's cells. A component can override the three-value form
-instead, to use the value both sides last agreed on throughout.
-`LatticeOps.mergeChanges` is an experimental rule for it, for a merge with no better
-way of handling conflicts. A merge that can resolve a conflict itself, as a lattice
-join does, should do that instead. Each side's changes are kept, so changes to
-different locations never conflict, and it throws `MergeConflictException` where
-both sides changed one location to different values.
+side. A component can override the three-value form instead, to use the value both
+sides last agreed on throughout. Changes in different places combine only where the
+component's value is independent place by place, as a CRDT's is or a container's
+top-level regions are; anywhere else, a change on both sides is a conflict.
 For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use
 `Transactions`.
 
@@ -372,10 +364,10 @@ component's transaction commits by the component's own merge, so a concurrent ch
 the component can reconcile, such as one to a different region, commits with the
 run. Transactions record no reads: what the merge accepts is valid by the
 component's rules. By default a component's merge treats a change on both sides as
-a conflict. A transaction on a plain cursor, given no merge, commits strictly: if
-its own value is unchanged, the run's changes are carried onto that value's cells,
-which may have been persisted during the run, and a run that changed nothing
-commits whatever changed meanwhile, as of the value it read. On a conflict, the
+a conflict. A transaction on a plain cursor, given no merge, commits strictly: only
+if its own value is unchanged, which it is if it was only persisted during the run,
+and a run that changed nothing commits whatever changed meanwhile, as of the value
+it read. On a conflict, the
 transaction takes the claim of its nearest boundary and finishes under it. Claims
 on the same boundary run one at a time, and a callback runs at most twice. An exclusive transaction starts with that claim and runs
 once, for work too expensive to repeat or with side effects.
@@ -389,7 +381,7 @@ write through the boundary from another thread that would change its value waits
 for the release and recalculates, and a write that leaves the value equal carries
 on. Persisting leaves the value equal, so it proceeds during a claim and the root
 then holds the persisted cells; an exclusive transaction that changes nothing writes
-nothing over them, and one that does change the value carries its changes onto them.
+nothing over them.
 Reads never wait. Without a claim, each read or compare-and-set of the root
 adds one type check, and nothing is recorded per transaction.
 
@@ -476,7 +468,6 @@ for unsigned working state that is signed only when published, and
 ## Code and specifications
 
 - `convex.lattice.cursor`: atomic storage, paths, function-based views, drafts and wrappers.
-- `convex.lattice.LatticeOps`: strict path updates and explicit component construction helpers.
 - `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `LatticeHost`: structure,
   merge policy and publication lifecycle.
 - `convex.lattice.LatticeContext`: optional policy for lattice adapters; domain

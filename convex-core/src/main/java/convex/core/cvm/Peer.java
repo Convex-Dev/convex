@@ -554,10 +554,10 @@ public class Peer {
 	/**
 	 * Updates the state of the Peer based on latest consensus Belief
 	 * @return Updated Peer
+	 * @throws IllegalStateException if the Belief holds no Order of this Peer
 	 */
 	public Peer updateState() {
-		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
-		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
+		long consensusPoint = requireOwnOrder().getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
 		return updateState(consensusPoint);
 	}
 
@@ -566,9 +566,10 @@ public class Peer {
 	 *
 	 * @param targetPosition Finalised Order position to compute
 	 * @return Updated Peer at the requested position
+	 * @throws IllegalStateException if the Belief holds no Order of this Peer
 	 */
 	public Peer updateState(long targetPosition) {
-		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
+		Order myOrder = requireOwnOrder();
 		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
 		if ((targetPosition < 0) || (targetPosition > consensusPoint)) {
 			throw new IllegalArgumentException("State target position " + targetPosition
@@ -617,6 +618,18 @@ public class Peer {
 			stateIndex++;
 		}
 		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp, index);
+	}
+
+	/**
+	 * Gets this Peer's Order from its latest Belief.
+	 *
+	 * @return This Peer's Order
+	 * @throws IllegalStateException if the Belief holds no Order of this Peer
+	 */
+	private Order requireOwnOrder() {
+		Order order=belief.getOrder(peerKey);
+		if (order==null) throw new IllegalStateException("Belief holds no Order of this peer");
+		return order;
 	}
 
 	/**

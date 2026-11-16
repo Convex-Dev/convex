@@ -5,8 +5,11 @@ import convex.core.lang.RT;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +32,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -534,6 +538,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		try {
 			try {
 				ACell payload=m.getPayload(getStore());
+				// Before merging, which keeps only what it takes: the sender counts every
+				// cell as announced and leaves it out of the updates that follow
+				stageUpdate(payload);
 				return mergeBeliefValue(orders,payload,m);
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());
@@ -548,6 +555,43 @@ public class BeliefPropagator extends AThreadedComponent {
 			rejectReceived(m,e,"Unusable Belief message");
 		}
 		return false;
+	}
+
+	/**
+	 * Stores every cell a decoded update carries at STORED status, its top cell included.
+	 * A failure stops it and is logged, not thrown.
+	 *
+	 * @param update Decoded payload of a received update
+	 */
+	private void stageUpdate(ACell update) {
+		if (update==null) return;
+		try {
+			AStore store=getStore();
+			ArrayList<ACell> stack=new ArrayList<>();
+			// Each cell once, however often the update refers to it
+			Set<ACell> seen=Collections.newSetFromMap(new IdentityHashMap<>());
+			Cells.store(update,store);
+			stack.add(update);
+			while (!stack.isEmpty()) {
+				ACell cell=stack.remove(stack.size()-1);
+				if (!seen.add(cell)) continue;
+				if (!cell.isEmbedded()) Cells.store(cell,store);
+				int n=cell.getRefCount();
+				for (int i=0; i<n; i++) {
+					Ref<ACell> ref=cell.getRef(i);
+					// Decoding refers directly to the cells an update carries, and through the
+					// store to the rest: those are held already or missing
+					if (!ref.isDirect()) continue;
+					ACell child=ref.getValue();
+					if (child!=null) stack.add(child);
+				}
+			}
+		} catch (Throwable e) {
+			// Keeping the cells only spares later fetches: the merge goes ahead all the
+			// same, unless the JVM itself has failed
+			Utils.checkRequestFailure(e);
+			stageFailures.log(e,"Unable to keep a received update's cells");
+		}
 	}
 
 	/** Accumulates one completed poll while preserving the complete-value invariant. */
@@ -582,7 +626,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
 				// The merge ignores Orders from unstaked keys, which anyone can make:
-				// drop them before the costly signature check and store write
+				// drop them before the costly signature check
 				if (!BeliefMerge.isValidPeer(state,key)) continue;
 				Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 				if (newOrder==null) {
@@ -650,6 +694,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	private final RequestFailures receiveFailures=new RequestFailures(log);
 	private final RequestFailures mergeFailures=new RequestFailures(log);
 	private final RequestFailures fetchFailures=new RequestFailures(log);
+	private final RequestFailures stageFailures=new RequestFailures(log);
 	private final RequestFailures observerFailures=new RequestFailures(log);
 
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
@@ -662,8 +707,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Fetches what an update lacks from the connection it arrived on: whoever sent a
 	 * delta holds everything it refers to (CAD015). At most one fetch is outstanding.
 	 * A miss while one is under way is ignored, because the same Orders usually arrive
-	 * soon from other peers. The update's own cells are stored first, so only what it
-	 * left out is requested. Once that has arrived the update is queued again to merge.
+	 * soon from other peers. The update's own cells were kept when it was received, so
+	 * normally only what it left out is requested. Once that has arrived the update is
+	 * queued again to merge.
 	 * A fetch that fails, or takes longer than the poll delay, is dropped.
 	 *
 	 * <p>The request goes only to the sender, so a sender that never answers delays
@@ -677,7 +723,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		if (!fetching.compareAndSet(false,true)) return;
 		try {
 			AStore store=getStore();
-			ACell update=Cells.store(m.getPayload(store),store);
+			ACell update=m.getPayload(store);
 			long timeout=server.getConnectionManager().getPollDelay();
 			Acquiror acquiror=Acquiror.fromMessages(update.getHash(),store,hashes ->
 				connection.request(Message.createDataRequest(null,hashes),timeout));

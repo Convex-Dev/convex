@@ -90,7 +90,7 @@ class ReadOnlyCursorTest {
 		var fork=root.readOnly().fork();
 		fork.path(A).set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,fork.get(A));
-		assertRefused(() -> fork.sync((own,other) -> own));
+		assertRefused(() -> fork.reconcile((base,own,other) -> own));
 		assertEquals(CVMLong.TWO,fork.get(A));
 		assertEquals(CVMLong.ONE,root.get(A));
 	}
@@ -100,11 +100,11 @@ class ReadOnlyCursorTest {
 		var root=new CountingRoot<AHashMap<Keyword,ACell>>(Maps.of(A,CVMLong.ONE));
 		var view=root.readOnly();
 		var merges=new AtomicInteger();
-		BinaryOperator<AHashMap<Keyword,ACell>> merge=(own,other) -> { merges.incrementAndGet(); return own; };
-		assertRefused(() -> view.sync(merge));
-		assertRefused(() -> view.<AHashMap<Keyword,ACell>>path().sync(merge)); // an empty path is the view itself
-		assertEquals(CVMLong.ONE,view.path(A).sync((own,other) -> own));
-		assertEquals(root.get(),view.withDefault(Maps.empty()).sync((own,other) -> own));
+		ThreeWayMerge<AHashMap<Keyword,ACell>> merge=(base,own,other) -> { merges.incrementAndGet(); return own; };
+		assertRefused(() -> view.reconcile(merge));
+		assertRefused(() -> view.<AHashMap<Keyword,ACell>>path().reconcile(merge)); // an empty path is the view itself
+		assertEquals(CVMLong.ONE,view.path(A).reconcile((base,own,other) -> own));
+		assertEquals(root.get(),view.withDefault(Maps.empty()).reconcile((base,own,other) -> own));
 		assertEquals(0,merges.get());
 		assertEquals(0,root.writes.get());
 	}

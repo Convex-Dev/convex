@@ -42,7 +42,7 @@ public class SignedComponentTest {
 	public void testNestedDraftsReconcileUnsignedAndSignOnlyAtTheEnvelopeBoundary() {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		var signatures=new AtomicInteger();
-		var notebook=new SignedComponent<>(SIGNED,destination,signer(signatures::incrementAndGet));
+		var notebook=new SignedSetComponent<>(SIGNED,destination,signer(signatures::incrementAndGet));
 		var first=notebook.fork();
 		var second=notebook.fork();
 		new SetComponent<>(first.cursor()).add(CVMLong.ONE);
@@ -63,18 +63,20 @@ public class SignedComponentTest {
 		assertEquals(1,signatures.get(),"Unchanged publication must not sign again");
 	}
 
+	/** A whole-record payload keeps one side, so local edits on both sides conflict; incoming ties keep the own value. */
 	@Test
-	public void testSignedLocalEditWinsAnEqualTimestampConflict() {
+	public void testLocalEditsToAWholeRecordOnBothSidesConflict() {
 		var lattice=OwnerKeyLattice.create(LWWLattice.<CVMLong>create(v -> 100)).signingFor(KEY.getAccountKey());
 		var destination=new Root<>(KEY.signData(CVMLong.ZERO));
 		var component=new SignedComponent<>(lattice,destination,KEY::signData);
 		component.cursor().set(CVMLong.ONE);
-		destination.set(KEY.signData(CVMLong.TWO));
-		component.sync();
-		assertEquals(CVMLong.ONE,destination.get().getValue());
-		assertTrue(destination.get().checkSignature());
+		var theirs=KEY.signData(CVMLong.TWO);
+		destination.set(theirs);
+		assertThrows(MergeConflictException.class,component::sync);
+		assertSame(theirs,destination.get());
+		assertEquals(CVMLong.ONE,component.cursor().get());
 		assertEquals(CVMLong.ONE,component.merge(KEY.signData(CVMLong.TWO)),
-			"Incoming ties also preserve the existing own value");
+			"Incoming ties preserve the existing own value");
 	}
 
 	@Test
@@ -159,7 +161,7 @@ public class SignedComponentTest {
 	public void testChangedDestinationPayloadIsMergedAndResigned() {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		AtomicInteger signatures=new AtomicInteger();
-		var component=new SignedComponent<>(SIGNED,destination,signer(() -> {
+		var component=new SignedSetComponent<>(SIGNED,destination,signer(() -> {
 			if (signatures.incrementAndGet()==1) destination.set(KEY.signData(Sets.of(2)));
 		}));
 		component.cursor().set(Sets.of(1));

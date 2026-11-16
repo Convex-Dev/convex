@@ -19,6 +19,7 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
@@ -235,7 +236,10 @@ public class State extends ARecordGeneric {
 	 */
 	public BlockResult checkBlock(SignedData<Block> signedBlock) {
 		Block block=RT.ensureCVM(signedBlock.getValue(),Block.class);
-		// First: the key below means nothing until the signature verifies
+		// Before the checks below, which read the Block: a value that is not a readable
+		// Block is invalid whoever signed it
+		if ((block==null)||(block.getTransactions()==null)) return BlockResult.createInvalidBlock(this,block,UNREADABLE_BLOCK);
+		// First of the remaining checks: the key below means nothing until the signature verifies
 		if (!signedBlock.checkSignature()) return BlockResult.createInvalidBlock(this,block,Strings.BAD_SIGNATURE);
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=getPeer(peerKey);
@@ -265,6 +269,8 @@ public class State extends ARecordGeneric {
 		
 		return null;
 	}
+
+	private static final AString UNREADABLE_BLOCK=Strings.intern("Signed value is not a readable Block");
 
 	/**
 	 * Apply state updates consistent with time advancing to a given timestamp
@@ -453,8 +459,12 @@ public class State extends ARecordGeneric {
 		for (int i = 0; i < blockLength; i++) {
 			// No catch here: an unexpected exception makes the whole Block invalid (applyBlock)
 			// extract the signed transaction from the block
-			SignedData<ATransaction> signed = transactions.get(i);
-			
+			if (!(transactions.get(i) instanceof SignedData<?> entry)) {
+				throw new InvalidBlockException("Not a signed transaction at position "+i);
+			}
+			@SuppressWarnings("unchecked")
+			SignedData<ATransaction> signed = (SignedData<ATransaction>)entry;
+
 			// Update transaction context
 			tctx.signedTx=signed;
 			tctx.txNumber=i;

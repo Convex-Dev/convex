@@ -3,6 +3,7 @@ package convex.core;
 import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -297,6 +298,24 @@ public class StateTransitionsTest {
 		State s = TestState.STATE;
 		@SuppressWarnings("unchecked")
 		SignedData<Block> sb=(SignedData<Block>)(SignedData<?>)KEYPAIR_PEER.signData(CVMLong.ONE);
+
+		BlockResult checked=s.checkBlock(sb);
+		assertNotNull(checked,"the checks reject a signed value that is not a Block");
+		assertEquals(s,checked.getState());
+
+		BlockResult br=s.applyBlock(sb);
+		assertNull(br.getResult(0));
+		assertEquals(s,br.getState());
+	}
+
+	@Test
+	public void testBadBlockTransactionsNotAVector() {
+		State s = TestState.STATE;
+		SignedData<Block> sb=KEYPAIR_PEER.signData(Block.create(Vectors.of(s.getTimestamp(),CVMLong.ONE)));
+
+		BlockResult checked=s.checkBlock(sb);
+		assertNotNull(checked,"the checks reject a Block whose transactions are not a vector");
+		assertEquals(s,checked.getState());
 
 		BlockResult br=s.applyBlock(sb);
 		assertNull(br.getResult(0));

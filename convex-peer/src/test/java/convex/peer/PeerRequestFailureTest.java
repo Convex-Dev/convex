@@ -670,24 +670,24 @@ public class PeerRequestFailureTest {
 				long ts=blockTime(peer);
 				SignedData<Order> good=order(REMOTE_B,ts,block(REMOTE_B,ts));
 				List<Message> sent=updateMissingABlock(ts,1,good,senderStore);
-				for (Message m: sent) {
-					// Storing the update for its fetch is the first time the peer stores it
-					if (m.getType()==MessageType.BELIEF) store.failOnce(m.getPayload().getHash(),error);
-				}
-				var senderEnd=InvalidPeerDataTest.connect(peer);
+				// The fetch is the first to store the part the update left out
+				store.failOnce(MissingBeliefDataTest.leftOut(sent),error);
+				var senderEnd=MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore));
 				for (Message m: sent) senderEnd.sendMessage(InvalidPeerDataTest.wire(m));
 
 				Belief merged=updates.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 				assertNotNull(merged,error+": the good Order is merged");
 				assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()),error.toString());
+				CompletableFuture<?> fetch=peer.getBeliefPropagator().getMissingDataFetch();
+				assertNotNull(fetch,error+": the missing data is fetched");
+				fetch.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 				assertTrue(store.fired(),error+" fired");
-				assertNull(peer.getBeliefPropagator().getMissingDataFetch(),error+": no fetch started");
 
 				SignedData<Order> later=order(REMOTE_B,ts+1,block(REMOTE_B,ts),block(REMOTE_B,ts+1));
 				var laterEnd=InvalidPeerDataTest.connect(peer);
 				for (Message m: updateMissingABlock(ts+1,9,later,senderStore)) laterEnd.sendMessage(InvalidPeerDataTest.wire(m));
 				assertNotNull(updates.poll(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),error+": the later good Order is merged");
-				assertNotNull(peer.getBeliefPropagator().getMissingDataFetch(),error+": later missing data is fetched");
+				assertNotSame(fetch,peer.getBeliefPropagator().getMissingDataFetch(),error+": later missing data is fetched");
 			} finally {
 				peer.close();
 			}

@@ -106,16 +106,23 @@ bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the stor
 decision, not the data layer's.
 
 A delta leaves out every cell its sender has announced before, to anyone: the
-record of what has been announced is per store, not per receiver. A receiver can
-therefore lack cells an update refers to. It may not have been connected when
-they were first sent (a peer broadcasts as soon as it starts, while its
-connections are still opening). A queue may have refused the update that carried
-them. Or the receiver may have dropped that update because something else was
-missing, since decoding an update never stores the cells it carries.
+record of what has been announced is per store, not per receiver. A receiver
+therefore keeps every cell an update carries as it takes the update off its
+queue, before merging and whatever the merge takes from it. A merge takes only
+the Orders it uses, yet the sender's later updates leave out all the rest too:
+an Order older than one the receiver holds, the receiver's own Order as the
+sender saw it, and the Belief's own cells, which an unchanged Belief repeated as
+a keepalive refers to. Keeping them is staging, as for DATA; a failure to keep
+them is logged and the merge goes ahead.
 
-Such an update ends in a request rather than a timer. `BeliefPropagator` stores
-the update's own cells, fetches what they lack from the connection the update
-arrived on, and queues the update again to merge once that has arrived. The
+A receiver can still lack cells an update refers to. It may not have been
+connected when they were first sent (a peer broadcasts as soon as it starts,
+while its connections are still opening), or a queue may have refused the update
+that carried them.
+
+Such an update ends in a request rather than a timer. `BeliefPropagator` fetches
+what the update lacks from the connection it arrived on, and queues the update
+again to merge once that has arrived. The
 sender holds everything it refers to, and a peer's own connections to other
 peers answer these requests from its store, as its server answers any
 connection. A peer has at most one fetch outstanding: a miss while one is under

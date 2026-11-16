@@ -14,6 +14,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,7 @@ import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.ALattice;
+import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
@@ -60,6 +63,7 @@ import convex.p2p.P2PLattice;
 import convex.p2p.P2PNodeRecord;
 import convex.p2p.P2PUser;
 import convex.social.Social;
+import convex.social.SocialLattice;
 import convex.social.SocialPost;
 import convex.social.SocialUser;
 
@@ -93,6 +97,28 @@ public class SharedApplicationInternalsTest {
 		return new Regions(host.cursor());
 	}
 
+	/** A signed draft that reconciles local changes on both sides by its domain's merge. */
+	private static final class Draft<T extends ACell> extends SignedComponent<T> {
+		private final BinaryOperator<T> merge;
+
+		Draft(SignedLattice<T> lattice,ACursor<SignedData<T>> destination,Function<T,SignedData<T>> signer,BinaryOperator<T> merge) {
+			super(lattice,destination,signer);
+			this.merge=merge;
+		}
+
+		private Draft(SignedLattice<T> lattice,AForkableCursor<T> cursor,BinaryOperator<T> merge) {
+			super(lattice,cursor);
+			this.merge=merge;
+		}
+
+		@Override protected T reconcile(T own,T other) {
+			return (merge==null)?super.reconcile(own,other):merge.apply(own,other);
+		}
+
+		@Override public Draft<T> rebind(AForkableCursor<T> cursor) { return new Draft<>(lattice,cursor,merge); }
+		@Override public Draft<T> fork() { return rebind(storage.fork()); }
+	}
+
 	/** Applications choose working-state policy; ordinary domain views need no fork. */
 	private static final class WorkingApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		CVMLong timestamp=CVMLong.create(100);
@@ -107,19 +133,19 @@ public class SharedApplicationInternalsTest {
 			super(host.cursor().fork(),host::persist);
 			if (socialApp) {
 				var policy=context(SOCIAL_KEY,signing);
-				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
+				socialState=owned(host,policy,SocialLattice.INSTANCE::merge,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
 				social=Social.connect(new IndexComponent<>(cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).rebind(socialState.cursor());
 				files=null;
 				fileState=null;
 			} else {
-				fileState=owned(host,context(FILES_KEY,signing),Keywords.FS,FILES_KEY.getAccountKey());
+				fileState=owned(host,context(FILES_KEY,signing),null,Keywords.FS,FILES_KEY.getAccountKey());
 				files=convex.dlfs.DLFSDrives.wrap(fileState.cursor(),() -> CVMLong.create(100));
 				social=null;
 				socialState=null;
 			}
 			AccountKey nodeOwner=(socialApp?COMMON_KEY:FILES_KEY).getAccountKey();
-			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),Keywords.P2P,Keywords.NODES,nodeOwner);
+			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),null,Keywords.P2P,Keywords.NODES,nodeOwner);
 			node=P2PUser.create(this,nodeOwner).node().rebind(nodeState.cursor());
 		}
 
@@ -128,25 +154,27 @@ public class SharedApplicationInternalsTest {
 		}
 
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.reconcile(HOST_ROOT,VERIFY,own,other);
+			return LatticeComponent.reconcile(HOST_ROOT,VERIFY,own,other);
 		}
 
 		/**
 		 * Each owned subtree publishes through its own fork of the host, beside this
 		 * application's staged root. Its fork reconciles only that subtree, so the
 		 * root's merge never has to ask which subtrees this application touched.
+		 * The merge is the subtree's domain rule for local changes on both sides, or
+		 * null where they conflict.
 		 */
 		@SuppressWarnings("unchecked")
 		private <T extends ACell> SignedComponent<T> owned(LatticeHost<Index<Keyword,ACell>> host,
-				LatticeContext context,ACell... path) {
+				LatticeContext context,BinaryOperator<T> merge,ACell... path) {
 			ALattice<?> lattice=HOST_ROOT;
 			for (ACell key:path) lattice=lattice.path(key);
 			var rule=(SignedLattice<T>)lattice;
 			// This legacy application's resolver supplies both the public owner rule
 			// and an explicit signer; the draft itself does not look up a context.
-			return new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
+			return new Draft<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
 				LatticeComponent.<SignedData<T>>resolve(host.cursor(),HOST_ROOT,path),
-				value -> context.signAs(rule.getOwner(),value));
+				value -> context.signAs(rule.getOwner(),value),merge);
 		}
 
 		@Override protected void syncChildren() {

@@ -434,6 +434,16 @@ public class PeerTest {
 		doPeerTest(p);
 	}
 
+	/** A Peer whose Belief holds no Order of its own has no finality point to compute its State to. */
+	@Test
+	public void testUpdateStateWithoutOwnOrder() {
+		Peer p=Peer.create(KP, GENESIS);
+		Peer other=p.updateBelief(Belief.create(AKeyPair.generate().signData(Order.create())));
+		assertNull(other.getPeerOrder());
+		assertThrows(IllegalStateException.class,()->other.updateState());
+		assertThrows(IllegalStateException.class,()->other.updateState(0));
+	}
+
 	/**
 	 * Transactions can be located after a finalised Block with transaction entries that
 	 * are not signed transactions.

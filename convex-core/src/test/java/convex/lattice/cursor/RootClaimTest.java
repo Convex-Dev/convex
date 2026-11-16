@@ -325,7 +325,7 @@ class RootClaimTest {
 			});
 		}
 		assertTrue(persisted.contains(original),"The reconciled baseline was persisted");
-		fork.sync((mine,theirs) -> mine);
+		fork.reconcile((base,mine,theirs) -> mine);
 		assertEquals(CVMLong.TWO,root.get(A,X));
 		assertEquals(CVMLong.ONE,root.get(A,Y));
 	}
