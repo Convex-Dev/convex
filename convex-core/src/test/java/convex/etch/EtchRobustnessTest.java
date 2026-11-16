@@ -159,30 +159,28 @@ public class EtchRobustnessTest {
 		AVector<ACell> tree = Vectors.of(nonEmbedded(31), Vectors.of(nonEmbedded(32)));
 		Hash rootHash;
 		List<Hash> branches = new ArrayList<>();
-		{
-			EtchStore store = EtchStore.create(f);
+		try (EtchStore store = EtchStore.create(f)) {
 			tree = Cells.persist(tree, store);
 			Cells.announce(tree, null, store);
 			store.setRootData(tree);
 			rootHash = tree.getHash();
 			collectBranchHashes(tree, branches);
 			store.flush();
-			store.close();
 		}
 
-		EtchStore reopened = EtchStore.create(f);
-		assertEquals(rootHash, reopened.getRootHash());
-		assertEquals(tree, reopened.getRootData());
-		for (Hash h : branches) {
-			RefSoft<?> r = reopened.getEtch().read(h);
-			assertNotNull(r, "Value lost across reopen: " + h);
-			assertTrue(r.getStatus() >= Ref.ANNOUNCED, "Flags lost across reopen: " + h);
-		}
+		try (EtchStore reopened = EtchStore.create(f)) {
+			assertEquals(rootHash, reopened.getRootHash());
+			assertEquals(tree, reopened.getRootData());
+			for (Hash h : branches) {
+				RefSoft<?> r = reopened.getEtch().read(h);
+				assertNotNull(r, "Value lost across reopen: " + h);
+				assertTrue(r.getStatus() >= Ref.ANNOUNCED, "Flags lost across reopen: " + h);
+			}
 
-		EtchVerifier.IndexVisitor vd = new EtchVerifier.IndexVisitor();
-		reopened.getEtch().visitIndex(vd);
-		assertTrue(vd.values >= branches.size());
-		reopened.close();
+			EtchVerifier.IndexVisitor vd = new EtchVerifier.IndexVisitor();
+			reopened.getEtch().visitIndex(vd);
+			assertTrue(vd.values >= branches.size());
+		}
 	}
 
 	/**
@@ -197,35 +195,37 @@ public class EtchRobustnessTest {
 
 		AString v1 = nonEmbedded(41);
 		AString v2 = nonEmbedded(42);
-		{
-			EtchStore store = EtchStore.create(f);
+		try (EtchStore store = EtchStore.create(f)) {
 			Cells.persist(v1, store);
 			Cells.persist(v2, store);
 			store.flush();
-			store.close();
 		}
 
 		// Fresh store instance with cold caches
 		EtchStore reopened = EtchStore.create(f);
-		Ref<ACell> lazy1 = RefSoft.createForHash(v1.getHash(), reopened);
-		assertEquals(v1, lazy1.getValue()); // populates the store cache
+		try {
+			Ref<ACell> lazy1 = RefSoft.createForHash(v1.getHash(), reopened);
+			assertEquals(v1, lazy1.getValue()); // populates the store cache
 
-		// Genuinely absent value on a live store: null / missing semantics
-		Hash absent = nonEmbedded(43).getHash();
-		assertNull(reopened.refForHash(absent));
-		assertThrows(MissingDataException.class,
-				() -> RefSoft.createForHash(absent, reopened).getValue());
+			// Genuinely absent value on a live store: null / missing semantics
+			Hash absent = nonEmbedded(43).getHash();
+			assertNull(reopened.refForHash(absent));
+			assertThrows(MissingDataException.class,
+					() -> RefSoft.createForHash(absent, reopened).getValue());
 
-		reopened.close();
+			reopened.close();
 
-		// Cached values may still be served after close (no IO required)
-		assertNotNull(reopened.refForHash(v1.getHash()));
+			// Cached values may still be served after close (no IO required)
+			assertNotNull(reopened.refForHash(v1.getHash()));
 
-		// Uncached lookups need IO: fundamental failure, never "absent"
-		assertThrows(StoreException.class, () -> reopened.refForHash(v2.getHash()));
-		Ref<ACell> lazy2 = RefSoft.createForHash(v2.getHash(), reopened);
-		assertThrows(StoreException.class, lazy2::getValue);
-		assertThrows(StoreException.class, lazy2::isMissing);
+			// Uncached lookups need IO: fundamental failure, never "absent"
+			assertThrows(StoreException.class, () -> reopened.refForHash(v2.getHash()));
+			Ref<ACell> lazy2 = RefSoft.createForHash(v2.getHash(), reopened);
+			assertThrows(StoreException.class, lazy2::getValue);
+			assertThrows(StoreException.class, lazy2::isMissing);
+		} finally {
+			reopened.close();
+		}
 	}
 
 	@Test

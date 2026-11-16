@@ -1130,9 +1130,10 @@ public class IndexTest {
 			store.close();
 		}
 		EtchStore reopened=EtchStore.create(file);
-		EtchStore second=EtchStore.createTemp("index-unresolved-2");
-		File secondFile=second.getFile();
+		EtchStore second=null;
 		try {
+			second=EtchStore.createTemp("index-unresolved-2");
+			File secondFile=second.getFile();
 			// The variants share the long key: take both from the reopened store before
 			// persisting either, so each is decoded with that key unread
 			ArrayList<Index<ABlob,CVMLong>> reloads=new ArrayList<>();
@@ -1154,8 +1155,8 @@ public class IndexTest {
 				assertEquals(expected,reopened.decode(expected).getEncoding());
 			}
 		} finally {
-			reopened.close();
-			second.close();
+			EtchStore last=second;
+			assertAll("Close the stores",reopened::close,() -> { if (last!=null) last.close(); });
 		}
 	}
 

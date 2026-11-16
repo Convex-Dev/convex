@@ -95,21 +95,26 @@ class LatticeHostCloseTest {
 		};
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var durability=host.autoFlush(Duration.ofMillis(1));
-		host.cursor().set(CVMLong.TWO);
-		CompletableFuture<Void> closing;
+		CompletableFuture<Void> closing=null;
 		try {
-			// The worker holds the host's sync lock inside this flush.
-			assertTrue(flushing.await(10,TimeUnit.SECONDS));
-			closing=closeAsync(host);
-			assertFalse(closing.isDone(),"Close drains the active flush");
-		} finally { release.countDown(); }
-		closing.get(10,TimeUnit.SECONDS);
-		assertEquals(CVMLong.TWO,store.getRootData());
-		assertTrue(flushedAfterRetaining.get(),"The final save flushes what it retained");
-		int flushed=flushes.get();
-		// Already closed: closing it again would otherwise flush the closed host and throw.
-		durability.close();
-		assertEquals(flushed,flushes.get());
+			host.cursor().set(CVMLong.TWO);
+			try {
+				// The worker holds the host's sync lock inside this flush.
+				assertTrue(flushing.await(10,TimeUnit.SECONDS));
+				closing=closeAsync(host);
+				assertFalse(closing.isDone(),"Close drains the active flush");
+			} finally { release.countDown(); }
+			closing.get(10,TimeUnit.SECONDS);
+			assertEquals(CVMLong.TWO,store.getRootData());
+			assertTrue(flushedAfterRetaining.get(),"The final save flushes what it retained");
+			int flushed=flushes.get();
+			// Already closed: closing it again would otherwise flush the closed host and throw.
+			durability.close();
+			assertEquals(flushed,flushes.get());
+		} finally {
+			// A close already started owns stopping the worker: the host is never closed from two threads
+			if (closing==null) host.close();
+		}
 	}
 
 	@Test void storelessCloseStopsAutomaticFlushing() throws Exception {

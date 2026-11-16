@@ -21,8 +21,8 @@ public class EtchFileMapperTest {
 	public void testMapperRoundTripAndGrowth() throws Exception {
 		File file=File.createTempFile("etch-mapper", ".dat");
 		String implementation;
-		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2);
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
+				AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2)) {
 			implementation=mapper.implementationName();
 			assertRoundTripAndGrowth(mapper);
 			if ("MemorySegment".equals(implementation)) {
@@ -30,7 +30,6 @@ public class EtchFileMapperTest {
 				assertTrue(allocated>=(64L<<20),"FFM growth used an unexpectedly small increment");
 				assertTrue(allocated<=(70L<<20),"FFM growth allocated excessive file space");
 			}
-			mapper.close();
 		}
 
 		boolean deleted=file.delete();

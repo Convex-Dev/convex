@@ -295,38 +295,30 @@ public class LocalLatticeTest {
 		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> local = LocalLattice.createSlot(kp, data);
 
 		// Persist to EtchStore
-		EtchStore store = EtchStore.createTemp("local-lattice-test");
-		try {
+		File etchFile;
+		try (EtchStore store = EtchStore.createTemp("local-lattice-test")) {
 			store.setRootData(local);
 			store.flush();
+			etchFile = store.getFile();
+		}
 
-			File etchFile = store.getFile();
-			store.close();
+		// Reopen and read back
+		try (EtchStore reopened = EtchStore.create(etchFile)) {
+			@SuppressWarnings("unchecked")
+			AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> loaded =
+					(AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>>) reopened.getRootData();
 
-			// Reopen and read back
-			EtchStore reopened = EtchStore.create(etchFile);
-			try {
-				@SuppressWarnings("unchecked")
-				AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> loaded =
-						(AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>>) reopened.getRootData();
+			assertNotNull(loaded);
+			assertEquals(CVMLong.create(3), LocalLattice.get(loaded, pk, KEY_VERSION));
 
-				assertNotNull(loaded);
-				assertEquals(CVMLong.create(3), LocalLattice.get(loaded, pk, KEY_VERSION));
-
-				// Verify nested structure
-				AHashMap<Keyword, ACell> slot = LocalLattice.getSlot(loaded, pk);
-				assertNotNull(slot);
-				ACell signing = slot.get(KEY_SIGNING);
-				assertNotNull(signing);
-				@SuppressWarnings("unchecked")
-				AHashMap<Keyword, ACell> signingMap = (AHashMap<Keyword, ACell>) signing;
-				assertEquals(Strings.create("encrypted-data"), signingMap.get(KEY_SECRET));
-			} finally {
-				reopened.close();
-			}
-		} catch (Exception e) {
-			store.close();
-			throw e;
+			// Verify nested structure
+			AHashMap<Keyword, ACell> slot = LocalLattice.getSlot(loaded, pk);
+			assertNotNull(slot);
+			ACell signing = slot.get(KEY_SIGNING);
+			assertNotNull(signing);
+			@SuppressWarnings("unchecked")
+			AHashMap<Keyword, ACell> signingMap = (AHashMap<Keyword, ACell>) signing;
+			assertEquals(Strings.create("encrypted-data"), signingMap.get(KEY_SECRET));
 		}
 	}
 

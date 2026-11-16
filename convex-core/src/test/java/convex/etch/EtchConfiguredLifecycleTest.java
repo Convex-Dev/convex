@@ -1,5 +1,6 @@
 package convex.etch;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -117,9 +118,9 @@ public class EtchConfiguredLifecycleTest {
 		AVector<ACell> garbage=EtchGCLifecycleTest.tree(seed-20);
 		EtchConfig config=matrixCase.config().withRefCacheSize(37);
 		EtchStore old=EtchStore.create(base,config);
-		assertEquals(37,old.getRefCacheSize());
 		EtchStore successor=null;
 		try {
+			assertEquals(37,old.getRefCacheSize());
 			old.setRootData(garbage);
 			old.setRootData(previousRoot);
 			old.startGC();
@@ -141,8 +142,7 @@ public class EtchConfiguredLifecycleTest {
 			successor.setRootData(expected.assoc(0,expected));
 			successor.setRootData(expected);
 		} finally {
-			if (successor!=null) successor.close();
-			old.close();
+			closeStores(successor,old);
 		}
 
 		try (EtchStore reopened=EtchStore.create(base,config)) {
@@ -291,8 +291,7 @@ public class EtchConfiguredLifecycleTest {
 			old.transferGC();
 			successor=old.completeGC();
 		} finally {
-			if (successor!=null) successor.close();
-			old.close();
+			closeStores(successor,old);
 		}
 
 		Map<String,byte[]> before=snapshotRelated(base);
@@ -320,8 +319,7 @@ public class EtchConfiguredLifecycleTest {
 			successor=old.completeGC();
 			current=successor.getFile();
 		} finally {
-			if (successor!=null) successor.close();
-			old.close();
+			closeStores(successor,old);
 		}
 		markV3Open(current,config);
 
@@ -438,11 +436,15 @@ public class EtchConfiguredLifecycleTest {
 		File file=File.createTempFile("etch-config-crypto-close",".etch");
 		file.deleteOnExit();
 		Etch etch=Etch.create(file,config);
-		assertTrue(etch.hasShutdownHook());
-		assertFalse(etch.isCryptoDestroyed());
-		etch.close();
-		assertFalse(etch.hasShutdownHook());
-		assertTrue(etch.isCryptoDestroyed());
+		try {
+			assertTrue(etch.hasShutdownHook());
+			assertFalse(etch.isCryptoDestroyed());
+			etch.close();
+			assertFalse(etch.hasShutdownHook());
+			assertTrue(etch.isCryptoDestroyed());
+		} finally {
+			etch.close();
+		}
 	}
 
 	@Test
@@ -454,9 +456,13 @@ public class EtchConfiguredLifecycleTest {
 			store.setRootData(EtchGCLifecycleTest.tree(5000));
 		}
 		EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config);
-		assertFalse(reader.isCryptoDestroyed());
-		reader.close();
-		assertTrue(reader.isCryptoDestroyed());
+		try {
+			assertFalse(reader.isCryptoDestroyed());
+			reader.close();
+			assertTrue(reader.isCryptoDestroyed());
+		} finally {
+			reader.close();
+		}
 	}
 
 	@Test
@@ -481,8 +487,7 @@ public class EtchConfiguredLifecycleTest {
 			assertTrue(transferred.isCryptoDestroyed());
 			successor=null;
 		} finally {
-			if (successor!=null) successor.close();
-			old.close();
+			closeStores(successor,old);
 		}
 		markRelatedForDeletion(file);
 	}
@@ -493,15 +498,24 @@ public class EtchConfiguredLifecycleTest {
 		File file=File.createTempFile("etch-config-gc-crypto-close",".etch");
 		file.deleteOnExit();
 		EtchStore store=EtchStore.create(file,config);
-		Etch base=store.getEtch();
-		store.startGC();
-		Etch target=store.getTargetEtch();
-		store.close();
-		assertTrue(base.isCryptoDestroyed());
-		assertTrue(target.isCryptoDestroyed());
-		assertFalse(base.hasShutdownHook());
-		assertFalse(target.hasShutdownHook());
+		try {
+			Etch base=store.getEtch();
+			store.startGC();
+			Etch target=store.getTargetEtch();
+			store.close();
+			assertTrue(base.isCryptoDestroyed());
+			assertTrue(target.isCryptoDestroyed());
+			assertFalse(base.hasShutdownHook());
+			assertFalse(target.hasShutdownHook());
+		} finally {
+			store.close();
+		}
 		markRelatedForDeletion(file);
+	}
+
+	/** Closes a GC successor, if any, then the store it replaced, even if the first close fails. */
+	private static void closeStores(EtchStore successor, EtchStore old) {
+		assertAll("Close the stores",() -> { if (successor!=null) successor.close(); },old::close);
 	}
 
 	private static Stream<Arguments> gcCases() {

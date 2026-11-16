@@ -1,5 +1,6 @@
 package convex.etch;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -14,6 +15,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -42,10 +44,10 @@ public class EtchVersionMatrixTest {
 
 	@AfterEach
 	public void closeStores() {
-		for (EtchStore store: openStores) {
-			store.close();
-		}
+		List<Executable> closes=new ArrayList<>();
+		for (EtchStore store: openStores) closes.add(store::close);
 		openStores.clear();
+		assertAll("Close the matrix stores",closes);
 	}
 
 	@Test

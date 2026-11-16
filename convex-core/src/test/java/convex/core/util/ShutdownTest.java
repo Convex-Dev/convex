@@ -96,10 +96,10 @@ public class ShutdownTest {
 		}
 		done.await();
 		for (Thread t : threads) t.join();
-		assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 
 		ConcurrentSkipListMap<Integer, Object> order = order();
 		try {
+			assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 			for (int i = 0; i < n; i++) {
 				assertNotNull(order.get(BASE + i), "lost hook group for priority " + (BASE + i));
 			}
@@ -137,11 +137,11 @@ public class ShutdownTest {
 		}
 		done.await();
 		for (Thread t : threads) t.join();
-		assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 
 		ConcurrentSkipListMap<Integer, Object> order = order();
 		Object group = order.get(priority);
 		try {
+			assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 			assertNotNull(group);
 			assertEquals(n, hookCount(group), "lost hooks in shared group");
 		} finally {

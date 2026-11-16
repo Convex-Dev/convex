@@ -207,28 +207,27 @@ public class StoreCacheTest {
 	 */
 	@Test
 	public void testWorkingSetLargerThanCacheDecodesAgain() throws IOException, BadFormatException {
-		EtchStore store = new EtchStore(Etch.createTempEtch());
+		try (EtchStore store = new EtchStore(Etch.createTempEtch())) {
+			int n = CACHE_SIZE * 4;
+			List<Blob> cells = generate(n, 0xDEADL);
 
-		int n = CACHE_SIZE * 4;
-		List<Blob> cells = generate(n, 0xDEADL);
+			decodeAll(store, cells);
+			store.resetCacheStats();
+			decodeAll(store, cells);
+			CacheStats pass2 = store.getCacheStats();
 
-		decodeAll(store, cells);
-		store.resetCacheStats();
-		decodeAll(store, cells);
-		CacheStats pass2 = store.getCacheStats();
-
-		assertEquals(n, pass2.total());
-		// Working set 4× the cache, so the vast majority must re-decode.
-		assertTrue(pass2.decodes > n / 2,
-				"expected many re-decodes with a working set larger than the cache, got " + pass2);
-		// The cache size must survive GC cutover.
-		store.startGC();
-		store.transferGC();
-		try (EtchStore successor=store.completeGC()) {
-			assertEquals(store.getConfig(),successor.getConfig());
-			assertEquals(CACHE_SIZE,successor.getRefCacheSize());
+			assertEquals(n, pass2.total());
+			// Working set 4× the cache, so the vast majority must re-decode.
+			assertTrue(pass2.decodes > n / 2,
+					"expected many re-decodes with a working set larger than the cache, got " + pass2);
+			// The cache size must survive GC cutover.
+			store.startGC();
+			store.transferGC();
+			try (EtchStore successor=store.completeGC()) {
+				assertEquals(store.getConfig(),successor.getConfig());
+				assertEquals(CACHE_SIZE,successor.getRefCacheSize());
+			}
 		}
-		store.close();
 	}
 
 	/**
@@ -236,19 +235,19 @@ public class StoreCacheTest {
 	 */
 	@Test
 	public void testWorkingSetWithinCacheHits() throws IOException, BadFormatException {
-		EtchStore store = new EtchStore(Etch.createTempEtch());
-		// Small working set so slot collisions are rare. (RefCache maps each hash to
-		// one slot, so even modest n can collide — hence "vast majority", not equality.)
-		int n = 50;
-		List<Blob> cells = generate(n, 0xFEEDL);
-		decodeAll(store, cells);
+		try (EtchStore store = new EtchStore(Etch.createTempEtch())) {
+			// Small working set so slot collisions are rare. (RefCache maps each hash to
+			// one slot, so even modest n can collide — hence "vast majority", not equality.)
+			int n = 50;
+			List<Blob> cells = generate(n, 0xFEEDL);
+			decodeAll(store, cells);
 
-		store.resetCacheStats();
-		decodeAll(store, cells);
-		CacheStats pass2 = store.getCacheStats();
+			store.resetCacheStats();
+			decodeAll(store, cells);
+			CacheStats pass2 = store.getCacheStats();
 
-		assertEquals(n, pass2.total());
-		assertTrue(pass2.l1Hits >= n - 5, "vast majority should hit the cache: " + pass2);
-		store.close();
+			assertEquals(n, pass2.total());
+			assertTrue(pass2.l1Hits >= n - 5, "vast majority should hit the cache: " + pass2);
+		}
 	}
 }

@@ -269,12 +269,16 @@ public class DLFSCursorTest {
 				failure.set(t);
 			}
 		});
-		snapshotTaken.await();
+		try {
+			snapshotTaken.await();
 
-		// The local update clears the equal-time tombstone while sync still holds
-		// the older deleted snapshot. The host's CAS fails and the local write stays.
-		Files.write(path,new byte[] {2});
-		continueSync.countDown();
+			// The local update clears the equal-time tombstone while sync still holds
+			// the older deleted snapshot. The host's CAS fails and the local write stays.
+			Files.write(path,new byte[] {2});
+		} finally {
+			// A failed step would otherwise leave the sync thread holding its snapshot
+			continueSync.countDown();
+		}
 		syncThread.join();
 
 		assertNull(failure.get());

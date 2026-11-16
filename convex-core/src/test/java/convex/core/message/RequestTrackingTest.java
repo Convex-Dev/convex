@@ -42,18 +42,18 @@ class RequestTrackingTest {
 
 	@Test void timeoutAddedToReturnedFutureAlsoReleasesRequest() throws Exception {
 		LocalConnection connection=LocalConnection.createPair(m -> true,m -> true);
-		var source=new CompletableFuture<Message>();
-		var reply=connection.request(Message.createStatusRequest(null),0,source);
-		// The callback runs on the JVM's shared timeout thread, so it records what it
-		// sees rather than holding that thread while the test checks
-		AtomicBoolean cancelled=new AtomicBoolean(),pending=new AtomicBoolean(true);
-		var called=new CompletableFuture<Void>();
-		reply.whenComplete((value,error) -> {
-			cancelled.set(source.isCancelled());
-			pending.set(connection.hasPendingRequests());
-			called.complete(null);
-		});
 		try {
+			var source=new CompletableFuture<Message>();
+			var reply=connection.request(Message.createStatusRequest(null),0,source);
+			// The callback runs on the JVM's shared timeout thread, so it records what it
+			// sees rather than holding that thread while the test checks
+			AtomicBoolean cancelled=new AtomicBoolean(),pending=new AtomicBoolean(true);
+			var called=new CompletableFuture<Void>();
+			reply.whenComplete((value,error) -> {
+				cancelled.set(source.isCancelled());
+				pending.set(connection.hasPendingRequests());
+				called.complete(null);
+			});
 			reply.orTimeout(0,TimeUnit.MILLISECONDS);
 			called.get();
 			assertTrue(cancelled.get());
@@ -214,15 +214,19 @@ class RequestTrackingTest {
 
 	@Test void closingEitherEndCompletesBothDirections() {
 		LocalConnection connection=LocalConnection.createPair(m -> true,m -> true);
-		LocalConnection paired=connection.getPaired();
-		var first=connection.request(Message.createStatusRequest(null),0);
-		var second=paired.request(Message.createStatusRequest(null),0);
-		paired.close();
-		assertTrue(first.isCompletedExceptionally());
-		assertTrue(second.isCompletedExceptionally());
-		assertFalse(connection.hasPendingRequests());
-		assertFalse(paired.hasPendingRequests());
-		assertTrue(connection.request(Message.createStatusRequest(null),0).isCompletedExceptionally());
+		try {
+			LocalConnection paired=connection.getPaired();
+			var first=connection.request(Message.createStatusRequest(null),0);
+			var second=paired.request(Message.createStatusRequest(null),0);
+			paired.close();
+			assertTrue(first.isCompletedExceptionally());
+			assertTrue(second.isCompletedExceptionally());
+			assertFalse(connection.hasPendingRequests());
+			assertFalse(paired.hasPendingRequests());
+			assertTrue(connection.request(Message.createStatusRequest(null),0).isCompletedExceptionally());
+		} finally {
+			connection.close();
+		}
 	}
 
 	@Test void closeBeforeRegistrationCannotOrphanFuture() throws Exception {

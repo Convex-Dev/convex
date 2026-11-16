@@ -116,16 +116,18 @@ public class EtchGCRecoveryTest {
 		AVector<ACell> newRoot=EtchGCLifecycleTest.tree(8600);
 		ACell garbage=EtchGCLifecycleTest.nonEmbedded(8700);
 		EtchStore store=EtchStore.create(base);
-		store.setRootData(oldRoot);
-		Cells.persist(garbage,store);
-		store.startGC();
-		store.setRootData(newRoot);
-		store.transferGC();
-		try (EtchStore next=store.completeGC(backup)) {
-			assertTrue(Files.isSameFile(base.toPath(),backup.toPath()),"Snapshot must retain the old file without copying");
-			store.close();
-			assertEquals(newRoot,next.getRootData());
-			assertNull(next.getEtch().read(garbage.getHash()));
+		try {
+			store.setRootData(oldRoot);
+			Cells.persist(garbage,store);
+			store.startGC();
+			store.setRootData(newRoot);
+			store.transferGC();
+			try (EtchStore next=store.completeGC(backup)) {
+				assertTrue(Files.isSameFile(base.toPath(),backup.toPath()),"Snapshot must retain the old file without copying");
+				store.close();
+				assertEquals(newRoot,next.getRootData());
+				assertNull(next.getEtch().read(garbage.getHash()));
+			}
 		} finally {
 			store.close();
 		}

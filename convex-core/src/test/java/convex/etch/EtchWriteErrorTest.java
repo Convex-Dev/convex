@@ -1,5 +1,6 @@
 package convex.etch;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -43,8 +44,7 @@ public class EtchWriteErrorTest {
 
 	@AfterEach
 	public void tearDown() {
-		etch.close();
-		reader.close();
+		assertAll("Close the file and reader",etch::close,reader::close);
 	}
 
 	@Test

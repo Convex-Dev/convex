@@ -186,14 +186,17 @@ public class EtchConfigTest {
 				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,false);
 		Etch etch=Etch.createTempEtch(config);
 		EtchStore store=new EtchStore(etch);
-		Hash first=Hash.fromHex("0000000000000001000000000000000000000000000000000000000000000000");
-		Hash second=Hash.fromHex("0000000000000002000000000000000000000000000000000000000000000000");
-		etch.write(first,first.getRef());
-		etch.write(second,second.getRef());
+		try {
+			Hash first=Hash.fromHex("0000000000000001000000000000000000000000000000000000000000000000");
+			Hash second=Hash.fromHex("0000000000000002000000000000000000000000000000000000000000000000");
+			etch.write(first,first.getRef());
+			etch.write(second,second.getRef());
 
-		long rootSlot=etch.readSlot(etch.getIndexStart(),0);
-		assertEquals(EtchConstants.POINTER_INDEX,etch.extractType(rootSlot));
-		store.close();
+			long rootSlot=etch.readSlot(etch.getIndexStart(),0);
+			assertEquals(EtchConstants.POINTER_INDEX,etch.extractType(rootSlot));
+		} finally {
+			store.close();
+		}
 	}
 
 	@Test
@@ -204,16 +207,22 @@ public class EtchConfigTest {
 				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,false).withRefCacheSize(23);
 
 		Etch etch=Etch.create(file,configured);
-		assertEquals(configured,etch.getConfig());
-		assertEquals("MappedByteBuffer",etch.getMappingImplementation());
-		etch.close();
+		try {
+			assertEquals(configured,etch.getConfig());
+			assertEquals("MappedByteBuffer",etch.getMappingImplementation());
+		} finally {
+			etch.close();
+		}
 
 		Etch reopened=Etch.create(file);
-		assertEquals(EtchConstants.VERSION_1,reopened.getConfig().getVersion());
-		assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,reopened.getConfig().getMappingMode());
-		assertTrue(reopened.getConfig().isBuildChains(),"Non-persisted options use defaults on legacy reopen");
-		assertEquals(10000,reopened.getConfig().getRefCacheSize());
-		reopened.close();
+		try {
+			assertEquals(EtchConstants.VERSION_1,reopened.getConfig().getVersion());
+			assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,reopened.getConfig().getMappingMode());
+			assertTrue(reopened.getConfig().isBuildChains(),"Non-persisted options use defaults on legacy reopen");
+			assertEquals(10000,reopened.getConfig().getRefCacheSize());
+		} finally {
+			reopened.close();
+		}
 	}
 
 	@Test

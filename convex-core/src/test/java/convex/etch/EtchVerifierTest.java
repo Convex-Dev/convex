@@ -82,10 +82,10 @@ public class EtchVerifierTest {
 		for (EtchConfig config:configs) {
 			File file=tempFile("etch-strict-v"+config.getVersion());
 			AString child=largeString("child-"+config.getCipherMode().configName());
-			EtchStore store=new EtchStore(Etch.create(file,config));
-			store.setRootData(Vectors.of(child,largeString("second")));
-			store.flush();
-			store.close();
+			try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+				store.setRootData(Vectors.of(child,largeString("second")));
+				store.flush();
+			}
 
 			EtchVerifier.Report report=EtchVerifier.validate(file,config);
 			assertTrue(report.isValid(),config+" "+report);
@@ -98,10 +98,10 @@ public class EtchVerifierTest {
 	public void testCleanStoreWithBranchingCellsIsValid() throws Exception {
 		File file=tempFile("etch-strict-branching");
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(branchingRoot());
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(branchingRoot());
+			store.flush();
+		}
 
 		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertEquals(List.of(),report.problems());
@@ -137,10 +137,10 @@ public class EtchVerifierTest {
 		for (EtchConfig config:configs) {
 			File file=tempFile("etch-strict-hash-"+config.getCipherMode().configName());
 			AString root=largeString("damaged-root-"+config.getCipherMode().configName());
-			EtchStore store=new EtchStore(Etch.create(file,config));
-			store.setRootData(root);
-			store.flush();
-			store.close();
+			try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+				store.setRootData(root);
+				store.flush();
+			}
 
 			long recordPosition=findRootRecord(file,config,root.getHash());
 			try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
@@ -165,10 +165,10 @@ public class EtchVerifierTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-length");
 		AString root=largeString("invalid-length");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long recordPosition=findRootRecord(file,config,root.getHash());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
@@ -187,10 +187,10 @@ public class EtchVerifierTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-stored-hash");
 		AString root=largeString("stored-hash");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long recordPosition=findRootRecord(file,config,root.getHash());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
@@ -210,10 +210,10 @@ public class EtchVerifierTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-pointer");
 		AString root=largeString("invalid-pointer");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long slotPosition;
 		long fileEnd;
@@ -238,10 +238,10 @@ public class EtchVerifierTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-truncated");
 		AString root=largeString("truncated-record");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long slotPosition;
 		long fileEnd;
@@ -289,10 +289,10 @@ public class EtchVerifierTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-trie");
 		AString root=rootBelowLastSlot("bad-trie");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long slot;
 		long pointer;
@@ -379,10 +379,10 @@ public class EtchVerifierTest {
 
 	/** Stores a root alone in a new file and returns the position of its root slot. */
 	private static long storeRoot(File file, EtchConfig config, AString root) throws IOException {
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config)) {
 			long slot=reader.getIndexStart()
 					+(root.getHash().shortAt(0)&0xffffL)*EtchConstants.POINTER_SIZE;
@@ -409,10 +409,10 @@ public class EtchVerifierTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-duplicate");
 		AString root=rootBelowLastSlot("duplicate-pointer");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long slot;
 		long pointer;
@@ -443,10 +443,10 @@ public class EtchVerifierTest {
 			child=largeStringWithDifferentRootDigit("missing-child",child.getHash());
 			root=Vectors.of(child);
 		}
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long slotPosition;
 		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config)) {

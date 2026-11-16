@@ -264,13 +264,14 @@ public class EtchStoreTest {
 	@Test
 	public void testReopen() throws IOException {
 		File file=File.createTempFile("etch",null);
-		EtchStore es=EtchStore.create(file);
-		es.setRootData(CVMLong.ONE);
-		assertEquals(CVMLong.ONE,es.getRootData());
-		es.close();
+		try (EtchStore es=EtchStore.create(file)) {
+			es.setRootData(CVMLong.ONE);
+			assertEquals(CVMLong.ONE,es.getRootData());
+		}
 
-		EtchStore es2=EtchStore.create(file);
-		ACell data=es2.getRootData();
-		assertEquals(CVMLong.ONE,data);
+		try (EtchStore es2=EtchStore.create(file)) {
+			ACell data=es2.getRootData();
+			assertEquals(CVMLong.ONE,data);
+		}
 	}
 }

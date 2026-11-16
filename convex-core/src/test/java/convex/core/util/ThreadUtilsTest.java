@@ -50,15 +50,21 @@ public class ThreadUtilsTest {
 		});
 		interrupter.start();
 
-		Thread worker=ThreadUtils.callUninterruptibly(() -> {
-			entered.countDown();
-			try {
-				release.await();
-			} catch (InterruptedException e) {
-				throw new IOException("Uninterruptible worker was interrupted");
-			}
-			return Thread.currentThread();
-		});
+		Thread worker;
+		try {
+			worker=ThreadUtils.callUninterruptibly(() -> {
+				entered.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					throw new IOException("Uninterruptible worker was interrupted");
+				}
+				return Thread.currentThread();
+			});
+		} finally {
+			// Ends an interrupter still waiting because the call failed; a released one has finished
+			interrupter.interrupt();
+		}
 		// Clear the restored interrupt before joining, which would otherwise throw
 		boolean restored=Thread.interrupted();
 		interrupter.join();
@@ -84,8 +90,13 @@ public class ThreadUtilsTest {
 			release.countDown();
 		});
 		caller.interrupt();
-		boolean ended=ThreadUtils.joinUninterruptibly(target);
-		returned.set(true);
+		boolean ended;
+		try {
+			ended=ThreadUtils.joinUninterruptibly(target);
+		} finally {
+			// Stops the releaser, which then releases the target, even if the join fails
+			returned.set(true);
+		}
 		boolean restored=Thread.interrupted();
 		releaser.join();
 

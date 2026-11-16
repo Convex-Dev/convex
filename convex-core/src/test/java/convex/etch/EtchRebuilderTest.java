@@ -58,11 +58,11 @@ public class EtchRebuilderTest {
 		ACell root=Vectors.of(first,second);
 		AString extra=largeString("unreachable-extra-"+config.getCipherMode().configName());
 
-		EtchStore sourceStore=new EtchStore(Etch.create(source,config));
-		sourceStore.storeTopRef(extra.getRef(),Ref.STORED,null);
-		sourceStore.setRootData(root);
-		sourceStore.flush();
-		sourceStore.close();
+		try (EtchStore sourceStore=new EtchStore(Etch.create(source,config))) {
+			sourceStore.storeTopRef(extra.getRef(),Ref.STORED,null);
+			sourceStore.setRootData(root);
+			sourceStore.flush();
+		}
 		if (config.getVersion()==EtchConstants.VERSION_3) markV3Open(source,config);
 		byte[] originalSource=Files.readAllBytes(source.toPath());
 
@@ -89,10 +89,10 @@ public class EtchRebuilderTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File source=tempFile("etch-rebuild-branching");
 		File destination=tempFile("etch-rebuild-branching-destination");
-		EtchStore store=new EtchStore(Etch.create(source,config));
-		store.setRootData(EtchVerifierTest.branchingRoot());
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(source,config))) {
+			store.setRootData(EtchVerifierTest.branchingRoot());
+			store.flush();
+		}
 
 		EtchRebuilder.Result result=EtchRebuilder.rebuild(source,config,destination,null);
 		assertEquals(List.of(),result.problems());
@@ -131,11 +131,11 @@ public class EtchRebuilderTest {
 		AString root=largeString("damaged-root");
 		AString extra=largeString("recoverable-extra");
 
-		EtchStore store=new EtchStore(Etch.create(source,config));
-		store.storeTopRef(extra.getRef(),Ref.STORED,null);
-		store.setRootData(root);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(source,config))) {
+			store.storeTopRef(extra.getRef(),Ref.STORED,null);
+			store.setRootData(root);
+			store.flush();
+		}
 
 		long rootPosition;
 		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(source)) {

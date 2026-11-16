@@ -33,14 +33,18 @@ public class EtchV3IntegrationTest {
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 
 		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(value);
-		store.flush();
-		EtchV3Header flushed=readHeader(file,null);
-		assertTrue(flushed.isCleanClosed());
-		long flushGeneration=flushed.generation();
-		store.close();
-		assertEquals(flushGeneration,readHeader(file,null).generation(),
-				"closing an already clean checkpoint must not rewrite its header");
+		try {
+			store.setRootData(value);
+			store.flush();
+			EtchV3Header flushed=readHeader(file,null);
+			assertTrue(flushed.isCleanClosed());
+			long flushGeneration=flushed.generation();
+			store.close();
+			assertEquals(flushGeneration,readHeader(file,null).generation(),
+					"closing an already clean checkpoint must not rewrite its header");
+		} finally {
+			store.close();
+		}
 
 		EtchStore reopened=new EtchStore(Etch.create(file));
 		try {
@@ -59,12 +63,12 @@ public class EtchV3IntegrationTest {
 		AString first=value("first-checkpoint");
 		AString second=value("second-checkpoint");
 
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(first);
-		store.flush();
-		store.setRootData(second);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(first);
+			store.flush();
+			store.setRootData(second);
+			store.flush();
+		}
 
 		EtchStore reopened=new EtchStore(Etch.create(file,config));
 		try {
@@ -178,8 +182,11 @@ public class EtchV3IntegrationTest {
 		assertEquals(generation,readHeader(file,null).generation());
 
 		Etch writer=Etch.create(file,config);
-		writer.write(value("mutation").getHash(),value("mutation").getRef());
-		writer.close();
+		try {
+			writer.write(value("mutation").getHash(),value("mutation").getRef());
+		} finally {
+			writer.close();
+		}
 		EtchV3Header mutated=readHeader(file,null);
 		assertEquals(generation+2L,mutated.generation());
 		assertTrue(mutated.isCleanClosed());
@@ -197,13 +204,19 @@ public class EtchV3IntegrationTest {
 				});
 
 		Etch etch=Etch.create(file,config);
-		assertNull(seenHint[0]);
-		assertArrayEquals(SECRET,borrowed);
-		java.util.Arrays.fill(borrowed,(byte)0);
-		AString stored=value("borrowed-key");
-		EtchStore store=new EtchStore(etch);
-		store.setRootData(stored);
-		store.close();
+		EtchStore store=null;
+		AString stored;
+		try {
+			assertNull(seenHint[0]);
+			assertArrayEquals(SECRET,borrowed);
+			java.util.Arrays.fill(borrowed,(byte)0);
+			stored=value("borrowed-key");
+			store=new EtchStore(etch);
+			store.setRootData(stored);
+		} finally {
+			// The store, once built, owns the file
+			if (store!=null) store.close(); else etch.close();
+		}
 
 		EtchConfig reopenConfig=EtchConfig.create(EtchConstants.VERSION_3)
 				.withKeyFunction(hint->SECRET.clone());
@@ -244,8 +257,11 @@ public class EtchV3IntegrationTest {
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
 				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->SECRET.clone());
 		Etch etch=Etch.create(file,config);
-		etch.flush();
-		etch.close();
+		try {
+			etch.flush();
+		} finally {
+			etch.close();
+		}
 
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			// Preserve a valid clean v3 copy in B, then make the leading copy look
@@ -333,10 +349,10 @@ public class EtchV3IntegrationTest {
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
 				true,cipherMode,encryptedIndex,null,hint->SECRET.clone());
 
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(value);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(value);
+			store.flush();
+		}
 
 		byte[] wrong=SECRET.clone();
 		wrong[0]^=1;
