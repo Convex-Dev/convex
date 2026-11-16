@@ -230,11 +230,20 @@ public class PeerGUI extends AbstractGUI {
 		
 		// Set up observability
 		
+		RESTServer rs=null;
 		try {
-			RESTServer rs=RESTServer.create(first);
+			rs=RESTServer.create(first);
 			rs.start(restPort);
 			restServer=rs;
 		} catch (Exception t) {
+			// The network runs without one, but a server that failed to start still holds its clients
+			if (rs!=null) {
+				try {
+					rs.close();
+				} catch (Exception closeFailure) {
+					t.addSuppressed(closeFailure);
+				}
+			}
 			log.warn("Unable to start REST Server: ",t);
 		}
 		
