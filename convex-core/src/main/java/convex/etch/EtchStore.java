@@ -285,13 +285,17 @@ public class EtchStore extends ACachedStore {
 	@Override
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		Ref<ACell> existing = checkCache(hash);
-		if (existing != null)
+		// A cached ref below STORED is a decoded cell, which says nothing of the file
+		if ((existing != null) && (existing.getStatus() >= Ref.STORED))
 			return (Ref<T>) existing;
 
 		if (hash == Hash.NULL_HASH)
 			return (Ref<T>) RefDirect.NULL_VALUE;
 		try {
-			return readStoreRef(hash);
+			Ref<T> stored = readStoreRef(hash);
+			if (stored != null) return stored;
+			// Not in the file: the decoded cell is still served, as before
+			return (Ref<T>) existing;
 		} catch (IOException e) {
 			// Includes ClosedChannelException. A failed read is a fundamental store
 			// failure: it must never be reported as the value being absent
