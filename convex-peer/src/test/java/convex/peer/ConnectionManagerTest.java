@@ -50,12 +50,12 @@ import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.Init;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
-import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -120,81 +120,40 @@ public class ConnectionManagerTest {
 		assertFalse(cm.isConnected(null));
 	}
 
+	/** Closing the connection of a null key closes nothing. */
 	@Test
 	public void testCloseConnectionNullKey() {
-		ConnectionManager cm = network.SERVER.getConnectionManager();
-		// Should not throw
-		cm.closeConnection(null, "test");
+		TestConnectionManager manager=new TestConnectionManager();
+		SequencedConvex connection=new SequencedConvex(-1);
+		manager.add(AKeyPair.createSeeded(223).getAccountKey(),connection);
+
+		manager.closeConnection(null,"test");
+		assertEquals(1,manager.getConnectionCount());
+		assertEquals(0,connection.closeCount);
 	}
 
-	// ===== PING message construction tests =====
+	// ===== PING message construction =====
 
+	/**
+	 * A PING is a request carrying its ID, and comes off the wire as the same message,
+	 * its type inferred from the payload.
+	 */
 	@Test
-	public void testCreatePingMessageType() {
-		Message ping = Message.createPing(42);
-		assertEquals(MessageType.PING, ping.getType(), "createPing should produce PING type");
-	}
+	public void testPingMessage() throws Exception {
+		Message ping=Message.createPing(42);
+		assertEquals(MessageType.PING,ping.getType());
+		assertEquals(Vectors.of(MessageTag.PING,42),ping.getPayload());
+		assertEquals(CVMLong.create(42),ping.getRequestID());
+		assertEquals(CVMLong.create(42),ping.getID());
 
-	@Test
-	public void testCreatePingRequestID() {
-		Message ping = Message.createPing(99);
-		assertEquals(CVMLong.create(99), ping.getRequestID(),
-				"Request ID should match the id passed to createPing");
-	}
+		Message received=Message.create(ping.getMessageData());
+		assertEquals(ping.getPayload(),received.getPayload(null));
+		assertEquals(MessageType.PING,received.getType());
+		assertEquals(CVMLong.create(42),received.getRequestID());
 
-	@Test
-	public void testCreatePingDifferentIDs() {
-		Message p1 = Message.createPing(1);
-		Message p2 = Message.createPing(2);
-		assertFalse(p1.getRequestID().equals(p2.getRequestID()),
-				"Different IDs should produce different request IDs");
-	}
-
-	@Test
-	public void testPingTypeInference() {
-		// Verify that type inference from payload works (not just the stored type)
-		Message ping = Message.createPing(7);
-		// Re-create from raw payload to test inference path
-		Message fromPayload = Message.create(MessageType.PING, ping.getPayload());
-		assertEquals(MessageType.PING, fromPayload.getType());
-		assertEquals(ping.getRequestID(), fromPayload.getRequestID());
-	}
-
-	@Test
-	public void testCreatePingPayloadStructure() {
-		Message ping = Message.createPing(42);
-		AVector<?> payload = RT.ensureVector(ping.getPayload());
-		assertNotNull(payload, "Payload should be a vector");
-		assertEquals(2, payload.count(), "Payload should have exactly 2 elements: [tag, id]");
-		assertEquals(MessageTag.PING, payload.get(0), "First element should be :PING tag");
-		assertEquals(CVMLong.create(42), payload.get(1), "Second element should be the request ID");
-	}
-
-	@Test
-	public void testCreatePingGetID() {
-		Message ping = Message.createPing(77);
-		// getID() returns the message ID (same as getRequestID for requests)
-		ACell id = ping.getID();
-		assertEquals(CVMLong.create(77), id);
-	}
-
-	@Test
-	public void testCreatePingWithID() {
-		Message ping = Message.createPing(1);
-		// Replace the ID
-		Message retagged = ping.withID(CVMLong.create(999));
-		assertNotNull(retagged, "withID should succeed for PING messages");
-		assertEquals(CVMLong.create(999), retagged.getRequestID());
-		assertEquals(MessageType.PING, retagged.getType());
-	}
-
-	@Test
-	public void testCreatePingEncodeDecodeRoundTrip() throws Exception {
-		Message ping = Message.createPing(123);
-
-		// Encode to wire format and decode back
-		assertNotNull(ping.getMessageData(), "PING should have encodable message data");
-		assertTrue(ping.getMessageData().count() > 0, "Encoded data should be non-empty");
+		Message retagged=ping.withID(CVMLong.create(999));
+		assertEquals(MessageType.PING,retagged.getType());
+		assertEquals(CVMLong.create(999),retagged.getRequestID());
 	}
 
 	@Test
@@ -287,8 +246,10 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testGetConnectionCount() {
-		ConnectionManager cm = network.SERVER.getConnectionManager();
-		assertTrue(cm.getConnectionCount() >= 0);
+		TestConnectionManager manager=new TestConnectionManager();
+		assertEquals(0,manager.getConnectionCount());
+		manager.add(AKeyPair.createSeeded(224).getAccountKey(),new SequencedConvex(-1));
+		assertEquals(1,manager.getConnectionCount());
 	}
 
 	@Test
