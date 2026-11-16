@@ -61,6 +61,12 @@ public class CompilerTest extends ACVMTest {
 		super(BaseTest.UPGRADED);
 	}
 
+	/**
+	 * Juice limit for running an endless loop until it fails: thousands of iterations,
+	 * far past MAX_DEPTH, so a loop that consumed depth would fail with :DEPTH first.
+	 */
+	private static final long LOOP_JUICE=1_000_000;
+
 	@Test
 	public void testConstants() {
 		// Basic constant values should evaluate to themselves
@@ -407,7 +413,7 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testQuotedJuice() {
-		assertJuiceError(step("`(do ~(loop [] (recur)))"));
+		assertJuiceError(step(context().withJuiceLimit(LOOP_JUICE),"`(do ~(loop [] (recur)))"));
 	}
 
 	@Test
@@ -581,7 +587,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testLoopRecur() {
 		// infinite loop should run out of juice
-		assertJuiceError(step("(loop [] (recur))"));
+		assertJuiceError(step(context().withJuiceLimit(LOOP_JUICE),"(loop [] (recur))"));
 
 		// infinite loop with wrong arity should fail with arity error first
 		assertArityError(step("(loop [] (recur 1))"));

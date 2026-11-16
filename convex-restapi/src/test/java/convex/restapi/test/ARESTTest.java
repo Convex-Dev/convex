@@ -21,6 +21,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;
+import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
 import convex.peer.API;
@@ -36,7 +37,9 @@ public abstract class ARESTTest {
 	protected static String API_PATH;
 	protected static AKeyPair KP;
 	protected static AKeyPair CLIENT_KP=AKeyPair.createSeeded(568756);
-	
+	/** The shared peer's store: nothing reopens it, so it stays in memory. */
+	private static final MemoryStore STORE=new MemoryStore();
+
 	protected static final HttpClient httpClient = HttpClient.newBuilder()
 			.connectTimeout(Duration.ofSeconds(10))
 			.build();
@@ -50,6 +53,7 @@ public abstract class ARESTTest {
 				""");
 			var launchConfig=config.toLegacy();
 			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
+			launchConfig.put(Keywords.STORE,STORE);
 			Server s = API.launchPeer(launchConfig);
 			RESTServer rs = RESTServer.create(s);
 			rs.start(0);
@@ -71,11 +75,16 @@ public abstract class ARESTTest {
 		try {
 			rs.close();
 		} finally {
-			if (peer!=null) peer.close();
-			httpClient.shutdownNow();
-			HOST_PATH=null;
-			API_PATH=null;
-			KP=null;
+			try {
+				if (peer!=null) peer.close();
+			} finally {
+				// The peer borrows the store, so it is closed here, after the peer
+				STORE.close();
+				httpClient.shutdownNow();
+				HOST_PATH=null;
+				API_PATH=null;
+				KP=null;
+			}
 		}
 	}
 	

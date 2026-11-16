@@ -230,12 +230,15 @@ public class OpsTest extends ACVMTest {
 		doOpTest(op);
 	}
 	
+	/** A Query holding nil where an op belongs runs the nil as a constant. */
 	@Test
 	public void testBadQuery() {
-		// query with a null op
 		Query<CVMLong> op=Reader.read("#[c0bb800100]");
-		Context c = context();
-		c=step(c,op);
+		Context c=step(context(),op);
+		assertFalse(c.isExceptional());
+		assertNull(c.getResult());
+
+		doOpTest(op);
 	}
 
 	@Test

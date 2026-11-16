@@ -594,15 +594,16 @@ public class RESTAPITest extends ARESTTest {
 			longSource.append(")");
 			String query = JSON.toStringPretty(Maps.of("address", 11, "source", longSource.toString()));
 			HttpResponse<String> res = post(API_PATH + "/query", query);
-			// Should either succeed or fail gracefully (not crash)
-			assertTrue(res.statusCode() == 200 || res.statusCode() == 400 || res.statusCode() == 422);
+			// Evaluated in full: a sum of 1001 terms
+			assertEquals(200, res.statusCode(), res.body());
+			AMap<AString,ACell> result = JSON.parse(res.body());
+			assertEquals(CVMLong.create(1001), result.getIn("value"), res.body());
 		}
 
-		{ // Null bytes in source
+		{ // Null bytes in source are a parse error
 			String query = "{\"address\":11,\"source\":\"(+ 1 \\u0000 2)\"}";
 			HttpResponse<String> res = post(API_PATH + "/query", query);
-			// Should handle gracefully
-			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500);
+			assertEquals(400, res.statusCode(), res.body());
 		}
 
 		{ // Unicode in source
@@ -611,11 +612,12 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(200, res.statusCode());
 		}
 
-		{ // Very large address number
+		{ // Very large address number: a query result reporting that no such account exists
 			String query = JSON.toStringPretty(Maps.of("address", Long.MAX_VALUE, "source", "*balance*"));
 			HttpResponse<String> res = post(API_PATH + "/query", query);
-			// Should handle - might be 200 with error result or 404
-			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500);
+			assertEquals(200, res.statusCode(), res.body());
+			AMap<AString,ACell> result = JSON.parse(res.body());
+			assertEquals("NOBODY", RT.str(result.getIn("errorCode")).toString(), res.body());
 		}
 
 		{ // Negative address
@@ -623,20 +625,16 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(400, res.statusCode());
 		}
 
-		{ // SQL injection attempt in query source (should be harmless)
+		{ // SQL injection attempt in query source: not Convex Lisp, so a parse error
 			String query = JSON.toStringPretty(Maps.of("address", 11, "source", "'; DROP TABLE users; --"));
 			HttpResponse<String> res = post(API_PATH + "/query", query);
-			// Should fail to parse as Convex code, but not crash (400 parse error or 422 execution error)
-			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500,
-				"SQL injection should be handled gracefully, got: " + res.statusCode());
+			assertEquals(400, res.statusCode(), res.body());
 		}
 
-		{ // Script injection attempt
+		{ // Script injection attempt: not Convex Lisp, so a parse error
 			String query = JSON.toStringPretty(Maps.of("address", 11, "source", "<script>alert('xss')</script>"));
 			HttpResponse<String> res = post(API_PATH + "/query", query);
-			// Should fail to parse as Convex code (400 parse error or 422 execution error)
-			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500,
-				"Script injection should be handled gracefully, got: " + res.statusCode());
+			assertEquals(400, res.statusCode(), res.body());
 		}
 
 		{ // Deeply nested JSON
@@ -647,17 +645,14 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(200, res.statusCode());
 		}
 
-		{ // Empty hash for getData
+		{ // Empty hash for getData: no route matches
 			HttpResponse<String> res = get(API_PATH + "/data/");
-			// Should be 404 (no route match) or 400
-			assertTrue(res.statusCode() == 400 || res.statusCode() == 404);
+			assertEquals(404, res.statusCode(), res.body());
 		}
 
-		{ // Hash with special characters (path traversal attempt)
+		{ // Hash with special characters (path traversal attempt): no route matches
 			HttpResponse<String> res = get(API_PATH + "/data/../../etc/passwd");
-			// Should be 400 (bad hash) or 404 (route not found due to path normalization)
-			assertTrue(res.statusCode() == 400 || res.statusCode() == 404,
-				"Path traversal should be handled, got: " + res.statusCode());
+			assertEquals(404, res.statusCode(), res.body());
 		}
 
 		{ // Block number as negative
@@ -696,8 +691,10 @@ public class RESTAPITest extends ARESTTest {
 				"amount", CVMLong.create(-1000)
 			);
 			HttpResponse<String> res = post(API_PATH + "/faucet", JSON.toString(req));
-			// Should either reject or treat as 0
-			assertTrue(res.statusCode() == 200 || res.statusCode() == 400 || res.statusCode() == 422);
+			// The CVM refuses a negative transfer, reported as a CVM error result
+			assertEquals(200, res.statusCode(), res.body());
+			AMap<AString,ACell> result = JSON.parse(res.body());
+			assertEquals("ARGUMENT", RT.str(result.getIn("errorCode")).toString(), res.body());
 		}
 
 		{ // Malformed JSON

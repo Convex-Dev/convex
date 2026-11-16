@@ -99,20 +99,21 @@ class UnsupportedColumnTypeTest {
 			try { return db.getConnection("wire"); }
 			catch (SQLException e) { throw new RuntimeException(e); }
 		}).build();
+		// The wire passes the declaration to JDBC and reports its error: the JDBC test
+		// covers every unsupported type, so one shows the wire carries the rejection
+		String type = UNSUPPORTED[0];
+		String sql = "CREATE TABLE rejected (id INTEGER, v " + type + ")";
 		try {
 			server.start();
 			for (String mode : new String[] {"simple", "extended"}) {
 				try (Connection c = DriverManager.getConnection("jdbc:postgresql://localhost:" + server.getPort()
 						+ "/wire?preferQueryMode=" + mode, "test", ""); var s = c.createStatement()) {
 					var before = db.cursor().get();
-					for (String type : UNSUPPORTED) {
-						String sql = "CREATE TABLE rejected (id INTEGER, v " + type + ")";
-						unsupported(() -> s.execute(sql), mode + ": " + type);
-						try (var prepared = c.prepareStatement(sql)) {
-							unsupported(prepared::execute, mode + " prepared: " + type);
-						}
-						assertSame(before, db.cursor().get(), mode + ": " + type);
+					unsupported(() -> s.execute(sql), mode + ": " + type);
+					try (var prepared = c.prepareStatement(sql)) {
+						unsupported(prepared::execute, mode + " prepared: " + type);
 					}
+					assertSame(before, db.cursor().get(), mode + ": " + type);
 					try (var rows = s.executeQuery("SELECT 1")) { assertTrue(rows.next()); }
 				}
 			}

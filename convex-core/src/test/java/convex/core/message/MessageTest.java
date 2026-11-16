@@ -33,7 +33,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -658,8 +657,8 @@ public class MessageTest {
 
 	/**
 	 * A payload that cannot fit one legal frame is rejected when its data is
-	 * generated, never silently truncated: the maximum message length is applied
-	 * at the Message boundary, not inside the encoder.
+	 * generated, never silently truncated. EncodingTest.testMultiCellSizeLimit
+	 * covers the encoder's own limit: none by default, and exact at a given one.
 	 */
 	@Test
 	public void testOversizedPayloadRejected() {
@@ -672,10 +671,5 @@ public class MessageTest {
 
 		Message m=Message.create(MessageType.RESULT,Result.create(CVMLong.ONE,payload));
 		assertThrows(IllegalArgumentException.class,()->m.getMessageData());
-
-		// The same value is still encodable with no maximum, and exact at its own size
-		Blob full=Format.encodeMultiCell(payload,true);
-		assertTrue(full.count()>CPoSConstants.MAX_MESSAGE_LENGTH);
-		assertEquals(full,Format.encodeMultiCell(payload,true,full.count()));
 	}
 }

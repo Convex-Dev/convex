@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
@@ -71,8 +70,11 @@ public class LatticePropagatorTest {
 	private AStore store1;
 	private AStore store2;
 
-	@BeforeEach
-	public void setUp() throws IOException, InterruptedException {
+	/**
+	 * Launches two connected nodes, for the tests that propagate between them;
+	 * {@link #tearDown()} closes them.
+	 */
+	private void launchNetwork() throws IOException, InterruptedException {
 		// Use the base lattice
 		lattice = Lattice.ROOT;
 
@@ -152,13 +154,23 @@ public class LatticePropagatorTest {
 		if (store2 != null) {
 			store2.close();
 		}
+		// One instance serves every test, so a test without the network must not close this one again
+		transport1=null;
+		transport2=null;
+		server1=null;
+		server2=null;
+		propagator1=null;
+		propagator2=null;
+		store1=null;
+		store2=null;
 	}
 
 	/**
 	 * Tests that the propagator is automatically started when NodeServer launches.
 	 */
 	@Test
-	public void testPropagatorAutoStart() {
+	public void testPropagatorAutoStart() throws Exception {
+		launchNetwork();
 		assertSame(propagator1,server1.getPropagators().get(0),
 			"Node should retain the application-supplied propagator");
 		assertTrue(propagator1.isRunning(), "Propagator should be running");
@@ -196,12 +208,13 @@ public class LatticePropagatorTest {
 
 	@Test
 	public void testAddPeerReportsIdentityFailure() throws Exception {
+		launchNetwork();
 		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
-		Convex peer=ConvexRemote.connect(transport2.getHostAddress());
-
-		assertThrows(ExecutionException.class,
-			()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));
-		assertFalse(propagator1.getConnectionManager().isConnected(wrongKey));
+		try (Convex peer=ConvexRemote.connect(transport2.getHostAddress())) {
+			assertThrows(ExecutionException.class,
+				()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));
+			assertFalse(propagator1.getConnectionManager().isConnected(wrongKey));
+		}
 	}
 
 	/**
@@ -215,6 +228,7 @@ public class LatticePropagatorTest {
 	 */
 	@Test
 	public void testAutomaticPropagation() throws Exception {
+		launchNetwork();
 		// Get the :data keyword
 		Keyword dataKeyword = Keyword.intern("data");
 
@@ -253,6 +267,7 @@ public class LatticePropagatorTest {
 	 */
 	@Test
 	public void testPulledValueIsPersistedNotAnnounced() throws Exception {
+		launchNetwork();
 		// Server2 must not push to server1, so server1 only ever holds the value by pulling
 		propagator2.removePeer(propagator1.getTransportKey());
 
@@ -275,6 +290,7 @@ public class LatticePropagatorTest {
 	/** Delta broadcast retains the protocol envelope and drives a real push merge. */
 	@Test
 	public void testDeltaPushUsesLatticeValueEnvelope() throws Exception {
+		launchNetwork();
 		Keyword dataKeyword = Keyword.intern("data");
 		ACell expected = CVMLong.create(4242);
 		Hash expectedHash = expected.getHash();
@@ -299,6 +315,7 @@ public class LatticePropagatorTest {
 	/** Oversized novelty is staged as bounded DATA messages before one root merge. */
 	@Test
 	public void testOversizedDeltaIsChunkedWithoutBlockingOtherMessages() throws Exception {
+		launchNetwork();
 		Keyword dataKeyword=Keyword.intern("data");
 		@SuppressWarnings("unchecked")
 		Index<Hash,ACell> values=(Index<Hash,ACell>)Index.EMPTY;
@@ -324,6 +341,7 @@ public class LatticePropagatorTest {
 	/** A delta encoding failure must not hide the newly announced root from recovery. */
 	@Test
 	public void testFailedDeltaStillAdvancesRootAnnouncementAndAnnounceFuture() throws Exception {
+		launchNetwork();
 		Blob value=Blobs.createRandom(400);
 		server1.getCursor().assoc(Keyword.intern("failed-delta"),value);
 		ACell expected=server1.getLocalValue();
@@ -353,6 +371,7 @@ public class LatticePropagatorTest {
 	/** Consecutive explicit syncs may coalesce, but the latest value must converge. */
 	@Test
 	public void testConsecutiveSyncsEachBroadcast() throws Exception {
+		launchNetwork();
 		Keyword dataKeyword = Keyword.intern("data");
 		ACell first = CVMLong.create(4301);
 		ACell second = CVMLong.create(4302);
@@ -747,6 +766,7 @@ public class LatticePropagatorTest {
 	 */
 	@Test
 	public void testMultipleUpdates() throws Exception {
+		launchNetwork();
 		// Perform multiple local updates on server1
 		Keyword dataKeyword = Keyword.intern("data");
 

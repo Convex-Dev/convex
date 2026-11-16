@@ -75,15 +75,6 @@ public class ConvexHTTPTest extends ARESTTest {
 		assertEquals(ErrorCodes.JUICE,convex.simulate(Invoke.create(empty,1,"1")).join().getErrorCode());
 	}
 
-	@Test public void testOffensiveMessages() throws ResultException, InterruptedException {
-		ConvexHTTP convex=connect();
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
-		
-		// TODO: blast with illegal messages
-		// CompletableFuture<Result> r=convex.message(Blob.fromHex("0xBADBADBADBAD"));
-	}
-	
 	@Test public void testTransact() throws ResultException, InterruptedException {
 		ConvexHTTP convex=newClient();
 		

@@ -19,7 +19,6 @@ import org.slf4j.event.Level;
 
 import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
-import convex.core.init.Init;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.net.RequestFailuresTest.RecordingLogger;
@@ -139,7 +138,7 @@ public class LoopFailuresTest {
 		};
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,InvalidPeerDataTest.LOCAL);
-		config.put(Keywords.STATE,Init.createState(List.of(InvalidPeerDataTest.LOCAL.getAccountKey())));
+		config.put(Keywords.STATE,GenesisStates.of(InvalidPeerDataTest.LOCAL));
 		config.put(Keywords.PORT,0);
 		config.put(Keywords.STORE,new MemoryStore());
 		config.put(Keywords.OUTGOING_CONNECTIONS,outgoing);

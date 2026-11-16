@@ -179,13 +179,14 @@ public class ConvexJSONTest {
 		Address address=c.useNewAccount(1_000_666);
 		assertNotNull(address);
 		assertEquals(1_000_666L,c.queryBalance());
-		for (int i=0;i<10;i++) {
+		// Three transactions: each after the first needs the sequence the one before advanced
+		for (int i=0;i<3;i++) {
 			Map<String,Object> result=c.transactAsync("(def a "+i+")").get(10,TimeUnit.SECONDS);
 			assertFalse(result.containsKey("errorCode"),result::toString);
 			assertEquals((long)i,result.get("value"));
 		}
-		assertEquals(9L,c.query("a").get("value"));
-		assertEquals(10L,c.queryAccount().get("sequence"));
+		assertEquals(2L,c.query("a").get("value"));
+		assertEquals(3L,c.queryAccount().get("sequence"));
 		assertTrue(c.queryBalance()<1_000_666L);
 	}
 }

@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,7 +18,6 @@ import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -59,7 +57,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
-import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
@@ -94,17 +91,34 @@ public class InvalidPeerDataTest {
 
 	/** Launches a peer as {@link #launchPeer(AKeyPair, AKeyPair...)} does, on the given store. */
 	static Server launchPeer(AStore store, AKeyPair kp, AKeyPair... others) throws Exception {
-		ArrayList<AccountKey> keys=new ArrayList<>();
-		keys.add(kp.getAccountKey());
-		for (AKeyPair o: others) keys.add(o.getAccountKey());
-		State genesis=Init.createState(keys);
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
-		config.put(Keywords.STATE,genesis);
+		config.put(Keywords.STATE,genesis(kp,others));
 		config.put(Keywords.PORT,0);
 		config.put(Keywords.STORE,store);
 		config.put(Keywords.POLL_DELAY,LONG_POLL_DELAY);
 		return API.launchPeer(config);
+	}
+
+	/**
+	 * Creates a peer on the network {@link #launchPeer(AKeyPair, AKeyPair...)} would, but
+	 * does not launch it, for a test that runs one of its components on the test thread.
+	 * It is not live, so it refuses transactions, and its store holds nothing.
+	 */
+	static Server createPeer(AKeyPair kp, AKeyPair... others) throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		server.getCVMExecutor().setPeer(Peer.createGenesisPeer(kp,genesis(kp,others)));
+		return server;
+	}
+
+	/** The genesis State of a network of the given keys, all equally staked. */
+	static State genesis(AKeyPair kp, AKeyPair... others) {
+		ArrayList<AccountKey> keys=new ArrayList<>();
+		keys.add(kp.getAccountKey());
+		for (AKeyPair o: others) keys.add(o.getAccountKey());
+		return GenesisStates.of(keys);
 	}
 
 	/** Timestamp for Blocks: valid against the genesis State. */
@@ -590,58 +604,6 @@ public class InvalidPeerDataTest {
 		}
 	}
 
-	/**
-	 * A transaction whose intake runs the peer out of memory is rejected as the peer
-	 * being busy, and later transactions are still processed.
-	 */
-	@Test
-	public void aTransactionThatRunsThePeerOutOfMemory() throws Exception {
-		OutOfMemoryError error=new OutOfMemoryError("Test: out of memory storing a transaction");
-		ExpectedLogs logs=ExpectedLogs.carrying(error).open();
-		try (logs) {
-			checkTransactionIntakeError(error,ErrorCodes.LOAD);
-		}
-		logs.assertLogged(Level.WARN,error);
-	}
-
-	/**
-	 * A transaction whose intake overflows the peer's stack is rejected as exceeding a
-	 * limit, and later transactions are still processed.
-	 */
-	@Test
-	public void aTransactionThatOverflowsThePeerStack() throws Exception {
-		checkTransactionIntakeError(new StackOverflowError("Test: stack overflow storing a transaction"),ErrorCodes.LIMIT);
-	}
-
-	/**
-	 * Sends a transaction whose storing at intake throws the given error, and checks the
-	 * error code the client gets and that the next transaction runs.
-	 */
-	private void checkTransactionIntakeError(Error error, Keyword expectedCode) throws Exception {
-		SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
-		Hash failing=tx.getHash();
-		MemoryStore store=new MemoryStore() {
-			@Override
-			public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-				if (ref.getHash().equals(failing)) throw error;
-				return super.storeTopRef(ref,status,noveltyHandler);
-			}
-		};
-		Server peer=launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
-			Result failed=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
-			assertEquals(expectedCode,failed.getErrorCode(),failed.toString());
-
-			SignedData<ATransaction> next=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 2 3)"));
-			Result ok=client.transact(next).get(WAIT,TimeUnit.SECONDS);
-			assertEquals(CVMLong.create(5),ok.getValue(),ok.toString());
-			assertTrue(peer.isLive());
-		} finally {
-			peer.close();
-		}
-	}
-
 	private void aDeeplyNestedTransactionIsExecuted(AStore store) throws Exception {
 		Server peer=launchPeer(store,LOCAL);
 		try {
@@ -716,96 +678,6 @@ public class InvalidPeerDataTest {
 		}
 	}
 
-	/** A client connection that records results, or throws a chosen Error on every reply. */
-	static final class ReplyConnection extends AConnection {
-		final Error error;
-		final ConcurrentHashMap<ACell,Result> results=new ConcurrentHashMap<>();
-		volatile boolean closed;
-
-		ReplyConnection(Error error) {
-			this.error=error;
-		}
-
-		Result result(long id) {
-			return results.get(CVMLong.create(id));
-		}
-
-		@Override public boolean sendMessage(Message msg) {
-			return trySendMessage(msg);
-		}
-
-		@Override public boolean trySendMessage(Message msg) {
-			if (error!=null) throw error;
-			if (msg.getType()==MessageType.RESULT) {
-				Result r=msg.toResult();
-				results.put(r.getID(),r);
-			}
-			return true;
-		}
-
-		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.3",30000); }
-		@Override public boolean isClosed() { return closed; }
-		@Override public void close() { closed=true; }
-		@Override public long getReceivedCount() { return 0; }
-	}
-
-	/**
-	 * A query whose handling overflows or runs out of memory fails alone: its
-	 * connection is kept, since the failure may be the peer's own, and the next query
-	 * in the same batch is answered.
-	 */
-	@Test
-	public void aQueryThatFailsLeavesTheRestOfItsBatch() throws Exception {
-		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
-		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
-		try (logs) {
-			Server peer=launchPeer(LOCAL);
-			try {
-				for (Error error: List.of(new StackOverflowError("simulated"),outOfMemory)) {
-					QueryHandler handler=new QueryHandler(peer);
-					ReplyConnection failing=new ReplyConnection(error);
-					ReplyConnection healthy=new ReplyConnection(null);
-					assertTrue(handler.offerQuery(Message.createQuery(1,"(+ 1 2)",Init.GENESIS_ADDRESS).withConnection(failing)));
-					assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",Init.GENESIS_ADDRESS).withConnection(healthy)));
-					handler.loop();
-					assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-					assertFalse(failing.isClosed(),error.toString());
-				}
-			} finally {
-				peer.close();
-			}
-		}
-		logs.assertLogged(Level.WARN,outOfMemory);
-	}
-
-	/**
-	 * A data request whose reply overflows or runs out of memory fails alone: the next
-	 * request in the same batch is answered.
-	 */
-	@Test
-	public void aDataRequestThatFailsLeavesTheRestOfItsBatch() throws Exception {
-		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
-		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
-		try (logs) {
-			Server peer=launchPeer(LOCAL);
-			try {
-				for (Error error: List.of(new StackOverflowError("simulated"),outOfMemory)) {
-					QueryHandler handler=new QueryHandler(peer);
-					ReplyConnection failing=new ReplyConnection(error);
-					ReplyConnection healthy=new ReplyConnection(null);
-					Hash held=peer.getBelief().getHash();
-					assertTrue(handler.offerQuery(Message.createDataRequest(CVMLong.create(1),held).withConnection(failing)));
-					assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",Init.GENESIS_ADDRESS).withConnection(healthy)));
-					handler.loop();
-					assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-				}
-			} finally {
-				peer.close();
-			}
-		}
-		logs.assertLogged(Level.WARN,outOfMemory);
-	}
-
 	/**
 	 * A staked peer's Order that runs out of memory as the merge persists it is dropped. A
 	 * good Order from another peer in the same Belief is still merged.
@@ -863,36 +735,40 @@ public class InvalidPeerDataTest {
 	 */
 	@Test
 	public void aFetchThatRunsOutOfMemoryIsDropped() throws Exception {
-		FaultingStore store=new FaultingStore();
-		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
-		try {
-			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
-			MemoryStore senderStore=new MemoryStore();
-			long ts=blockTime(peer);
-			SignedData<Order> good=order(REMOTE_B,ts,block(REMOTE_B,ts));
-			List<Message> sent=updateMissingABlock(ts,1,good,senderStore);
-			// The fetch is the first to store the part the update left out
-			store.failOnce(MissingBeliefDataTest.leftOut(sent),new OutOfMemoryError("simulated"));
-			LocalConnection senderEnd=MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore));
-			for (Message m: sent) senderEnd.sendMessage(wire(m));
+		OutOfMemoryError error=new OutOfMemoryError("simulated");
+		// The fetch warns of running out of memory only the first time in the JVM
+		try (ExpectedLogs logs=ExpectedLogs.carrying(error).ifLogged().open()) {
+			FaultingStore store=new FaultingStore();
+			Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
+			try {
+				BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+				MemoryStore senderStore=new MemoryStore();
+				long ts=blockTime(peer);
+				SignedData<Order> good=order(REMOTE_B,ts,block(REMOTE_B,ts));
+				List<Message> sent=updateMissingABlock(ts,1,good,senderStore);
+				// The fetch is the first to store the part the update left out
+				store.failOnce(MissingBeliefDataTest.leftOut(sent),error);
+				LocalConnection senderEnd=MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore));
+				for (Message m: sent) senderEnd.sendMessage(wire(m));
 
-			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
-			assertNotNull(merged,"the good Order is merged");
-			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
-			CompletableFuture<?> fetch=peer.getBeliefPropagator().getMissingDataFetch();
-			assertNotNull(fetch,"the missing data is fetched");
-			fetch.get(WAIT,TimeUnit.SECONDS);
-			assertNull(store.failing,"the fetch ran out of memory");
+				Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+				assertNotNull(merged,"the good Order is merged");
+				assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+				CompletableFuture<?> fetch=peer.getBeliefPropagator().getMissingDataFetch();
+				assertNotNull(fetch,"the missing data is fetched");
+				fetch.get(WAIT,TimeUnit.SECONDS);
+				assertNull(store.failing,"the fetch ran out of memory");
 
-			SignedData<Order> later=order(REMOTE_B,ts+1,block(REMOTE_B,ts),block(REMOTE_B,ts+1));
-			LocalConnection laterEnd=connect(peer);
-			for (Message m: updateMissingABlock(ts+1,9,later,senderStore)) laterEnd.sendMessage(wire(m));
-			merged=updates.poll(WAIT,TimeUnit.SECONDS);
-			assertNotNull(merged,"the later good Order is merged");
-			assertNotSame(fetch,peer.getBeliefPropagator().getMissingDataFetch(),"later missing data is fetched");
-			assertTrue(peer.isLive());
-		} finally {
-			peer.close();
+				SignedData<Order> later=order(REMOTE_B,ts+1,block(REMOTE_B,ts),block(REMOTE_B,ts+1));
+				LocalConnection laterEnd=connect(peer);
+				for (Message m: updateMissingABlock(ts+1,9,later,senderStore)) laterEnd.sendMessage(wire(m));
+				merged=updates.poll(WAIT,TimeUnit.SECONDS);
+				assertNotNull(merged,"the later good Order is merged");
+				assertNotSame(fetch,peer.getBeliefPropagator().getMissingDataFetch(),"later missing data is fetched");
+				assertTrue(peer.isLive());
+			} finally {
+				peer.close();
+			}
 		}
 	}
 

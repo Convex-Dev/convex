@@ -33,7 +33,6 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
-import convex.etch.EtchStore;
 import convex.core.store.MemoryStore;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -63,15 +62,15 @@ public class P2PSocialSyncTest {
 	private final AString carolDid=DID.forKey(carolUserKey.getAccountKey());
 	private final AString daveDid=DID.forKey(daveUserKey.getAccountKey());
 
-	private EtchStore aliceStore,bobStore,carolStore,daveStore;
+	private MemoryStore aliceStore,bobStore,carolStore,daveStore;
 	private P2PNode aliceNode,bobNode,carolNode,daveNode;
 	private LatticePropagator bobInfrastructureView,bobBrokenView;
 
 	@BeforeEach
 	public void setUp() throws Exception {
-		aliceStore=EtchStore.createTemp("p2p-social-alice");
-		bobStore=EtchStore.createTemp("p2p-social-bob");
-		carolStore=EtchStore.createTemp("p2p-social-carol");
+		aliceStore=new MemoryStore();
+		bobStore=new MemoryStore();
+		carolStore=new MemoryStore();
 		NodeConfig aliceHost=NodeConfig.localNetwork();
 		NodeConfig bobHost=NodeConfig.localNetwork();
 		NodeConfig carolHost=NodeConfig.localNetwork();
@@ -191,7 +190,7 @@ public class P2PSocialSyncTest {
 		assertNull(carol.user(carolDid).follows().getActive());
 
 		// Dave is outbound-only, is told only about Bob, and follows Carol.
-		daveStore=EtchStore.createTemp("p2p-social-dave");
+		daveStore=new MemoryStore();
 		NodeConfig daveHost=NodeConfig.port(-1);
 		daveNode=P2PNode.create(daveStore,daveHost,
 			LatticePropagatorConfig.create(),daveNodeKey);

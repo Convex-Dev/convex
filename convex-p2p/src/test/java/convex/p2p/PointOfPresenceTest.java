@@ -28,7 +28,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.node.NodeConfig;
 
 /** End-to-end point messaging through one public PoP and two NAT leaves. */
@@ -38,9 +38,9 @@ public class PointOfPresenceTest {
 	private final AKeyPair bobKey=AKeyPair.generate();
 	private final AKeyPair daveKey=AKeyPair.generate();
 
-	private EtchStore aliceStore;
-	private EtchStore bobStore;
-	private EtchStore daveStore;
+	private MemoryStore aliceStore;
+	private MemoryStore bobStore;
+	private MemoryStore daveStore;
 	private P2PNode alice;
 	private P2PNode bob;
 	private P2PNode dave;
@@ -57,9 +57,9 @@ public class PointOfPresenceTest {
 
 	@Test
 	public void testPublicAndPrivateMessagesThroughPop() throws Exception {
-		aliceStore=EtchStore.createTemp("pop-alice");
-		bobStore=EtchStore.createTemp("pop-bob");
-		daveStore=EtchStore.createTemp("pop-dave");
+		aliceStore=new MemoryStore();
+		bobStore=new MemoryStore();
+		daveStore=new MemoryStore();
 
 		AccountKey bobNodeKey=bobKey.getAccountKey();
 		alice=P2PNode.create(aliceStore,NodeConfig.port(-1),aliceKey)

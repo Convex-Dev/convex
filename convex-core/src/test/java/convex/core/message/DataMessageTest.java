@@ -51,7 +51,7 @@ public class DataMessageTest {
 	}
 
 	/** Each message within the limit and readable alone; every cell carried once, in order. */
-	private static void assertPartitioned(List<ACell> cells, int limit) throws BadFormatException {
+	private static List<Message> assertPartitioned(List<ACell> cells, int limit) throws BadFormatException {
 		List<Message> messages = Message.createDataMessages(cells, limit);
 		assertTrue(messages.size() > 1);
 		int seen = 0;
@@ -63,6 +63,7 @@ public class DataMessageTest {
 			for (int i = 1; i < payload.count(); i++) assertEquals(cells.get(seen++), payload.get(i));
 		}
 		assertEquals(cells.size(), seen);
+		return messages;
 	}
 
 	@Test
@@ -72,8 +73,11 @@ public class DataMessageTest {
 
 	@Test
 	public void testManyCellsPartitioned() throws BadFormatException {
-		// Thousands of cells per message at the default Belief delta size
-		assertPartitioned(cells(30000), 4 * 1024 * 1024);
+		// Thousands of cells per message. The first holds over 4096 elements, so its
+		// Vector is a tree level deeper than any other test here decodes
+		List<Message> messages = assertPartitioned(cells(6000), 1280 * 1024);
+		AVector<?> first = messages.get(0).getPayload(null);
+		assertTrue(first.count() > 4096);
 	}
 
 	@Test

@@ -6,10 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -19,7 +17,6 @@ import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.Format;
@@ -27,10 +24,8 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
-import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
@@ -46,9 +41,10 @@ import convex.x402.model.VerifyResponse;
 
 /**
  * End-to-end test of x402 payment support: gated route, facilitator endpoints,
- * payment flow, idempotent replay and stale payment rejection.
+ * payment flow, idempotent replay and stale payment rejection. A REST server with
+ * the x402 policy serves the shared test peer, and one account pays throughout.
  */
-public class X402Test {
+public class X402Test extends ARESTTest {
 
 	static final long PRICE = 1_000_000;
 	static final Address PAY_TO = Address.create(13);
@@ -58,10 +54,8 @@ public class X402Test {
 	static RESTServer restServer;
 	static String hostPath;
 	static AKeyPair kp;
+	static Address payer;
 	static Convex convex;
-
-	static final HttpClient httpClient = HttpClient.newBuilder()
-			.connectTimeout(Duration.ofSeconds(10)).build();
 
 	@BeforeAll
 	static void setup() throws Exception {
@@ -69,22 +63,19 @@ public class X402Test {
 			{rest:{x402:{enabled:true, payTo:"#13",
 				routes:[{path:"/api/v1/status", amount:"1000000", description:"Paid status"}]}}}
 			""");
-		var launchConfig = config.toLegacy();
-		launchConfig.put(Keywords.KEYPAIR, AKeyPair.generate());
-		launchConfig.put(Keywords.PORT, 0);
-		peerServer = API.launchPeer(launchConfig);
-		restServer = RESTServer.create(peerServer);
+		peerServer = server.getServer();
+		restServer = RESTServer.create(peerServer, config);
 		restServer.start(0);
 		hostPath = "http://localhost:" + restServer.getPort();
-		kp = peerServer.getKeyPair();
+		kp = CLIENT_KP;
+		payer = newAccount();
 		convex = Convex.connect(peerServer);
-		convex.setAddress(Init.GENESIS_ADDRESS, kp);
+		convex.setAddress(payer, kp);
 	}
 
 	@AfterAll
 	static void tearDown() {
 		if (restServer != null) restServer.close();
-		if (peerServer != null) peerServer.close();
 	}
 
 	static URI gatedUri() {
@@ -149,7 +140,7 @@ public class X402Test {
 		assertNotNull(receipt);
 		assertTrue(receipt.success());
 		assertTrue(receipt.transaction().startsWith("0x"));
-		assertEquals(Init.GENESIS_ADDRESS.toString(), receipt.payer());
+		assertEquals(payer.toString(), receipt.payer());
 
 		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
 	}
@@ -181,8 +172,8 @@ public class X402Test {
 		// A payment with a wrong (future) sequence is rejected outright. A future
 		// sequence is used because a stale one could coincide with the identical
 		// already-settled transaction above, which settles idempotently by design.
-		long badSequence = convex.lookupSequence(Init.GENESIS_ADDRESS) + 5;
-		ATransaction wrongSeq = Transfer.create(Init.GENESIS_ADDRESS, badSequence, PAY_TO, PRICE);
+		long badSequence = convex.lookupSequence(payer) + 5;
+		ATransaction wrongSeq = Transfer.create(payer, badSequence, PAY_TO, PRICE);
 		SignedData<ATransaction> staleSigned = kp.signData(wrongSeq);
 		PaymentPayload stalePayment = new PaymentPayload(X402.VERSION, null, req,
 				Maps.of(Fields.TRANSACTION,
@@ -223,7 +214,7 @@ public class X402Test {
 		VerifyResponse verified = VerifyResponse
 				.fromJSON(RT.castMap(JSON.parse(verifyResponse.body())));
 		assertTrue(verified.isValid(), "verify failed: " + verifyResponse.body());
-		assertEquals(Init.GENESIS_ADDRESS.toString(), verified.payer());
+		assertEquals(payer.toString(), verified.payer());
 
 		// Settle: executes the payment
 		long before = convex.getBalance(PAY_TO);
@@ -274,7 +265,7 @@ public class X402Test {
 		// Fresh connection: its sequence tracking must not be confused by payments
 		// settled out-of-band in other tests
 		Convex deployer = Convex.connect(peerServer);
-		deployer.setAddress(Init.GENESIS_ADDRESS, kp);
+		deployer.setAddress(payer, kp);
 		convex.core.Result deployed = deployer
 				.transactSync("(deploy (@convex.fungible/build-token {:supply 1000000}))");
 		assertFalse(deployed.isError(), "token deploy failed: " + deployed);
@@ -308,8 +299,8 @@ public class X402Test {
 	@Test
 	public void testFailedPaymentCannotBeReplayedAsSettled() throws Exception {
 		PaymentRequirements req = fetchDemand().accepts().get(0);
-		long sequence = convex.lookupSequence(Init.GENESIS_ADDRESS) + 5;
-		ATransaction transaction = Transfer.create(Init.GENESIS_ADDRESS, sequence, PAY_TO, PRICE);
+		long sequence = convex.lookupSequence(payer) + 5;
+		ATransaction transaction = Transfer.create(payer, sequence, PAY_TO, PRICE);
 		SignedData<ATransaction> signed = kp.signData(transaction);
 		long before = convex.getBalance(PAY_TO);
 
