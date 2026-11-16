@@ -706,6 +706,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	/** The acquisition behind the latest fetch, which closing this component stops. */
 	private volatile Acquiror fetchAcquiror=null;
 
+	/** Set by close before it stops the fetch, so a fetch starting meanwhile stops itself. */
+	private volatile boolean closed=false;
+
 	/**
 	 * Fetches what an update lacks from the connection it arrived on: whoever sent a
 	 * delta holds everything it refers to (CAD015). At most one fetch is outstanding.
@@ -732,7 +735,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				connection.request(Message.createDataRequest(null,hashes),timeout));
 			fetchAcquiror=acquiror;
 			// A close that ran before the line above found no fetch to stop
-			if (!server.isRunning()) acquiror.close();
+			if (closed) acquiror.close();
 			missingDataFetch=acquiror.<ACell>getFuture()
 				.orTimeout(timeout,TimeUnit.MILLISECONDS)
 				.handle((value,error) -> {
@@ -767,6 +770,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	/** Also stops a fetch of missing update data, which would otherwise write to the store after the peer closes it. */
 	@Override
 	public void close() {
+		closed=true;
 		super.close();
 		Acquiror fetch=fetchAcquiror;
 		if (fetch!=null) fetch.close();
