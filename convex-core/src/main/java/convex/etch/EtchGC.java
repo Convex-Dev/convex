@@ -19,6 +19,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
+import convex.core.util.Cleanup;
 
 /**
  * GC and file lifetime for one logical Etch store, shared by all its generations.
@@ -180,13 +181,16 @@ final class EtchGC {
 	private void release(Etch[] files) {
 		operations.lock();
 		try {
+			// A file that fails to retire leaves every other pin released
+			Cleanup cleanup=new Cleanup();
 			for (Etch file:files) {
 				Pin pin=pins.get(file);
 				if (--pin.readers==0) {
 					pins.remove(file);
-					if (pin.retired) retire(file,pin.delete);
+					if (pin.retired) cleanup.run(() -> retire(file,pin.delete));
 				}
 			}
+			cleanup.finish();
 		} finally { operations.unlock(); }
 	}
 
@@ -197,11 +201,14 @@ final class EtchGC {
 			pin.delete|=delete;
 			return;
 		}
-		etch.close();
-		if (delete) {
-			File file=etch.getFile();
-			if (file.delete()) new File(file.getPath()+".gc-defunct").delete();
-			else file.deleteOnExit();
+		try {
+			etch.close();
+		} finally {
+			if (delete) {
+				File file=etch.getFile();
+				if (file.delete()) new File(file.getPath()+".gc-defunct").delete();
+				else file.deleteOnExit();
+			}
 		}
 	}
 
@@ -449,12 +456,15 @@ final class EtchGC {
 				store.closed=true;
 				State s=state;
 				int retained=s.views.length;
+				// A file that fails to retire leaves the others to retire and the state to update
+				Cleanup cleanup=new Cleanup();
 				while (retained>0 && s.views[retained-1].closed) {
 					EtchStore view=s.views[--retained];
-					retire(view.getEtch(),view!=s.owner);
+					cleanup.run(() -> retire(view.getEtch(),view!=s.owner));
 				}
-				if (retained==0 && s.target!=null) retire(s.target,false); // abandoned cycle: recover on reopen
+				if (retained==0 && s.target!=null) cleanup.run(() -> retire(s.target,false)); // abandoned cycle: recover on reopen
 				state=new State(s.owner,Arrays.copyOf(s.views,retained),s.target,s.cancelling);
+				cleanup.finish();
 			}
 		} finally {
 			writes.writeLock().unlock();

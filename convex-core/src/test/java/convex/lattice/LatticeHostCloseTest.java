@@ -156,6 +156,40 @@ class LatticeHostCloseTest {
 		}
 	}
 
+	@Test void aFatalLastApplicationSyncStillStopsFlushingAndSaves() throws Exception {
+		var store=new MemoryStore();
+		var host=LatticeHost.create(CVMLong.ONE,store);
+		var closing=new AtomicBoolean();
+		var failure=new OutOfMemoryError("simulated");
+		var syncer=host.autoSync(Duration.ofDays(1),() -> { if (closing.get()) throw failure; });
+		var flusher=host.autoFlush(Duration.ofDays(1));
+		host.cursor().set(CVMLong.TWO);
+		closing.set(true);
+
+		assertSame(failure,assertThrows(OutOfMemoryError.class,host::close));
+		assertSame(failure,syncer.failure().toCompletableFuture().getNow(null));
+		assertEquals(CVMLong.TWO,store.getRootData(),"The save still runs");
+		assertThrows(IllegalStateException.class,host::sync,"The host is closed");
+		flusher.close(); // Already closed by the host, so no flush of the closed host.
+	}
+
+	@Test void noAutomaticWorkerStartsOnceCloseHasBegun() throws Exception {
+		var flushes=new AtomicInteger();
+		try (var store=new EtchStore(Etch.createTempEtch("host-closing")) {
+			@Override public void flush() throws IOException {
+				if (flushes.getAndIncrement()==0) throw new IOException("disk unavailable");
+				super.flush();
+			}
+		}) {
+			var host=LatticeHost.create(CVMLong.ONE,store);
+			assertThrows(IOException.class,host::close);
+			assertEquals(CVMLong.ONE,host.sync(),"Still open");
+			assertThrows(IllegalStateException.class,() -> host.autoFlush(Duration.ofDays(1)));
+			assertThrows(IllegalStateException.class,() -> host.autoSync(Duration.ofDays(1)));
+			host.close();
+		}
+	}
+
 	@Test void closeWithAPublisherAttachedStillCheckpoints() throws Exception {
 		var store=new MemoryStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);

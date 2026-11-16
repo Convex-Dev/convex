@@ -66,13 +66,15 @@ public final class AutoSync implements Closeable {
 	/**
 	 * Stops and drains the worker, then syncs the applications once more, for the
 	 * host's close, whose checkpoint saves the result. A failure of the application
-	 * sync is reported through {@link #failure()} rather than thrown, so the host's
-	 * save still runs.
+	 * sync is reported through {@link #failure()}; one no service can carry on from is
+	 * also thrown, and the host's close still saves before throwing it.
 	 */
 	void closeForHost() throws IOException {
 		stop(() -> {
 			Throwable failed=syncApplicationsLast();
-			if (failed!=null) worker.report(failed);
+			if (failed==null) return;
+			worker.report(failed);
+			if (HostWorker.isFatal(failed)) throw (Error)failed;
 		});
 	}
 
@@ -97,17 +99,13 @@ public final class AutoSync implements Closeable {
 		if (failed instanceof Error e) throw e;
 	}
 
-	/**
-	 * Runs the application sync once more, returning its failure so the save can
-	 * still run. Only failures no service can carry on from are thrown.
-	 */
+	/** Runs the application sync once more, returning its failure so the save can still run. */
 	private Throwable syncApplicationsLast() {
 		if (applicationSync==null) return null;
 		try {
 			applicationSync.run();
 			return null;
 		} catch (RuntimeException | Error e) {
-			if (HostWorker.isFatal(e)) throw e;
 			return e;
 		}
 	}

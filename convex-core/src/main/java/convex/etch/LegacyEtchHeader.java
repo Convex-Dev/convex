@@ -12,6 +12,7 @@ import java.util.Arrays;
 
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 
 /** Existing single-header Etch v1/v2 metadata behaviour. */
@@ -121,7 +122,9 @@ final class LegacyEtchHeader extends AEtchHeader {
 
 	@Override
 	void close(Etch etch) throws IOException {
-		writeDataLength(etch);
-		sync(etch);
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(() -> writeDataLength(etch));
+		cleanup.run(() -> sync(etch));
+		cleanup.finish(IOException.class);
 	}
 }

@@ -16,6 +16,7 @@ import convex.core.data.Keyword;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.core.store.Persister;
+import convex.core.util.Cleanup;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 
@@ -68,6 +69,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	private volatile AutoSync autoSync;
 	private volatile AutoFlush autoFlush;
 	private boolean closed;
+	/** Set under syncLock when close begins, so no automatic worker starts after close collects them */
+	private boolean closing;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
 	/**
@@ -467,7 +470,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	private AutoSync startAutoSync(Duration interval, Runnable applicationSync) {
 		syncLock.lock();
 		try {
-			ensureOpen();
+			ensureNotClosing();
 			if (autoSync!=null) throw new IllegalStateException("Host already has an automatic sync");
 			autoSync=new AutoSync(this,interval,applicationSync);
 			return autoSync;
@@ -487,7 +490,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	public AutoFlush autoFlush(Duration interval) {
 		syncLock.lock();
 		try {
-			ensureOpen();
+			ensureNotClosing();
 			if (autoFlush!=null) throw new IllegalStateException("Host already has an automatic flusher");
 			autoFlush=new AutoFlush(this,interval);
 			return autoFlush;
@@ -517,7 +520,12 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * {@link #flush()}, {@link #autoSync(Duration, Runnable)}, {@link #autoFlush(Duration)}
 	 * and {@link #attachPublisher(Function)} throw {@link IllegalStateException}. Reads
 	 * still work. Incoming merges may still change the in-memory value but cannot be
-	 * retained, so a node still running fails its syncs. Closing again does nothing.</p>
+	 * retained, so a node still running fails its syncs. Closing again does nothing.
+	 * Automatic workers cannot be started once close has begun, even if it fails.</p>
+	 *
+	 * <p>Every step runs whatever an earlier one threw: a failure no service can carry
+	 * on from in the last application sync, such as running out of memory, is thrown
+	 * once the flushing has stopped and the save has run.</p>
 	 *
 	 * @throws IOException if the final checkpoint fails; the host stays open and a
 	 *         later close retries, without the automatic workers, which have stopped
@@ -526,14 +534,28 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 */
 	@Override
 	public void close() throws IOException {
-		// Outside syncLock: the workers' steps take it, and stopping waits for them
-		AutoSync syncer=autoSync;
-		AutoFlush flusher=autoFlush;
-		if ((syncer!=null && syncer.isWorker()) || (flusher!=null && flusher.isWorker())) {
-			throw new IllegalStateException("Close the host from its owner, not an automatic worker's failure callback");
+		AutoSync syncer;
+		AutoFlush flusher;
+		syncLock.lock();
+		try {
+			syncer=autoSync;
+			flusher=autoFlush;
+			if ((syncer!=null && syncer.isWorker()) || (flusher!=null && flusher.isWorker())) {
+				throw new IllegalStateException("Close the host from its owner, not an automatic worker's failure callback");
+			}
+			closing=true;
+		} finally {
+			syncLock.unlock();
 		}
-		if (syncer!=null) syncer.closeForHost();
-		if (flusher!=null) flusher.closeForHost();
+		// Outside syncLock: the workers' steps take it, and stopping waits for them
+		Cleanup cleanup=new Cleanup();
+		if (syncer!=null) cleanup.run(syncer::closeForHost);
+		if (flusher!=null) cleanup.run(flusher::closeForHost);
+		cleanup.run(this::finalCheckpoint);
+		cleanup.finish(IOException.class);
+	}
+
+	private void finalCheckpoint() throws IOException {
 		syncLock.lock();
 		try {
 			if (closed) return;
@@ -546,6 +568,11 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 
 	private void ensureOpen() {
 		if (closed) throw new IllegalStateException("Lattice host is closed");
+	}
+
+	private void ensureNotClosing() {
+		ensureOpen();
+		if (closing) throw new IllegalStateException("Lattice host is closing");
 	}
 
 	void releaseAutoSync(AutoSync resource) {

@@ -20,6 +20,7 @@ import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -696,30 +697,16 @@ public class Etch {
 			Runnable hook=shutdownHook;
 			shutdownHook=null;
 			if (hook!=null) Shutdown.removeHook(Shutdown.ETCH,hook);
+			// Every step runs, so an Error finalising the header still releases the file and its lock
+			Cleanup cleanup=new Cleanup();
+			if (header != null) cleanup.run(() -> header.close(this));
+			cleanup.run(mapper::close);
+			if (data != null) cleanup.run(data::close);
+			cleanup.run(() -> destroyCiphers(dataCipher,indexCipher));
 			try {
-				Exception failure = null;
-				try {
-					if (header != null)
-						header.close(this);
-				} catch (Exception e) {
-					failure = e;
-				}
-				try {
-					mapper.close();
-				} catch (Exception e) {
-					failure = combineCloseFailure(failure, e);
-				}
-				try {
-					if (data != null)
-						data.close();
-				} catch (Exception e) {
-					failure = combineCloseFailure(failure, e);
-				}
-				if (failure != null) {
-					throw new IOException("Etch close failed: " + fileName, failure);
-				}
-			} finally {
-				destroyCiphers(dataCipher,indexCipher);
+				cleanup.finish(Exception.class);
+			} catch (Exception e) {
+				throw new IOException("Etch close failed: " + fileName, e);
 			}
 		}
 	}
@@ -728,13 +715,6 @@ public class Etch {
 			EtchFileCipher indexCipher) {
 		if (dataCipher!=null) dataCipher.destroy();
 		if ((indexCipher!=null)&&(indexCipher!=dataCipher)) indexCipher.destroy();
-	}
-
-	private static Exception combineCloseFailure(Exception first, Exception next) {
-		if (first == null)
-			return next;
-		first.addSuppressed(next);
-		return first;
 	}
 
 	/**
