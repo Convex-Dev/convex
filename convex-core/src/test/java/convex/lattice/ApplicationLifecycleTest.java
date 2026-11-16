@@ -29,7 +29,7 @@ class ApplicationLifecycleTest {
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
 			return cursor().updateAndGet(own -> union(own,incoming));
 		}
-		@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
+		@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 			return union(own,other);
 		}
 	}
@@ -90,7 +90,7 @@ class ApplicationLifecycleTest {
 				if (fail) throw new IllegalStateException("later child failed");
 			}
 			@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) { return child.merge(incoming); }
-			@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
+			@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 				return union(own,other);
 			}
 		};
@@ -112,7 +112,7 @@ class ApplicationLifecycleTest {
 			@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
 				return cursor().updateAndGet(own -> union(own,incoming));
 			}
-			@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
+			@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 				return union(own,other);
 			}
 			@Override protected void beforeSync() {

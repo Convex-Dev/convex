@@ -21,9 +21,11 @@ import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -32,7 +34,9 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
@@ -347,12 +351,20 @@ public class Peer {
 	 * @param address Address to use for query execution, or {@code null} for the
 	 *        genesis address
 	 * @param maxJuice Maximum execution Juice, non-negative and capped at the transaction maximum
-	 * @return Query result context
+	 * @return Query result context, with a FORMAT error if the form's structure is invalid
 	 */
 	public ResultContext executeQuery(ACell form, Address address, long maxJuice) {
 		form=CVMEncoder.specialise(form);
 		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
+
+		// A query can come from any caller, and this Peer does not keep it: check its
+		// structure before use
+		try {
+			Cells.checkReceived(form);
+		} catch (BadFormatException e) {
+			return ResultContext.error(state,ErrorCodes.FORMAT,e.getMessage());
+		}
 
 		if (form instanceof ATransaction tx) {
 			return executeDetached(tx,maxJuice);
@@ -599,22 +611,68 @@ public class Peer {
 
 		// We need to compute at least one new state update
 		while (stateIndex < targetPosition) { // add states until last state is at target position
-			SignedData<Block> block = blocks.get(stateIndex);
-			
-			BlockResult br = s.applyBlock(block);
-			State newState=br.getState();
+			BlockResult br = applyBlockAt(s, blocks, stateIndex);
 			newResults = newResults.append(br);
-			
-			if (newState.equals(s)) {
-				// Nothing changes in CVM state, so the Block must have been invalid!
-				if (peerKey.equals(block.getAccountKey())) {
-					// We messed up, or someone was messing with us in a serious way.....
-				}
-			} 
-			s=newState;
+			s=br.getState();
 			stateIndex++;
 		}
 		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp, index);
+	}
+
+	/**
+	 * Applies the agreed Block at a position of an Order. An entry that cannot be read
+	 * as a signed value is an invalid Block, leaving the State unchanged.
+	 *
+	 * @param s State to apply the Block to
+	 * @param blocks Blocks of the Order
+	 * @param i Position of the Block
+	 * @return Result of applying the Block
+	 * @throws MissingDataException if the entry is not held in the local store
+	 */
+	@SuppressWarnings("unchecked")
+	private static BlockResult applyBlockAt(State s, AVector<SignedData<Block>> blocks, long i) {
+		ACell entry=readEntry(blocks,i);
+		if (entry instanceof SignedData<?> signed) return s.applyBlock((SignedData<Block>)signed);
+		return BlockResult.createInvalidBlock(s, null, UNREADABLE_BLOCK);
+	}
+
+	private static final AString UNREADABLE_BLOCK=Strings.intern("Block is not a signed value");
+
+	/**
+	 * Reads an element of an agreed vector without assuming its type.
+	 *
+	 * @param v Vector to read
+	 * @param i Position within the vector's count
+	 * @return Element, or null if the vector's structure does not hold it
+	 * @throws MissingDataException if the element is not held in the local store
+	 */
+	static ACell readEntry(AVector<?> v, long i) {
+		try {
+			return v.get(i);
+		} catch (MissingDataException e) {
+			throw e;
+		} catch (RuntimeException e) {
+			// A received vector whose nodes disagree with its count
+			return null;
+		}
+	}
+
+	/**
+	 * Reads the transaction entries of an agreed Block entry. A Block may be invalid
+	 * and still have them: it may claim more than
+	 * {@link Constants#MAX_TRANSACTIONS_PER_BLOCK}, and an entry need not be a signed
+	 * transaction, so read each one with {@link #readEntry(AVector, long)}.
+	 *
+	 * @param entry Entry of an Order's Blocks
+	 * @return Transaction entries, or null if the entry is not a signed Block with a
+	 *         vector of transactions
+	 * @throws MissingDataException if part of the Block is not held in the local store
+	 */
+	static AVector<SignedData<ATransaction>> readTransactions(ACell entry) {
+		if (!(entry instanceof SignedData<?> signed)) return null;
+		Block block=RT.ensureCVM(signed.getValue(),Block.class);
+		if (block==null) return null;
+		return block.getTransactions();
 	}
 	
 	public Peer recalcState(long pos) {
@@ -671,9 +729,8 @@ public class Peer {
 	private void validateSignatures(AVector<SignedData<Block>> blocks, long start, long end) {
 		java.util.ArrayList<Future<?>> futures = null;
 		for (long b = start; b < end; b++) {
-			AVector<SignedData<ATransaction>> transactions = RT.ensureCVM(blocks.get(b).getValue(),Block.class).getTransactions();
-			// A Block with more transactions than it may hold is invalid: none to check
-			if (transactions.count() > Constants.MAX_TRANSACTIONS_PER_BLOCK) continue;
+			AVector<SignedData<ATransaction>> transactions = transactionsToValidate(blocks, b);
+			if (transactions == null) continue;
 			int count = (int) transactions.count();
 			if (count == 0) continue;
 
@@ -704,14 +761,31 @@ public class Peer {
 	}
 
 	/**
+	 * Gets the transactions of the Block at a position whose signatures to pre-validate.
+	 *
+	 * @return Transactions, or null if there are none to validate
+	 */
+	private static AVector<SignedData<ATransaction>> transactionsToValidate(AVector<SignedData<Block>> blocks, long b) {
+		AVector<SignedData<ATransaction>> txs;
+		try {
+			txs=readTransactions(readEntry(blocks,b));
+		} catch (MissingDataException e) {
+			// Left to applying the Block, which reports it
+			return null;
+		}
+		// A Block with more transactions than it may hold is invalid: none to check
+		if ((txs==null)||(txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK)) return null;
+		return txs;
+	}
+
+	/**
 	 * Verify a chunk of signatures using the embedded public key in each SignedData.
 	 * Caches the result so later calls to checkSignature() are a fast no-op.
 	 */
 	private static void verifyChunk(AVector<SignedData<ATransaction>> txns, int from, int to) {
 		for (int i = from; i < to; i++) {
 			// An entry that is not a signed transaction makes the Block invalid when applied
-			ACell tx = txns.get(i);
-			if (tx instanceof SignedData<?> signed) signed.checkSignature();
+			if (readEntry(txns, i) instanceof SignedData<?> signed) signed.checkSignature();
 		}
 	}
 
@@ -776,6 +850,19 @@ public class Peer {
 		BlockResult br=getBlockResult(blockIndex);
 		if (br==null) return null;
 		return br.getResult(txIndex);
+	}
+
+	/**
+	 * Gets a Block this Peer signed, at a position of its own Order
+	 * @param i Position of the Block
+	 * @return Block, or null if the entry there is not a Block signed by this Peer
+	 * @throws MissingDataException if the entry is not held in the local store
+	 */
+	public Block getOwnBlock(long i) {
+		ACell entry=readEntry(getIndexedBlocks(),i);
+		if (!(entry instanceof SignedData<?> signed)) return null;
+		if (!peerKey.equals(signed.getAccountKey())) return null;
+		return RT.ensureCVM(signed.getValue(),Block.class);
 	}
 
 	/**

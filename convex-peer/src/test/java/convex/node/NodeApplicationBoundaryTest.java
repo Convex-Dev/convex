@@ -28,7 +28,7 @@ class NodeApplicationBoundaryTest {
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> other) {
 			return cursor().updateAndGet(own -> LATTICE.merge(own,other));
 		}
-		@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
+		@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 			return LATTICE.merge(own,other);
 		}
 		@Override protected void beforeSync() { preparations++; }

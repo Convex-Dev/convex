@@ -60,6 +60,7 @@ import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
@@ -267,6 +268,73 @@ public class NodeServerTest {
 		assertEquals(NodeServer.LifecycleState.STOPPED,maxNodeServer.getLifecycleState());
 	}
 
+	/** Running out of memory notifying one group fails that group's notification alone. */
+	@Test
+	public void testGroupOutOfMemoryOnNotificationIsIsolated() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator broken=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public void triggerBroadcast(ACell value) {
+				throw new OutOfMemoryError("simulated notification");
+			}
+		};
+		LatticePropagator healthy=new LatticePropagator(store,LatticePropagatorConfig.create());
+		maxNodeServer.addPropagator(broken);
+		maxNodeServer.addPropagator(healthy);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=broken.nextFailure();
+		CompletableFuture<ACell> announced=healthy.nextAnnounce();
+
+		maxNodeServer.getCursor().set(CVMLong.create(23));
+		maxNodeServer.getHost().sync();
+		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
+		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+		assertTrue(maxNodeServer.isRunning());
+	}
+
+	/** Running out of memory publishing one value fails that publication alone: later values are published. */
+	@Test
+	public void testGroupOutOfMemoryOnPublicationIsIsolated() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public ACell processSnapshot(ACell value) throws IOException {
+				if (CVMLong.create(13).equals(value)) throw new OutOfMemoryError("simulated publication");
+				return super.processSnapshot(value);
+			}
+		};
+		maxNodeServer.addPropagator(group);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+
+		maxNodeServer.getCursor().set(CVMLong.create(13));
+		maxNodeServer.getHost().sync();
+		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+		CompletableFuture<ACell> announced=group.nextAnnounce();
+		maxNodeServer.getCursor().set(CVMLong.create(23));
+		maxNodeServer.getHost().sync();
+		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
+	}
+
+	/** A failure of the JVM itself while publishing stops the group's publication visibly. */
+	@Test
+	public void testFatalErrorStopsPublicationVisibly() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+			@Override public ACell processSnapshot(ACell value) throws IOException {
+				if (CVMLong.create(13).equals(value)) throw new InternalError("simulated publication");
+				return super.processSnapshot(value);
+			}
+		};
+		maxNodeServer.addPropagator(group);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+
+		maxNodeServer.getCursor().set(CVMLong.create(13));
+		maxNodeServer.getHost().sync();
+		LatticePropagator.Failure recorded=failure.get(5,TimeUnit.SECONDS);
+		assertTrue(recorded.cause() instanceof InternalError);
+		assertEquals("publication processing",recorded.operation());
+	}
+
 	/** Every propagation-group callback is optional, isolated fan-out. */
 	@Test
 	public void testPropagatorFailuresCannotBreakAuthoritativeLoop() throws Exception {
@@ -443,26 +511,6 @@ public class NodeServerTest {
 		assertEquals(CVMLong.create(7), c.get());
 	}
 
-	/** A lattice whose merge throws an Error (e.g. simulating deep-recursion StackOverflowError). */
-	static final class ThrowingLattice extends ALattice<AInteger> {
-		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
-			throw new StackOverflowError("simulated deep-recursion merge");
-		}
-		@Override public AInteger zero() { return null; }
-		@Override public boolean checkForeign(AInteger value) { return true; }
-		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
-	}
-
-	/** A lattice modelling a fatal JVM failure rather than malformed recursion. */
-	static final class FatalThrowingLattice extends ALattice<AInteger> {
-		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
-			throw new OutOfMemoryError("simulated fatal merge failure");
-		}
-		@Override public AInteger zero() { return null; }
-		@Override public boolean checkForeign(AInteger value) { return true; }
-		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
-	}
-
 	@Test
 	public void testHostAndPropagationDefaultsAndOverrides() {
 		NodeConfig hostDefaults=NodeConfig.create();
@@ -573,30 +621,115 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * #561: StackOverflowError from a maliciously deep value is recoverable once its
-	 * stack unwinds, so the merge is rejected atomically without losing the dispatcher.
+	 * #561: a merge that fails, including by overflowing the stack on a maliciously
+	 * deep value or running out of memory, is rejected and leaves the cursor unchanged.
 	 */
 	@Test
-	public void testMergeStackOverflowRejectedNotPropagated() {
-		maxNodeServer = new TestNode<>(new ThrowingLattice(), store, NodeConfig.port(-1));
-		var c = maxNodeServer.getCursor();
-		c.set(CVMLong.create(5));
-
-		assertFalse(maxNodeServer.mergeIncoming(CVMLong.create(7)),
-			"a recursive stack overflow must be caught and rejected");
-		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
+	public void testFailedMergeRejected() throws IOException {
+		List<Error> errors=List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"),
+			new NoClassDefFoundError("simulated"));
+		for (Error error: errors) {
+			try (TestNode<AInteger> node=new TestNode<>(new PoisonedLattice(CVMLong.create(7),error),store,NodeConfig.port(-1))) {
+				var c=node.getCursor();
+				c.set(CVMLong.create(5));
+				assertFalse(node.mergeIncoming(CVMLong.create(7)),error.toString());
+				assertEquals(CVMLong.create(5),c.get(),error.toString());
+			}
+		}
 	}
 
-	/** Fatal VM errors must reach the dispatcher's fail-closed boundary. */
+	/** A failure of the JVM itself in a merge is not contained, and leaves the cursor unchanged. */
 	@Test
-	public void testFatalMergeErrorPropagates() {
-		maxNodeServer = new TestNode<>(new FatalThrowingLattice(), store, NodeConfig.port(-1));
-		var c = maxNodeServer.getCursor();
+	public void testJvmFailureInMergePropagates() {
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(7),new InternalError("simulated")),
+			store,NodeConfig.port(-1));
+		var c=maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
+		assertThrows(InternalError.class,() -> maxNodeServer.mergeIncoming(CVMLong.create(7)));
+		assertEquals(CVMLong.create(5),c.get());
+	}
 
-		assertThrows(OutOfMemoryError.class,
-			() -> maxNodeServer.mergeIncoming(CVMLong.create(7)));
-		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted fatal merge");
+	/** A lattice whose merge of one chosen value throws a chosen Error, and otherwise keeps the larger value. */
+	static final class PoisonedLattice extends ALattice<AInteger> {
+		private final ACell poison;
+		private final Error error;
+		PoisonedLattice(ACell poison, Error error) { this.poison=poison; this.error=error; }
+		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
+			if (poison.equals(otherValue)) throw error;
+			return MaxLattice.create().merge(ownValue,otherValue);
+		}
+		@Override public AInteger zero() { return CVMLong.ZERO; }
+		@Override public boolean checkForeign(AInteger value) { return true; }
+		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
+	}
+
+	/** A correlated LATTICE_VALUE of a value at the root. */
+	private static Message rootValue(long id, ACell value, AConnection conn) {
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(id),Vectors.empty(),value);
+		return Message.create(MessageType.LATTICE_VALUE,payload).withConnection(conn);
+	}
+
+	/**
+	 * Running out of memory merging one lattice message fails that message alone, with a
+	 * load error that does not count against its sender, and later messages are still
+	 * handled.
+	 */
+	@Test
+	public void testOutOfMemoryInMergeFailsOnlyItsMessage() throws Exception {
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new OutOfMemoryError("simulated")),
+			store,NodeConfig.port(-1));
+		maxNodeServer.addPropagator(new LatticePropagator(store,LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(2)))));
+		maxNodeServer.launch();
+		LatticePropagator group=propagator(maxNodeServer);
+		ScriptedPeer sender=new ScriptedPeer();
+		ScriptedPeer honest=new ScriptedPeer();
+
+		group.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),sender)); // reject 1
+		group.handleIncomingMessage(rootValue(1,CVMLong.create(13),sender));
+		group.handleIncomingMessage(rootValue(2,CVMLong.create(42),honest));
+		assertEquals(ErrorCodes.LOAD,sender.awaitResult(1).getErrorCode(),
+			"the message whose merge ran out of memory fails with a load error");
+		assertFalse(sender.isClosed(),"running out of memory is not the sender's fault, so not a second reject");
+		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
+		assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
+	}
+
+	/**
+	 * Running out of memory handling one lattice message outside the merge, here
+	 * returning its result, closes that message's connection alone: later messages are
+	 * still handled.
+	 */
+	@Test
+	public void testOutOfMemoryReplyingClosesOnlyItsConnection() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		LatticePropagator group=propagator(maxNodeServer);
+		maxNodeServer.launch();
+		ScriptedPeer faulting=new ScriptedPeer();
+		faulting.onReply=new OutOfMemoryError("simulated");
+		ScriptedPeer honest=new ScriptedPeer();
+
+		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),faulting)));
+		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
+		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
+		assertNull(faulting.onReply,"replying ran out of memory");
+		assertTrue(faulting.isClosed(),"the connection whose reply ran out of memory is closed");
+	}
+
+	/** An Error that no message can be blamed for stops the group's inbound processing visibly. */
+	@Test
+	public void testFatalErrorStopsInboundVisibly() throws Exception {
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new InternalError("simulated")),
+			store,NodeConfig.port(-1));
+		LatticePropagator group=propagator(maxNodeServer);
+		maxNodeServer.launch();
+		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+		ScriptedPeer peer=new ScriptedPeer();
+
+		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),peer)));
+		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof InternalError);
+		assertNotNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),peer)),
+			"a group whose inbound processing stopped refuses further messages");
 	}
 
 	/**
@@ -1519,6 +1652,8 @@ public class NodeServerTest {
 		final ConcurrentHashMap<ACell,CompletableFuture<Result>> results = new ConcurrentHashMap<>();
 		volatile boolean refuseSends = false;
 		volatile boolean closed = false;
+		/** Thrown once, by the next attempt to return a result. */
+		volatile Error onReply = null;
 
 		ScriptedPeer() {
 			this(AKeyPair.generate().getAccountKey());
@@ -1536,6 +1671,11 @@ public class NodeServerTest {
 
 		@Override public boolean trySendMessage(Message msg) {
 			if (msg.getType() == MessageType.RESULT) {
+				Error replying = onReply;
+				if (replying != null) {
+					onReply = null;
+					throw replying;
+				}
 				Result result = msg.toResult();
 				result(result.getID()).complete(result);
 			}
@@ -2009,6 +2149,152 @@ public class NodeServerTest {
 	}
 
 	/**
+	 * A vector that decodes, being correctly encoded cell by cell, but whose tree
+	 * claims 256 elements while its last leaf holds 15: 547 bytes, so a branch.
+	 */
+	public static AVector<?> invalidVectorTree() throws BadFormatException {
+		StringBuilder sb=new StringBuilder("808200");
+		for (int i=0; i<16; i++) {
+			int n=(i<15)?16:15;
+			sb.append("80").append(String.format("%02x",n));
+			for (int j=1; j<=n; j++) sb.append("11").append(String.format("%02x",j));
+		}
+		return new MemoryStore().decode(Blob.fromHex(sb.toString()));
+	}
+
+	/** A complete value that fails the structure check is the sender's fault. */
+	@Test
+	public void testInvalidStructureCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(1),Vectors.empty(),invalidVectorTree());
+		endpoint.handleIncomingMessage(Message.create(MessageType.LATTICE_VALUE,payload).withConnection(peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an invalid structure is the sender's fault, for the second reject");
+	}
+
+	/** Data acquired from a trusted sender that fails the structure check is that sender's fault. */
+	@Test
+	public void testAcquiredInvalidStructureCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		// Only the payload's own cell is sent: the tree is a branch the receiver must acquire
+		AVector<?> tree=invalidVectorTree();
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(1),Vectors.empty(),tree);
+		endpoint.handleIncomingMessage(Message.create(MessageType.LATTICE_VALUE,null,payload.getEncoding()).withConnection(peer));
+		peer.answerNextRequest(Result.value(Vectors.of(tree)));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an invalid structure is the sender's fault, for the second reject");
+	}
+
+	/**
+	 * A vector leaf of fifteen small integers with an empty vector as its prefix, so
+	 * correctly encoded but disagreeing with the count it claims.
+	 *
+	 * @param countVLQ Claimed count, VLQ-encoded, leaving 15 mod 16
+	 */
+	static AVector<?> pathClaiming(String countVLQ) throws BadFormatException {
+		StringBuilder sb=new StringBuilder("80").append(countVLQ);
+		for (int i=1; i<=15; i++) sb.append("11").append(String.format("%02x",i));
+		sb.append("8000");
+		return new MemoryStore().decode(Blob.fromHex(sb.toString()));
+	}
+
+	/** Sends a correlated LATTICE_VALUE of 42 at a path. */
+	private static Message latticeValueAt(long id, AVector<?> path, AConnection conn) {
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(id),path,CVMLong.create(42));
+		return Message.create(MessageType.LATTICE_VALUE,payload).withConnection(conn);
+	}
+
+	/** Sends a correlated LATTICE_QUERY for a path. */
+	private static Message latticeQueryAt(long id, AVector<?> path, AConnection conn) {
+		AVector<?> payload=Vectors.create(MessageTag.LATTICE_QUERY,CVMLong.create(id),path);
+		return Message.create(MessageType.LATTICE_QUERY,payload).withConnection(conn);
+	}
+
+	/** A path claiming far more keys than its message holds is the sender's fault. */
+	@Test
+	public void testOverlongPathCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		AVector<?> path=pathClaiming("87ffffff7f");
+		assertEquals(Integer.MAX_VALUE,path.count());
+		endpoint.handleIncomingMessage(latticeValueAt(1,path,peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an overlong path is the sender's fault, for the second reject");
+	}
+
+	/** A well formed path longer than the group accepts is the sender's fault. */
+	@Test
+	public void testLongPathCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		int limit=LatticePropagatorConfig.DEFAULT_MAX_PATH_LENGTH;
+		endpoint.handleIncomingMessage(latticeValueAt(1,Vectors.repeat(CVMLong.ONE,limit+1),peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"a path over the limit is the sender's fault, for the second reject");
+	}
+
+	/** A short path whose structure is invalid is the sender's fault. */
+	@Test
+	public void testInvalidPathStructureCountsAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		AVector<?> path=pathClaiming("1f");
+		assertEquals(31,path.count());
+		endpoint.handleIncomingMessage(latticeValueAt(1,path,peer));
+		assertEquals(ErrorCodes.FORMAT,peer.awaitResult(1).getErrorCode());
+		assertTrue(peer.isClosed(),"an invalid path is the sender's fault, for the second reject");
+	}
+
+	/** A query for a path longer than the group accepts is refused. */
+	@Test
+	public void testLatticeQueryRejectsLongPath() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		int limit=LatticePropagatorConfig.DEFAULT_MAX_PATH_LENGTH;
+		endpoint.handleIncomingMessage(latticeQueryAt(1,Vectors.repeat(CVMLong.ONE,limit+1),peer));
+		assertEquals(ErrorCodes.ARGUMENT,peer.awaitResult(1).getErrorCode());
+		endpoint.handleIncomingMessage(latticeQueryAt(2,Vectors.repeat(CVMLong.ONE,limit),peer));
+		assertFalse(peer.awaitResult(2).isError(),"a path at the limit is read");
+	}
+
+	/** An operator's path limit decides which paths a group accepts. */
+	@Test
+	public void testConfiguredPathLength() throws Exception {
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_PATH_LENGTH,CVMLong.create(2)));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
+		maxNodeServer.addPropagator(new LatticePropagator(store,groupConfig));
+		maxNodeServer.launch();
+		LatticePropagator endpoint=propagator(maxNodeServer);
+		ScriptedPeer peer=new ScriptedPeer();
+
+		endpoint.handleIncomingMessage(latticeQueryAt(1,Vectors.of(CVMLong.ONE,CVMLong.ONE,CVMLong.ONE),peer));
+		assertEquals(ErrorCodes.ARGUMENT,peer.awaitResult(1).getErrorCode());
+		endpoint.handleIncomingMessage(latticeQueryAt(2,Vectors.of(CVMLong.ONE,CVMLong.ONE),peer));
+		assertFalse(peer.awaitResult(2).isError(),"a path at the configured limit is read");
+	}
+
+	/** A negative path limit is not a valid setting. */
+	@Test
+	public void testNegativePathLengthIsInvalid() {
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_PATH_LENGTH,CVMLong.create(-1)));
+		assertThrows(IllegalArgumentException.class,groupConfig::getMaxPathLength);
+	}
+
+	/**
 	 * #566: closed connections drain from the stats map via the periodic sweep (so an idle
 	 * node cleans up without inbound traffic), and removeConnection is the explicit single-sink
 	 * teardown.
@@ -2434,6 +2720,20 @@ public class NodeServerTest {
 				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
 			assertTrue(e.getCause() instanceof ResultException,String.valueOf(e.getCause()));
 			assertEquals(ErrorCodes.TIMEOUT,((ResultException)e.getCause()).getResult().getErrorCode());
+		}
+	}
+
+	/** A pull answered with a value that fails the structure check fails checked, as a bad reply. */
+	@Test
+	public void testPullAnsweredWithInvalidStructureFailsChecked() throws Exception {
+		ControlledVerificationConvex peer=new ControlledVerificationConvex();
+		peer.answer=Result.value(invalidVectorTree());
+		try (NodeServer<AInteger> target=new TestNode<>(MaxLattice.create(),new MemoryStore())) {
+			LatticePropagator group=propagator(target);
+			target.launch();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
+			assertTrue(e.getCause() instanceof BadFormatException,String.valueOf(e.getCause()));
 		}
 	}
 

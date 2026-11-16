@@ -128,7 +128,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergePublication(
+	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> reconcile(
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
 		return lattice.merge(own,other);

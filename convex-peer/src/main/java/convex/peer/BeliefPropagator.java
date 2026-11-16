@@ -26,12 +26,13 @@ import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.core.data.Index;
+import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.message.AConnection;
@@ -189,8 +190,18 @@ public class BeliefPropagator extends AThreadedComponent {
 		// Try belief update.
 		// Might include new blocks published by the peer
 		// Returns true if peer's Order changed (and therefore needs immediate broadcast)
-		boolean updated= maybeUpdateBelief(incomingBelief);
-		
+		boolean updated;
+		try {
+			updated=maybeUpdateBelief(incomingBelief);
+		} catch (MissingDataException e) {
+			// The merge reads only Orders this peer holds in full: it lacks data it must
+			// hold, so it cannot proceed
+			server.requestShutdown("Belief merge is missing data this peer must hold: "+e.getMissingHash(),e,true);
+			// Stops this thread's loop now: the shutdown runs on a thread of its own
+			close();
+			return;
+		}
+
 		if (updated) {
 			if (log.isDebugEnabled()) {
 				log.debug("Belief updated cps="+Vectors.createLongs(belief.getOrder(server.getPeerKey()).getConsensusPoints()));
@@ -291,7 +302,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Handle general Belief update, taking belief registered in newBeliefs
 	 *
 	 * @return true if Peer Belief changed, false otherwise
-	 * @throws InterruptedException
+	 * @throws MissingDataException if this peer lacks data the merge reads
 	 */
 	protected boolean maybeUpdateBelief(Belief newBelief) {
 
@@ -352,53 +363,92 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
-	 * belief.
-	 * @param newBeliefs New beliefs to merge 
+	 * belief. A newly received Order that cannot be merged is dropped, and the
+	 * others are merged without it.
+	 * @param newBeliefs New beliefs to merge
 	 *
 	 * @return True if Peer Belief Order was changed, false otherwise.
+	 * @throws MissingDataException if this peer lacks data the merge reads
 	 */
 	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
 		if ((newBeliefs==null)||(newBeliefs.length==0)) return false;
-		try {
-			long ts=server.getTimestamp();
-			AKeyPair kp=server.getKeyPair();
-			BeliefMerge mc = BeliefMerge.create(belief,kp, ts, server.getPeer().getConsensusState());
-			Belief newBelief = mc.merge(newBeliefs);
-
-			AccountKey key=mc.getAccountKey();
-			Order oldOrder=belief.getOrder(key);
-			Order newOrder=newBelief.getOrder(key);
-			
-			boolean ownChanged=false;
-			if (oldOrder==null) {
-				ownChanged=newOrder!=null;
-			} else {
-				if (newOrder==null) {
-					ownChanged=true; // old order must have been removed
-				} else {
-					ownChanged=!newOrder.consensusEquals(oldOrder);
-				}
-			}
-			// Any change to the Belief, including other peers' Orders, is worth relaying
-			if (newBelief!=belief) beliefChanged=true;
-			belief=newBelief;
-
-			return ownChanged;
-		} catch (MissingDataException e) {
-			// Shouldn't happen if beliefs are correctly persisted
-			// e.printStackTrace();
-			throw new Error("Missing data in belief merge: " + e.getMissingHash().toHexString(), e);
-		} catch (InvalidDataException e) {
-			// Shouldn't happen if Beliefs are already validated
-			// e.printStackTrace();
-			throw new Error("Invalid data in belief merge!", e);
-		} catch (Throwable e) {
-			// Merging the received Orders failed: drop them and keep this peer's Belief,
-			// unless the JVM itself has failed
-			Utils.checkRequestFailure(e);
-			mergeFailures.log(e,"Belief merge failed, received Orders dropped");
+		long ts=server.getTimestamp();
+		AKeyPair kp=server.getKeyPair();
+		State state=server.getPeer().getConsensusState();
+		Belief newBelief=tryMerge(ts,kp,state,newBeliefs);
+		if (newBelief==null) {
+			newBelief=tryMerge(ts,kp,state,withoutUnmergeableOrders(ts,kp,state,newBeliefs));
+		}
+		if (newBelief==null) {
+			log.error("Belief merge failed even without the Orders that cannot be merged on their own");
 			return false;
 		}
+
+		AccountKey key=kp.getAccountKey();
+		Order oldOrder=belief.getOrder(key);
+		Order newOrder=newBelief.getOrder(key);
+
+		boolean ownChanged=false;
+		if (oldOrder==null) {
+			ownChanged=newOrder!=null;
+		} else {
+			if (newOrder==null) {
+				ownChanged=true; // old order must have been removed
+			} else {
+				ownChanged=!newOrder.consensusEquals(oldOrder);
+			}
+		}
+		// Any change to the Belief, including other peers' Orders, is worth relaying
+		if (newBelief!=belief) beliefChanged=true;
+		belief=newBelief;
+
+		return ownChanged;
+	}
+
+	/**
+	 * Merges Beliefs into this peer's Belief.
+	 *
+	 * @return Merged Belief, or null if the merge fails
+	 * @throws MissingDataException if this peer lacks data the merge reads
+	 */
+	private Belief tryMerge(long ts, AKeyPair kp, State state, Belief... beliefs) {
+		try {
+			return BeliefMerge.create(belief,kp,ts,state).merge(beliefs);
+		} catch (MissingDataException e) {
+			// Not a failure of the received Orders: this peer's own fault, for the caller
+			throw e;
+		} catch (Throwable e) {
+			// The merge builds a new Belief and changes nothing else, and only its work
+			// held the stack or memory, so this peer's Belief is as it was, unless the JVM
+			// itself has failed
+			Utils.checkRequestFailure(e);
+			mergeFailures.log(e,"Belief merge failed");
+			return null;
+		}
+	}
+
+	/**
+	 * Gets a Belief with this peer's Orders and those received Orders that can each be
+	 * merged into this peer's Belief on their own.
+	 */
+	private Belief withoutUnmergeableOrders(long ts, AKeyPair kp, State state, Belief[] beliefs) {
+		Index<AccountKey, SignedData<Order>> current=belief.getOrders();
+		Index<AccountKey, SignedData<Order>> usable=current;
+		for (Belief b: beliefs) {
+			if (b==null) continue;
+			Index<AccountKey, SignedData<Order>> orders=b.getOrders();
+			long n=orders.count();
+			for (long i=0; i<n; i++) {
+				MapEntry<AccountKey, SignedData<Order>> e=orders.entryAt(i);
+				if (Cells.equals(e.getValue(),current.get(e.getKey()))) continue;
+				if (tryMerge(ts,kp,state,Belief.create(current.assocEntry(e)))==null) {
+					log.debug("Dropped an Order from peer {} that cannot be merged",e.getKey());
+					continue;
+				}
+				usable=usable.assocEntry(e);
+			}
+		}
+		return Belief.create(usable);
 	}
 	
 	/**
@@ -534,8 +584,12 @@ public class BeliefPropagator extends AThreadedComponent {
 				// The merge ignores Orders from unstaked keys, which anyone can make:
 				// drop them before the costly signature check and store write
 				if (!BeliefMerge.isValidPeer(state,key)) continue;
+				Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
+				if (newOrder==null) {
+					rejectReceived(source,new BadFormatException("Signed value in a Belief is not an Order"),"Unusable Order");
+					continue;
+				}
 				if (orders.containsKey(key)) {
-					Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 					Order oldOrder=RT.ensureCVM(orders.get(key).getValue(),Order.class);
 					if (!BeliefMerge.compareOrders(oldOrder,newOrder)) continue;
 				}
@@ -547,16 +601,13 @@ public class BeliefPropagator extends AThreadedComponent {
 					break;
 				}
 
-				so=Cells.persist(so,server.getStore());
+				// The merge reads only Orders persisted in full
+				so=Cells.persist(so,getStore());
 				observeOrderUpdate(so);
 				orders.put(key,so);
 				changed=true;
 			} catch (MissingDataException e) {
-				if (source!=null) {
-					fetchMissing(source);
-				} else {
-					log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
-				}
+				awaitMissing(source,e.getMissingHash());
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
@@ -568,6 +619,18 @@ public class BeliefPropagator extends AThreadedComponent {
 			}
 		}
 		return changed;
+	}
+
+	/**
+	 * Handles a received value that refers to data not held yet: fetches it from the
+	 * sender of a wire value, or reports a locally acquired value as incomplete.
+	 */
+	private void awaitMissing(Message source, Hash missing) {
+		if (source!=null) {
+			fetchMissing(source);
+		} else {
+			log.warn("Locally acquired Belief is incomplete at {}",missing);
+		}
 	}
 
 	/**
@@ -588,7 +651,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	private final RequestFailures mergeFailures=new RequestFailures(log);
 	private final RequestFailures fetchFailures=new RequestFailures(log);
 	private final RequestFailures observerFailures=new RequestFailures(log);
-	
+
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
 	private final AtomicBoolean fetching=new AtomicBoolean();
 

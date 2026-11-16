@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
+import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -128,6 +129,21 @@ class MergeChangesTest {
 		assertRejected(null,hashed,indexed);
 	}
 
+	/** Where other holds base's value in other cells, own's change goes into them rather than replacing them. */
+	@Test void aChangeOnlyOwnMadeIsCarriedIntoTheOtherSidesCells() {
+		byte[] bytes=new byte[200];
+		AHashMap<Keyword,ACell> inner=Maps.of(X,ONE,Y,Blob.wrap(bytes));
+		AHashMap<Keyword,ACell> base=Maps.of(A,inner,B,inner);
+		// An equal value in new cells, as a persist would leave it
+		AHashMap<Keyword,ACell> otherInner=Maps.of(X,ONE,Y,Blob.wrap(bytes.clone()));
+		AHashMap<Keyword,ACell> other=Maps.of(A,otherInner,B,otherInner);
+		var own=base.assoc(A,inner.assoc(X,OURS));
+		@SuppressWarnings("unchecked")
+		var merged=(AHashMap<Keyword,ACell>)LatticeOps.mergeChanges(base,own,other).get(A);
+		assertEquals(OURS,merged.get(X));
+		assertSame(otherInner.get(Y),merged.get(Y),"the other side's cells, not own's");
+	}
+
 	@Test void theResultKeepsTheOtherSidesCells() {
 		AHashMap<Keyword,ACell> inner=Maps.of(X,ONE);
 		AHashMap<Keyword,ACell> base=Maps.of(A,inner,B,inner);
@@ -170,7 +186,7 @@ class MergeChangesTest {
 		var root=new Root<AHashMap<Keyword,ACell>>(original);
 		var fork=root.fork();
 		var component=new ALatticeComponent<AHashMap<Keyword,ACell>>(fork) {
-			@Override protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
+			@Override protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 				return own.assoc(X,OURS);
 			}
 		};
@@ -186,6 +202,6 @@ class MergeChangesTest {
 		var component=new ALatticeComponent<AHashMap<Keyword,ACell>>(fork) {};
 		fork.set(original.assoc(B,OURS));
 		root.set(original.assoc(Y,THEIRS));
-		assertThrows(UnsupportedOperationException.class,component::sync);
+		assertThrows(MergeConflictException.class,component::sync);
 	}
 }

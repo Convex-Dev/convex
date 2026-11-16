@@ -37,21 +37,23 @@ import convex.lattice.cursor.BoundaryCursor;
  * and an exclusive one claims only that region's boundary, so regions transact
  * exclusively at the same time. A transaction
  * on the whole container, by a subclass that implements {@link TransactionalComponent},
- * spans its regions and works on their values published into the container; a region
- * write landing there during an attempt makes it retry on top. An exclusive
+ * spans its regions and works on their values published into the container. A region
+ * write landing there during an attempt merges with its run region by region
+ * ({@link #reconcile(Index,Index,Index)}); a region both changed, which
+ * {@link #mergeRegion} refuses, reruns it under the claim. An exclusive
  * transaction on the container holds the claim beneath every region's boundary, so region writes wait
  * for it. Work a region keeps in a working copy of its own, including transactions
  * committed into that fork, has not yet been published into the container. It is
  * not part of a transaction on the container, and it merges with the container's
  * current value when the region next syncs. A live region's exclusive transaction,
  * and an ordinary one once it has taken the
- * claim after two conflicts, holds against writes through its boundary; a
+ * claim after a conflict, holds against writes through its boundary; a
  * transaction on the container that changes the same region meanwhile does not pass
- * through it, so the region's commit merges that change with its own run by the
- * region's publication merge, or fails if the region has none.</p>
+ * through it, so the region's commit reconciles that change with its own run by the
+ * region's {@link #reconcile(Index,Index,Index)}, or fails if the region cannot.</p>
  *
  * <p>A fork of this container, or a container built over a fork, reconciles at sync
- * region by region ({@link #mergePublication(Index,Index,Index)}): a region changed
+ * region by region ({@link #reconcile(Index,Index,Index)}): a region changed
  * on only one side takes that side, so regions that update independently never
  * conflict, and a region this container does not serve that both sides changed
  * keeps the destination's value.</p>
@@ -310,13 +312,12 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 
 	/**
 	 * Reconciles this container's working copy with a destination that also changed,
-	 * key by key. A key changed on only one side, or changed to the same value on
-	 * both, takes that value. A key this container does not serve keeps the
-	 * destination's value. A region it serves that the two sides changed differently
-	 * goes to {@link #mergeRegion}.
+	 * key by key. A key changed on only one side takes that side's value. A key this
+	 * container does not serve keeps the destination's value. A region it serves that
+	 * both sides changed, even to equal values, goes to {@link #mergeRegion}.
 	 */
 	@Override
-	protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+	protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> result=other;
 		for (Index<Keyword,ACell> side:Arrays.asList(base,own)) {
 			if (side==null) continue;
@@ -330,8 +331,9 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				if (same(ownHas,ownValue,has(base,key),get(base,key))) continue;
 				boolean otherHas=has(other,key);
 				ACell otherValue=get(other,key);
-				if (same(otherHas,otherValue,has(base,key),get(base,key)) || same(ownHas,ownValue,otherHas,otherValue)) {
-					result=put(result,key,ownHas,ownValue);
+				if (same(otherHas,otherValue,has(base,key),get(base,key))) {
+					// Only own changed: carried onto the destination's cells where they are equal
+					result=put(result,key,ownHas,(ownHas && otherHas)?LatticeOps.mergeChanges(get(base,key),ownValue,otherValue):ownValue);
 				} else {
 					Keyword region=served(key);
 					if (region!=null) result=put(result,key,true,mergeRegion(region,get(base,key),ownValue,otherValue));
@@ -350,8 +352,8 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	}
 
 	/**
-	 * Reconciles one region that this container's working copy and its destination
-	 * changed differently. Called within the destination's atomic update, so it must
+	 * Reconciles one region that both this container's working copy and its destination
+	 * changed. Called within the destination's atomic update, so it must
 	 * use only the values given. The default refuses: a region's own merge works on
 	 * its component's working type, which may differ from what is stored here, so a
 	 * subclass that forks itself while such conflicts can arise supplies the rule.
@@ -363,7 +365,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * @return Reconciled stored value
 	 */
 	protected ACell mergeRegion(Keyword key,ACell base,ACell own,ACell other) {
-		throw new UnsupportedOperationException("Region "+key+" changed both in "+getClass().getSimpleName()
+		throw new MergeConflictException("Region "+key+" changed both in "+getClass().getSimpleName()
 			+" and at its destination, and no region merge is defined");
 	}
 

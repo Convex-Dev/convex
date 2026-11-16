@@ -189,9 +189,7 @@ public final class Acquiror implements AutoCloseable {
 				missing.add(hash);
 			} else {
 				ref.findMissing(missing, CPoSConstants.MISSING_LIMIT);
-				if (missing.isEmpty()) {
-					return Cells.persist(ref.getValue(), store);
-				}
+				if (missing.isEmpty()) return Cells.persistReceived(ref.getValue(), store);
 			}
 
 			Hash[] requested = missing.toArray(Utils.EMPTY_HASHES);

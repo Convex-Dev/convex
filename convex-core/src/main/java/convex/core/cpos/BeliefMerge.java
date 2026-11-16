@@ -273,12 +273,16 @@ public class BeliefMerge {
 		// Get the winning chain for this peer, including new blocks encountered
 		AVector<SignedData<Block>> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
 		if (winningBlocks == null) return null; // if no voting stake on any order
-		
-		winningBlocks=filterBlocks(winningBlocks,consensusPoint);
+
+		// What the network has agreed, judged on the winning ordering as it stands, is taken
+		// as it is: this peer checks every Block after it and after its own consensus point
+		long agreed=updateConsensus(myOrder.withBlocks(winningBlocks),stakedOrders,totalStake).getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS);
+		long checkFrom=Math.max(agreed,consensusPoint);
+		AVector<SignedData<Block>> myNewBlocks=filterBlocks(winningBlocks,checkFrom,consensusPoint);
 
 		// Take winning blocks into my Order
 		// winning chain should have same consensus as my initial chain
-		Order winningOrder = myOrder.withBlocks(winningBlocks);
+		Order winningOrder = myOrder.withBlocks(myNewBlocks);
 
 		Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
@@ -488,8 +492,10 @@ public class BeliefMerge {
 	}
 	
 	/**
-	 * #595 stage (ii): reorders the winning Block vector so a far-future Block does not
-	 * wedge later in-horizon Blocks behind it (see {@link #demoteFutureBlocks}). Applied
+	 * Gives the Blocks this peer's Order takes from the winning ordering: the winning
+	 * Blocks without any, from the given position on, whose signature does not verify,
+	 * then reordered so a far-future Block does not wedge later in-horizon Blocks behind
+	 * it (#595 stage (ii), see {@link #demoteFutureBlocks}). Applied
 	 * to the winning order before consensus is computed, so the reordering feeds
 	 * {@code updateConsensus} and the stage (i) clamp: with the future Block moved to the
 	 * back, the clamp confirms up to it, and the in-horizon Blocks ahead of it finalise.
@@ -502,12 +508,37 @@ public class BeliefMerge {
 	 * assumption breaks.</p>
 	 *
 	 * @param blks winning Block vector
+	 * @param checkFrom position from which Block signatures are checked
 	 * @param cp   consensus point: floor below which Blocks are not reordered
-	 * @return reordered Blocks, or the same vector if unchanged
+	 * @return Blocks for this peer's Order, or the same vector if unchanged
 	 */
 	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
-			long cp) {
-		return demoteFutureBlocks(blks, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
+			long checkFrom, long cp) {
+		// Which Blocks join first, then where far-future ones sit
+		AVector<SignedData<Block>> good=keepGoodBlocks(blks,checkFrom);
+		return demoteFutureBlocks(good, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
+	}
+
+	/**
+	 * Removes, from a given position on, the Blocks whose signature does not verify.
+	 *
+	 * @param blocks ordered Blocks
+	 * @param from first position checked
+	 * @return the Blocks without those that do not verify, or the same vector if all verify
+	 */
+	static AVector<SignedData<Block>> keepGoodBlocks(AVector<SignedData<Block>> blocks, long from) {
+		long n=blocks.count();
+		AVector<SignedData<Block>> result=null;
+		for (long i=from; i<n; i++) {
+			SignedData<Block> b=blocks.get(i);
+			if (b.checkSignature()) {
+				if (result!=null) result=result.conj(b);
+			} else if (result==null) {
+				// Shares every complete subtree before the first bad Block
+				result=blocks.slice(0,i);
+			}
+		}
+		return (result==null)?blocks:result;
 	}
 
 	/**
@@ -643,12 +674,10 @@ public class BeliefMerge {
 			newBlocks.remove(it.next());
 		}
 		newBlocksOrdered.removeIf(sb -> {
+			// Membership first: only Blocks to be appended are checked
+			if (!newBlocks.contains(sb)) return true;
 			// We ignore blocks that don't look valid for current state
-			BlockResult br=state.checkBlock(sb);
-			if (br!=null) {
-				return true;
-			}
-			return !newBlocks.contains(sb);
+			return state.checkBlock(sb)!=null;
 		});
 
 		// sort new blocks by timestamp and append to winning Order

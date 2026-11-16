@@ -35,6 +35,11 @@
  *       and path delivery; retries retain concurrent tasks without leaking draft edits.</li>
  *   <li>{@link convex.lattice.app.SharedRegionsTest}: separate staged regions share
  *       a host without publishing or overwriting one another's state.</li>
+ *   <li>{@link convex.lattice.app.ShopExample}, tested by
+ *       {@link convex.lattice.app.ShopApplicationTest}: an application in its
+ *       {@code :app} region, making its parts on its own cursor when they are
+ *       needed; its operations are transactions over them, and its merge keeps
+ *       concurrent changes to a fork or under an exclusive transaction's claim.</li>
  * </ul>
  *
  * <p>Network delivery and propagation scenarios belong in {@code convex.node.app}

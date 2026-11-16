@@ -291,7 +291,18 @@ public class StateTransitionsTest {
 		// Should be no state transition with a bad block
 		assertEquals(s,br.getState());
 	}
-	
+
+	@Test
+	public void testBadBlockNotABlock() {
+		State s = TestState.STATE;
+		@SuppressWarnings("unchecked")
+		SignedData<Block> sb=(SignedData<Block>)(SignedData<?>)KEYPAIR_PEER.signData(CVMLong.ONE);
+
+		BlockResult br=s.applyBlock(sb);
+		assertNull(br.getResult(0));
+		assertEquals(s,br.getState());
+	}
+
 	@Test
 	public void testBadBlockInsufficientStake() throws BadSignatureException {
 		State s = TestState.STATE;
@@ -309,6 +320,23 @@ public class StateTransitionsTest {
 		
 		// Should be no state transition with a bad block
 		// TODO: slash Peer?
+		assertEquals(s,br.getState());
+	}
+
+	@Test
+	public void testBadBlockSignature() throws BadSignatureException {
+		State s = TestState.STATE;
+		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read(":should-fail"));
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		Block b1 = Block.of(s.getTimestamp().longValue(), kp.signData(t1));
+		// The Peer's key, with another key's signature
+		SignedData<Block> sb=SignedData.create(KEYPAIR_PEER.getAccountKey(),KEYPAIR_ROBB.signData(b1).getSignature(),b1.getRef());
+
+		BlockResult br=s.applyBlock(sb);
+		assertEquals(ErrorCodes.PEER,br.getResult(0).getErrorCode());
+		assertEquals(Strings.BAD_SIGNATURE,br.getResult(0).getValue());
+
+		// Should be no state transition with a bad block
 		assertEquals(s,br.getState());
 	}
 

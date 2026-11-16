@@ -7,6 +7,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 
 /**
@@ -142,7 +143,7 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 	 * edited value instead.
 	 */
 	@Override
-	public V persist(Persister<V> persister) throws IOException {
+	public V persist(Persister persister) throws IOException {
 		for (int attempt=0;attempt<PERSIST_ATTEMPTS;attempt++) {
 			V held=get();
 			if (held==null) return null;

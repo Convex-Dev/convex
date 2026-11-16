@@ -105,6 +105,25 @@ class LatticePropagatorAnnounceTest {
 		}
 	}
 
+	/** A condition that overflows its stack or runs out of memory fails its own wait; publication and other waits carry on. */
+	@Test void conditionErrorFailsOnlyItsWait() throws Exception {
+		for (Error error: List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"))) {
+			Blob value=Blobs.createRandom(400);
+			try (MemoryStore store=new MemoryStore()) {
+				LatticePropagator group=new LatticePropagator(store);
+				CompletableFuture<ACell> broken=group.whenAnnounced(v -> {
+					throw error;
+				});
+				CompletableFuture<ACell> healthy=group.whenAnnounced(value::equals);
+
+				assertEquals(value,group.processSnapshot(value));
+				ExecutionException failure=assertThrows(ExecutionException.class,() -> broken.get(10,TimeUnit.SECONDS));
+				assertSame(error,failure.getCause());
+				assertEquals(value,healthy.getNow(null));
+			}
+		}
+	}
+
 	/** A wait still pending when the group stops fails; an announcement already made still satisfies one. */
 	@Test void pendingWaitFailsWhenTheGroupStops() throws Exception {
 		Blob value=Blobs.createRandom(400);

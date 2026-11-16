@@ -318,34 +318,89 @@ public class EtchVerifierTest {
 	}
 
 	@Test
+	public void testOneEntryChainIsValid() throws Exception {
+		// A chain start with no continuation, as a chain creation cut off between
+		// its two slot writes leaves it
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		File file=tempFile("etch-strict-chain-start");
+		AString root=rootBelowLastSlot("one-entry-chain");
+		long slot=storeRoot(file,config,root);
+		long pointer=readSlot(file,config,slot);
+		writeSlot(file,slot,EtchConstants.POINTER_START|pointer);
+
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
+		assertTrue(report.isValid(),report.toString());
+		try (EtchStore reopened=new EtchStore(Etch.create(file,config))) {
+			reopened.getEtch().visitIndex(new EtchVerifier.IndexVisitor());
+			EtchVerifier.verifyPersisted(reopened.getEtch());
+		}
+	}
+
+	@Test
+	public void testStaleContinuationOfIndexedRecordIsValid() throws Exception {
+		// A continuation with no chain start before it, pointing at a record the
+		// index holds elsewhere, as a collapse cut off while clearing leaves it
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		File file=tempFile("etch-strict-stale");
+		AString root=rootBelowLastSlot("stale-continuation");
+		long slot=storeRoot(file,config,root);
+		long pointer=readSlot(file,config,slot);
+		writeSlot(file,slot+EtchConstants.POINTER_SIZE,EtchConstants.POINTER_CHAIN|pointer);
+
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
+		assertTrue(report.isValid(),report.toString());
+		try (EtchStore reopened=new EtchStore(Etch.create(file,config))) {
+			EtchVerifier.IndexVisitor visitor=new EtchVerifier.IndexVisitor();
+			reopened.getEtch().visitIndex(visitor);
+			assertEquals(1L,visitor.stale);
+			EtchVerifier.verifyPersisted(reopened.getEtch());
+		}
+	}
+
+	@Test
 	public void testBrokenChainIsReported() throws Exception {
+		// A continuation with no chain start, holding the only pointer to its record
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
 		File file=tempFile("etch-strict-chain");
 		AString root=rootBelowLastSlot("broken-chain");
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(root);
-		store.flush();
-		store.close();
-
-		long slot;
-		long pointer;
-		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config)) {
-			slot=reader.getIndexStart()
-					+(root.getHash().shortAt(0)&0xffffL)*EtchConstants.POINTER_SIZE;
-			pointer=reader.readIndexSlot(slot)&~EtchConstants.POINTER_TYPE_MASK;
-		}
-		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			data.seek(slot);
-			data.writeLong(EtchConstants.POINTER_START|pointer);
-		}
+		long slot=storeRoot(file,config,root);
+		long pointer=readSlot(file,config,slot);
+		writeSlot(file,slot,0L);
+		writeSlot(file,slot+EtchConstants.POINTER_SIZE,EtchConstants.POINTER_CHAIN|pointer);
 
 		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertTrue(report.problems().stream().anyMatch(p ->
 				p.kind()==EtchVerifier.ProblemKind.CHAIN),report.toString());
 		try (EtchStore reopened=new EtchStore(Etch.create(file,config))) {
-			assertThrows(Error.class,()->reopened.getEtch().visitIndex(new EtchVerifier.IndexVisitor()));
-			assertThrows(IOException.class,()->EtchVerifier.verifyPersisted(reopened.getEtch()));
+			assertThrows(MissingDataException.class,()->EtchVerifier.verifyPersisted(reopened.getEtch()));
+		}
+	}
+
+	/** Stores a root alone in a new file and returns the position of its root slot. */
+	private static long storeRoot(File file, EtchConfig config, AString root) throws IOException {
+		EtchStore store=new EtchStore(Etch.create(file,config));
+		store.setRootData(root);
+		store.flush();
+		store.close();
+		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config)) {
+			long slot=reader.getIndexStart()
+					+(root.getHash().shortAt(0)&0xffffL)*EtchConstants.POINTER_SIZE;
+			assertEquals(0L,reader.readIndexSlot(slot+EtchConstants.POINTER_SIZE));
+			return slot;
+		}
+	}
+
+	private static long readSlot(File file, EtchConfig config, long slot) throws IOException {
+		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config)) {
+			return reader.readIndexSlot(slot)&~EtchConstants.POINTER_TYPE_MASK;
+		}
+	}
+
+	private static void writeSlot(File file, long slot, long value) throws IOException {
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			data.seek(slot);
+			data.writeLong(value);
 		}
 	}
 

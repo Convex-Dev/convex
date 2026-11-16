@@ -19,10 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Disconnect a remote that sends false input, such as a signature that does not verify or a data reply holding cells other than those requested; malformed input is rejected and keeps its connection, and in-process clients such as the REST API stay connected. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
-- Fail `Convex.verifyPeer`, rather than completing with null, when the remote's reply to the identity challenge is malformed, forged or signed for another challenge; a peer refuses a forged or misdirected reply instead of identifying the remote by its unverified status.
+- Fail `Convex.verifyPeer`, rather than completing with null, when the remote's reply to the identity challenge is malformed, forged or signed for another challenge.
 - Reply to a message or transaction a peer fails to handle with LOAD, LIMIT or PEER rather than an exception and its stack trace, logging the failure at debug and warning only the first time the peer runs out of memory or meets a probable defect.
 - Give invalid data the error FORMAT, or SIGNATURE for a signature that does not verify, in replies and in `Result.fromException`, rather than a generic error with a stack trace.
 - Log a failed data acquisition at debug, warning only the first time one runs out of memory or meets a probable defect.
+- Let operators limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
 - Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run exclusive lattice transactions on any component, holding up writes through the nearest transactional boundary, a `BoundaryCursor` or else the root; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Run colliding lattice transactions one at a time after two conflicts on their own value.
@@ -37,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Keep a peer running when one request or one pass of its own work fails, whatever the failure, including running out of memory or stack: only that work is dropped, and the peer shuts down only when it cannot advance consensus state, writing a final checkpoint, or when the JVM itself fails. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
 - Fail a data acquisition whatever error it meets, so its caller is never left waiting.
+- Validate data that peers and lattice nodes receive more strictly before using it.
+- Keep an Etch store usable, verifiable and safe to reopen after a write or sync stops part-way. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
 - Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
 - Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
 - Store a value a lattice node pulls from a peer without announcing it before the node has merged it, so the node's next update carries those cells to its other peers.

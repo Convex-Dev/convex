@@ -16,6 +16,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.test.Persisters;
 
 /** Claims stopping at a boundary, while writes go straight through it. */
 class BoundaryCursorTest {
@@ -164,13 +165,33 @@ class BoundaryCursorTest {
 		assertSame(written,a.get(),"the destination's own cells, which may be persisted");
 	}
 
-	@Test void aBypassingWriteThatMatchesTheRunNeedsNoMerge() {
+	@Test void aMergeEqualToTheBypassingWriteKeepsItsCells() {
 		var root=tree();
 		var a=boundary(root,A);
+		AInteger written=CVMLong.create(123456789);
+		AInteger copy=CVMLong.create(123456789);
+		assertNotSame(written,copy,"the test needs two objects with one value");
+		Transactions.executeExclusively(a,draft -> {
+			root.set(root.get().assoc(A,written));
+			draft.set(CVMLong.ONE);
+		},(base,own,other) -> copy);
+		assertSame(written,a.get(),"a merge result equal to the destination's value is a write of an equal value");
+	}
+
+	/** A merge is total, so whether equal changes on both sides agree is its decision. */
+	@Test void aBypassingWriteThatMatchesTheRunIsGivenToTheMerge() {
+		var root=tree();
+		var a=boundary(root,A);
+		var given=new ArrayList<ACell>();
 		Transactions.executeExclusively(a,draft -> {
 			root.set(root.get().assoc(A,CVMLong.ONE));
 			draft.set(CVMLong.ONE);
-		},(base,own,other) -> fail("both sides agree"));
+		},(base,own,other) -> {
+			given.add(own);
+			given.add(other);
+			return other;
+		});
+		assertEquals(List.of(CVMLong.ONE,CVMLong.ONE),given);
 		assertEquals(CVMLong.ONE,a.get());
 	}
 
@@ -188,7 +209,7 @@ class BoundaryCursorTest {
 		var a=boundary(root,A);
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
 			Transactions.executeExclusively(a,draft -> {
-				complete(other.submit(() -> { a.persist(value -> value); return null; }));
+				complete(other.submit(() -> { a.persist(Persisters.UNCHANGED); return null; }));
 				draft.set(CVMLong.ONE);
 			});
 		}

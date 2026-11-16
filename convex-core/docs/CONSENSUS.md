@@ -40,7 +40,8 @@ Peers converge on one ordering of Blocks without leaders or rounds. Each peer
 keeps an **Order** (its view of the ordering plus its consensus points) inside a
 signed **Belief** it gossips. `BeliefMerge` combines the Orders of other peers
 with the peer's own, weighted by effective stake, and adopts the stake-weighted
-winner; repeated adoption of the majority view converges exponentially fast.
+winner, less any Block after the consensus point whose signature does not
+verify; repeated adoption of the majority view converges exponentially fast.
 
 Confirmation proceeds through `CPoSConstants.CONSENSUS_LEVELS` levels. Level 0
 is the raw Block vector; each higher level records the longest prefix agreed by
@@ -124,7 +125,8 @@ attributable liveness wedge under attack: legitimate Blocks behind the offending
 one wait until the horizon passes it.
 
 **Stage (ii), ordering hygiene (liveness).** `filterBlocks` calls
-`demoteFutureBlocks` on the winning order before consensus is computed, stably
+`demoteFutureBlocks` on the winning order, after leaving out badly signed
+Blocks and before consensus is computed, stably
 moving out-of-window Blocks to the back of the unconfirmed tail. It is a stable
 partition, not a timestamp sort: sorting by claimed timestamp would let a peer
 back-date within the 15-minute window to jump ahead of others. In-horizon Blocks
@@ -155,6 +157,10 @@ trust in a specific peer for submission is a separate, explicit choice.
   `MAX_BLOCK_BACKDATE` and per-peer timestamp monotonicity in `checkBlock`.
 - **Future-dated Orders.** Ignored in belief merge, so an attacker cannot make a
   Belief artificially newest.
+- **Blocks under another peer's key.** `checkBlock` makes a Block whose signature
+  does not verify invalid, and a peer keeps no such Block in its Order after the
+  consensus point. One the network has already agreed is taken, so the peer
+  follows consensus and execution fails it.
 - **Stake-weight manipulation.** Advancement needs 2/3 of *effective* stake;
   decay removes the weight of inactive peers and sub-minimum peers cannot
   produce Blocks. Delegated stake adds weight but is withdrawable only by its
@@ -172,6 +178,18 @@ trust in a specific peer for submission is a separate, explicit choice.
 - **Message-level denial of service.** `MAX_MESSAGE_LENGTH`, `MISSING_LIMIT`,
   bounded transactions per Block, and juice metering on all execution including
   compile and expand. Malformed data from untrusted peers must fail closed.
+- **Unusable input.** Belief merge admits a received Order only once its whole
+  tree is in the store, and drops an Order the merge cannot use while merging the
+  others. A finalised Block that is not a signed Block with at most
+  `MAX_TRANSACTIONS_PER_BLOCK` signed transactions is invalid like any other
+  (`Peer.updateState`): the State is unchanged and execution moves on. Running out
+  of memory or stack while storing or answering one received query, transaction,
+  Order or DATA message fails that message alone, and while merging received Orders
+  drops them like any Order the merge cannot use. Data missing from a peer's own
+  store that it must hold in full (an agreed Block it executes, or an Order it
+  merges) stops the peer, as [Failure containment](#failure-containment) describes.
+  Missing data is never invalidity: a peer missing it is faulty, and treating the
+  Block as invalid would fork it from the network.
 - **Upgrade boundary.** A peer that cannot apply a scheduled upgrade withdraws
   deterministically rather than diverging; the trigger is unforgeable on-chain
   state, so withdrawal is not selectively targetable. See `UPGRADE.md`.
@@ -199,9 +217,10 @@ state is at risk:
   last consistent state remains.
 - **The peer shuts down only when it cannot advance consensus state, or the JVM
   has failed in its own work.** If applying or persisting consensus state fails,
-  other than by running out of memory, the peer shuts down rather than keep voting
-  on Blocks it has not applied, writing a final checkpoint of the last state it
-  persisted. Running out of memory there is retried on the next pass. A failure of
+  other than by running out of memory, or a Belief merge lacks data the peer must
+  hold, the peer shuts down rather than keep voting on Blocks it has not applied,
+  writing a final checkpoint of the last state it persisted. Running out of memory
+  there is retried on the next pass. A failure of
   the JVM itself at the top of one of the peer's loops shuts it down without a
   checkpoint.
 - **Operators are warned of what they must act on.** A client request that fails

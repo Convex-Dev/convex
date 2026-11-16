@@ -33,8 +33,8 @@ import convex.core.lang.RT;
  *
  * Binary representation:
  * <ol>
- * <li>1 byte - Tag.SIGNED_DATA tag </li>
- * <li>32 bytes - Public Key of signer</li>
+ * <li>1 byte - Tag.SIGNED_DATA tag, or Tag.SIGNED_DATA_SHORT without a public key</li>
+ * <li>32 bytes - Public Key of signer, absent in the short form</li>
  * <li>64 bytes - raw Signature data</li>
  * <li>1+ bytes - Data Value Ref (may be embedded)</li>
  * </ol>
@@ -59,7 +59,7 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	private AccountKey verifiedKey=null;
 
 	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
-		super(Tag.SIGNED_DATA,FORMAT.count());
+		super((address==null)?Tag.SIGNED_DATA_SHORT:Tag.SIGNED_DATA,FORMAT.count());
 		this.valueRef = refToValue;
 		this.pubKey = address;
 		signature = sig;
@@ -193,14 +193,13 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		byte tag=Tag.SIGNED_DATA;
-		bs[pos++]=tag;
+		bs[pos++]=getTag();
 		return encodeRaw(bs,pos);
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = pubKey.getBytes(bs,pos);
+		if (pubKey!=null) pos = pubKey.getBytes(bs,pos); // the short form has no key
 		pos = signature.getBytes(bs, pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
@@ -208,8 +207,8 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 
 	@Override
 	public int calcHeaderLength() {
-		// tag, raw public key and raw signature, then the value ref
-		return 1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH;
+		// tag, raw public key unless the short form, and raw signature, then the value ref
+		return 1+((pubKey==null)?0:AccountKey.LENGTH)+Ed25519Signature.SIGNATURE_LENGTH;
 	}
 	
 	@Override

@@ -358,6 +358,12 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
+	public void validateStructure() throws InvalidDataException {
+		// This cell's children are those of the vector it wraps
+		data.validateStructure();
+	}
+
+	@Override
 	public void forEach(Consumer<? super T> action) {
 		ListIterator<T> it = data.listIterator(count);
 		while (it.hasPrevious()) {

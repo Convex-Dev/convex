@@ -131,8 +131,14 @@ the component creates a missing container only when a changed write needs it.
 
 ## Composition and sharing
 
-An application is a component assembled at the host root. It usually groups
-named regions, each handled by a child component. Region paths belong to this
+An application is a component assembled at the host root. The root's keys are
+regions: facilities that many applications use, such as `:fs`, listed in
+[CAD053](https://docs.convex.world/docs/cad/lattice_regions), and `:app`, under
+which each application keeps its own state at `[:app <name>]`
+([CAD045](https://docs.convex.world/docs/cad/lattice_apps)). A root application
+registers the regions it serves: `:app`, holding each application's domain
+component under its name, and beside it any facilities used. A transaction on a
+transactional root application spans them all. Region paths belong to this
 assembly; domain components receive storage at their own position. The same
 component can therefore live at a default region, a custom path, or inside
 another application. Nodes can participate in different sets of regions while
@@ -177,7 +183,17 @@ does. It never syncs a child registered as an existing instance, which belongs t
 whoever made it. Syncing regions is sequential, not atomic: earlier successful
 work remains if a later region fails.
 
-An application made only of regions extends a region container and is registered
+Within its place, a domain component makes its parts on its own cursor when they
+are needed, such as `new Stock(path(STOCK))` from an `IndexComponent`, rather than
+registering them as regions. Such a part holds nothing but that cursor, so it is
+cheap to make and works alike on live storage, a fork or a transaction's draft. It
+shares its component's publication and claim boundary, and the component's merge
+rule covers it. A child needs to be a region only for a boundary of its own:
+separate publication, staging or exclusive transactions. A transaction reads its
+component's value, so whoever makes a component at a place that may still be
+absent gives it a default there, such as `cursor.withDefault(Index.none())`.
+
+A root application made only of regions extends a region container and is registered
 with the host as it is. One with root-level behaviour of its own, such as a merge
 across its regions or a private copy of the whole root, extends
 `ALatticeApplication`, holding a region container where that helps. The host
@@ -355,13 +371,14 @@ live view and a private view. Their storage and publication boundaries differ,
 not the meaning of actions such as adding a favourite or editing a file.
 
 A transaction executes operations on a private draft, then commits one local
-atomic change. During optimistic execution, a change to the transaction's input
-makes the operations run again against current state. Under a claim, a change
-that bypasses the claimed boundary is instead reconciled using the component's
-publication merge; a component without a suitable merge refuses that conflicting
-commit. These are different ways of handling a conflict: retrying repeats the
-operations, while merging resolves the resulting versions according to component
-policy.
+atomic change by the component's `reconcile`, given the value it started from,
+its own value and the current value. A concurrent change the component can
+reconcile commits with the run; a conflict, which by default is any change on both
+sides, makes the operations run once more, under a claim, against current state.
+Under a claim, a change that bypasses the claimed boundary goes through the same
+`reconcile`, and a conflict there refuses the commit. These are different ways of
+handling a concurrent change: merging resolves the resulting versions according to
+component policy, while retrying repeats the operations.
 
 Execution produces a transaction value and a return value. Commit applies any
 required reconciliation and authoring, then atomically installs the resulting
@@ -723,6 +740,8 @@ These executable assemblies and tests exercise the design boundaries.
 | Signed user records, local edits and private drafts | [FavouritesExample](../src/test/java/convex/lattice/app/FavouritesExample.java) |
 | Atomic edits versus mergeable drafts | [FavouritesTransactionTest](../src/test/java/convex/lattice/app/FavouritesTransactionTest.java) and [TaskBoardApplicationTest](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java) |
 | Shared regions and independent publication | [SharedRegionsTest](../src/test/java/convex/lattice/app/SharedRegionsTest.java) |
+| An application in its `:app` region, making its parts when needed, with transactions over them | [ShopExample](../src/test/java/convex/lattice/app/ShopExample.java) and [ShopApplicationTest](../src/test/java/convex/lattice/app/ShopApplicationTest.java) |
+| A file and application state committed in one transaction across `:fs` and `:app` | [FileCountTest](../../convex-integration/src/test/java/convex/lattice/FileCountTest.java) |
 | DID ownership and several authorised keys | [OwnedScoresApplicationTest](../src/test/java/convex/lattice/app/OwnedScoresApplicationTest.java) |
 | Saving, reopening, batched durability and private host storage | [FavouritesLifecycleTest](../src/test/java/convex/lattice/app/FavouritesLifecycleTest.java) |
 | Replication and staged receipt | [ReadingListApplicationTest](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java) |

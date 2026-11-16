@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -166,6 +167,23 @@ public class AcquirorTest {
 			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
 			assertTrue(acquired.isCompletedExceptionally());
 			assertSame(defect, assertThrows(ExecutionException.class, acquired::get).getCause());
+		}
+	}
+
+	/** A fetch that fails with an Error fails this acquisition alone, and its worker ends. */
+	@Test
+	public void testErrorFailsOnlyThisAcquisition() throws Exception {
+		Blob expected = Blobs.createRandom(400);
+		for (Error simulated : List.of(new OutOfMemoryError("simulated fetch"), new NoClassDefFoundError("simulated fetch"))) {
+			try (MemoryStore store = new MemoryStore();
+					Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> {
+						throw simulated;
+					})) {
+				ExecutionException error = org.junit.jupiter.api.Assertions.assertThrows(
+					ExecutionException.class, () -> acquiror.getFuture().get(5, TimeUnit.SECONDS));
+				assertSame(simulated, error.getCause());
+				assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+			}
 		}
 	}
 

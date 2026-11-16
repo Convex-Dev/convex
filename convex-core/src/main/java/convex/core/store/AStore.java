@@ -16,6 +16,7 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 
 /**
@@ -25,7 +26,7 @@ import convex.core.exceptions.MissingDataException;
  * made" ― Robert C. Martin
  *
  */
-public abstract class AStore implements Closeable {
+public abstract class AStore implements Closeable, Persister {
 	
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
@@ -44,6 +45,8 @@ public abstract class AStore implements Closeable {
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If status is PERSISTED or above, and a cell
+	 *         stored at that status for the first time is inconsistent with a child
 	 */
 	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
@@ -63,8 +66,23 @@ public abstract class AStore implements Closeable {
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If status is PERSISTED or above, and a cell
+	 *         stored at that status for the first time is inconsistent with a child
 	 */
 	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
+
+	/**
+	 * Persists a value in this store, including an embedded top-level value.
+	 *
+	 * @param <T> Value type
+	 * @param value Value to persist
+	 * @return Equal value whose cells are retained in this store
+	 * @throws IOException in case of IO error during persistence
+	 */
+	@Override
+	public <T extends ACell> T persist(T value) throws IOException {
+		return storeTopRef(Ref.get(value),Ref.PERSISTED,null).getValue();
+	}
 
 	
 	/**

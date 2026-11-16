@@ -146,7 +146,7 @@ public class DLFSLocalHeldCellsTest {
 	}
 
 	private <V extends ACell> void persist(ACursor<V> holder) {
-		try { holder.persist(value -> Cells.persist(value,store)); }
+		try { holder.persist(store); }
 		catch (IOException e) { throw new UncheckedIOException(e); }
 	}
 

@@ -27,7 +27,7 @@ public class UnionSet<V extends ACell> extends SetComponent<V> {
 		return storage.updateAndGet(own -> SetLattice.<V>create().merge(own,incoming));
 	}
 
-	@Override protected ASet<V> mergePublication(ASet<V> own,ASet<V> other) {
+	@Override protected ASet<V> reconcile(ASet<V> own,ASet<V> other) {
 		return SetLattice.<V>create().merge(own,other);
 	}
 }

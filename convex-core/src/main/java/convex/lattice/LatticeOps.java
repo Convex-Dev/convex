@@ -103,21 +103,45 @@ public class LatticeOps {
 		return updated;
 	}
 
-	/** Reconciles a lattice-backed publication, retaining destination keys outside a keyed lattice. */
+	/**
+	 * Reconciles a lattice-backed publication where both sides changed, retaining
+	 * destination keys outside a keyed lattice. The result is built on {@code other}'s
+	 * cells wherever it equals them.
+	 */
 	@SuppressWarnings("unchecked")
-	public static <V extends ACell> V mergePublication(ALattice<V> lattice,LatticeContext context,V own,V other) {
+	public static <V extends ACell> V reconcile(ALattice<V> lattice,LatticeContext context,V own,V other) {
+		// Own first: tie rules prefer that side (see LWWLattice), so the order decides the
+		// value. The join is built on own's cells, so it is carried onto other's after.
 		V merged=lattice.merge(context,own,other);
-		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || (other!=null && !(other instanceof AMap<?,?>))) return merged;
+		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || (other!=null && !(other instanceof AMap<?,?>))) return (V)carry(other,merged);
 		if (merged==null) return other;
 		AMap<ACell,ACell> result=(AMap<ACell,ACell>)other;
 		for (Map.Entry<ACell,ACell> entry:((AMap<ACell,ACell>)merged).entrySet()) {
-			if (keyed.path(entry.getKey())!=null) {
+			ACell key=entry.getKey();
+			if (keyed.path(key)!=null) {
 				// Rebuild an absent destination only for keys this component owns.
 				if (result==null) result=(AMap<ACell,ACell>)keyed.zero();
-				result=result.assoc(entry.getKey(),entry.getValue());
+				ACell held=result.get(key);
+				ACell carried=carry(held,entry.getValue());
+				if (carried!=held) result=result.assoc(key,carried);
 			}
 		}
 		return (V)result;
+	}
+
+	/**
+	 * Returns {@code value} built on {@code held}'s cells wherever the two are equal: a
+	 * two-way merge that builds on the held side. Used where a value was built from other
+	 * cells, such as a lattice join built on the other side, so that cells already held,
+	 * which may be persisted, stay held. Maps of the same kind are compared entry by entry.
+	 */
+	@SuppressWarnings("unchecked")
+	static ACell carry(ACell held,ACell value) {
+		if (held==value || Utils.equals(held,value)) return held;
+		if (!isSameMapKind(held,value)) return value;
+		Carried carried=new Carried((AMap<ACell,ACell>)held);
+		((AMap<ACell,ACell>)held).mergeDifferences((AMap<ACell,ACell>)value,carried);
+		return carried.result;
 	}
 
 	/**
@@ -150,14 +174,23 @@ public class LatticeOps {
 
 	@SuppressWarnings("unchecked")
 	private static ACell mergeLocation(ACell base,ACell own,ACell other) {
+		// By reference first, which costs nothing. Own was built from base, so where other
+		// still holds base's cells, own already shares them.
+		if (own==base || own==other) return other;
+		if (other==base) return own;
 		if (Utils.equals(own,base) || Utils.equals(own,other)) return other;
+		if (isSameMapKind(own,other)) {
+			// Before the test below: where other holds base's value in other cells, such as
+			// persisted ones, own's change is carried into them rather than taken whole
+			AMap<ACell,ACell> ownMap=(AMap<ACell,ACell>)own;
+			AMap<ACell,ACell> from=isSameMapKind(base,own)?(AMap<ACell,ACell>)base:ownMap.empty();
+			OwnChanges changes=new OwnChanges((AMap<ACell,ACell>)other);
+			from.mergeDifferences(ownMap,changes);
+			return changes.result;
+		}
+		// A value only own changed, whose cells are new
 		if (Utils.equals(other,base)) return own;
-		if (!isSameMapKind(own,other)) throw new MergeConflictException();
-		AMap<ACell,ACell> ownMap=(AMap<ACell,ACell>)own;
-		AMap<ACell,ACell> from=isSameMapKind(base,own)?(AMap<ACell,ACell>)base:ownMap.empty();
-		OwnChanges changes=new OwnChanges((AMap<ACell,ACell>)other);
-		from.mergeDifferences(ownMap,changes);
-		return changes.result;
+		throw new MergeConflictException();
 	}
 
 	private static boolean isSameMapKind(ACell a,ACell b) {
@@ -185,6 +218,27 @@ public class LatticeOps {
 			ACell merged=mergeLocation(base,own,current);
 			if (merged!=current) result=(merged==null)?result.dissoc(k):result.assoc(k,merged);
 			return base;
+		}
+	}
+
+	/** Carries onto one map the entries where another differs from it. */
+	private static final class Carried implements MergeFunction<ACell> {
+		private AMap<ACell,ACell> result;
+
+		Carried(AMap<ACell,ACell> held) {
+			this.result=held;
+		}
+
+		@Override public ACell merge(ACell held,ACell value) {
+			throw new IllegalStateException("A map's difference walk always supplies the key");
+		}
+
+		/** Returns the held value so the walk, whose own result is discarded, builds nothing. */
+		@Override public ACell merge(Object key,ACell held,ACell value) {
+			ACell k=(ACell)key;
+			ACell carried=carry(held,value);
+			if (carried!=held) result=(carried==null)?result.dissoc(k):result.assoc(k,carried);
+			return held;
 		}
 	}
 

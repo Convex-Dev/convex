@@ -15,9 +15,9 @@ package convex.core.exceptions;
  * <p>The cause distinguishes failure classes for operator diagnostics: no cause
  * means a missing migration (release update required); a deterministic migration
  * bug carries the underlying exception (corrected release required); a peer-local
- * condition such as {@link MissingDataException} means resync-and-retry may
- * succeed without any release change. All classes resolve to the same safe
- * behaviour: produce no state, withdraw.</p>
+ * condition such as {@link MissingDataException} needs the operator to repair or
+ * resync the peer's store, without any release change. All classes resolve to the
+ * same safe behaviour: produce no state, withdraw.</p>
  */
 @SuppressWarnings("serial")
 public class UpgradeError extends Error {
@@ -55,22 +55,5 @@ public class UpgradeError extends Error {
 	 */
 	public long getVersion() {
 		return version;
-	}
-
-	/**
-	 * Is this a retryable, peer-local (environmental) failure rather than a
-	 * deterministic one?
-	 *
-	 * <p>A deterministic failure (missing migration, or a migration bug that throws
-	 * identically everywhere) requires a corrected release: retrying the same
-	 * release recomputes the same failure. A peer-local failure such as
-	 * {@link MissingDataException} — an incomplete store — may succeed on
-	 * resync-and-retry with no release change, and must not be treated as a
-	 * permanent freeze. See UPGRADE.md.</p>
-	 *
-	 * @return true if the peer may retry without a release change
-	 */
-	public boolean isRetryable() {
-		return getCause() instanceof MissingDataException;
 	}
 }

@@ -111,7 +111,7 @@ class FavouritesTransactionTest {
 			});
 			writer.get(10,TimeUnit.SECONDS);
 		}
-		assertEquals(2,calls.get());
+		assertEquals(2,calls.get(),"a whole-record merge cannot keep both, so it is a conflict");
 		assertEquals(Sets.of(1,99,42,7),live.items(),
 			"Local transactions preserve concurrent operations even when replica merge selects a whole record");
 	}

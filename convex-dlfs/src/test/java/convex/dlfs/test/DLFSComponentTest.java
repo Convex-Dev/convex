@@ -166,7 +166,7 @@ public class DLFSComponentTest {
 
 		CompositeDLFSApplication(LatticeHost<Index<Keyword,ACell>> host,AKeyPair keyPair) {
 			super(host,keyPair::signData,KEY_DOCUMENTS);
-			this.archive=region(KEY_ARCHIVE,DLFSRegion.connect(new IndexComponent<>(cursor()).path(KEY_ARCHIVE),store(),keyPair::signData,Utils::getCurrentTimestampCell));
+			this.archive=region(KEY_ARCHIVE,DLFSRegion.connect(new IndexComponent<>(cursor()).path(KEY_ARCHIVE),persister(),keyPair::signData,Utils::getCurrentTimestampCell));
 		}
 	}
 

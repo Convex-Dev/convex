@@ -70,6 +70,10 @@ final class EtchV3Header extends AEtchHeader {
 	private Hash rootHash;
 	private long closeState;
 	private int activeCopy;
+	// Set while a commit may have written its copy without completing: a written copy
+	// can reach storage unforced, so the newest copy on disk is unknown until the
+	// next commit of either kind rewrites it.
+	private boolean newestCopyUncertain;
 
 	private EtchV3Header(int cipherId, boolean encryptedIndex, long generation,
 			long syncedFileEnd, long indexStart, Hash rootHash, byte[] fileSalt,
@@ -402,7 +406,7 @@ final class EtchV3Header extends AEtchHeader {
 
 	@Override
 	void prepareMutation(Etch etch) throws IOException {
-		if (closeState==V3_CLEAN_CLOSED) commitHeaderOnly(etch,V3_OPEN);
+		if ((closeState==V3_CLEAN_CLOSED)||newestCopyUncertain) commitHeaderOnly(etch,V3_OPEN);
 	}
 
 	@Override
@@ -412,14 +416,14 @@ final class EtchV3Header extends AEtchHeader {
 
 	@Override
 	void sync(Etch etch) throws IOException {
-		if (closeState==V3_CLEAN_CLOSED) return;
+		if ((closeState==V3_CLEAN_CLOSED)&&!newestCopyUncertain) return;
 		commit(etch,V3_CLEAN_CLOSED);
 	}
 
 	@Override
 	void close(Etch etch) throws IOException {
 		try {
-			if (closeState!=V3_CLEAN_CLOSED) commit(etch,V3_CLEAN_CLOSED);
+			if ((closeState!=V3_CLEAN_CLOSED)||newestCopyUncertain) commit(etch,V3_CLEAN_CLOSED);
 		} finally {
 			destroy();
 		}
@@ -451,6 +455,7 @@ final class EtchV3Header extends AEtchHeader {
 		int nextCopy=1-activeCopy;
 
 		if (forceBody) etch.force();
+		newestCopyUncertain=true;
 		writeCopy(etch,nextCopy,nextGeneration,nextSyncedEnd,rootHash,nextCloseState);
 		forceCopy(etch,nextCopy);
 
@@ -458,6 +463,7 @@ final class EtchV3Header extends AEtchHeader {
 		syncedFileEnd=nextSyncedEnd;
 		closeState=nextCloseState;
 		activeCopy=nextCopy;
+		newestCopyUncertain=false;
 	}
 
 	int cipherId() {

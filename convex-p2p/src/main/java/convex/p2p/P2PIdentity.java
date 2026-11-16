@@ -53,7 +53,7 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected ACell mergePublication(ACell own,ACell other) {
+	protected ACell reconcile(ACell own,ACell other) {
 		return P2PLattice.ID_LATTICE.getValueLattice().merge(own,other);
 	}
 }

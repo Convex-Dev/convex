@@ -199,14 +199,22 @@ Index algorithms preserve a valid old view until their single publication write:
 - a new entry is appended completely before its empty slot is filled;
 - converting a plain slot into a chain appends the new record first, changes the
   original slot from `PTR_PLAIN` to `PTR_START`, then publishes the new pointer as
-  `PTR_CHAIN`, so a failed publication leaves only an unreachable record;
+  `PTR_CHAIN`, so a failed publication leaves a valid one-entry chain and an
+  unreachable record;
 - replacing a chain with a child index builds the whole child first and repoints
   the parent slot to `PTR_INDEX` last; old continuation slots are cleanup, cleared
   afterwards, and a lock-free reader that started from the old `PTR_START` re-reads
   that slot before returning a miss and retries the level if it changed.
 
-These rules keep live readers safe and improve crash recovery without adding a force
-to the hot path.
+A run of `PTR_CHAIN` slots with no `PTR_START` before it is a stale run: the
+cleanup of a collapse that stopped part-way, whose entries are all in the child
+index. Readers treat a stale slot as a miss, a write that lands on one clears the
+run and takes the slot, and a chain never grows into a slot followed by a stale
+run without clearing it first. Strict validation accepts a stale slot only when
+its record is also reached through the index proper.
+
+These rules keep live readers safe, keep the index usable after a write that stops
+part-way, and improve crash recovery without adding a force to the hot path.
 
 ### `sync`
 
@@ -223,7 +231,10 @@ durability boundary:
 The body is forced before the new header can become valid, so a completely written
 new header that reaches storage early is still safe to select. A failed body force,
 header write or header force is reported to the caller and the in-memory active
-generation advances only after the final force succeeds. After later unsynchronised
+generation advances only after the final force succeeds. A copy written but not
+forced may still reach storage, so after a commit fails past its header write the
+next mutation first publishes `OPEN` over that copy, and the next `sync` or `close`
+commits even if nothing changed. After later unsynchronised
 writes begin, a crash may preserve any mixture of them; exact rollback to the last
 generation is not guaranteed, because in-place index pages can be written back by the
 operating system before `sync`.

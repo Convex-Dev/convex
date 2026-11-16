@@ -20,8 +20,8 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Persister;
 
 class LocalComponentTest {
 
@@ -39,7 +39,7 @@ class LocalComponentTest {
 		}
 
 		Notes(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AtomicInteger signatures,AtomicLong time,
-				Persister<AHashMap<Keyword,ACell>> persister) {
+				Persister persister) {
 			super(root,service,KEY.getAccountKey(),value -> {
 				signatures.incrementAndGet();
 				return KEY.signData(value);

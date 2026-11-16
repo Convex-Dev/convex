@@ -36,7 +36,7 @@ class ComponentSyncTest {
 			return new Value(ForkedCursor.create(destination));
 		}
 
-		@Override protected CVMLong mergePublication(CVMLong own,CVMLong other) {
+		@Override protected CVMLong reconcile(CVMLong own,CVMLong other) {
 			if (own==null) return other;
 			return other==null || own.longValue()>=other.longValue()?own:other;
 		}
@@ -61,7 +61,7 @@ class ComponentSyncTest {
 			return new Record(cursor,clock);
 		}
 		@Override public AHashMap<Keyword,ACell> merge(AHashMap<Keyword,ACell> incoming) { return edits.merge(incoming); }
-		@Override protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
+		@Override protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 			return Timestamped.lattice().merge(own,other);
 		}
 	}

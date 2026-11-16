@@ -306,6 +306,6 @@ class ValueComponentTest {
 		var conflicting=live.fork();
 		conflicting.cursor().set(CVMLong.ONE);
 		live.cursor().set(CVMLong.TWO);
-		assertThrows(UnsupportedOperationException.class,conflicting::sync);
+		assertThrows(MergeConflictException.class,conflicting::sync);
 	}
 }

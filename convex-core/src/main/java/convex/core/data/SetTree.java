@@ -599,73 +599,49 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-
-		validateWithPrefix(Hash.EMPTY_HASH,0,-1);
-	}
-	
-	@Override
-	protected void validateWithPrefix(Hash base, int digit, int position) throws InvalidDataException {
-		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		if ((shift <0)||(shift>MAX_SHIFT)) {
-			throw new InvalidDataException("Invalid shift for SetTree", this);
-		}
-		
-		if (count<=SetLeaf.MAX_ELEMENTS) {
-			throw new InvalidDataException("Count too small [" + count + "] for SetTree", this);
-		}
-
-		Hash firstHash;
-		try {
-			firstHash=getFirstHash();
-		
-		int bsize = children.length;
-
-		long childCount=0;;
-			for (int i = 0; i < bsize; i++) {
-				if (children[i] == null) {
-					throw new InvalidDataException("Null child ref at index " + i,this);
+	public void validateStructure() throws InvalidDataException {
+		Hash firstHash=getFirstHash();
+		long childCount=0;
+		for (int i = 0; i < children.length; i++) {
+			ACell o = children[i].getValue();
+			if (!(o instanceof AHashSet)) throw new InvalidDataException("Child "+i+" is not a hash set",this);
+			AHashSet<T> child=(AHashSet<T>) o;
+			if (child.isEmpty()) throw new InvalidDataException("Empty child "+i,this);
+			int d = digitForIndex(i, mask);
+			if (child instanceof SetTree<T> tree) {
+				if (tree.shift<=shift) throw new InvalidDataException("Child "+i+" shift not greater than "+shift,this);
+				checkChildHash(tree.getFirstHash(),firstHash,d,i);
+			} else {
+				SetLeaf<T> leaf=(SetLeaf<T>) child;
+				long n=leaf.count();
+				for (long j=0; j<n; j++) {
+					checkChildHash(leaf.getElementRef(j).getHash(),firstHash,d,i);
 				}
-				
-				ACell o = children[i].getValue();
-				if (!(o instanceof AHashSet)) {
-					throw new InvalidDataException(
-							"Expected AHashSet child at index " + i +" but got "+Utils.getClassName(o), this);
-				}
-				@SuppressWarnings("unchecked")
-				AHashSet<T> child = (AHashSet<T>) o;
-				if (child.isEmpty())
-					throw new InvalidDataException("Empty child at index " + i,this);
-				
-				if (child instanceof SetTree) {
-					SetTree<T> childTree=(SetTree<T>) child;
-					if (childTree.shift<=shift) {
-						throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected greater than ["+shift+"]",this);
-					}
-				}
-				
-				Hash childHash=child.getElementRef(0).getHash();
-				long pmatch=firstHash.hexMatch(childHash);
-				if (pmatch<shift) throw new InvalidDataException("Mismatched child hash [" + childHash +"] with this ["+firstHash+"]",
-						this);
-				
-				int d = digitForIndex(i, mask);
-				child.validateWithPrefix(firstHash ,d,position+1);
-				
-				childCount += child.count();
 			}
-			
-			if (count != childCount) {
-				throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
-			}
-		} catch (ClassCastException e) {
-			throw new InvalidDataException("Bad child type:" +e.getMessage(), this);
+			childCount += child.count();
+		}
+		if (count != childCount) {
+			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
 	}
 
+	/**
+	 * Checks that an element hash in child i shares this tree's prefix and has the child's digit
+	 */
+	private void checkChildHash(Hash h, Hash firstHash, int digit, int i) throws InvalidDataException {
+		if ((h.commonHexPrefixLength(firstHash, shift) < shift) || (h.getHexDigit(shift) != digit)) {
+			throw new InvalidDataException("Child "+i+" holds an element outside its digit",this);
+		}
+	}
+
+	/**
+	 * Check for top level structural integrity. Does not traverse branch refs.
+	 * @return true if valid, false otherwise
+	 */
 	boolean isValidStructure() {
+		if ((shift<0)||(shift>MAX_SHIFT)) return false;
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		int n=children.length;
 		if (n<2) return false;

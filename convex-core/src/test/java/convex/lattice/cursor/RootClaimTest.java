@@ -26,10 +26,12 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.Persister;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.MaxLattice;
+import convex.test.Persisters;
 
 /** What a root's claim holds back, with writers on real threads ordered by latches. */
 class RootClaimTest {
@@ -179,7 +181,7 @@ class RootClaimTest {
 		var persisted=new AtomicReference<AHashMap<Keyword,ACell>>();
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
 			Transactions.executeExclusively(claimed,draft -> {
-				persisted.set(result(other.submit(() -> root.persist(RootClaimTest::inNewCells))));
+				persisted.set(result(other.submit(() -> root.persist(Persisters.replacing(RootClaimTest::inNewCells)))));
 				draft.set(committed);
 			});
 		}
@@ -313,10 +315,7 @@ class RootClaimTest {
 		var fork=root.fork();
 		fork.<AInteger>path(A,Y).set(CVMLong.ONE);
 		var persisted=new CopyOnWriteArrayList<ACell>();
-		Persister<AHashMap<Keyword,ACell>> persister=value -> {
-			persisted.add(value);
-			return value;
-		};
+		Persister persister=Persisters.after(persisted::add,Persisters.UNCHANGED);
 		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
 			Transactions.executeExclusively(fork.<AInteger>path(A,X),draft -> {
 				// Completes inside the callback, so it did not wait for the claim.

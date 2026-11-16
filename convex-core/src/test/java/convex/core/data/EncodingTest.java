@@ -191,7 +191,7 @@ public class EncodingTest {
 		ACell a=Reader.read(s);
 		
 		// Should b invalid
-		assertThrows(InvalidDataException.class,()->Cells.validate(a));
+		assertThrows(InvalidDataException.class,()->a.validate());
 		
 		// Should still print
 		String p=RT.print(a).toString(); 

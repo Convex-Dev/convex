@@ -71,8 +71,10 @@
 								</goals>
 								<configuration>
 									<release>22</release>
+									<!-- The FFM backend, and tests that need the JDK 22 API -->
 									<compileSourceRoots>
 										<compileSourceRoot>${project.basedir}/src/main/java22</compileSourceRoot>
+										<compileSourceRoot>${project.basedir}/src/test/java22</compileSourceRoot>
 									</compileSourceRoots>
 								</configuration>
 							</execution>

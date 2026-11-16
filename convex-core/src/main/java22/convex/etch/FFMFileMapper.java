@@ -331,23 +331,18 @@ final class FFMFileMapper extends AFileMapper {
 		Arena arena=Arena.ofShared();
 		MapMode mode=readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE;
 		long mappedLength=target;
-		MemorySegment segment;
 		try {
-			segment=ThreadUtils.callUninterruptibly(() -> channel.map(mode,start,mappedLength,arena));
-		} catch (IOException | RuntimeException e) {
-			arena.close();
-			throw e;
-		}
-
-		Mapping replacement=new Mapping(start,segment,arena);
-		try {
+			MemorySegment segment=ThreadUtils.callUninterruptibly(
+					() -> channel.map(mode,start,mappedLength,arena));
+			Mapping replacement=new Mapping(start,segment,arena);
 			current=mappings;
 			Mapping[] updated=(regionIndex<current.length)
 					?current.clone():Arrays.copyOf(current,regionIndex+1);
 			previous=(regionIndex<current.length)?current[regionIndex]:null;
 			updated[regionIndex]=replacement;
 			mappings=updated;
-		} catch (RuntimeException | Error e) {
+		} catch (IOException | RuntimeException | Error e) {
+			// Until published, the arena and any mapping in it belong to this call
 			arena.close();
 			throw e;
 		}

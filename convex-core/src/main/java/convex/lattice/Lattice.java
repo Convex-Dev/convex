@@ -32,6 +32,8 @@ public class Lattice {
 	 *   Each topic has metadata + partitions; each partition is an append-only log
 	 * - :local - Application state that is not shared externally (owner -> keyword-keyed map)
 	 *   Each peer owns a signed slot, written by one application instance; may be replicated for backup
+	 * - :app - Application regions (application name -> application lattice), per CAD045
+	 *   Registers no application: a node adds the ones it hosts, and merges ignore the rest
 	 */
 	public static KeyedLattice ROOT = KeyedLattice.create(
 		Keywords.DATA, DataLattice.INSTANCE,
@@ -45,6 +47,7 @@ public class Lattice {
 			MapLattice.create(TopicLattice.INSTANCE)
 		),
 		Keywords.P2P, P2PLattice.LATTICE,
-		LocalLattice.KEY_LOCAL, LocalLattice.LATTICE
+		LocalLattice.KEY_LOCAL, LocalLattice.LATTICE,
+		Keywords.APP, KeyedLattice.create()
 	);
 }

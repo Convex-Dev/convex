@@ -12,8 +12,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Persister;
 
 /**
  * Base for one service's state that is not shared externally, held as a record at
@@ -55,7 +55,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	 */
 	protected ALocalComponent(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AccountKey owner,
 			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,Supplier<CVMLong> clock,
-			Persister<AHashMap<Keyword,ACell>> persister) {
+			Persister persister) {
 		super(recordPath(root,service,owner,signer).fork(),persister);
 		record=Timestamped.create(storage.withDefault(Maps.empty()),clock);
 	}
@@ -91,7 +91,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 
 	/** When the slot's record also changed, the newer record wins. */
 	@Override
-	protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
+	protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 		return record.getLattice().merge(own,other);
 	}
 }

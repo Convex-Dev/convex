@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -611,12 +612,12 @@ public class PeerRequestFailureTest {
 	}
 
 	/**
-	 * A merge that fails drops its batch and keeps the peer's Belief, and nothing is
-	 * thrown. Here it fails signing the peer's own Order, which a merge does once a
-	 * proposed Block moves consensus on.
+	 * A merge that fails is retried without the Orders that cannot be merged on their
+	 * own, and nothing is thrown. Here it fails once signing the peer's own Order, which
+	 * a merge does once a proposed Block moves consensus on, so the retry merges.
 	 */
 	@Test
-	public void aMergeThatFailsDropsItsBatch() throws Exception {
+	public void aMergeThatFailsIsRetried() throws Exception {
 		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof Order);
 		Server peer=launchHaltedPeer(kp);
 		try {
@@ -627,9 +628,9 @@ public class PeerRequestFailureTest {
 				BeliefPropagator merger=new BeliefPropagator(peer);
 				merger.belief=proposed;
 				kp.failure.set(error);
-				assertFalse(merger.maybeMergeBeliefs(proposed),error.toString());
+				assertTrue(merger.maybeMergeBeliefs(proposed),error.toString());
 				assertNull(kp.failure.get(),error+" fired");
-				assertSame(proposed,merger.belief,error.toString());
+				assertNotSame(proposed,merger.belief,error.toString());
 			}
 		} finally {
 			peer.close();

@@ -46,7 +46,7 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected ACell mergePublication(ACell own,ACell other) {
+	protected ACell reconcile(ACell own,ACell other) {
 		return P2PLattice.NODES_LATTICE.getValueLattice().merge(own,other);
 	}
 }
