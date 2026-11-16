@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disconnect a connection that sends false data, such as a bad signature, and keep one that sends malformed data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
 - Report failures to clients as clear errors rather than stack traces, empty results or no reply, and keep routine failures out of operator warning logs.
 - Limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
+- Poll the peers a peer has verified first, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
 
 ### Fixed
 

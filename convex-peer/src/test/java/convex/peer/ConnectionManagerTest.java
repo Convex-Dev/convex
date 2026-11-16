@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -20,6 +21,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -32,15 +35,19 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Order;
+import convex.core.crypto.Ed25519Signature;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
+import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
@@ -54,6 +61,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.net.PeerRefusedException;
 import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 
@@ -470,8 +478,489 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	// ===== Polling preference and back-off =====
+
+	/** Start of the test clock, well past the first poll slot. */
+	private static final long START_TIME=1_000_000;
+
+	@Test
+	public void testBackoffDoublesFromPollDelayToCap() {
+		assertEquals(2000,ConnectionManager.backoff(2000,1));
+		assertEquals(4000,ConnectionManager.backoff(2000,2));
+		long cap=2000L<<ConnectionManager.MAX_BACKOFF_DOUBLINGS;
+		assertEquals(cap,ConnectionManager.backoff(2000,ConnectionManager.MAX_BACKOFF_DOUBLINGS+1));
+		assertEquals(cap,ConnectionManager.backoff(2000,1000));
+	}
+
+	/** Verified links get every poll slot they can use; an unverified link gets the rest. */
+	@Test
+	public void testPollPrefersDueVerifiedLinks() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(230));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			long delay=manager.getPollDelay();
+			AccountKey verifiedKey=AKeyPair.createSeeded(231).getAccountKey();
+			AccountKey unverifiedKey=AKeyPair.createSeeded(232).getAccountKey();
+			PollingConvex verified=pollingLink(server);
+			verified.markVerified(verifiedKey);
+			PollingConvex unverified=pollingLink(server);
+			manager.addConnection(verifiedKey,verified);
+			manager.addConnection(unverifiedKey,unverified);
+
+			for (int i=0;i<3;i++) {
+				manager.maybePollBelief();
+				clock.addAndGet(delay);
+			}
+			assertEquals(3,verified.statusCount);
+			assertEquals(0,unverified.statusCount,"no slot goes to an unverified link while a verified one is due");
+
+			// Two failures in a row leave the verified link waiting past the next slot
+			verified.statusResult=Result.error(ErrorCodes.LOAD,"busy");
+			manager.maybePollBelief();
+			clock.addAndGet(delay);
+			manager.maybePollBelief();
+			clock.addAndGet(delay);
+			manager.maybePollBelief();
+			assertEquals(5,verified.statusCount);
+			assertEquals(1,unverified.statusCount,"a slot no verified link can use goes to an unverified one");
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testUnverifiedPollLeavesBackoffAlone() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(233));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(234).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.statusResult=Result.error(ErrorCodes.LOAD,"busy");
+			manager.addConnection(key,link);
+
+			manager.pollBelief(key,link);
+			assertTrue(manager.isDue(key),"an unverified link's back-off is for getting it verified");
+		} finally {
+			server.close();
+		}
+	}
+
+	/** Each failed poll of a verified link doubles its wait, and a good poll clears them. */
+	@Test
+	public void testFailedPollsBackOff() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(235));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			long delay=manager.getPollDelay();
+			Belief other=Belief.create(AKeyPair.createSeeded(236),Order.create());
+			Result changed=Result.create(CVMLong.ZERO,server.getStatusData().assoc(0,other.getHash()));
+			List<Consumer<PollingConvex>> failures=List.of(
+				link -> link.statusResult=Result.error(ErrorCodes.LOAD,"busy"),
+				link -> link.statusResult=Result.create(CVMLong.ZERO,Strings.create("not a status")),
+				link -> { link.statusResult=changed; link.acquired=CVMLong.ONE; },
+				link -> { link.statusResult=changed; link.acquireFails=true; });
+			int seed=240;
+			for (Consumer<PollingConvex> failure:failures) {
+				AccountKey key=AKeyPair.createSeeded(seed++).getAccountKey();
+				PollingConvex link=pollingLink(server);
+				link.markVerified(key);
+				failure.accept(link);
+				manager.addConnection(key,link);
+
+				manager.pollBelief(key,link);
+				assertFalse(manager.isDue(key));
+				clock.addAndGet(delay);
+				assertTrue(manager.isDue(key));
+
+				manager.pollBelief(key,link);
+				clock.addAndGet(delay);
+				assertFalse(manager.isDue(key),"a second failure in a row doubles the wait");
+				clock.addAndGet(delay);
+				assertTrue(manager.isDue(key));
+
+				link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData());
+				manager.pollBelief(key,link);
+				failure.accept(link);
+				manager.pollBelief(key,link);
+				clock.addAndGet(delay);
+				assertTrue(manager.isDue(key),"a good poll cleared the earlier failures");
+			}
+		} finally {
+			server.close();
+		}
+	}
+
+	/** False data in a polled Belief closes the link at once, verified or not, and its peer waits the longest. */
+	@Test
+	public void testFalseBeliefClosesLinkWithLongestWait() throws Exception {
+		AKeyPair keyPair=AKeyPair.createSeeded(275);
+		Server server=createPollingServer(keyPair);
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			// An Order from a staked peer, which the merge would check, with a signature that does not verify
+			SignedData<Order> forged=SignedData.create(keyPair.getAccountKey(),Ed25519Signature.ZERO,Order.create().getRef());
+			Belief polled=Belief.create(forged);
+			for (boolean verified : new boolean[] {true,false}) {
+				AccountKey key=AKeyPair.createSeeded(verified ? 276 : 277).getAccountKey();
+				PollingConvex link=pollingLink(server);
+				if (verified) link.markVerified(key);
+				link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData().assoc(0,polled.getHash()));
+				link.acquired=polled;
+				manager.addConnection(key,link);
+
+				manager.pollBelief(key,link);
+				assertFalse(link.isConnected());
+				assertNull(manager.getConnection(key));
+				assertLongestWait(manager,clock,key);
+			}
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testFullPolledBeliefQueueIsNoFailure() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(244));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(245).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.markVerified(key);
+			Belief other=Belief.create(AKeyPair.createSeeded(246),Order.create());
+			link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData().assoc(0,other.getHash()));
+			manager.addConnection(key,link);
+			while (server.getBeliefPropagator().queueBelief(Belief.initial())) {}
+
+			manager.pollBelief(key,link);
+			assertEquals(0,link.acquireCount);
+			assertTrue(manager.isDue(key),"a full local queue is not the peer's failure");
+		} finally {
+			server.close();
+		}
+	}
+
+	/** A challenge passed verifies a link, but only a good poll clears its peer's failures. */
+	@Test
+	public void testChallengeVerifiesLinkAndKeepsFailures() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(247));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			long delay=manager.getPollDelay();
+			AKeyPair remote=AKeyPair.createSeeded(248);
+			AccountKey key=remote.getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(249));
+			link.answerer=AKeyPair.createSeeded(250);
+			manager.addConnection(key,link);
+
+			manager.verifyDueLinks();
+			assertEquals(1,link.challengeCount);
+			manager.verifyDueLinks();
+			assertNull(link.getVerifiedPeer(),"an answer from another key does not verify the link");
+			assertFalse(manager.isDue(key));
+			manager.verifyDueLinks();
+			assertEquals(1,link.challengeCount,"no new challenge before the wait has passed");
+
+			clock.addAndGet(delay);
+			manager.verifyDueLinks();
+			manager.verifyDueLinks();
+			assertEquals(2,link.challengeCount);
+
+			link.answerer=remote;
+			clock.addAndGet(2*delay);
+			manager.verifyDueLinks();
+			manager.verifyDueLinks();
+			assertEquals(key,link.getVerifiedPeer());
+			assertTrue(manager.isDue(key),"a newly verified link is polled at once");
+
+			// The two failed challenges still count, so a failed poll is the third in a row
+			link.statusResult=Result.error(ErrorCodes.LOAD,"busy");
+			manager.pollBelief(key,link);
+			clock.addAndGet(3*delay);
+			assertFalse(manager.isDue(key));
+			clock.addAndGet(delay);
+			assertTrue(manager.isDue(key));
+		} finally {
+			server.close();
+		}
+	}
+
+	/** An answer signed for another challenge is false input: the link closes at once and its peer waits the longest. */
+	@Test
+	public void testChallengeAnsweredForAnotherClosesLink() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(270));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AKeyPair remote=AKeyPair.createSeeded(271);
+			AccountKey key=remote.getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(272));
+			manager.addConnection(key,link);
+
+			// The first challenge goes unanswered, so the link has one to replay
+			manager.verifyDueLinks();
+			clock.addAndGet(ConnectionManager.POLL_TIMEOUT_MILLIS);
+			manager.verifyDueLinks();
+			assertTrue(link.isConnected());
+
+			link.answerer=remote;
+			link.replayFirst=true;
+			advanceUntilDue(manager,clock,key);
+			manager.verifyDueLinks();
+			assertEquals(2,link.challengeCount);
+			manager.verifyDueLinks();
+			assertFalse(link.isConnected(),"a replayed answer closes the link");
+			assertNull(manager.getConnection(key));
+			assertNull(link.getVerifiedPeer());
+			assertLongestWait(manager,clock,key);
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testUnansweredChallengesCloseLinkAfterMinute() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(251));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(252).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(253));
+			manager.addConnection(key,link);
+
+			long firstMiss=-1;
+			for (int i=0;link.isConnected() && i<20;i++) {
+				advanceUntilDue(manager,clock,key);
+				manager.verifyDueLinks();
+				clock.addAndGet(ConnectionManager.POLL_TIMEOUT_MILLIS);
+				manager.verifyDueLinks();
+				if (firstMiss<0) firstMiss=clock.get();
+				boolean minutePassed=clock.get()-firstMiss>=ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS;
+				assertEquals(!minutePassed,link.isConnected());
+			}
+			assertNull(manager.getConnection(key));
+		} finally {
+			server.close();
+		}
+	}
+
+	/** A verified link that never replies is polled on its back-off and closed after a minute. */
+	@Test
+	public void testSilentVerifiedLinkClosedAfterMinute() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(266));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(267).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.markVerified(key);
+			link.statusResult=Result.error(ErrorCodes.TIMEOUT,"no reply");
+			manager.addConnection(key,link);
+
+			long firstMiss=clock.get();
+			while (link.isConnected() && link.statusCount<20) {
+				advanceUntilDue(manager,clock,key);
+				manager.maybePollBelief();
+				boolean minutePassed=clock.get()-firstMiss>=ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS;
+				assertEquals(!minutePassed,link.isConnected());
+			}
+			assertEquals(6,link.statusCount,"polled at 0, 2, 6, 14, 30 and 62 s");
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testLinkClosedWhenFailuresReachCap() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(254));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(255).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.markVerified(key);
+			link.statusResult=Result.error(ErrorCodes.LOAD,"busy");
+			manager.addConnection(key,link);
+
+			for (int i=0;i<ConnectionManager.MAX_BACKOFF_DOUBLINGS;i++) {
+				manager.pollBelief(key,link);
+			}
+			assertTrue(link.isConnected(),"a link that answers stays open below the cap");
+			manager.pollBelief(key,link);
+			assertFalse(link.isConnected());
+
+			// Linked again, the peer keeps its failures, so the new link gets one attempt
+			PollingConvex again=pollingLink(server);
+			again.markVerified(key);
+			again.statusResult=Result.error(ErrorCodes.LOAD,"busy");
+			manager.addConnection(key,again);
+			manager.pollBelief(key,again);
+			assertFalse(again.isConnected());
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testUnverifiedLinkKeptAtCapWhileNoLinkIsVerified() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(256));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(257).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(258));
+			link.answerer=AKeyPair.createSeeded(259);
+			manager.addConnection(key,link);
+
+			for (int i=0;i<=ConnectionManager.MAX_BACKOFF_DOUBLINGS+1;i++) {
+				advanceUntilDue(manager,clock,key);
+				manager.verifyDueLinks();
+				manager.verifyDueLinks();
+			}
+			assertEquals(ConnectionManager.MAX_BACKOFF_DOUBLINGS+2,link.challengeCount);
+			assertTrue(link.isConnected(),"while no link is verified, an unverified one is all there is to poll");
+
+			AccountKey verifiedKey=AKeyPair.createSeeded(260).getAccountKey();
+			PollingConvex verified=pollingLink(server);
+			verified.markVerified(verifiedKey);
+			manager.addConnection(verifiedKey,verified);
+			advanceUntilDue(manager,clock,key);
+			manager.verifyDueLinks();
+			manager.verifyDueLinks();
+			assertFalse(link.isConnected());
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testDialsBackOff() throws Exception {
+		AKeyPair keyPair=AKeyPair.createSeeded(261);
+		AccountKey remoteKey=AKeyPair.createSeeded(262).getAccountKey();
+		State genesis=Init.createState(List.of(keyPair.getAccountKey(),remoteKey));
+		PeerStatus remoteStatus=genesis.getPeer(remoteKey);
+		genesis=genesis.withPeer(remoteKey,remoteStatus.withPeerData(Maps.of(Keywords.URL,Strings.create("127.0.0.1:1"))));
+		Server server=createPollingServer(keyPair,genesis);
+		DialingManager manager=new DialingManager(server);
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			State state=server.getPeer().getConsensusState();
+			long delay=manager.getPollDelay();
+
+			// Reaching nobody, with no verified link, is most likely this peer's own fault
+			manager.next=() -> CompletableFuture.failedFuture(new IOException("unreachable"));
+			assertNotNull(manager.tryRandomConnect(state));
+			assertFalse(manager.isDue(remoteKey));
+			assertNotNull(manager.tryRandomConnect(state),"retried at once while no link is verified");
+			assertEquals(2,manager.dials);
+
+			AccountKey verifiedKey=AKeyPair.createSeeded(263).getAccountKey();
+			PollingConvex verified=pollingLink(server);
+			verified.markVerified(verifiedKey);
+			manager.addConnection(verifiedKey,verified);
+			assertNull(manager.tryRandomConnect(state),"with a verified link, the peer waits");
+			clock.addAndGet(2*delay);
+			assertNotNull(manager.tryRandomConnect(state));
+			assertEquals(3,manager.dials);
+
+			// A dial that reaches another key is the peer answering wrongly: it waits regardless
+			verified.close();
+			clock.addAndGet(4*delay);
+			AccountKey otherKey=AKeyPair.createSeeded(264).getAccountKey();
+			manager.next=() -> {
+				PollingConvex other=pollingLink(server);
+				manager.addConnection(otherKey,other);
+				return CompletableFuture.completedFuture(other);
+			};
+			assertNotNull(manager.tryRandomConnect(state));
+			assertEquals(4,manager.dials);
+			assertFalse(manager.isDue(remoteKey));
+			assertNull(manager.tryRandomConnect(state),"a peer that answered wrongly is not redialled at once");
+
+			// So is a peer refused for a wrong answer to the identity challenge
+			advanceUntilDue(manager,clock,remoteKey);
+			manager.next=() -> CompletableFuture.failedFuture(new PeerRefusedException("proved no key"));
+			assertNotNull(manager.tryRandomConnect(state));
+			assertEquals(5,manager.dials);
+			assertNull(manager.tryRandomConnect(state),"a refused peer is not redialled at once");
+
+			// A peer refused for false input in its answer waits the longest
+			advanceUntilDue(manager,clock,remoteKey);
+			manager.next=() -> CompletableFuture.failedFuture(new PeerRefusedException("failed identity challenge",
+				new MisbehaviourException("Challenge response answers another challenge")));
+			assertNotNull(manager.tryRandomConnect(state));
+			assertEquals(6,manager.dials);
+			assertLongestWait(manager,clock,remoteKey);
+		} finally {
+			manager.close();
+			server.close();
+		}
+	}
+
+	/** The link to the peer a server was launched from can be verified like any other. */
+	@Test
+	public void testLaunchSourceLinkCanBeVerified() throws Exception {
+		AKeyPair keyPair=AKeyPair.createSeeded(265);
+		HashMap<convex.core.data.Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,keyPair);
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		try {
+			Convex source=Convex.connect(network.SERVER);
+			source.setStore(server.getStore());
+			assertNull(source.getKeyPair());
+			server.syncPeer(keyPair,source);
+
+			AccountKey sourceKey=network.SERVER.getPeerKey();
+			Convex link=server.getConnectionManager().getConnection(sourceKey);
+			assertSame(source,link);
+			Hash networkID=network.SERVER.getPeer().getNetworkID();
+			assertEquals(sourceKey,link.verifyPeer(sourceKey,networkID).get(10,TimeUnit.SECONDS));
+		} finally {
+			server.close();
+		}
+	}
+
+	private static void advanceUntilDue(ConnectionManager manager, AtomicLong clock, AccountKey key) {
+		while (!manager.isDue(key)) clock.addAndGet(manager.getPollDelay());
+	}
+
+	/** Checks that a peer's wait, starting at the current time, is the longest there is. */
+	private static void assertLongestWait(ConnectionManager manager, AtomicLong clock, AccountKey key) {
+		long longest=manager.getPollDelay()<<ConnectionManager.MAX_BACKOFF_DOUBLINGS;
+		clock.addAndGet(longest-1);
+		assertFalse(manager.isDue(key),"waits the longest");
+		clock.addAndGet(1);
+		assertTrue(manager.isDue(key));
+	}
+
+	private static PollingConvex pollingLink(Server server) {
+		PollingConvex link=new PollingConvex();
+		link.setStore(server.getStore());
+		link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData());
+		return link;
+	}
+
 	private static Server createPollingServer(AKeyPair keyPair) throws Exception {
-		State genesis=Init.createState(List.of(keyPair.getAccountKey()));
+		return createPollingServer(keyPair,Init.createState(List.of(keyPair.getAccountKey())));
+	}
+
+	private static Server createPollingServer(AKeyPair keyPair, State genesis) throws Exception {
 		Peer peer=Peer.createGenesisPeer(keyPair,genesis);
 		HashMap<convex.core.data.Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE,new MemoryStore());
@@ -713,20 +1202,57 @@ public class ConnectionManagerTest {
 	private static final class PollingConvex extends SequencedConvex {
 		Result statusResult;
 		ACell acquired;
+		boolean acquireFails;
 		int acquireCount;
+		int statusCount;
+		/** Key pair that answers challenges, or null to leave them unanswered. */
+		AKeyPair answerer;
+		/** Whether to answer the first challenge received instead of each one sent. */
+		boolean replayFirst;
+		SignedData<ACell> firstChallenge;
+		int challengeCount;
 
 		PollingConvex() {
 			super(-1);
 		}
 
+		void markVerified(AccountKey key) {
+			verifiedPeer=key;
+		}
+
 		@Override public CompletableFuture<Result> requestStatus() {
+			statusCount++;
 			return CompletableFuture.completedFuture(statusResult);
+		}
+
+		@Override protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
+			challengeCount++;
+			if (firstChallenge==null) firstChallenge=data;
+			if (answerer==null) return new CompletableFuture<>();
+			SignedData<ACell> answered=replayFirst ? firstChallenge : data;
+			return CompletableFuture.completedFuture(Message.answerChallenge(answerer,answered,context -> true));
 		}
 
 		@SuppressWarnings("unchecked")
 		@Override public <T extends ACell> CompletableFuture<T> acquire(Hash hash,AStore store) {
 			acquireCount++;
+			if (acquireFails) return CompletableFuture.failedFuture(new IOException("acquire failed"));
 			return CompletableFuture.completedFuture((T)acquired);
+		}
+	}
+
+	/** Connection manager whose dials are supplied by the test. */
+	private static final class DialingManager extends ConnectionManager {
+		Supplier<CompletableFuture<Convex>> next;
+		int dials;
+
+		DialingManager(Server server) {
+			super(server);
+		}
+
+		@Override CompletableFuture<Convex> dial(URI hostAddress, AccountKey peerKey) {
+			dials++;
+			return next.get();
 		}
 	}
 }

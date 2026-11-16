@@ -268,8 +268,10 @@ These are independent of the steps below unless a step names them.
 
 - **`ConnectionManager.handleStatusFailure` treats every `:LOAD` as a sign the peer is still
   there.** Once the status poll's deadline is on the request, a peer that never reads our messages
-  produces `FULL_CLIENT_BUFFER` and is never retired. Count `:LOAD` from `:CLIENT` as unresponsive,
-  and keep `:LOAD` from `:PEER` as not. Needed with step 3.
+  produces `FULL_CLIENT_BUFFER`. That counts only as a failed poll, so the link is closed at the
+  back-off cap, about 8.5 minutes, rather than after a minute without a reply
+  ([Polling and Back-off](../../convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off)). Count
+  `:LOAD` from `:CLIENT` as unresponsive, and keep `:LOAD` from `:PEER` as not. Needed with step 3.
 - **`Result.fromException` turns unknown exceptions into `:EXCEPTION` with a stack trace.** That
   includes the `RejectedExecutionException` for a refused send. `LatticeProtocolEndpoint` returns
   that result to the remote peer when our own buffer refused an acquisition request. Map the refusal

@@ -374,6 +374,8 @@ public class Server implements Closeable {
 				log.info("Remote peer did not advertise a state position; locally replayed finalised Order to position {} without a remote state comparison",
 						peer.getStatePosition());
 			}
+			// The manager verifies its links by challenge, which needs a key pair to sign with
+			if (convex.getKeyPair()==null) convex.setKeyPair(keyPair);
 			// Ownership transfers to the manager only after the complete sync is valid.
 			if (!getConnectionManager().addConnection(remotePeerKey,convex)) {
 				throw new LaunchException("Connection manager closed during peer sync");

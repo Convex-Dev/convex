@@ -28,6 +28,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.message.Message;
 import convex.core.store.MemoryStore;
 import convex.node.BlockingWriteStore;
+import convex.peer.ExpectedLogs;
 
 /** Tests for lifecycle-aware remote data acquisition. */
 public class AcquirorTest {
@@ -161,7 +162,9 @@ public class AcquirorTest {
 	public void testErrorFailsAcquisition() throws Exception {
 		Blob expected = Blobs.createRandom(400);
 		AssertionError defect = new AssertionError("defect in the source");
-		try (MemoryStore store = new MemoryStore();
+		// Acquisitions warn of a defect once in the JVM
+		try (ExpectedLogs logs = ExpectedLogs.carrying(defect).ifLogged().open();
+				MemoryStore store = new MemoryStore();
 				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> { throw defect; })) {
 			CompletableFuture<ACell> acquired = acquiror.getFuture();
 			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
@@ -175,7 +178,9 @@ public class AcquirorTest {
 	public void testErrorFailsOnlyThisAcquisition() throws Exception {
 		Blob expected = Blobs.createRandom(400);
 		for (Error simulated : List.of(new OutOfMemoryError("simulated fetch"), new NoClassDefFoundError("simulated fetch"))) {
-			try (MemoryStore store = new MemoryStore();
+			// Acquisitions warn of running out of memory, and of a defect, once in the JVM
+			try (ExpectedLogs logs = ExpectedLogs.carrying(simulated).ifLogged().open();
+					MemoryStore store = new MemoryStore();
 					Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> {
 						throw simulated;
 					})) {

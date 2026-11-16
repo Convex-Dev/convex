@@ -162,7 +162,8 @@ public class NettyServer extends AServer {
              public void initChannel(SocketChannel ch) throws Exception {
             	 // Enforce connection limit
             	 if (clientChannels.size() >= maxClientConnections) {
-            		 log.warn("Connection limit reached ({}), rejecting {}",
+            		 // Any remote can cause this, so it is a routine failure, not a warning
+            		 log.debug("Connection limit reached ({}), rejecting {}",
             			 maxClientConnections, ch.remoteAddress());
             		 ch.close();
             		 return;

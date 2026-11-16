@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -232,6 +233,10 @@ public class PeerRequestFailureTest {
 	static final List<Throwable> FAILURES=List.of(new OutOfMemoryError("simulated"),new StackOverflowError("simulated"),
 		new NoClassDefFoundError("simulated"),new AssertionError("simulated"),new IllegalStateException("simulated"));
 
+	/** What the peers log of the failures these tests inject, shared by the class's tests. After both lists. */
+	@RegisterExtension
+	static final ExpectedLogs LOGS=ExpectedLogs.carrying(CONTAINED,FAILURES);
+
 	/** A store that throws a chosen failure once, the first time it is asked to store a chosen kind of cell. */
 	static final class FaultingStore extends MemoryStore {
 		final AtomicReference<Predicate<Ref<?>>> failing=new AtomicReference<>();
@@ -378,7 +383,10 @@ public class PeerRequestFailureTest {
 		// Each round produces a Block at once, however soon after the last
 		config.put(Keywords.MIN_BLOCK_TIME,0);
 		Server peer=Server.create(config);
-		peer.haltConsensus(UpgradeError.missing(99));
+		// The halt is logged on this thread, as an error for the operator
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(Server.upgradeLog.getName(),Thread.currentThread()).open()) {
+			peer.haltConsensus(UpgradeError.missing(99));
+		}
 		peer.launch();
 		return peer;
 	}

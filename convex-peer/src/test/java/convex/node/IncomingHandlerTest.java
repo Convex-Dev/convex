@@ -25,6 +25,8 @@ import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.MaxLattice;
 import convex.net.IncomingHandler;
+import convex.net.impl.netty.NettyServer;
+import convex.peer.ExpectedLogs;
 
 class IncomingHandlerTest {
 
@@ -79,11 +81,15 @@ class IncomingHandlerTest {
 	}
 
 	@Test void nullAndThrowingFactoriesRefuseSocketsButListenerSurvives() throws Exception {
-		try (var listener=new LatticeListener(NodeConfig.port(0))) {
+		try (var logs=ExpectedLogs.onThreads(NettyServer.class.getName()).open();
+				var listener=new LatticeListener(NodeConfig.port(0))) {
 			listener.setConnectionHandler(connection -> null);
 			listener.launch();
 			assertClosedOnAccept(listener);
-			listener.setConnectionHandler(connection -> { throw new IllegalStateException("factory failure"); });
+			listener.setConnectionHandler(connection -> {
+				logs.expectOnThisThread();
+				throw new IllegalStateException("factory failure");
+			});
 			assertClosedOnAccept(listener);
 			listener.setConnectionHandler(connection -> message -> {
 				reply(message,1);
@@ -97,8 +103,11 @@ class IncomingHandlerTest {
 
 	@Test void outOfMemoryInFactoryRefusesOnlyItsSocket() throws Exception {
 		var listener=new LatticeListener(NodeConfig.port(0));
-		try {
-			listener.setConnectionHandler(connection -> { throw new OutOfMemoryError("simulated"); });
+		try (var logs=ExpectedLogs.onThreads(NettyServer.class.getName()).open()) {
+			listener.setConnectionHandler(connection -> {
+				logs.expectOnThisThread();
+				throw new OutOfMemoryError("simulated");
+			});
 			listener.launch();
 			assertClosedOnAccept(listener);
 			listener.setConnectionHandler(connection -> message -> {

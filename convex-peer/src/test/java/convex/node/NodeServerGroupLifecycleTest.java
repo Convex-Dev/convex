@@ -26,6 +26,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.MaxLattice;
+import convex.peer.ExpectedLogs;
 
 /** Removing a policy group must leave the authoritative host and other groups live. */
 public class NodeServerGroupLifecycleTest {
@@ -169,7 +170,10 @@ public class NodeServerGroupLifecycleTest {
 			node.addPropagator(broken);
 			node.addPropagator(retained);
 			node.launch();
-			assertTrue(node.removePropagator(broken));
+			// The node warns of the group it isolates
+			try (ExpectedLogs logs=ExpectedLogs.carrying(broken).open()) {
+				assertTrue(node.removePropagator(broken));
+			}
 			assertSame(failure,broken.getStatus().lastFailure().cause());
 			assertEquals(List.of(retained),node.getPropagators());
 			CompletableFuture<ACell> announced=retained.nextAnnounce();
