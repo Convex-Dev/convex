@@ -332,8 +332,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				boolean otherHas=has(other,key);
 				ACell otherValue=get(other,key);
 				if (same(otherHas,otherValue,has(base,key),get(base,key))) {
-					// Only own changed: carried onto the destination's cells where they are equal
-					result=put(result,key,ownHas,(ownHas && otherHas)?LatticeOps.mergeChanges(get(base,key),ownValue,otherValue):ownValue);
+					result=put(result,key,ownHas,ownValue);
 				} else {
 					Keyword region=served(key);
 					if (region!=null) result=put(result,key,true,mergeRegion(region,get(base,key),ownValue,otherValue));

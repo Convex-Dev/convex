@@ -117,12 +117,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Reconciles this component's working value with its destination, given the value
 	 * both sides last agreed on. Called whatever changed: a side that changed nothing
-	 * contributes nothing. The result is built on {@code other}, the value held there, so
-	 * cells the destination holds, which may be persisted, stay held wherever the result
-	 * equals them. By default only own's changes are carried onto other, and
-	 * {@link #reconcile(ACell,ACell)} resolves changes on both sides. Experimental: a
-	 * merge with no better way of handling conflicts can override this with
-	 * {@link LatticeOps#mergeChanges}.
+	 * contributes nothing. By default a side that changed nothing takes the other's value, and
+	 * {@link #reconcile(ACell,ACell)} resolves changes on both sides. Changes in
+	 * different places combine only where the component's value is independent place
+	 * by place, as a CRDT's is: an override that combines them must hold to that.
 	 *
 	 * @param base Value both sides last agreed on, or null if there was none
 	 * @param own Working value
@@ -131,8 +129,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	protected V reconcile(V base,V own,V other) {
 		if (Utils.equals(own,base)) return other;
-		// Other changed nothing, so this never conflicts
-		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		if (Utils.equals(other,base)) return own;
 		// Both changed, even to equal values: two increments to the same count are two changes
 		return reconcile(own,other);
 	}

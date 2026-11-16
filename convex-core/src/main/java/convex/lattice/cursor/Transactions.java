@@ -7,7 +7,6 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
-import convex.lattice.LatticeOps;
 import convex.lattice.MergeConflictException;
 
 /**
@@ -39,9 +38,8 @@ import convex.lattice.MergeConflictException;
  * from, the run's value and the value as held, which may be persisted since, as
  * {@code base}, {@code own} and {@code other}. Given a {@link ThreeWayMerge}, the run
  * commits with a concurrent change wherever that merge reconciles them. Without one the
- * merge is strict: the run's changes are carried onto the held value if it is
- * unchanged, and a run that changed nothing commits whatever changed meanwhile, as of
- * the value it read. When the merge throws {@link MergeConflictException}, the
+ * merge is strict: the run commits if the held value is unchanged, and a run that
+ * changed nothing commits whatever changed meanwhile, as of the value it read. When the merge throws {@link MergeConflictException}, the
  * transaction takes the {@link Claim} beneath its cursor (see {@link ACursor#claim})
  * and finishes under it. Claims on the same boundary run one at a time, and a callback
  * runs at most twice. {@link #transactExclusively} starts with the claim, for work too
@@ -185,19 +183,15 @@ public final class Transactions {
 		},merge);
 	}
 
-	/**
-	 * Commits a run only if nothing else changed its value, because its reads hold only
-	 * then. Where its value is held in other cells, such as persisted ones, the run's
-	 * changes are carried onto them.
-	 */
+	/** Commits a run only if nothing else changed its value, because its reads hold only then. */
 	private static <V extends ACell> V strict(V base,V own,V other) {
-		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		if (Utils.equals(other,base)) return own;
 		throw new MergeConflictException();
 	}
 
 	/** As {@link #strict}, for a change under the claim that there is no merge to reconcile. */
 	private static <V extends ACell> V refuse(V base,V own,V other) {
-		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		if (Utils.equals(other,base)) return own;
 		throw new IllegalStateException("Value changed under a transaction's claim, by this thread or by a write that did not pass through the claimed boundary");
 	}
 

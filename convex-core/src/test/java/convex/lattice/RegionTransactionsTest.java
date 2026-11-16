@@ -63,7 +63,7 @@ class RegionTransactionsTest {
 			create(FORKED,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c.fork()));
 			create(LIVE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
 			create(MORE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
-			create(SIGNED,(AForkableCursor<SignedData<ASet<CVMLong>>> c) -> new SignedComponent<>(SIGNING,c,OWNER::signData));
+			create(SIGNED,(AForkableCursor<SignedData<ASet<CVMLong>>> c) -> new SignedSetComponent<>(SIGNING,c,OWNER::signData));
 		}
 		private App(AForkableCursor<Index<Keyword,ACell>> cursor,App source) { super(cursor,source); }
 		@Override public App rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new App(cursor,this); }

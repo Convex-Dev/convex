@@ -1,8 +1,8 @@
 package convex.lattice;
 
 /**
- * Two sides changed the same location from a common base, to different values, and
- * nothing defines how to reconcile them. See {@link LatticeOps#mergeChanges}.
+ * A merge cannot reconcile changes that both sides made from a common base. See
+ * {@link ALatticeComponent#reconcile(convex.core.data.ACell,convex.core.data.ACell,convex.core.data.ACell)}.
  */
 public class MergeConflictException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
