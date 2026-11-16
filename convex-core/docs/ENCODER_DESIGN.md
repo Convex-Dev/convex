@@ -36,6 +36,8 @@ in. Read it before touching `ACell`, `Ref`, `Format`, the encoder hierarchy or
   caller's own limit is exceeded. Choosing limits is the message layer's job.
 - **Storeless decode is allocation-free for the common case.** A single-cell message
   with no branches decodes with no map, no temporary store and no extra encoder.
+- **Decoders accept only canonical encodings.** Bytes that decode as a cell re-encode
+  to exactly those bytes, so decoding never re-encodes to check what it received.
 
 ## Encoding path
 
@@ -99,6 +101,22 @@ and a count of branch refs met so far). Reads advance it, so there is no manual
 position arithmetic in the decoders. Tag dispatch happens in `read(DecodeState)`, with
 `CVMEncoder` overriding the coded-data, dense-record and extension branches to produce
 CVM-specific cells.
+
+### Canonical decoding
+
+CAD003 makes a byte sequence a valid encoding only if some cell encodes to exactly
+those bytes, and requires a decoder to reject every other sequence. Each reader
+therefore accepts only the canonical encoding of the cell it returns. Doubles fit the
+rule: every 64-bit pattern, each NaN included, is the encoding of a distinct value.
+
+Decoding relies on this rather than checking it. A child cell decoded from a
+multi-cell message takes its received bytes, and their hash, as its encoding and value
+ID; an inline cell's encoding length is the number of bytes it consumed, which settles
+whether it was entitled to be inline without measuring it. A reader that accepted a
+second form of some value would give that value two IDs, and peers holding different
+forms would disagree about it. `CanonicalDecodeTest` checks the property over every cell
+of the committed genesis, Belief and DLFS snapshots, mutations of them and every
+one- and two-byte sequence; a new cell type needs seeds there.
 
 ### Store binding
 
@@ -208,8 +226,8 @@ follow-up messages.
 Decoded keys, signatures, blobs, strings and branch hashes are views of the bytes they
 were read from. So that a cell kept after a message holds only its own bytes, never the
 whole message, the top cell is read again from a copy of its own bytes when children
-follow it, and each child that is decoded is decoded from a copy of its own. A child
-whose re-encoding matches its bytes keeps that copy as its encoding.
+follow it, and each child that is decoded is decoded from a copy of its own, which
+becomes its encoding.
 
 `Message` exposes two accessors: `getPayload()` returns the cached payload or null and
 never decodes; `getPayload(store)` decodes on demand, storelessly when `store` is null
@@ -225,7 +243,7 @@ peer side).
 | Storeless decode | `convex.core.store.NullStore`, `convex.core.exceptions.PartialMessageException` |
 | Multi-cell encode | `Format.encodeMultiCell`, `Format.encodeDataResult` |
 | Message limits | `convex.core.message.Message`, `convex.core.cpos.CPoSConstants` |
-| Tests | `EncodingTest`, `ObjectsTest`, `MessageTest`, `FormatFuzzTest`, `AdversarialDataTest` |
+| Tests | `EncodingTest`, `ObjectsTest`, `MessageTest`, `FormatFuzzTest`, `AdversarialDataTest`, `CanonicalDecodeTest` |
 
 ## Related
 
