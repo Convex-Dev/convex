@@ -221,7 +221,7 @@ convex.query(q).thenCompose(r -> convex.transact(next(r)));
   main code checks for `:COMM`. The REST API picks its HTTP status from the error code and reads the
   source only for `:CVM`, `:CODE` and `:PEER`.
 - **Load tools** that rely on being slowed keep being slowed: the GUI stress panel,
-  `LatencyBenchmark`, `ServerTest.testServerFlood` and the `TransactionThroughput` example.
+  `LatencyBenchmark` and the `TransactionThroughput` example.
 
 ## API changes
 
