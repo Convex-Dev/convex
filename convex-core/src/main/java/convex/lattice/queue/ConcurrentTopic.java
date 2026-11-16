@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.util.ThreadUtils;
 
 /**
  * Bounded, batched producers over a topic, with one worker per partition.
@@ -123,17 +124,10 @@ public class ConcurrentTopic implements AutoCloseable {
 		}
 		state=State.CLOSING;
 		for (Worker worker:workers) worker.wake();
-		boolean interrupted=false;
 		try {
-			for (Thread thread:threads) {
-				while (thread.isAlive()) {
-					try { thread.join(); }
-					catch (InterruptedException e) { interrupted=true; }
-				}
-			}
+			for (Thread thread:threads) ThreadUtils.joinUninterruptibly(thread);
 		} finally {
 			state=State.CLOSED;
-			if (interrupted) Thread.currentThread().interrupt();
 		}
 		checkFailure();
 	}

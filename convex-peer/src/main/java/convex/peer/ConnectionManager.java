@@ -48,6 +48,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Cleanup;
 import convex.core.util.LoadMonitor;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.PeerConnectionException;
 import convex.net.PeerRefusedException;
@@ -160,18 +161,7 @@ public class ConnectionManager extends AConnectionManager {
 
 		if (managerThread != null) {
 			managerThread.interrupt();
-			if (managerThread != Thread.currentThread()) {
-				boolean interrupted=false;
-				while (managerThread.isAlive()) {
-					try {
-						managerThread.join();
-					} catch (InterruptedException e) {
-						interrupted=true;
-						managerThread.interrupt();
-					}
-				}
-				if (interrupted) Thread.currentThread().interrupt();
-			}
+			ThreadUtils.joinUninterruptibly(managerThread);
 		}
 
 		// Broadcast GOODBYE after maintenance has stopped, then close every route.

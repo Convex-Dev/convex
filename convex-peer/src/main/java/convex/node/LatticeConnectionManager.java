@@ -47,6 +47,7 @@ import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.util.Cleanup;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.PeerConnectionException;
 import convex.net.PeerRefusedException;
@@ -709,18 +710,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 		if (maintenanceThread != null) {
 			maintenanceThread.interrupt();
-			if (maintenanceThread != Thread.currentThread()) {
-				boolean interrupted=false;
-				while (maintenanceThread.isAlive()) {
-					try {
-						maintenanceThread.join();
-					} catch (InterruptedException e) {
-						interrupted=true;
-						maintenanceThread.interrupt();
-					}
-				}
-				if (interrupted) Thread.currentThread().interrupt();
-			}
+			ThreadUtils.joinUninterruptibly(maintenanceThread);
 			maintenanceThread = null;
 		}
 	}

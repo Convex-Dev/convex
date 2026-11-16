@@ -2,6 +2,7 @@ package convex.core.util;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -178,6 +179,56 @@ public class ThreadUtils {
 					throw (E)cause;
 				}
 			}
+		} finally {
+			if (interrupted) Thread.currentThread().interrupt();
+		}
+	}
+
+	/**
+	 * Waits until a thread is no longer alive. An interrupt does not end the wait: the
+	 * caller's interrupt status is restored once the wait is over.
+	 *
+	 * @param thread Thread to wait for
+	 * @return true once the thread is not alive; false at once if called on that thread
+	 */
+	public static boolean joinUninterruptibly(Thread thread) {
+		return join(thread,-1);
+	}
+
+	/**
+	 * Waits at most the given time until a thread is no longer alive, as
+	 * {@link #joinUninterruptibly(Thread)}.
+	 *
+	 * @param thread Thread to wait for
+	 * @param timeout Longest wait
+	 * @return true if the thread is not alive; false if it still is when the time is up,
+	 *         or at once if called on that thread
+	 */
+	public static boolean joinUninterruptibly(Thread thread, Duration timeout) {
+		return join(thread,Math.max(0,timeout.toNanos()));
+	}
+
+	/** Joins uninterruptibly for at most the given nanoseconds, or without limit if negative. */
+	private static boolean join(Thread thread, long nanos) {
+		if (thread==Thread.currentThread()) return false;
+		long deadline=System.nanoTime()+nanos;
+		boolean interrupted=false;
+		try {
+			while (thread.isAlive()) {
+				try {
+					if (nanos<0) {
+						thread.join();
+					} else {
+						long remaining=deadline-System.nanoTime();
+						if (remaining<=0) break;
+						TimeUnit.NANOSECONDS.timedJoin(thread,remaining);
+					}
+				} catch (InterruptedException e) {
+					// Thrown with the status cleared, so the next join waits again
+					interrupted=true;
+				}
+			}
+			return !thread.isAlive();
 		} finally {
 			if (interrupted) Thread.currentThread().interrupt();
 		}

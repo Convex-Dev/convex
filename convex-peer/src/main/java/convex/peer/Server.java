@@ -64,6 +64,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Cleanup;
 import convex.core.util.Shutdown;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.net.AServer;
@@ -1057,22 +1058,15 @@ public class Server implements Closeable {
 		shutdownHookRegistered=false;
 	}
 
-	/** Joins component threads without allowing an interrupt to skip resource safety. */
+	/**
+	 * Joins component threads without allowing an interrupt to skip resource safety.
+	 * Returns false if called on one of them.
+	 */
 	private boolean awaitComponentsStopped(AThreadedComponent... components) {
-		boolean interrupted=false;
 		boolean stopped=true;
 		for (AThreadedComponent component : components) {
-			while (true) {
-				try {
-					stopped&=component.awaitStopped();
-					break;
-				} catch (InterruptedException e) {
-					interrupted=true;
-					component.close();
-				}
-			}
+			stopped&=ThreadUtils.joinUninterruptibly(component.thread);
 		}
-		if (interrupted) Thread.currentThread().interrupt();
 		return stopped;
 	}
 
