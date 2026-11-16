@@ -497,6 +497,31 @@ public class EncoderTest {
 			"Embedded cell as child should be rejected");
 	}
 
+	@Test public void testChildAtEmbeddingLimit() throws BadFormatException {
+		// A child at the embedding limit belongs inline, so is rejected as a branch
+		ACell big = Samples.INT_VECTOR_300;
+		assertEquals(Format.MAX_EMBEDDED_LENGTH, Samples.MAX_EMBEDDED_BLOB.getEncodingLength());
+		Blob msg = buildMultiCell(big, Samples.MAX_EMBEDDED_BLOB);
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(msg));
+
+		// One byte longer, it is a branch
+		AVector<ABlob> v = Vectors.of(Samples.NON_EMBEDDED_BLOB);
+		assertEquals(v, CVM.decodeMultiCell(Format.encodeMultiCell(v, true)));
+	}
+
+	@Test public void testInlineCellAtEmbeddingLimit() throws BadFormatException {
+		// A vector of one element is the vector tag, a count of 1 and the element
+		Blob header = Blob.wrap(new byte[] {Tag.VECTOR, 1});
+		Blob atLimit = header.append(Cells.encode(Samples.MAX_EMBEDDED_BLOB)).toFlatBlob();
+		assertEquals(Cells.encode(Vectors.of(Samples.MAX_EMBEDDED_BLOB)), atLimit);
+		assertEquals(Vectors.of(Samples.MAX_EMBEDDED_BLOB), CVM.decodeMultiCell(atLimit));
+
+		// One byte longer, the element must be a branch ref, not inline
+		Blob tooLong = header.append(Cells.encode(Samples.NON_EMBEDDED_BLOB)).toFlatBlob();
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(tooLong));
+		assertThrows(BadFormatException.class, () -> CAD3.decodeMultiCell(tooLong));
+	}
+
 	@Test public void testAdversarialNullChildEncoding() {
 		// A child that decodes to null (0x00 tag)
 		ACell big = Samples.INT_VECTOR_300;
