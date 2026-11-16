@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
@@ -205,6 +206,20 @@ class RESTRuntimeConfigTest {
 
 			HttpResponse<String> denied=getWithOrigin(running.url("/api/v1/status"),"https://evil.example");
 			assertTrue(denied.headers().firstValue("Access-Control-Allow-Origin").isEmpty());
+		}
+	}
+
+	@Test
+	void restartingKeepsTheLocalClientsAndClosingIsFinal() throws Exception {
+		try (RunningServer running=launch("{mcp:{enabled:false}}")) {
+			RESTServer rest=running.rest();
+			rest.start(0);
+			assertTrue(rest.getConvex().isConnected(),"Restarting keeps the local client open");
+			assertEquals(200,get(running.url("/api/v1/status"),null).statusCode());
+
+			rest.close();
+			assertFalse(rest.getConvex().isConnected(),"Closing closes the local client");
+			assertThrows(IllegalStateException.class,() -> rest.start(0));
 		}
 	}
 

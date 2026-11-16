@@ -637,10 +637,13 @@ public class RESTServer implements Closeable {
 	}
 
 	/**
-	 * Start app with specific port
+	 * Start app with specific port, stopping it first if it is running
+	 *
+	 * @throws IllegalStateException if this server has been closed
 	 */
 	public synchronized void start(Integer port) {
-		close();
+		if (closed) throw new IllegalStateException("REST server is closed");
+		stopApp();
 		if (port == null) port = restConfig.getRestPort();
 		try {
 			javalin=buildApp(port);
@@ -648,14 +651,15 @@ public class RESTServer implements Closeable {
 		} catch (JavalinBindException e) {
 			if (port!=null) throw e; // only try again if port unspecified
 			log.warn("Default port "+DEFAULT_PORT+" already in use ("+e.getMessage()+"), choosing another at random");
-			close();
+			stopApp();
 
 			javalin=buildApp(0); // use random port
 			javalin.start();
 		}
 	}
 
-	public synchronized void close() {
+	/** Stops the HTTP server and the APIs it serves; starting builds them again. */
+	private void stopApp() {
 		// A failing API shutdown still leaves the HTTP server to stop
 		Cleanup cleanup=new Cleanup();
 		if (mcpAPI!=null) cleanup.run(mcpAPI::shutdown);
@@ -664,10 +668,28 @@ public class RESTServer implements Closeable {
 		Javalin app=javalin;
 		javalin=null;
 		if (app!=null) cleanup.run(app::stop);
+		cleanup.finish();
+	}
+
+	/**
+	 * Closes this server for good: stops the HTTP server and its APIs, then closes the
+	 * local clients it opened. Closing again does nothing. The peer is not closed.
+	 */
+	public synchronized void close() {
+		if (closed) return;
+		closed=true;
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(this::stopApp);
+		// Once requests have stopped
+		cleanup.run(convex::close);
+		if (convexFaucet!=null) cleanup.run(convexFaucet::close);
 
 		// we don't own the Convex server, so do nothing to it
 		cleanup.finish();
 	}
+
+	/** Set by the first close, under this server's lock, which start also holds */
+	private boolean closed;
 
 	/**
 	 * Shared local Convex client instance. Use for fast reads. Don't transact with this!!

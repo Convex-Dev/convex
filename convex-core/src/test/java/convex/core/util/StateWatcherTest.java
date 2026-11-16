@@ -138,13 +138,44 @@ class StateWatcherTest {
 
 		try {
 			consumerStarted.await();
-			watcher.close();
+			// Close waits for the consumer, held until after the assertion, so it runs elsewhere
+			Thread closer=Thread.ofVirtual().start(watcher::close);
 			caller.join();
 			assertTrue(failure.get() instanceof IllegalStateException);
+			releaseConsumer.countDown();
+			closer.join();
 		} finally {
 			releaseConsumer.countDown();
 			watcher.close();
 		}
+	}
+
+	@Test
+	void closeWaitsForAConsumerCallInProgress() throws Exception {
+		CountDownLatch consumerStarted=new CountDownLatch(1);
+		CountDownLatch releaseConsumer=new CountDownLatch(1);
+		AtomicBoolean consumerReturned=new AtomicBoolean();
+		StateWatcher<Integer> watcher=new StateWatcher<>(v-> {
+			consumerStarted.countDown();
+			awaitUninterruptibly(releaseConsumer);
+			consumerReturned.set(true);
+		});
+		AtomicBoolean returnedAfterConsumer=new AtomicBoolean();
+		Thread closer=null;
+		try {
+			watcher.update(1);
+			consumerStarted.await();
+			closer=Thread.ofVirtual().start(() -> {
+				watcher.close();
+				returnedAfterConsumer.set(consumerReturned.get());
+			});
+			// Releases the consumer only once close is waiting for it
+			while ((closer.getState()!=Thread.State.TIMED_WAITING) && closer.isAlive()) Thread.onSpinWait();
+		} finally {
+			releaseConsumer.countDown();
+		}
+		closer.join();
+		assertTrue(returnedAfterConsumer.get(),"close returns only after the consumer call");
 	}
 
 	private static void awaitUninterruptibly(CountDownLatch latch) {
