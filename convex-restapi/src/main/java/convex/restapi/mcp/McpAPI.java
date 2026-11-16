@@ -49,6 +49,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.Cleanup;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.restapi.PreparedTransaction;
@@ -193,14 +194,18 @@ public class McpAPI extends ABaseAPI {
 	 * Stops peer-state observation for this API instance.
 	 */
 	public void shutdown() {
+		Cleanup cleanup=new Cleanup();
 		// Ends each stream's keep-alive loop, so a graceful server stop need not wait for it
-		closeConnections(connections);
-		stateWatcher.shutdown();
+		cleanup.run(() -> closeConnections(connections));
+		cleanup.run(stateWatcher::shutdown);
+		cleanup.finish();
 	}
 
 	/** Closes every registered stream; each stream's request then completes. */
 	static void closeConnections(Map<String, McpConnection> connections) {
-		for (McpConnection conn : connections.values()) conn.close();
+		Cleanup cleanup=new Cleanup();
+		for (McpConnection conn : connections.values()) cleanup.run(conn::close);
+		cleanup.finish();
 	}
 
 	/**
@@ -1625,8 +1630,10 @@ public class McpAPI extends ABaseAPI {
 			var watcher=updates;
 			updateObserver=null;
 			updates=null;
-			if (observer!=null) server.removeStateUpdateObserver(observer);
-			if (watcher!=null) watcher.close();
+			Cleanup cleanup=new Cleanup();
+			if (observer!=null) cleanup.run(() -> server.removeStateUpdateObserver(observer));
+			if (watcher!=null) cleanup.run(watcher::close);
+			cleanup.finish();
 		}
 
 		ACell resolveValue(ACell[] path) {

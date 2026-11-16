@@ -1,6 +1,7 @@
 package convex.db.psql;
 
 import convex.core.crypto.TLS;
+import convex.core.util.Cleanup;
 import convex.db.calcite.StalePlanException;
 import convex.db.psql.msg.*;
 import io.netty.buffer.ByteBuf;
@@ -1177,8 +1178,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 	private void handleTerminate(ChannelHandlerContext ctx) {
 		log.debug("Client terminated connection");
-		closeConnection();
-		ctx.close();
+		closeConnectionAndChannel(ctx);
+	}
+
+	/** Closes the connection and then the channel, which closes even if the connection fails to. */
+	private void closeConnectionAndChannel(ChannelHandlerContext ctx) {
+		Cleanup cleanup = new Cleanup();
+		cleanup.run(this::closeConnection);
+		cleanup.run(ctx::close);
+		cleanup.finish();
 	}
 
 	private void write(ChannelHandlerContext ctx, PgMessage msg) {
@@ -1200,17 +1208,23 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void closeConnection() {
+		// A statement that fails to close, by any exception, leaves the rest and the connection to close
+		Cleanup cleanup = new Cleanup();
 		for (PreparedStmt stmt : new java.util.ArrayList<>(jdbcStatements.keySet())) {
-			closeJdbcStatement(stmt);
+			cleanup.run(() -> closeJdbcStatement(stmt));
 		}
-		if (connection != null) {
-			try {
-				connection.close();
-			} catch (SQLException e) {
-				log.warn("Error closing connection", e);
-			}
-			connection = null;
+		Connection c = connection;
+		connection = null;
+		if (c != null) {
+			cleanup.run(() -> {
+				try {
+					c.close();
+				} catch (SQLException e) {
+					log.warn("Error closing connection", e);
+				}
+			});
 		}
+		cleanup.finish();
 	}
 
 	@Override
@@ -1226,8 +1240,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		} else {
 			log.error("Protocol error",cause);
 		}
-		closeConnection();
-		ctx.close();
+		closeConnectionAndChannel(ctx);
 	}
 
 	/**

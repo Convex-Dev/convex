@@ -66,8 +66,7 @@ public class EtchMigrate extends AEtchCommand {
 		} catch (IOException e) {
 			throw new CLIError("IO error during Etch migration: "+e.getMessage(), e);
 		} finally {
-			source.close();
-			closeKeyContexts();
+			closeStoreAndKeys(source);
 		}
 	}
 }

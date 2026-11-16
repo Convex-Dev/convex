@@ -41,6 +41,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Cleanup;
 import convex.core.util.FileUtils;
 import convex.core.util.Shutdown;
 import convex.dlfs.DLFSServer;
@@ -385,24 +386,31 @@ public class DLFSBrowser extends AbstractGUI {
 	 * them.
 	 */
 	private void closeNodeServer() {
-		if (nodeServer != null) {
-			try {
-				nodeServer.close();
-			} catch (IOException e) {
-				log.warn("Error closing NodeServer: {}", e.getMessage());
-			}
-			try {
-				nodeServer.getHost().close();
-			} catch (IOException e) {
-				log.warn("Error saving DLFS store: {}", e.getMessage());
-			}
-			nodeServer = null;
+		var node = nodeServer;
+		EtchStore store = etchStore;
+		nodeServer = null;
+		etchStore = null;
+		// Any failure closing the node still leaves the host to save and the store to close
+		Cleanup cleanup = new Cleanup();
+		if (node != null) {
+			cleanup.run(() -> {
+				try {
+					node.close();
+				} catch (IOException e) {
+					log.warn("Error closing NodeServer: {}", e.getMessage());
+				}
+			});
+			cleanup.run(() -> {
+				try {
+					node.getHost().close();
+				} catch (IOException e) {
+					log.warn("Error saving DLFS store: {}", e.getMessage());
+				}
+			});
 		}
-		drives.clear();
-		if (etchStore != null) {
-			etchStore.close();
-			etchStore = null;
-		}
+		cleanup.run(drives::clear);
+		if (store != null) cleanup.run(store::close);
+		cleanup.finish();
 	}
 
 	private void stopWebDAV() {
@@ -694,11 +702,11 @@ public class DLFSBrowser extends AbstractGUI {
 
 	/** Stops the browser, WebDAV and the NodeServer, saving state. Runs once, as {@link #shutdownTask}. */
 	private void shutdown() {
-		if (panel != null) {
-			panel.close();
-		}
-		stopWebDAV();
-		closeNodeServer();
+		Cleanup cleanup = new Cleanup();
+		if (panel != null) cleanup.run(panel::close);
+		cleanup.run(this::stopWebDAV);
+		cleanup.run(this::closeNodeServer);
+		cleanup.finish();
 	}
 
 	public static void main(String[] args) {

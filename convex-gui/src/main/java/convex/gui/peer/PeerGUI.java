@@ -32,6 +32,7 @@ import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
+import convex.core.util.Cleanup;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.account.AccountsPanel;
 import convex.gui.keys.KeyGenPanel;
@@ -411,23 +412,28 @@ public class PeerGUI extends AbstractGUI {
 	 * every peer. Released when the GUI closes.
 	 */
 	private void closeNetwork() {
+		// A failure closing the REST server or one peer still leaves every peer to close
+		Cleanup cleanup=new Cleanup();
 		RESTServer rs=restServer;
 		if (rs!=null) {
 			restServer=null;
-			rs.close();
+			cleanup.run(rs::close);
 		}
 		DefaultListModel<ConvexLocal> peerList = getPeerList();
 		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
 			Convex p = peerList.getElementAt(i);
-			try {
-				p.getLocalServer().close();
-			} catch (Exception e) {
-				log.warn("Error closing peer",e);
-			} finally {
-				p.close();
-			}
+			cleanup.run(() -> {
+				try {
+					p.getLocalServer().close();
+				} catch (Exception e) {
+					log.warn("Error closing peer",e);
+				} finally {
+					p.close();
+				}
+			});
 		}
+		cleanup.finish();
 	}
 
 	/**

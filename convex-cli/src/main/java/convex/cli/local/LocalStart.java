@@ -17,6 +17,7 @@ import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;
+import convex.core.util.Cleanup;
 import convex.peer.API;
 import convex.peer.PeerException;
 import convex.peer.Server;
@@ -150,7 +151,7 @@ public class LocalStart extends ALocalCommand {
 		boolean trayInstalled=false;
 		try {
 			if (!norest) restServer=launchRestAPI(servers.get(0));
-			Runnable closeServers=()->servers.forEach(Server::close);
+			Runnable closeServers=()->closeAll(servers);
 			trayInstalled=TraySupport.installPeerTray(
 				"Convex local network ("+n+" peer"+((n>1)?"s":"")+")",
 				servers.get(0),restServer,noTray,closeServers);
@@ -160,10 +161,19 @@ public class LocalStart extends ALocalCommand {
 			servers.get(0).waitForShutdown();
 			inform("Peer shutdown complete");
 		} finally {
-			if (trayInstalled) TrayManager.remove();
-			if (restServer!=null) restServer.close();
-			servers.forEach(Server::close);
+			Cleanup cleanup=new Cleanup();
+			if (trayInstalled) cleanup.run(TrayManager::remove);
+			if (restServer!=null) cleanup.run(restServer::close);
+			cleanup.run(() -> closeAll(servers));
+			cleanup.finish();
 		}
+	}
+
+	/** Closes every peer, whichever of them fail to close. */
+	private static void closeAll(List<Server> servers) {
+		Cleanup cleanup=new Cleanup();
+		for (Server server:servers) cleanup.run(server::close);
+		cleanup.finish();
 	}
 
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) throws InterruptedException {

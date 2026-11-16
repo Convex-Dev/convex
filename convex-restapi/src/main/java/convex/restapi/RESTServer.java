@@ -22,6 +22,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Cursors;
 import convex.peer.API;
@@ -655,13 +656,17 @@ public class RESTServer implements Closeable {
 	}
 
 	public synchronized void close() {
-		if (mcpAPI!=null) mcpAPI.shutdown();
-		if (logWatchAPI!=null) logWatchAPI.shutdown();
-		if (queryWatchAPI!=null) queryWatchAPI.shutdown();
-		if (javalin!=null) javalin.stop();
+		// A failing API shutdown still leaves the HTTP server to stop
+		Cleanup cleanup=new Cleanup();
+		if (mcpAPI!=null) cleanup.run(mcpAPI::shutdown);
+		if (logWatchAPI!=null) cleanup.run(logWatchAPI::shutdown);
+		if (queryWatchAPI!=null) cleanup.run(queryWatchAPI::shutdown);
+		Javalin app=javalin;
 		javalin=null;
-		
+		if (app!=null) cleanup.run(app::stop);
+
 		// we don't own the Convex server, so do nothing to it
+		cleanup.finish();
 	}
 
 	/**

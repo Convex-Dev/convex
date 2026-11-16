@@ -16,6 +16,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
+import convex.core.util.Cleanup;
 import convex.core.util.StateWatcher;
 import convex.restapi.RESTServer;
 import convex.restapi.api.QueryWatch.Event;
@@ -192,14 +193,18 @@ public final class QueryWatchAPI extends ABaseAPI {
 
 	/** Stops observation and closes all active query streams. */
 	public void shutdown() {
-		for (SseConnection connection:subscriptions.keySet()) connection.close();
+		Cleanup cleanup=new Cleanup();
+		for (SseConnection connection:subscriptions.keySet()) cleanup.run(connection::close);
 		synchronized (lifecycleLock) {
 			generation++;
-			if (updateObserver!=null) server.removeStateUpdateObserver(updateObserver);
-			if (updates!=null) updates.close();
+			Consumer<Peer> observer=updateObserver;
+			StateWatcher<Peer> watcher=updates;
 			updates=null;
 			updateObserver=null;
+			if (observer!=null) cleanup.run(() -> server.removeStateUpdateObserver(observer));
+			if (watcher!=null) cleanup.run(watcher::close);
 			subscriptions.clear();
 		}
+		cleanup.finish();
 	}
 }
