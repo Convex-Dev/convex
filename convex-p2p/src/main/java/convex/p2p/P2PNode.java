@@ -1457,8 +1457,9 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Stops networking, sending what the host has published to connected peers first.
-	 * Neither publishes pending host edits nor flushes the borrowed store; a service
-	 * checkpoints the host first, as convex-peer/docs/SHUTDOWN.md describes.
+	 * Neither publishes pending host edits nor flushes the borrowed store. The host
+	 * stays open: the service checkpoints it before this and closes it after, as
+	 * convex-peer/docs/SHUTDOWN.md describes.
 	 */
 	@Override
 	public void close() throws IOException {
