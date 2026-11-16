@@ -10,7 +10,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.HashMap;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.auth.did.DID;
@@ -19,11 +22,13 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.lang.RT;
+import convex.core.store.MemoryStore;
 import convex.core.util.JSON;
 import convex.peer.API;
 import convex.peer.Server;
@@ -32,20 +37,45 @@ import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
 /**
- * Runtime configuration tests using a real Peer and HTTP server.
+ * Runtime configuration tests using a real Peer and HTTP server, guarding against
+ * configuration accessors that work in isolation but are ignored at runtime.
  *
- * <p>Each fixture crosses the production compatibility boundary:
+ * <p>Each test runs a REST server with its own typed policy on one in-memory
+ * Peer shared by the class. The test that shuts its Peer down launches its own,
+ * and crosses the production compatibility boundary on the way:
  * {@link RESTConfig#toLegacy()} attaches the typed policy to the Peer launch
- * map, and {@link RESTServer#create(Server)} recovers it. This guards against
- * configuration accessors that work in isolation but are ignored at runtime.</p>
+ * map, and {@link RESTServer#create(Server)} recovers it.</p>
  */
 class RESTRuntimeConfigTest {
 
 	private static final HttpClient CLIENT=HttpClient.newHttpClient();
 
+	private static MemoryStore store;
+	private static Server peer;
+
+	@BeforeAll
+	static void launchPeer() throws Exception {
+		store=new MemoryStore();
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,AKeyPair.generate());
+		config.put(Keywords.STORE,store);
+		config.put(Keywords.PORT,0);
+		peer=API.launchPeer(config);
+	}
+
+	@AfterAll
+	static void closePeer() {
+		try {
+			if (peer!=null) peer.close();
+		} finally {
+			// The peer borrows the store, so it is closed here, after the peer
+			if (store!=null) store.close();
+		}
+	}
+
 	@Test
 	void publicAccessIsOpenByDefault() throws Exception {
-		try (RunningServer running=launch("{mcp:{enabled:false}}")) {
+		try (RunningServer running=serve("{mcp:{enabled:false}}")) {
 			assertTrue(running.rest().getRESTConfig().isPublicAccess());
 			assertEquals(200,get(running.url("/api/v1/status"),null).statusCode());
 			assertEquals(404,postCvx(running.url("/api/v1/message"),"[:SR 1]").statusCode());
@@ -54,7 +84,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void publicPeerMayExplicitlyExposeProtocolMessagesOverHttp() throws Exception {
-		try (RunningServer running=launch("{rest:{messageEndpoint:true},mcp:{enabled:false}}")) {
+		try (RunningServer running=serve("{rest:{messageEndpoint:true},mcp:{enabled:false}}")) {
 			assertTrue(running.rest().getRESTConfig().isPublicAccess());
 			assertTrue(running.rest().getRESTConfig().isMessageEndpointEnabled());
 			assertEquals(200,postCvx(running.url("/api/v1/message"),"[:SR 1]").statusCode());
@@ -63,7 +93,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void privateAccessRequiresValidBearerToken() throws Exception {
-		try (RunningServer running=launch("{auth:{publicAccess:false}}")) {
+		try (RunningServer running=serve("{auth:{publicAccess:false}}")) {
 			assertEquals(401,get(running.url("/api/v1/status"),null).statusCode());
 			assertEquals(401,get(running.url("/api/v1/status"),"not-a-valid-token").statusCode());
 			assertEquals(401,post(running.url("/mcp"),ping(),null,null).statusCode());
@@ -80,7 +110,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void disablingMcpRemovesRoutesAndDiscovery() throws Exception {
-		try (RunningServer running=launch("{mcp:{enabled:false,signing:true,elevated:true}}")) {
+		try (RunningServer running=serve("{mcp:{enabled:false,signing:true,elevated:true}}")) {
 			assertNull(running.rest().getMcpAPI());
 			assertNull(running.rest().getSigningService());
 			assertNull(running.rest().getConfirmationService());
@@ -97,7 +127,7 @@ class RESTRuntimeConfigTest {
 		String config="""
 			{mcp:{signing:true,elevated:false,tools:{query:{enabled:false}}}}
 			""";
-		try (RunningServer running=launch(config)) {
+		try (RunningServer running=serve(config)) {
 			HttpResponse<String> response=post(running.url("/mcp"),toolsList(),null,null);
 			assertEquals(200,response.statusCode());
 			AVector<AMap<AString,ACell>> tools=toolList(response.body());
@@ -110,7 +140,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void elevatedCannotEnableSigningByItself() throws Exception {
-		try (RunningServer running=launch("{mcp:{signing:false,elevated:true}}")) {
+		try (RunningServer running=serve("{mcp:{signing:false,elevated:true}}")) {
 			AVector<AMap<AString,ACell>> tools=toolList(
 					post(running.url("/mcp"),toolsList(),null,null).body());
 			assertFalse(hasTool(tools,"signingSign"));
@@ -122,7 +152,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void administrationRoutesAreOptIn() throws Exception {
-		try (RunningServer running=launch("{mcp:{enabled:false}}")) {
+		try (RunningServer running=serve("{mcp:{enabled:false}}")) {
 			assertFalse(running.rest().getRESTConfig().isAdminEnabled());
 			assertEquals(404,post(running.url("/api/v1/peer/shutdown"),"{}",null,null).statusCode());
 			assertEquals(200,get(running.url("/api/v1/status"),null).statusCode());
@@ -132,15 +162,8 @@ class RESTRuntimeConfigTest {
 	@Test
 	void administrationRequiresStableConfiguredVenueIdentity() throws Exception {
 		RESTConfig config=RESTConfig.parse("{rest:{admin:true},mcp:{enabled:false}}");
-		var launchConfig=config.toLegacy();
-		launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
-		Server peer=API.launchPeer(launchConfig);
-		try {
-			org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-				()->RESTServer.create(peer));
-		} finally {
-			peer.close();
-		}
+		org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+			()->RESTServer.create(peer,config));
 	}
 
 	@Test
@@ -148,7 +171,7 @@ class RESTRuntimeConfigTest {
 		String config="""
 			{rest:{baseUrl:"http://localhost",admin:{enabled:true}},mcp:{enabled:false}}
 			""";
-		try (RunningServer running=launch(config)) {
+		try (RunningServer running=serve(config)) {
 			String shutdown=running.url("/api/v1/peer/shutdown");
 			assertEquals(401,post(shutdown,"{}",null,null).statusCode());
 
@@ -168,12 +191,18 @@ class RESTRuntimeConfigTest {
 		}
 	}
 
+	/**
+	 * The operational key shuts the local Peer down, so this test launches a Peer of
+	 * its own. Its policy reaches the server only across the production boundary:
+	 * administration and the base URL are honoured as configured.
+	 */
 	@Test
 	void operationalKeyMayShutDownLocalPeerWithVenueAudience() throws Exception {
 		String config="""
 			{rest:{baseUrl:"http://localhost",admin:{enabled:true}},mcp:{enabled:false}}
 			""";
 		try (RunningServer running=launch(config)) {
+			assertTrue(running.rest().getRESTConfig().isAdminEnabled());
 			AString token=selfIssuedToken(running.peer().getKeyPair(),"did:web:localhost");
 			HttpResponse<String> response=post(
 				running.url("/api/v1/peer/shutdown"),"{}",token.toString(),null);
@@ -184,7 +213,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void configuredVenueDIDIgnoresForgedForwardedHost() throws Exception {
-		try (RunningServer running=launch(
+		try (RunningServer running=serve(
 				"{rest:{baseUrl:\"https://venue.example.com\"},mcp:{enabled:false}}")) {
 			HttpRequest request=HttpRequest.newBuilder(URI.create(running.url("/.well-known/did.json")))
 				.header("X-Forwarded-Host","attacker.example")
@@ -198,7 +227,7 @@ class RESTRuntimeConfigTest {
 
 	@Test
 	void corsAllowListIsNotOverriddenByWildcardHeaders() throws Exception {
-		try (RunningServer running=launch("{rest:{cors:[\"https://app.example\"]},mcp:{enabled:false}}")) {
+		try (RunningServer running=serve("{rest:{cors:[\"https://app.example\"]},mcp:{enabled:false}}")) {
 			HttpResponse<String> allowed=getWithOrigin(running.url("/api/v1/status"),"https://app.example");
 			assertEquals("https://app.example",allowed.headers()
 					.firstValue("Access-Control-Allow-Origin").orElse(null));
@@ -208,19 +237,38 @@ class RESTRuntimeConfigTest {
 		}
 	}
 
+	/** Starts a REST server with the given policy on the class's shared Peer. */
+	private static RunningServer serve(String json5) {
+		RESTServer rest=RESTServer.create(peer,RESTConfig.parse(json5));
+		try {
+			rest.start(0);
+			return new RunningServer(peer,rest,null);
+		} catch (RuntimeException | Error t) {
+			rest.close();
+			throw t;
+		}
+	}
+
+	/**
+	 * Launches a Peer of its own from the typed policy's legacy launch map, and a REST
+	 * server that recovers the policy from the Peer.
+	 */
 	private static RunningServer launch(String json5) throws Exception {
 		RESTConfig config=RESTConfig.parse(json5);
 		var launchConfig=config.toLegacy();
+		MemoryStore ownStore=new MemoryStore();
 		launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
-		Server peer=API.launchPeer(launchConfig);
-		RESTServer rest=RESTServer.create(peer);
+		launchConfig.put(Keywords.STORE,ownStore);
+		launchConfig.put(Keywords.PORT,0);
+		Server ownPeer=API.launchPeer(launchConfig);
+		RESTServer rest=RESTServer.create(ownPeer);
+		RunningServer running=new RunningServer(ownPeer,rest,ownStore);
 		try {
 			rest.start(0);
 			assertNotNull(rest.getRESTConfig());
-			return new RunningServer(peer,rest);
+			return running;
 		} catch (RuntimeException | Error t) {
-			rest.close();
-			peer.close();
+			running.close();
 			throw t;
 		}
 	}
@@ -298,15 +346,26 @@ class RESTRuntimeConfigTest {
 		return false;
 	}
 
-	private record RunningServer(Server peer,RESTServer rest) implements AutoCloseable {
+	/** A REST server and its Peer; ownStore is set only when the Peer was launched for it. */
+	private record RunningServer(Server peer,RESTServer rest,MemoryStore ownStore) implements AutoCloseable {
 		String url(String path) {
 			return "http://localhost:"+rest.getPort()+path;
 		}
 
 		@Override
 		public void close() {
-			rest.close();
-			peer.close();
+			try {
+				rest.close();
+			} finally {
+				// The shared Peer outlives this server; a Peer of its own does not
+				if (ownStore!=null) {
+					try {
+						peer.close();
+					} finally {
+						ownStore.close();
+					}
+				}
+			}
 		}
 	}
 }

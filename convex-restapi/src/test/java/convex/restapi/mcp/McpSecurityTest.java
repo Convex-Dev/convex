@@ -6,28 +6,23 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.HashMap;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.peer.API;
-import convex.peer.Server;
 import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 import convex.restapi.SeedTransport;
+import convex.restapi.test.ARESTTest;
 
 /**
  * Tests for MCP endpoint security controls: Origin validation (#552) and
  * transport security for seed-carrying tools (#554).
  */
-public class McpSecurityTest {
+public class McpSecurityTest extends ARESTTest {
 
 	// ===== #554: seed transport rules (pure decision matrix) =====
 
@@ -74,17 +69,15 @@ public class McpSecurityTest {
 	@Test
 	public void testOriginValidationEndToEnd() throws Exception {
 		RESTConfig restConfig=RESTConfig.parse("""
-			{peer:{keypair:"%s"},mcp:{allowedOrigins:["https://app.example.com"]}}
-			""".formatted(AKeyPair.generate().getSeed().toHexString()));
-		HashMap<Keyword, Object> config = restConfig.toLegacy();
-		Server s = API.launchPeer(config);
-		try (RESTServer rs = RESTServer.create(s)) {
+			{mcp:{allowedOrigins:["https://app.example.com"]}}
+			""");
+		// The allow-list is REST policy, so a server of its own on the shared peer applies it
+		try (RESTServer rs = RESTServer.create(server.getServer(),restConfig)) {
 			rs.start(0);
 			String url = "http://localhost:" + rs.getPort() + "/mcp";
 			String ping = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}";
-			HttpClient client = HttpClient.newHttpClient();
 
-			HttpResponse<String> forbidden = client.send(HttpRequest.newBuilder()
+			HttpResponse<String> forbidden = httpClient.send(HttpRequest.newBuilder()
 					.uri(URI.create(url))
 					.header("Content-Type", "application/json")
 					.header("Origin", "https://evil.example.com")
@@ -92,7 +85,7 @@ public class McpSecurityTest {
 				HttpResponse.BodyHandlers.ofString());
 			assertEquals(403, forbidden.statusCode(), "Disallowed Origin should be rejected");
 
-			HttpResponse<String> allowed = client.send(HttpRequest.newBuilder()
+			HttpResponse<String> allowed = httpClient.send(HttpRequest.newBuilder()
 					.uri(URI.create(url))
 					.header("Content-Type", "application/json")
 					.header("Origin", "https://app.example.com")
@@ -100,14 +93,12 @@ public class McpSecurityTest {
 				HttpResponse.BodyHandlers.ofString());
 			assertEquals(200, allowed.statusCode(), "Allowed Origin should pass");
 
-			HttpResponse<String> noOrigin = client.send(HttpRequest.newBuilder()
+			HttpResponse<String> noOrigin = httpClient.send(HttpRequest.newBuilder()
 					.uri(URI.create(url))
 					.header("Content-Type", "application/json")
 					.POST(HttpRequest.BodyPublishers.ofString(ping)).build(),
 				HttpResponse.BodyHandlers.ofString());
 			assertNotEquals(403, noOrigin.statusCode(), "Non-browser (no Origin) requests should pass");
-		} finally {
-			s.close();
 		}
 	}
 }
