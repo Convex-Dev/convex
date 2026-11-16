@@ -1562,7 +1562,10 @@ public class NodeServerTest {
 			assertTrue(ingressStore.acquisitionReadEntered.await(5, TimeUnit.SECONDS),
 				"the inbound Acquiror should enter the controlled store operation");
 
-			receiver.close();
+			// The group warns that its acquisition did not stop in time
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				receiver.close();
+			}
 			assertEquals(NodeServer.LifecycleState.STOPPED,receiver.getLifecycleState(),
 				"a failed policy-group drain must not strand the node lifecycle");
 			assertTrue(receiver.getLocalValue().isEmpty(),
@@ -1616,7 +1619,10 @@ public class NodeServerTest {
 			assertTrue(ingressStore.entered.await(5, TimeUnit.SECONDS),
 				"the ingress worker should enter the controlled store write");
 
-			receiver.close();
+			// The group warns that its ingress did not drain in time
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				receiver.close();
+			}
 			assertEquals(NodeServer.LifecycleState.STOPPED,receiver.getLifecycleState());
 
 			ingressStore.release();
@@ -2087,7 +2093,10 @@ public class NodeServerTest {
 			assertNull(propagator.deliverIncomingMessage(blocking));
 			assertTrue(blocking.entered.await(5, TimeUnit.SECONDS));
 
-			node.close();
+			// The group warns that its ingress did not drain in time
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				node.close();
+			}
 			assertFalse(node.isRunning());
 			assertEquals(NodeServer.LifecycleState.STOPPED,node.getLifecycleState());
 			assertThrows(IllegalStateException.class,

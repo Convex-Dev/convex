@@ -697,7 +697,10 @@ public class LatticePropagatorTest {
 				propagator.triggerBroadcast(CVMLong.create(776));
 				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
 					"the publication worker should enter the controlled store write");
-				propagator.close();
+				// The group warns that its worker did not drain in time
+				try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+					propagator.close();
+				}
 				assertEquals(LatticePropagator.State.STOPPED, propagator.getStatus().state());
 			} finally {
 				store.release();

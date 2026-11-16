@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -82,11 +83,17 @@ public class ServerCloseTest {
 	static class FailingGoodbye extends Convex {
 		final IllegalStateException failure=new IllegalStateException("simulated GOODBYE failure");
 		final AtomicInteger closes=new AtomicInteger();
+		/** A scope to expect the failure's record on the thread that sends GOODBYE, if any */
+		volatile ExpectedLogs logs;
 
 		FailingGoodbye() { super(null,null); }
 
 		@Override public boolean trySend(Message message) {
-			if (message.getType()==MessageType.GOODBYE) throw failure;
+			if (message.getType()==MessageType.GOODBYE) {
+				ExpectedLogs expecting=logs;
+				if (expecting!=null) expecting.expectOnThisThread();
+				throw failure;
+			}
 			return true;
 		}
 		@Override public boolean isConnected() { return closes.get()==0; }
@@ -174,9 +181,18 @@ public class ServerCloseTest {
 		TrackingStore store=new TrackingStore();
 		FailingGoodbye connection=new FailingGoodbye();
 		Server peer=launchWithFailingGoodbye(store,connection);
+		IllegalStateException reason=new IllegalStateException("simulated");
+		// The peer logs why it shuts down on this thread, then that its shutdown failed
+		// on the thread that sends GOODBYE
+		ExpectedLogs logs=ExpectedLogs.onThreads(Server.class.getName(),Thread.currentThread()).open();
+		connection.logs=logs;
 		try {
-			peer.requestShutdown("test",new IllegalStateException("simulated"),true);
-			assertShutDownCompletely(peer,store,connection);
+			try (logs) {
+				peer.requestShutdown("test",reason,true);
+				assertShutDownCompletely(peer,store,connection);
+			}
+			logs.assertLogged(Level.ERROR,reason);
+			logs.assertLogged(Level.ERROR,connection.failure);
 		} finally {
 			peer.close();
 		}
