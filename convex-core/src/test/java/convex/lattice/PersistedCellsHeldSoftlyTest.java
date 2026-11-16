@@ -235,7 +235,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		/** Entries are written once, so each side's additions combine. */
 		@Override protected AHashMap<ACell,ACell> reconcile(AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
-			return LatticeOps.reconcile(NESTED,LatticeContext.EMPTY,own,other);
+			return LatticeComponent.reconcile(NESTED,LatticeContext.EMPTY,own,other);
 		}
 	}
 

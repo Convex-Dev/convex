@@ -16,6 +16,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ATransformCursor;
+import convex.lattice.cursor.PathCursor;
 
 /**
  * Addresses a value location as its JSON rendering shows it. Vectors and lists take
@@ -165,7 +166,7 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 				}
 				container=((ADataStructure<?>)container).get(keys[i]);
 			}
-			return LatticeOps.assocExisting(current,value,keys);
+			return PathCursor.assocExisting(current,value,keys);
 		}
 	}
 

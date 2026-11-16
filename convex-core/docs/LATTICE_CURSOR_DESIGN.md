@@ -65,7 +65,7 @@ reads throw `MissingValueException`; optional reads return their fallback, and
 presence checks return false.
 
 `path(keys...)` creates a view without reading or changing state. Writes
-use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. A plain
+use `PathCursor.assocExisting` to rebuild existing ancestors atomically. A plain
 path write through a signed envelope is refused with `IllegalArgumentException`.
 
 A write lands only where the cursor's place exists. For a path that is where its
@@ -241,7 +241,7 @@ and for update functions, without any merge definition; a plain path below it
 still writes only to an entry that exists. The optional adapter helper
 `LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
 lattice key, using an explicit lattice. It reads as any path does, so a missing
-key is absent. Its writes use `LatticeOps.assocIn` to insert its key, constructing an
+key is absent. Its writes use `LatticeComponent.assocIn` to insert its key, constructing an
 absent container from the lattice's zero at that level.
 Unknown missing container types fail; keys never determine container types.
 JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
@@ -471,7 +471,6 @@ for unsigned working state that is signed only when published, and
 ## Code and specifications
 
 - `convex.lattice.cursor`: atomic storage, paths, function-based views, drafts and wrappers.
-- `convex.lattice.LatticeOps`: strict path updates and explicit component construction helpers.
 - `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `LatticeHost`: structure,
   merge policy and publication lifecycle.
 - `convex.lattice.LatticeContext`: optional policy for lattice adapters; domain

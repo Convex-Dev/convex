@@ -154,7 +154,7 @@ public class SharedApplicationInternalsTest {
 		}
 
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.reconcile(HOST_ROOT,VERIFY,own,other);
+			return LatticeComponent.reconcile(HOST_ROOT,VERIFY,own,other);
 		}
 
 		/**
