@@ -1544,9 +1544,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
+	/**
+	 * Serves a data request on a thread of its own, which returns the permits taken for
+	 * it. Once closing, drops the request and returns them at once: the store may be
+	 * closed by the time a thread would read it.
+	 */
 	private void startDataRequest(Message message,Semaphore route,Semaphore pool) {
 		try {
 			Thread request=tracked(dataRequests,DATA_REQUEST_THREADS,() -> serveDataRequest(message,route,pool));
+			// After tracking: closing stops admission before it waits for data requests,
+			// so it either waits for this one or this sees admission stopped
+			if (!accepting) {
+				dataRequests.remove(request);
+				pool.release();
+				route.release();
+				return;
+			}
 			try {
 				request.start();
 			} catch (Throwable t) {
@@ -1558,6 +1571,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 			route.release();
 			throw t;
 		}
+	}
+
+	/** Data requests being served, for tests */
+	int getDataRequestCount() {
+		return dataRequests.size();
 	}
 
 	/** An unstarted thread that runs a task, in the given set from now until the task ends. */

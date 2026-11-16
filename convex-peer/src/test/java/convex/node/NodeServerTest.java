@@ -1435,6 +1435,25 @@ public class NodeServerTest {
 		}
 	}
 
+	/** A data request arriving once the manager has closed is dropped, never served from a store that may be closed. */
+	@Test
+	public void testDataRequestAfterCloseIsDropped() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore()) {
+			LatticeConnectionManager manager = new LatticeConnectionManager(servingStore);
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			// A request served despite the close would stay at the store gate, still counted
+			servingStore.blockedHash = value.getHash();
+			var route = manager.dataRequestDelivery();
+			manager.close();
+			try {
+				assertNull(route.apply(dataRequest(81, value, new ScriptedPeer())), "a dropped request asks for no retry");
+				assertEquals(0, manager.getDataRequestCount(), "a data request was served after close");
+			} finally {
+				servingStore.release.countDown();
+			}
+		}
+	}
+
 	private static Message dataRequest(long id, Blob value, AConnection connection) {
 		return Message.createDataRequest(CVMLong.create(id), value.getHash()).withConnection(connection);
 	}
