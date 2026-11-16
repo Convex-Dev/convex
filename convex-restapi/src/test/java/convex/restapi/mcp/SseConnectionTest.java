@@ -5,12 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -144,6 +146,66 @@ class SseConnectionTest {
 				assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"closer did not stop");
 			}
 		}
+	}
+
+	@Test
+	void closeWaitsForAWriteUnderWay() throws Exception {
+		CountDownLatch writing=new CountDownLatch(1);
+		AtomicBoolean closeReturned=new AtomicBoolean();
+		InterruptibleWriter output=new InterruptibleWriter(writing,Thread.currentThread(),closeReturned);
+		SseConnection connection=new SseConnection(new PrintWriter(output));
+		try {
+			connection.sendEvent("message","stuck");
+			assertTrue(writing.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			connection.close();
+			boolean stillWriting=output.writer.isAlive();
+			closeReturned.set(true);
+			assertFalse(stillWriting,"close returned while an event was being written");
+		} finally {
+			closeReturned.set(true);
+			connection.close();
+		}
+	}
+
+	/**
+	 * Blocks a write until interrupted, as a servlet container's blocking write does,
+	 * then fails it once the closing thread waits for it, or once that close has
+	 * returned, so a close that does not wait finds the write still under way. Every
+	 * write blocks so, so a connection that writes again after its close never stops.
+	 */
+	private static final class InterruptibleWriter extends Writer {
+		private final CountDownLatch writing;
+		private final Thread closer;
+		private final AtomicBoolean closeReturned;
+		volatile Thread writer;
+
+		private InterruptibleWriter(CountDownLatch writing, Thread closer, AtomicBoolean closeReturned) {
+			this.writing=writing;
+			this.closer=closer;
+			this.closeReturned=closeReturned;
+		}
+
+		@Override
+		public void write(char[] chars, int offset, int length) throws IOException {
+			writer=Thread.currentThread();
+			writing.countDown();
+			try {
+				new CountDownLatch(1).await();
+			} catch (InterruptedException e) {
+				while (!closerWaits() && !closeReturned.get()) {
+					Thread.onSpinWait();
+				}
+				throw new InterruptedIOException();
+			}
+		}
+
+		private boolean closerWaits() {
+			Thread.State state=closer.getState();
+			return (state==Thread.State.WAITING)||(state==Thread.State.TIMED_WAITING);
+		}
+
+		@Override public void flush() {}
+		@Override public void close() {}
 	}
 
 	private static final class BlockingWriter extends Writer {

@@ -1,9 +1,15 @@
 package convex.restapi.mcp;
 
 import java.io.PrintWriter;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.core.util.ThreadUtils;
 
 /**
  * A server-to-client SSE connection. Queues events for delivery by a
@@ -15,7 +21,12 @@ import java.util.concurrent.TimeUnit;
  * connection.</p>
  */
 public class SseConnection {
+	private static final Logger log=LoggerFactory.getLogger(SseConnection.class);
+
 	static final int DEFAULT_EVENT_QUEUE_CAPACITY=64;
+
+	/** Bound on how long a close waits for an event being written */
+	static final Duration CLOSE_TIMEOUT=Duration.ofSeconds(5);
 
 	/** Policy applied when an event arrives and the bounded queue is full. */
 	public enum OverflowPolicy {
@@ -113,7 +124,8 @@ public class SseConnection {
 		if (closed) return;
 		if (!events.offer(event)) {
 			if (overflowPolicy==OverflowPolicy.CLOSE) {
-				close();
+				// Not close(): sending never waits, least of all for a write to this slow client
+				stop();
 				return;
 			}
 			// DROP_OLDEST: evict until the new event fits; the dispatcher may be
@@ -151,20 +163,17 @@ public class SseConnection {
 					continue;
 				}
 				if (closed) break;
+				String frame=frame(event);
 				synchronized (writer) {
 					if (closed) break;
-					if (event.type()==null) {
-						writer.write(": " + event.data() + "\n\n");
-					} else {
-						if (event.id()!=null) writer.write("id: " + event.id() + "\n");
-						writer.write("event: " + event.type() + "\n");
-						writeData(event.data());
-						writer.write("\n");
-					}
+					// One write per event: a close interrupts at most this call, never half a frame
+					writer.write(frame);
+					// After a close, no flush: the write it cut short failed, and a flush could block again
+					if (closed) break;
 					// checkError() flushes an open stream (documented behaviour) and reports any
-					// IOException recorded by the writes above, so this delivers the event and
+					// IOException recorded by the write above, so this delivers the event and
 					// detects a broken client in one step. A separate flush() would only repeat it.
-					if (writer.checkError()) close();
+					if (writer.checkError()) stop();
 				}
 			}
 		} finally {
@@ -174,23 +183,45 @@ public class SseConnection {
 		}
 	}
 
-	private void writeData(String data) {
+	/** An event's SSE frame, or a comment's, ending with the blank line that ends it. */
+	private static String frame(Event event) {
+		StringBuilder frame=new StringBuilder();
+		if (event.type()==null) {
+			frame.append(": ").append(event.data()).append("\n\n");
+			return frame.toString();
+		}
+		if (event.id()!=null) frame.append("id: ").append(event.id()).append('\n');
+		frame.append("event: ").append(event.type()).append('\n');
+		String data=event.data();
 		int start=0;
 		int length=data.length();
 		for (int i=0;i<=length;i++) {
 			if ((i<length)&&(data.charAt(i)!='\r')&&(data.charAt(i)!='\n')) continue;
-			writer.write("data: ");
-			writer.write(data,start,i-start);
-			writer.write("\n");
+			frame.append("data: ").append(data,start,i).append('\n');
 			if ((i<length)&&(data.charAt(i)=='\r')&&(i+1<length)&&(data.charAt(i+1)=='\n')) i++;
 			start=i+1;
 		}
+		frame.append('\n');
+		return frame.toString();
 	}
 
 	/**
-	 * Close this connection. Idempotent.
+	 * Closes this connection and waits until it has stopped writing, so the caller may
+	 * then finish the response. A write that does not end when interrupted is waited for
+	 * up to {@link #CLOSE_TIMEOUT}. Idempotent; called while writing, returns at once.
 	 */
 	public void close() {
+		stop();
+		// Also after a close by a sender, which marks the connection closed without waiting
+		Thread thread=dispatcher;
+		if (thread==null) return;
+		if (!ThreadUtils.joinUninterruptibly(thread,CLOSE_TIMEOUT) && (thread!=Thread.currentThread())) {
+			log.warn("SSE writer still writing {} after close",CLOSE_TIMEOUT);
+		}
+	}
+
+	/** Marks this connection closed and interrupts a write under way, without waiting. */
+	private void stop() {
 		Thread thread;
 		synchronized (this) {
 			if (closed) return;
