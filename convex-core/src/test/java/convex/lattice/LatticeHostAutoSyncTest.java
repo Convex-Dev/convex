@@ -71,6 +71,21 @@ class LatticeHostAutoSyncTest {
 		host.autoSync(NEVER).close(); // and can start another
 	}
 
+	@Test void closingSavesEvenAfterAFatalApplicationSyncFailure() throws Exception {
+		var store=new RecordingStore();
+		var host=LatticeHost.create(CVMLong.ONE,store);
+		var closing=new AtomicReference<Boolean>(false);
+		var failure=new OutOfMemoryError("simulated");
+		var sync=host.autoSync(NEVER,() -> {
+			if (closing.get()) throw failure;
+			host.cursor().set(CVMLong.TWO);
+		});
+		host.cursor().set(CVMLong.TWO);
+		closing.set(true);
+		assertSame(failure,assertThrows(OutOfMemoryError.class,sync::close));
+		assertEquals(List.of("retain 2","flush"),store.events,"The save still runs");
+	}
+
 	@Test void closingTheHostSyncsApplicationsOnceMoreThenSavesOnce() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);

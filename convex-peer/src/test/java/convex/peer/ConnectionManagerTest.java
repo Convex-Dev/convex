@@ -574,20 +574,16 @@ public class ConnectionManagerTest {
 		Server server=createPollingServer(AKeyPair.createSeeded(223));
 		try {
 			ConnectionManager manager=server.getConnectionManager();
-			AssertionError failure=new AssertionError("simulated close");
-			SequencedConvex failing=new SequencedConvex(-1) {
-				@Override public void close() {
-					super.close();
-					throw failure;
-				}
-			};
-			SequencedConvex other=new SequencedConvex(-1);
-			assertTrue(manager.addConnection(AKeyPair.createSeeded(224).getAccountKey(),failing));
-			assertTrue(manager.addConnection(AKeyPair.createSeeded(225).getAccountKey(),other));
+			// Both fail, so whichever closes first, the other must still close
+			SequencedConvex first=failingConnection();
+			SequencedConvex second=failingConnection();
+			assertTrue(manager.addConnection(AKeyPair.createSeeded(224).getAccountKey(),first));
+			assertTrue(manager.addConnection(AKeyPair.createSeeded(225).getAccountKey(),second));
 
-			assertSame(failure,assertThrows(AssertionError.class,manager::close));
-			assertEquals(1,failing.closeCount);
-			assertEquals(1,other.closeCount);
+			AssertionError thrown=assertThrows(AssertionError.class,manager::close);
+			assertEquals(1,thrown.getSuppressed().length,"the other failure is reported with the first");
+			assertEquals(1,first.closeCount);
+			assertEquals(1,second.closeCount);
 			assertEquals(0,manager.getConnectionCount());
 		} finally {
 			server.close();
@@ -655,6 +651,15 @@ public class ConnectionManagerTest {
 
 		assertThrows(LaunchException.class,() -> API.launchPeer(config));
 		assertEquals(1,source.closeCount);
+	}
+
+	private static SequencedConvex failingConnection() {
+		return new SequencedConvex(-1) {
+			@Override public void close() {
+				super.close();
+				throw new AssertionError("simulated close");
+			}
+		};
 	}
 
 	private static final class TestConnectionManager extends AConnectionManager {
