@@ -4,14 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
@@ -58,10 +56,22 @@ public class UpgradeWithdrawalTest {
 	static final AKeyPair PEER_KP = AKeyPair.createSeeded(101);
 	static final Address GENESIS = Address.create(Init.GENESIS_ADDRESS);
 
+	/** Creates an isolated single peer on the given genesis State, with an in-memory store. */
+	private static Server createIsolatedPeer(State genesis) throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, PEER_KP);
+		config.put(Keywords.STATE, genesis);
+		config.put(Keywords.PORT, 0);
+		config.put(Keywords.STORE, new MemoryStore());
+		config.put(Keywords.AUTO_MANAGE, true);
+		return Server.create(config);
+	}
+
+	/** Launches an isolated single peer on the plain genesis State, reading the wall clock. */
 	private Server launchIsolatedPeer() throws Exception {
-		State genesis = GenesisStates.of(PEER_KP);
-		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
-		return servers.get(0);
+		Server s=createIsolatedPeer(GenesisStates.of(PEER_KP));
+		launchIsolated(s);
+		return s;
 	}
 
 	/**
@@ -69,12 +79,7 @@ public class UpgradeWithdrawalTest {
 	 * block or self-management decision ever sees the wall clock.
 	 */
 	private Server createIsolatedPeer(State genesis, LongSupplier clock) throws Exception {
-		HashMap<Keyword,Object> config=new HashMap<>();
-		config.put(Keywords.KEYPAIR, PEER_KP);
-		config.put(Keywords.STATE, genesis);
-		config.put(Keywords.PORT, 0);
-		config.put(Keywords.AUTO_MANAGE, true);
-		Server s=Server.create(config);
+		Server s=createIsolatedPeer(genesis);
 		s.setTimeSource(clock);
 		return s;
 	}
@@ -158,7 +163,8 @@ public class UpgradeWithdrawalTest {
 
 	@Test
 	public void testHaltConsensusFlag() throws Exception {
-		Server s = launchIsolatedPeer();
+		// Not launched: the flag is the Server's own, set and read on this thread
+		Server s = createIsolatedPeer(GenesisStates.of(PEER_KP));
 		try {
 			assertFalse(s.isConsensusHalted());
 			assertNull(s.getConsensusHalt());
@@ -310,12 +316,21 @@ public class UpgradeWithdrawalTest {
 			assertFalse(q.isError());
 			assertEquals(CVMLong.create(1), q.getValue());
 
-			// Consensus is frozen: a transaction submitted after the halt never
-			// confirms. The freeze is a hard latch (both executor and propagator
-			// gate on it), so this is deterministic, not a race — the future never
-			// completes and the bounded wait always times out.
+			// Consensus is frozen: a transaction submitted after the halt is taken in,
+			// but no round of the Belief propagator proposes it. Run one round here, on
+			// a queued Belief so that it does not wait: it leaves the transaction queued.
+			TransactionHandler handler = s.getTransactionHandler();
+			CompletableFuture<SignedData<ATransaction>> queued = new CompletableFuture<>();
+			handler.setRequestObserver(queued::complete);
 			CompletableFuture<Result> f = convex.transact("(def b 2)");
-			assertThrows(TimeoutException.class, () -> f.get(2, TimeUnit.SECONDS));
+			SignedData<ATransaction> tx = queued.get(5, TimeUnit.SECONDS);
+			// Not started: this test thread runs it
+			BeliefPropagator round = new BeliefPropagator(s);
+			round.belief = s.getBelief();
+			assertTrue(round.queueBelief(s.getBelief()));
+			round.loop();
+			assertTrue(handler.transactionQueue.contains(tx), "the transaction is not proposed");
+			assertFalse(f.isDone());
 
 			// State did not advance: b was never defined
 			Result q2 = convex.querySync("b");
