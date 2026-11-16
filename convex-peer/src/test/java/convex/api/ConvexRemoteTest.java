@@ -33,15 +33,15 @@ import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.AVector;
-import convex.core.data.Blobs;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
-import convex.core.message.AConnection;
 import convex.peer.TestNetwork;
 
 /**
@@ -61,12 +61,21 @@ public class ConvexRemoteTest {
 		assertTrue(convex.isConnected());
 	}
 	
+	/**
+	 * A QUERY without its form is answered with a :FORMAT error from the peer, which
+	 * keeps the connection: malformed input may be an honest mistake.
+	 */
 	@Test
-	public void testBadQueryMessage() throws IOException, TimeoutException, InterruptedException {
+	public void testBadQueryMessage() throws Exception {
 		TestNetwork network = TestNetwork.getInstance();
-		ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
-		AConnection conn=convex.connection;
-		conn.sendMessage(Message.create(MessageType.QUERY, Blobs.empty()));
+		try (ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress())) {
+			Result r = convex.request(Message.create(MessageType.QUERY, Vectors.of(MessageTag.QUERY, CVMLong.ZERO)))
+				.get(5, TimeUnit.SECONDS);
+			assertEquals(ErrorCodes.FORMAT, r.getErrorCode(), r::toString);
+			assertEquals(SourceCodes.PEER, r.getSource());
+
+			assertEquals(CVMLong.create(3), convex.querySync("(+ 1 2)").getValue());
+		}
 	}
 
 	@Test

@@ -945,7 +945,8 @@ public class Server implements Closeable {
 		if (rk==null) rk=peer.getPeerKey();
 		ACell rootKey=rk;
 
-		Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
+		Hash rootHash = store.getRootHash();
+		Ref<AMap<ACell,ACell>> rootRef = (rootHash == null) ? null : store.refForHash(rootHash);
 		AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
 		AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
 

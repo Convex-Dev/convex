@@ -3,7 +3,9 @@ package convex.gui.dlfs;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -13,21 +15,17 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import convex.core.data.Blobs;
-import convex.gui.GUIFixtureExtension;
-import convex.gui.GUITest;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSProvider;
 import convex.lattice.fs.DLFileSystem;
 
-@ExtendWith(GUIFixtureExtension.class)
 public class DLFSGUITest {
 
 	@Test public void testDLFSPanel() throws Exception {
-		GUITest.assumeGUI();
-		
+		assumeFalse(GraphicsEnvironment.isHeadless());
+
 		DLFSProvider provider=DLFS.provider();
 		try (DLFileSystem fs=provider.newFileSystem(new URI("dlfs-test"),null)) {
 			DLFSPanel pan=new DLFSPanel(fs);
@@ -42,7 +40,7 @@ public class DLFSGUITest {
 
 	/** A store that cannot be opened leaves the browser serving its previous store (#777). */
 	@Test public void testFailedStoreSwitchRestoresPreviousStore() throws Exception {
-		GUITest.assumeGUI();
+		assumeFalse(GraphicsEnvironment.isHeadless());
 
 		File good=File.createTempFile("dlfs-guitest-",".db");
 		good.deleteOnExit();

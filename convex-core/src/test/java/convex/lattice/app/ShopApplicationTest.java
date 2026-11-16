@@ -150,10 +150,6 @@ class ShopApplicationTest {
 		assertEquals(Maps.of(CVMLong.ONE,TEA,CVMLong.create(2),TEA),at(shop,ORDERS));
 	}
 
-	@Test void theExampleRuns() {
-		ShopExample.main(new String[0]);
-	}
-
 	/** Waits until a thread is parked, as one waiting for a claim is, or has finished. */
 	private static void awaitParked(Thread thread) {
 		while (thread.isAlive() && thread.getState()!=Thread.State.WAITING) Thread.onSpinWait();

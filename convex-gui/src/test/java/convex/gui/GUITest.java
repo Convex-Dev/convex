@@ -51,8 +51,9 @@ public class GUITest {
 	static {
 		try {
 			Toolkit.init();
+			// One peer: no test needs more than the primary server.
 			// REST API on port 0 (random): tests must not contend for the default port
-			manager=PeerGUI.create(3,AKeyPair.generate(),0);
+			manager=PeerGUI.create(1,AKeyPair.generate(),0);
 			SERVER=manager.getPrimaryServer();
 			CONVEX=Convex.connect(SERVER);
 		} catch (HeadlessException e) {

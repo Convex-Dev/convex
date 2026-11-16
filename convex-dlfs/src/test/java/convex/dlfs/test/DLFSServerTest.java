@@ -446,6 +446,29 @@ public class DLFSServerTest {
 		}
 	}
 
+	/** MCP messages are bounded by the server's request size, chunked ones included. */
+	@Test
+	void testMcpMessageLimitIsTheRequestSize() throws Exception {
+		byte[] ping = "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+		try (DLFSServer limited = DLFSServer.createEphemeral().setMaxRequestSize(1024)) {
+			limited.start(0);
+			String url = "http://localhost:" + limited.getPort() + "/mcp";
+			assertEquals(200, postChunked(url, ping, 1024).statusCode());
+			assertEquals(413, postChunked(url, ping, 1025).statusCode());
+		}
+	}
+
+	/** Posts a JSON message padded with spaces to the given size, chunked. */
+	private HttpResponse<String> postChunked(String url, byte[] message, int size) throws Exception {
+		byte[] body = new byte[size];
+		Arrays.fill(body, (byte) ' ');
+		System.arraycopy(message, 0, body, 0, message.length);
+		return client.send(HttpRequest.newBuilder(URI.create(url))
+			.header("Content-Type", "application/json")
+			.POST(HttpRequest.BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(body))).build(),
+			HttpResponse.BodyHandlers.ofString());
+	}
+
 	@Test
 	void testPutOnDirectory() throws Exception {
 		String dir = driveURL + "put-target-dir/";

@@ -5,10 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -19,14 +17,11 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.Format;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.init.Init;
-import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.handler.X402Decision;
 import convex.restapi.handler.X402Gate;
@@ -47,9 +42,10 @@ import io.javalin.http.Context;
  * Tests the embedder story: a standalone Javalin app (no RESTServer) protected
  * by an X402Gate with a custom credit policy — one payment buys several calls,
  * requests are free while credit lasts, and exhausting credit produces a fresh
- * payment demand. Also exercises the onSettled replay veto.
+ * payment demand. Also exercises the onSettled replay veto. Payments settle on
+ * the shared test peer, from one account of this class's own.
  */
-public class X402PolicyTest {
+public class X402PolicyTest extends ARESTTest {
 
 	static final long CALL_PRICE = 1_000_000;
 	static final int CALLS_PER_TOP_UP = 3;
@@ -58,11 +54,9 @@ public class X402PolicyTest {
 	static Javalin app;
 	static String paidUrl;
 	static AKeyPair kp;
+	static Address payer;
 	static Convex convex;
 	static CreditPolicy policy;
-
-	static final HttpClient httpClient = HttpClient.newBuilder()
-			.connectTimeout(Duration.ofSeconds(10)).build();
 
 	/**
 	 * Credit semantics: serve from credit while it lasts; when exhausted, demand
@@ -101,13 +95,11 @@ public class X402PolicyTest {
 
 	@BeforeAll
 	static void setup() throws Exception {
-		var launchConfig = new java.util.HashMap<convex.core.data.Keyword, Object>();
-		launchConfig.put(Keywords.KEYPAIR, AKeyPair.generate());
-		launchConfig.put(Keywords.PORT, 0);
-		peerServer = API.launchPeer(launchConfig);
-		kp = peerServer.getKeyPair();
+		peerServer = server.getServer();
+		kp = CLIENT_KP;
+		payer = newAccount();
 		convex = Convex.connect(peerServer);
-		convex.setAddress(Init.GENESIS_ADDRESS, kp);
+		convex.setAddress(payer, kp);
 
 		ConvexFacilitator facilitator = new ConvexFacilitator(convex,
 				NetworkId.create(peerServer.getPeer().getNetworkID()),
@@ -126,7 +118,6 @@ public class X402PolicyTest {
 	@AfterAll
 	static void tearDown() {
 		if (app != null) app.stop();
-		if (peerServer != null) peerServer.close();
 	}
 
 	static HttpResponse<String> plainGet() throws Exception {
@@ -145,7 +136,7 @@ public class X402PolicyTest {
 		X402Client client = X402Client.create(httpClient, convex, kp);
 		HttpResponse<String> paid = client.get(URI.create(paidUrl));
 		assertEquals(200, paid.statusCode());
-		assertEquals("served:" + Init.GENESIS_ADDRESS, paid.body());
+		assertEquals("served:" + payer, paid.body());
 		SettlementResponse receipt = client.lastPaymentResponse();
 		assertNotNull(receipt);
 		assertTrue(receipt.success());
@@ -163,8 +154,8 @@ public class X402PolicyTest {
 		// Ed25519 signing is deterministic, so rebuilding the canonical transaction
 		// with the already-used sequence reproduces the settled payment exactly.
 		PaymentRequirements req = client.lastPaymentRequired().accepts().get(0);
-		ATransaction settledTx = ExactConvexScheme.expectedTransaction(Init.GENESIS_ADDRESS,
-				convex.lookupSequence(Init.GENESIS_ADDRESS), Address.parse(req.payTo()), req);
+		ATransaction settledTx = ExactConvexScheme.expectedTransaction(payer,
+				convex.lookupSequence(payer), Address.parse(req.payTo()), req);
 		SignedData<ATransaction> settledSigned = kp.signData(settledTx);
 		PaymentPayload replay = new PaymentPayload(X402.VERSION, null, req,
 				Maps.of(Fields.TRANSACTION,

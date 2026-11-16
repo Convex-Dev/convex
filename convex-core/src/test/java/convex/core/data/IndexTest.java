@@ -933,24 +933,38 @@ public class IndexTest {
 	 */
 	@Test
 	public void testNonEmbeddedSingleEntryKeySurvivesStoreReload() throws Exception {
-		for (int len : new int[] {150, 180, Index.MAX_DEPTH/2-1}) {
-			byte[] bytes=new byte[len];
-			Arrays.fill(bytes,(byte)0x42);
-			Blob longKey=Blob.wrap(bytes);
-			Blob shortKey=Blob.fromHex("ff");
-			assertFalse(longKey.isEmbedded());
-			Index<ABlob,CVMLong> index=Index.of(longKey,CVMLong.ONE,shortKey,CVMLong.ZERO);
+		Blob shortKey=Blob.fromHex("ff");
+		ArrayList<Blob> longKeys=new ArrayList<>();
+		ArrayList<Index<ABlob,CVMLong>> indexes=new ArrayList<>();
+		ArrayList<Hash> hashes=new ArrayList<>();
 
-			EtchStore store=EtchStore.createTemp("index-reload");
-			File file=store.getFile();
-			Hash hash=Cells.persist(index,store).getHash();
+		// Every variant in one store, reopened once: they share no key, so each still
+		// decodes from the file with its key unread
+		EtchStore store=EtchStore.createTemp("index-reload");
+		File file=store.getFile();
+		try {
+			for (int len : new int[] {150, 180, Index.MAX_DEPTH/2-1}) {
+				byte[] bytes=new byte[len];
+				Arrays.fill(bytes,(byte)0x42);
+				Blob longKey=Blob.wrap(bytes);
+				assertFalse(longKey.isEmbedded());
+				Index<ABlob,CVMLong> index=Index.of(longKey,CVMLong.ONE,shortKey,CVMLong.ZERO);
+				longKeys.add(longKey);
+				indexes.add(index);
+				hashes.add(Cells.persist(index,store).getHash());
+			}
+		} finally {
 			store.close();
-			EtchStore reopened=EtchStore.create(file);
-			try {
-				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+		}
+		EtchStore reopened=EtchStore.create(file);
+		try {
+			for (int v=0; v<hashes.size(); v++) {
+				Blob longKey=longKeys.get(v);
+				Index<ABlob,CVMLong> index=indexes.get(v);
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hashes.get(v)).getValue();
 				assertEquals(2,reloaded.count());
 				assertEquals(longKey,reloaded.entryAt(0).getKey());
-				assertEquals(CVMLong.ONE,reloaded.get(longKey),"key length "+len);
+				assertEquals(CVMLong.ONE,reloaded.get(longKey),"key length "+longKey.count());
 				assertEquals(CVMLong.ZERO,reloaded.get(shortKey));
 				reloaded.validate();
 				assertEquals(index,reloaded);
@@ -963,9 +977,9 @@ public class IndexTest {
 				assertEquals(3,grown.count());
 				assertEquals(CVMLong.create(2),grown.get(extended));
 				assertEquals(CVMLong.ONE,grown.get(longKey));
-			} finally {
-				reopened.close();
 			}
+		} finally {
+			reopened.close();
 		}
 	}
 
@@ -1012,14 +1026,24 @@ public class IndexTest {
 		Index<ABlob,CVMLong> index=Index.of(huge,CVMLong.ONE,sibling,CVMLong.create(2),other,CVMLong.ZERO);
 		assertEquals(3,index.count());
 
-		for (Index<ABlob,CVMLong> original : java.util.List.of(single,index)) {
-			EtchStore store=EtchStore.createTemp("index-oversized");
-			File file=store.getFile();
-			Hash hash=Cells.persist(original,store).getHash();
+		java.util.List<Index<ABlob,CVMLong>> originals=java.util.List.of(single,index);
+		ArrayList<Hash> hashes=new ArrayList<>();
+		EtchStore store=EtchStore.createTemp("index-oversized");
+		File file=store.getFile();
+		try {
+			for (Index<ABlob,CVMLong> original : originals) hashes.add(Cells.persist(original,store).getHash());
+		} finally {
 			store.close();
-			EtchStore reopened=EtchStore.create(file);
-			try {
-				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+		}
+		EtchStore reopened=EtchStore.create(file);
+		try {
+			// The variants share the huge key: take both from the reopened store before
+			// using either, so each is decoded with that key unread
+			ArrayList<Index<ABlob,CVMLong>> reloads=new ArrayList<>();
+			for (Hash hash : hashes) reloads.add(reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue());
+			for (int v=0; v<originals.size(); v++) {
+				Index<ABlob,CVMLong> original=originals.get(v);
+				Index<ABlob,CVMLong> reloaded=reloads.get(v);
 				assertEquals(original.count(),reloaded.count());
 				assertEquals(CVMLong.ONE,reloaded.get(huge));
 				assertEquals(CVMLong.ONE,reloaded.get(hugeAlias),"oversized keys alias on the first 255 bytes");
@@ -1039,9 +1063,9 @@ public class IndexTest {
 				Index<ABlob,CVMLong> removed=reloaded.dissoc(hugeAlias);
 				assertEquals(reloaded.count()-1,removed.count());
 				assertNull(removed.get(huge));
-			} finally {
-				reopened.close();
 			}
+		} finally {
+			reopened.close();
 		}
 
 		// Out-of-range depths are rejected, never silently truncated to int
@@ -1096,31 +1120,42 @@ public class IndexTest {
 			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,2));
 
 		// Reload from a store, then persist again into a second store before any lookup
-		for (Index<ABlob,CVMLong> original : java.util.List.of(single,pair)) {
-			Blob expected=original.getEncoding();
-			EtchStore store=EtchStore.createTemp("index-unresolved");
-			File file=store.getFile();
-			Hash hash=Cells.persist(original,store).getHash();
+		java.util.List<Index<ABlob,CVMLong>> originals=java.util.List.of(single,pair);
+		ArrayList<Hash> hashes=new ArrayList<>();
+		EtchStore store=EtchStore.createTemp("index-unresolved");
+		File file=store.getFile();
+		try {
+			for (Index<ABlob,CVMLong> original : originals) hashes.add(Cells.persist(original,store).getHash());
+		} finally {
 			store.close();
-			EtchStore reopened=EtchStore.create(file);
-			EtchStore second=EtchStore.createTemp("index-unresolved-2");
-			File secondFile=second.getFile();
-			try {
-				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
-				Hash again=Cells.persist(reloaded,second).getHash();
-				assertEquals(hash,again);
-				second.close();
-				second=EtchStore.create(secondFile);
-				Index<ABlob,CVMLong> twice=second.<Index<ABlob,CVMLong>>refForHash(again).getValue();
+		}
+		EtchStore reopened=EtchStore.create(file);
+		EtchStore second=EtchStore.createTemp("index-unresolved-2");
+		File secondFile=second.getFile();
+		try {
+			// The variants share the long key: take both from the reopened store before
+			// persisting either, so each is decoded with that key unread
+			ArrayList<Index<ABlob,CVMLong>> reloads=new ArrayList<>();
+			for (Hash hash : hashes) reloads.add(reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue());
+			for (int v=0; v<originals.size(); v++) {
+				Hash again=Cells.persist(reloads.get(v),second).getHash();
+				assertEquals(hashes.get(v),again);
+			}
+			second.close();
+			second=EtchStore.create(secondFile);
+			for (int v=0; v<originals.size(); v++) {
+				Index<ABlob,CVMLong> original=originals.get(v);
+				Blob expected=original.getEncoding();
+				Index<ABlob,CVMLong> twice=second.<Index<ABlob,CVMLong>>refForHash(hashes.get(v)).getValue();
 				assertEquals(expected,twice.getEncoding());
 				assertEquals(CVMLong.ONE,twice.get(longKey));
 				assertEquals(original,twice);
 				twice.validate();
 				assertEquals(expected,reopened.decode(expected).getEncoding());
-			} finally {
-				reopened.close();
-				second.close();
 			}
+		} finally {
+			reopened.close();
+			second.close();
 		}
 	}
 
@@ -1151,11 +1186,9 @@ public class IndexTest {
 			checkDecodedDeepIndex(deep,decoded);
 
 			// Store-backed decode against a store holding none of the cells
-			try (EtchStore empty=EtchStore.createTemp("index-deep-decode")) {
-				ACell viaStore=empty.decodeMultiCell(message);
-				assertEquals(value,viaStore);
-				checkDecodedDeepIndex(deep,viaStore);
-			}
+			ACell viaStore=new MemoryStore().decodeMultiCell(message);
+			assertEquals(value,viaStore);
+			checkDecodedDeepIndex(deep,viaStore);
 		}
 	}
 

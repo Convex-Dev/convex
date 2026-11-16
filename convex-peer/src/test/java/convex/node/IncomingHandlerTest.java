@@ -68,11 +68,12 @@ class IncomingHandlerTest {
 				assertEquals(0,messages.get());
 				// A new factory must not replace an established connection's handler.
 				listener.setConnectionHandler(connection -> { fail("Existing connection was reassigned"); return null; });
-				for (int i=0;i<200;i++) {
+				// The first message would reach a reassigned handler; later ones show it stays
+				for (int i=0;i<3;i++) {
 					assertEquals(CVMLong.create(42),client.request(Message.createPing(1)).get(5,TimeUnit.SECONDS).getValue());
 				}
 				assertEquals(1,factories.get());
-				assertEquals(200,messages.get());
+				assertEquals(3,messages.get());
 			}
 			closed.get(5,TimeUnit.SECONDS);
 			listener.close();

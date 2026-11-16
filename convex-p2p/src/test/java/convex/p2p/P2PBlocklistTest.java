@@ -29,6 +29,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.LocalLattice;
 import convex.net.PeerRefusedException;
@@ -59,25 +60,32 @@ public class P2PBlocklistTest {
 		return Strings.create(text);
 	}
 
-	private EtchStore store(String name) throws Exception {
+	private MemoryStore store() {
+		MemoryStore store=new MemoryStore();
+		resources.add(store);
+		return store;
+	}
+
+	/** An on-disk store, for the test that restarts a node on its store */
+	private EtchStore restartableStore(String name) throws Exception {
 		EtchStore store=EtchStore.createTemp(name);
 		resources.add(store);
 		return store;
 	}
 
-	private P2PNode launch(String name,NodeConfig config,LatticePropagatorConfig group,AKeyPair key) throws Exception {
-		P2PNode node=P2PNode.create(store(name),config,group,key).serveAllInbound();
+	private P2PNode launch(NodeConfig config,LatticePropagatorConfig group,AKeyPair key) throws Exception {
+		P2PNode node=P2PNode.create(store(),config,group,key).serveAllInbound();
 		resources.add(node);
 		node.launch();
 		return node;
 	}
 
 	private P2PNode hub() throws Exception {
-		return launch("blocklist-hub",NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey);
+		return launch(NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey);
 	}
 
 	private P2PNode leaf() throws Exception {
-		return launch("blocklist-leaf",NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
+		return launch(NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
 	}
 
 	/** Shuts a node down as a service does, keeping its store. */
@@ -89,7 +97,7 @@ public class P2PBlocklistTest {
 
 	@Test
 	public void testABlockAndAnUnblockSurviveARestart() throws Exception {
-		EtchStore store=store("blocklist-restart");
+		EtchStore store=restartableStore("blocklist-restart");
 		AccountKey bob=AKeyPair.generate().getAccountKey();
 		P2PNode first=P2PNode.create(store,NodeConfig.localNetwork(),hubKey);
 		assertTrue(first.block(bob));
@@ -110,7 +118,7 @@ public class P2PBlocklistTest {
 
 	@Test
 	public void testANodeWithoutAKeyKeepsItsBlocklistInMemory() throws Exception {
-		P2PNode node=P2PNode.create(store("blocklist-keyless"),NodeConfig.localNetwork(),null);
+		P2PNode node=P2PNode.create(store(),NodeConfig.localNetwork(),null);
 		resources.add(node);
 		AccountKey bob=AKeyPair.generate().getAccountKey();
 		assertTrue(node.block(bob));
@@ -122,7 +130,7 @@ public class P2PBlocklistTest {
 	@Test
 	public void testDiscoveryOffersNoBlockedNodeOrAddress() throws Exception {
 		// No ambient slots: the hub keeps candidates but dials none of them
-		P2PNode hub=launch("blocklist-hub",NodeConfig.localNetwork(),LatticePropagatorConfig.create(Maps.of(
+		P2PNode hub=launch(NodeConfig.localNetwork(),LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(0))),hubKey);
 		AKeyPair blockedKey=AKeyPair.generate();
 		AccountKey blockedNode=blockedKey.getAccountKey();
@@ -252,14 +260,14 @@ public class P2PBlocklistTest {
 	public void testNoMessageGoesToOrThroughABlockedNode() throws Exception {
 		AKeyPair daveKey=AKeyPair.generate();
 		AccountKey pop=hubKey.getAccountKey(),dave=daveKey.getAccountKey();
-		P2PNode hub=P2PNode.create(store("blocklist-pop"),NodeConfig.localNetwork(),hubKey)
+		P2PNode hub=P2PNode.create(store(),NodeConfig.localNetwork(),hubKey)
 			.serveAllInbound().relayMessages();
 		resources.add(hub);
 		hub.launch();
-		P2PNode alice=P2PNode.create(store("blocklist-alice"),NodeConfig.port(-1),leafKey).pointsOfPresence(pop);
+		P2PNode alice=P2PNode.create(store(),NodeConfig.port(-1),leafKey).pointsOfPresence(pop);
 		resources.add(alice);
 		alice.launch();
-		P2PNode daveNode=P2PNode.create(store("blocklist-dave"),NodeConfig.port(-1),daveKey).pointsOfPresence(pop);
+		P2PNode daveNode=P2PNode.create(store(),NodeConfig.port(-1),daveKey).pointsOfPresence(pop);
 		resources.add(daveNode);
 		daveNode.launch();
 		alice.connect(pop,hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);

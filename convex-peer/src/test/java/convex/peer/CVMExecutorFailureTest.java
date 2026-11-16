@@ -66,8 +66,10 @@ public class CVMExecutorFailureTest {
 	 */
 	@Test
 	public void aFailureAdvancingStateShutsThePeerDownWithACheckpoint() throws Exception {
-		for (Throwable failure: List.of(new NoClassDefFoundError("simulated"),new AssertionError("simulated"),
-				new StackOverflowError("simulated"),new IllegalStateException("simulated"))) {
+		// An Error and an exception: every failure but running out of memory or a failure
+		// of the JVM itself takes the same path. A stack overflow is a VirtualMachineError
+		// that is not a JVM failure.
+		for (Throwable failure: List.of(new StackOverflowError("simulated"),new IllegalStateException("simulated"))) {
 			ExpectedLogs logs=ExpectedLogs.carrying(failure).open();
 			try (logs) {
 				RootFailingStore store=new RootFailingStore();

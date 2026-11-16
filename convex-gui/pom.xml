@@ -17,6 +17,13 @@
 	<properties>
 		<zxing.version>3.5.4</zxing.version>
 		<flatlaf.version>3.7.2</flatlaf.version>
+		<!-- FlatLaf loads its native library through JNI, which needs native access from
+		     JDK 24 (convex.jar's manifest grants it to the shipped GUI) -->
+		<argLine>
+			--add-opens=java.base/java.util=ALL-UNNAMED
+			-Dslf4j.internal.verbosity=ERROR
+			--enable-native-access=ALL-UNNAMED
+		</argLine>
 	</properties>
 
 	<build>

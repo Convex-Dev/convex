@@ -14,7 +14,13 @@ import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.java.ConvexJSON;
 
-public class StressTest extends ARESTTest {
+/**
+ * Standalone load driver for the REST API. This is <b>not</b> a JUnit test (no
+ * {@code @Test} methods, and named so that Surefire does not select it): run its
+ * {@link #main} to connect many clients to the shared test server and time their
+ * queries, faucet requests and transactions.
+ */
+public class StressBenchmark extends ARESTTest {
 
 	static int CLIENTCOUNT = 100;
 	static int TRANSCOUNT = 100;

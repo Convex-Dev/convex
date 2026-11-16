@@ -171,8 +171,8 @@ public class ConfigTest {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 
-		{ // just a peer keypair
-			Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,kp);
+		{ // just a peer keypair, apart from an in-memory store and any free port
+			Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,kp,Keywords.STORE,new MemoryStore(),Keywords.PORT,0);
 			Server s=API.launchPeer(config);
 			assertSame(kp,s.getKeyPair());
 			Peer p=s.getPeer();
@@ -185,7 +185,7 @@ public class ConfigTest {
 	}
 
 	@Test public void testServerOwnsImplicitTemporaryStore() throws Exception {
-		Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,AKeyPair.generate());
+		Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,AKeyPair.generate(),Keywords.PORT,0);
 		Server server=API.launchPeer(config);
 		EtchStore store=(EtchStore)server.getStore();
 		File file=store.getFile();
@@ -199,7 +199,8 @@ public class ConfigTest {
 		TrackingMemoryStore store=new TrackingMemoryStore();
 		Map<Keyword,Object> config=Config.of(
 				Keywords.KEYPAIR,AKeyPair.generate(),
-				Keywords.STORE,store);
+				Keywords.STORE,store,
+				Keywords.PORT,0);
 		Server server=API.launchPeer(config);
 
 		server.close();
@@ -214,7 +215,8 @@ public class ConfigTest {
 		file.deleteOnExit();
 		Map<Keyword,Object> config=Config.of(
 				Keywords.KEYPAIR,AKeyPair.generate(),
-				Keywords.STORE,file.getPath());
+				Keywords.STORE,file.getPath(),
+				Keywords.PORT,0);
 
 		Server server=API.launchPeer(config);
 		server.close();
@@ -263,6 +265,8 @@ public class ConfigTest {
 		// A network pinned to protocol version 0 launches with the raw genesis
 		Map<Keyword,Object> config=Config.of(
 				Keywords.KEYPAIR,AKeyPair.generate(),
+				Keywords.STORE,new MemoryStore(),
+				Keywords.PORT,0,
 				Keywords.PROTOCOL_VERSION,0L);
 		Server s=API.launchPeer(config);
 		assertEquals(0L,s.getPeer().getConsensusState().getProtocolVersion());

@@ -27,7 +27,7 @@ import convex.core.init.Init;
 
 public class BeliefVotingTest {
 
-	AKeyPair[] kps=new AKeyPair[] {
+	static final AKeyPair[] kps=new AKeyPair[] {
 			AKeyPair.createSeeded(1),
 			AKeyPair.createSeeded(2),
 			AKeyPair.createSeeded(3),
@@ -35,12 +35,13 @@ public class BeliefVotingTest {
 			AKeyPair.createSeeded(5),
 			AKeyPair.createSeeded(6)
 	};
-	
-	AccountKey[] keys=Stream.of(kps).map(kp->kp.getAccountKey()).toArray(AccountKey[]::new);
-	
-	
+
+	static final AccountKey[] keys=Stream.of(kps).map(kp->kp.getAccountKey()).toArray(AccountKey[]::new);
+
+
 	static final long TS=0;
-	final State initialState=Init.createState(List.of(keys)).withTimestamp(TS);
+	// One genesis State for the class: tests only read it
+	static final State initialState=Init.createState(List.of(keys)).withTimestamp(TS);
 	
 	@Test
 	public void testComputeVote() {

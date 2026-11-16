@@ -1,35 +1,69 @@
 package convex.restapi.handler;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 
+import io.javalin.http.BadRequestResponse;
+import io.javalin.http.ContentTooLargeResponse;
 import io.javalin.http.Context;
 
 /**
- * Safe access to structured REST request bodies.
+ * Reads structured request bodies whole, within a limit the caller gives. A chunked
+ * body declares no length, so it is bounded as it is read, the same as one that does.
+ * Exceeding the limit is the client's error, answered 413 like any other.
  *
- * <p>Javalin enforces its configured request-size limit in
- * {@link Context#bodyAsBytes()}, but its raw {@link Context#bodyInputStream()}
- * bypasses that limit. Buffer the bounded body before giving it to a streaming
- * parser so chunked requests are subject to the same limit as requests with a
- * declared content length.</p>
- *
- * <p>This helper is intentionally for structured messages which are ultimately
- * materialised in memory. A future large-file upload endpoint should instead
- * stream to its destination through its own explicit byte and time limits.</p>
+ * <p>For structured messages, which are materialised in memory anyway. A large-file
+ * upload endpoint should instead stream to its destination through its own byte and
+ * time limits.</p>
  */
 public final class RequestBody {
+
+	private static final int CHUNK_SIZE=8192;
 
 	private RequestBody() {
 	}
 
 	/**
-	 * Returns a stream over a complete request body already bounded by Javalin.
+	 * Reads a request body whole.
 	 *
 	 * @param ctx Request context
-	 * @return Stream over the bounded, buffered request body
+	 * @param maxBytes Most bytes the body may have
+	 * @return The body
+	 * @throws ContentTooLargeResponse if the body has more than maxBytes bytes
+	 * @throws BadRequestResponse if the body cannot be read
 	 */
-	public static InputStream boundedInputStream(Context ctx) {
-		return new ByteArrayInputStream(ctx.bodyAsBytes());
+	public static byte[] readBytes(Context ctx, long maxBytes) {
+		InputStream in=ctx.bodyInputStream();
+		ByteArrayOutputStream out=new ByteArrayOutputStream();
+		byte[] chunk=new byte[CHUNK_SIZE];
+		long total=0;
+		try {
+			int n;
+			while ((n=in.read(chunk))>=0) {
+				total+=n;
+				if (total>maxBytes) {
+					throw new ContentTooLargeResponse("Request body exceeds maximum size of "+maxBytes+" bytes");
+				}
+				out.write(chunk,0,n);
+			}
+		} catch (IOException e) {
+			throw new BadRequestResponse("Unable to read request body");
+		}
+		return out.toByteArray();
+	}
+
+	/**
+	 * Reads a request body whole and gives a stream over it.
+	 *
+	 * @param ctx Request context
+	 * @param maxBytes Most bytes the body may have
+	 * @return Stream over the body
+	 * @throws ContentTooLargeResponse if the body has more than maxBytes bytes
+	 * @throws BadRequestResponse if the body cannot be read
+	 */
+	public static InputStream boundedInputStream(Context ctx, long maxBytes) {
+		return new ByteArrayInputStream(readBytes(ctx,maxBytes));
 	}
 }

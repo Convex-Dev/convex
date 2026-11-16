@@ -40,7 +40,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.lattice.LatticeContext;
 import convex.net.PeerName;
 import convex.node.NodeConfig;
@@ -53,7 +53,7 @@ import convex.social.Social;
  */
 public class P2PNodeTest {
 
-	private EtchStore store;
+	private MemoryStore store;
 	private P2PNode node;
 	private final ConcurrentLinkedQueue<Throwable> unexpectedFailures=new ConcurrentLinkedQueue<>();
 
@@ -62,8 +62,9 @@ public class P2PNodeTest {
 	}
 
 	@BeforeEach
-	public void setUp() throws IOException {
-		store = EtchStore.createTemp("p2p-node-test");
+	public void setUp() {
+		// No test reopens the store, so it need not be on disk
+		store = new MemoryStore();
 	}
 
 	@AfterEach
@@ -228,7 +229,7 @@ public class P2PNodeTest {
 	@Timeout(30)
 	public void testFailedPeerInitialisationRunsAgain() throws Exception {
 		AKeyPair hubKey=AKeyPair.generate();
-		try (EtchStore hubStore=EtchStore.createTemp("p2p-node-test-hub");
+		try (MemoryStore hubStore=new MemoryStore();
 				P2PNode hub=observe(P2PNode.create(hubStore,NodeConfig.localNetwork(),hubKey)).serveAllInbound()) {
 			hub.launch();
 			BlockingQueue<Throwable> reported=new LinkedBlockingQueue<>();

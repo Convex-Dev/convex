@@ -38,7 +38,6 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
-import convex.core.init.Init;
 import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
@@ -67,7 +66,7 @@ public class MissingBeliefDataTest {
 	 * update lacks.
 	 */
 	static Server launchPeer(AKeyPair kp) throws Exception {
-		State genesis=Init.createState(List.of(LOCAL.getAccountKey(),REMOTE_A.getAccountKey(),REMOTE_B.getAccountKey()));
+		State genesis=GenesisStates.of(LOCAL,REMOTE_A,REMOTE_B);
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.STATE,genesis);

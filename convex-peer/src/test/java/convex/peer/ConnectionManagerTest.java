@@ -50,12 +50,12 @@ import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.Init;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
-import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -120,81 +120,40 @@ public class ConnectionManagerTest {
 		assertFalse(cm.isConnected(null));
 	}
 
+	/** Closing the connection of a null key closes nothing. */
 	@Test
 	public void testCloseConnectionNullKey() {
-		ConnectionManager cm = network.SERVER.getConnectionManager();
-		// Should not throw
-		cm.closeConnection(null, "test");
+		TestConnectionManager manager=new TestConnectionManager();
+		SequencedConvex connection=new SequencedConvex(-1);
+		manager.add(AKeyPair.createSeeded(223).getAccountKey(),connection);
+
+		manager.closeConnection(null,"test");
+		assertEquals(1,manager.getConnectionCount());
+		assertEquals(0,connection.closeCount);
 	}
 
-	// ===== PING message construction tests =====
+	// ===== PING message construction =====
 
+	/**
+	 * A PING is a request carrying its ID, and comes off the wire as the same message,
+	 * its type inferred from the payload.
+	 */
 	@Test
-	public void testCreatePingMessageType() {
-		Message ping = Message.createPing(42);
-		assertEquals(MessageType.PING, ping.getType(), "createPing should produce PING type");
-	}
+	public void testPingMessage() throws Exception {
+		Message ping=Message.createPing(42);
+		assertEquals(MessageType.PING,ping.getType());
+		assertEquals(Vectors.of(MessageTag.PING,42),ping.getPayload());
+		assertEquals(CVMLong.create(42),ping.getRequestID());
+		assertEquals(CVMLong.create(42),ping.getID());
 
-	@Test
-	public void testCreatePingRequestID() {
-		Message ping = Message.createPing(99);
-		assertEquals(CVMLong.create(99), ping.getRequestID(),
-				"Request ID should match the id passed to createPing");
-	}
+		Message received=Message.create(ping.getMessageData());
+		assertEquals(ping.getPayload(),received.getPayload(null));
+		assertEquals(MessageType.PING,received.getType());
+		assertEquals(CVMLong.create(42),received.getRequestID());
 
-	@Test
-	public void testCreatePingDifferentIDs() {
-		Message p1 = Message.createPing(1);
-		Message p2 = Message.createPing(2);
-		assertFalse(p1.getRequestID().equals(p2.getRequestID()),
-				"Different IDs should produce different request IDs");
-	}
-
-	@Test
-	public void testPingTypeInference() {
-		// Verify that type inference from payload works (not just the stored type)
-		Message ping = Message.createPing(7);
-		// Re-create from raw payload to test inference path
-		Message fromPayload = Message.create(MessageType.PING, ping.getPayload());
-		assertEquals(MessageType.PING, fromPayload.getType());
-		assertEquals(ping.getRequestID(), fromPayload.getRequestID());
-	}
-
-	@Test
-	public void testCreatePingPayloadStructure() {
-		Message ping = Message.createPing(42);
-		AVector<?> payload = RT.ensureVector(ping.getPayload());
-		assertNotNull(payload, "Payload should be a vector");
-		assertEquals(2, payload.count(), "Payload should have exactly 2 elements: [tag, id]");
-		assertEquals(MessageTag.PING, payload.get(0), "First element should be :PING tag");
-		assertEquals(CVMLong.create(42), payload.get(1), "Second element should be the request ID");
-	}
-
-	@Test
-	public void testCreatePingGetID() {
-		Message ping = Message.createPing(77);
-		// getID() returns the message ID (same as getRequestID for requests)
-		ACell id = ping.getID();
-		assertEquals(CVMLong.create(77), id);
-	}
-
-	@Test
-	public void testCreatePingWithID() {
-		Message ping = Message.createPing(1);
-		// Replace the ID
-		Message retagged = ping.withID(CVMLong.create(999));
-		assertNotNull(retagged, "withID should succeed for PING messages");
-		assertEquals(CVMLong.create(999), retagged.getRequestID());
-		assertEquals(MessageType.PING, retagged.getType());
-	}
-
-	@Test
-	public void testCreatePingEncodeDecodeRoundTrip() throws Exception {
-		Message ping = Message.createPing(123);
-
-		// Encode to wire format and decode back
-		assertNotNull(ping.getMessageData(), "PING should have encodable message data");
-		assertTrue(ping.getMessageData().count() > 0, "Encoded data should be non-empty");
+		Message retagged=ping.withID(CVMLong.create(999));
+		assertEquals(MessageType.PING,retagged.getType());
+		assertEquals(CVMLong.create(999),retagged.getRequestID());
 	}
 
 	@Test
@@ -287,8 +246,10 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testGetConnectionCount() {
-		ConnectionManager cm = network.SERVER.getConnectionManager();
-		assertTrue(cm.getConnectionCount() >= 0);
+		TestConnectionManager manager=new TestConnectionManager();
+		assertEquals(0,manager.getConnectionCount());
+		manager.add(AKeyPair.createSeeded(224).getAccountKey(),new SequencedConvex(-1));
+		assertEquals(1,manager.getConnectionCount());
 	}
 
 	@Test
@@ -302,7 +263,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testStatusPollDoesNotAcquireUnchangedBelief() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(201));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AccountKey remoteKey=AKeyPair.createSeeded(202).getAccountKey();
@@ -321,7 +282,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testStatusPollAcquiresChangedBelief() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(203));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AKeyPair remote=AKeyPair.createSeeded(204);
@@ -348,7 +309,7 @@ public class ConnectionManagerTest {
 	 */
 	@Test
 	public void testStatusPollAcquiresUntilPolledInputSaturated() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(209));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AKeyPair remote=AKeyPair.createSeeded(210);
@@ -378,7 +339,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testStatusTimeoutAgesOutConnection() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(205));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(1000);
 			server.setTimeSource(clock::get);
@@ -406,7 +367,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testSuccessfulStatusResetsTimeoutAge() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(207));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(1000);
 			server.setTimeSource(clock::get);
@@ -433,7 +394,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testNonKeywordStatusErrorIsNotConnectivityFailure() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(211));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(1000);
 			server.setTimeSource(clock::get);
@@ -460,7 +421,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testInterruptedConnectKeepsInterruptStatus() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(214));
+		Server server=createPollingServer();
 		// Accepts TCP but never answers the TLS handshake, so the connect cannot finish
 		try (ServerSocket silent=new ServerSocket(0,50,InetAddress.getLoopbackAddress())) {
 			ConnectionManager manager=new ConnectionManager(server);
@@ -495,7 +456,7 @@ public class ConnectionManagerTest {
 	/** Verified links get every poll slot they can use; an unverified link gets the rest. */
 	@Test
 	public void testPollPrefersDueVerifiedLinks() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(230));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -536,7 +497,7 @@ public class ConnectionManagerTest {
 	 */
 	@Test
 	public void testPollFollowsSoonerAfterAGoodPoll() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(235));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -575,7 +536,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testUnverifiedPollLeavesBackoffAlone() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(233));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AccountKey key=AKeyPair.createSeeded(234).getAccountKey();
@@ -593,7 +554,7 @@ public class ConnectionManagerTest {
 	/** Each failed poll of a verified link doubles its wait, and a good poll clears them. */
 	@Test
 	public void testFailedPollsBackOff() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(235));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -640,8 +601,8 @@ public class ConnectionManagerTest {
 	/** False data in a polled Belief closes the link at once, verified or not, and its peer waits the longest. */
 	@Test
 	public void testFalseBeliefClosesLinkWithLongestWait() throws Exception {
-		AKeyPair keyPair=AKeyPair.createSeeded(275);
-		Server server=createPollingServer(keyPair);
+		AKeyPair keyPair=POLLING_KEY;
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -669,7 +630,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testFullPolledBeliefQueueIsNoFailure() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(244));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AccountKey key=AKeyPair.createSeeded(245).getAccountKey();
@@ -691,7 +652,7 @@ public class ConnectionManagerTest {
 	/** A challenge passed verifies a link, but only a good poll clears its peer's failures. */
 	@Test
 	public void testChallengeVerifiesLinkAndKeepsFailures() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(247));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -739,7 +700,7 @@ public class ConnectionManagerTest {
 	/** An answer signed for another challenge is false input: the link closes at once and its peer waits the longest. */
 	@Test
 	public void testChallengeAnsweredForAnotherClosesLink() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(270));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -773,7 +734,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testUnansweredChallengesCloseLinkAfterMinute() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(251));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -802,7 +763,7 @@ public class ConnectionManagerTest {
 	/** A verified link that never replies is polled on its back-off and closed after a minute. */
 	@Test
 	public void testSilentVerifiedLinkClosedAfterMinute() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(266));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -828,7 +789,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testLinkClosedWhenFailuresReachCap() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(254));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AccountKey key=AKeyPair.createSeeded(255).getAccountKey();
@@ -858,7 +819,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testUnverifiedLinkKeptAtCapWhileNoLinkIsVerified() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(256));
+		Server server=createPollingServer();
 		try {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
@@ -999,8 +960,11 @@ public class ConnectionManagerTest {
 		return link;
 	}
 
-	private static Server createPollingServer(AKeyPair keyPair) throws Exception {
-		return createPollingServer(keyPair,Init.createState(List.of(keyPair.getAccountKey())));
+	/** Key pair of every polling server, so that they share one genesis State. */
+	private static final AKeyPair POLLING_KEY=InvalidPeerDataTest.LOCAL;
+
+	private static Server createPollingServer() throws Exception {
+		return createPollingServer(POLLING_KEY,GenesisStates.of(POLLING_KEY));
 	}
 
 	private static Server createPollingServer(AKeyPair keyPair, State genesis) throws Exception {
@@ -1029,7 +993,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testReplacingConnectionClosesPreviousOwner() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(213));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AccountKey key=AKeyPair.createSeeded(214).getAccountKey();
@@ -1061,7 +1025,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testClosedManagerRejectsLateConnection() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(216));
+		Server server=createPollingServer();
 		ConnectionManager manager=server.getConnectionManager();
 		manager.close();
 		SequencedConvex late=new SequencedConvex(-1);
@@ -1074,7 +1038,7 @@ public class ConnectionManagerTest {
 	@Test
 	@Timeout(60)
 	public void testCloseReleasesLockBeforeClosingConnections() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(221));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			// Closing a network connection waits for its event loop, which may be running
@@ -1103,7 +1067,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testErrorClosingOneConnectionClosesTheRest() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(223));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			// Both fail, so whichever closes first, the other must still close
@@ -1124,7 +1088,7 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testTCPRetainsUnverifiedStatusFallbackForKnownPeer() throws Exception {
-		try (Server server=createPollingServer(AKeyPair.createSeeded(220));
+		try (Server server=createPollingServer();
 				NettyServer remote=new NettyServer(0)) {
 			remote.setReceiveAction(message -> {
 				try {
@@ -1155,7 +1119,7 @@ public class ConnectionManagerTest {
 		try (NettyServer remote=new NettyServer(0)) {
 			remote.setReceiveAction(message -> {});
 			remote.launch();
-			Server server=createPollingServer(AKeyPair.createSeeded(218));
+			Server server=createPollingServer();
 			try {
 				ConnectionManager manager=server.getConnectionManager();
 				CompletableFuture<Convex> connecting=manager.connectToPeer(remote.getHostAddress());

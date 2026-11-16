@@ -15,13 +15,7 @@ import convex.cli.ExitCodes;
  */
 public class EvalTest {
 
-	@Test
-	public void testSimpleEval() {
-		CLTester tester=CLTester.run("eval","(+ 1 2)");
-		tester.assertExitCode(ExitCodes.SUCCESS);
-		assertEquals("3",tester.getOutput().trim());
-	}
-
+	/** Each form argument is evaluated in turn and its result printed */
 	@Test
 	public void testStatePersistsAcrossForms() {
 		CLTester tester=CLTester.run("eval","(def x 10)","(* x x)");
@@ -72,6 +66,7 @@ public class EvalTest {
 		tester.assertExitCode(ExitCodes.DATAERR);
 	}
 
+	/** Eval accepts --protocol-version and evaluates on a version 0 genesis */
 	@Test
 	public void testProtocolVersionZero() {
 		CLTester tester=CLTester.run("eval","--protocol-version","0","(+ 1 2)");

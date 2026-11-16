@@ -208,7 +208,7 @@ public class ChainAPI extends ABaseAPI {
 				throw new BadRequestResponse("Could not parse CVX data: "+e.getMessage());
 			}
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
-			InputStream body=RequestBody.boundedInputStream(ctx);
+			InputStream body=RequestBody.boundedInputStream(ctx,restServer.getMaxRequestBytes());
 			try {
 				value=Reader.read(body);
 			} catch (Exception e) {
@@ -258,7 +258,7 @@ public class ChainAPI extends ABaseAPI {
 			if (field==null) throw new BadRequestResponse("Decode requires 'cad3' field");
 			value=Blob.parse(field);
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.BYTES.equals(type)) {
-			InputStream body=RequestBody.boundedInputStream(ctx);
+			InputStream body=RequestBody.boundedInputStream(ctx,restServer.getMaxRequestBytes());
 			try {
 				value=Blobs.fromStream(body);
 			} catch (Exception e) {
@@ -550,7 +550,7 @@ public class ChainAPI extends ABaseAPI {
 
 			Message message;
 			if (ContentTypes.CVX_RAW.equals(contentType)) {
-				Blob rawData = Blob.wrap(ctx.bodyAsBytes());
+				Blob rawData = Blob.wrap(RequestBody.readBytes(ctx,restServer.getMaxRequestBytes()));
 				message = Message.create(rawData);
 				message.getPayload(server.getStore());
 			} else {

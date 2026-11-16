@@ -59,6 +59,9 @@
 						<manifestEntries>
 							<!-- Preserve version-specific backends from multi-release dependencies. -->
 							<Multi-Release>true</Multi-Release>
+							<!-- The GUI's look and feel, FlatLaf, loads its native library through
+							     JNI, which needs native access from JDK 24 -->
+							<Enable-Native-Access>ALL-UNNAMED</Enable-Native-Access>
 						</manifestEntries>
 					</archive>
 					<descriptorRefs>

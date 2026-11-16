@@ -22,7 +22,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 
@@ -39,7 +39,7 @@ public class P2PDiscoveryTest {
 	private final AKeyPair peerKey=AKeyPair.generate();
 	private final AKeyPair leafKey=AKeyPair.generate();
 
-	private EtchStore hubStore,peerStore,leafStore;
+	private MemoryStore hubStore,peerStore,leafStore;
 	private P2PNode hub,peer,leaf;
 
 	@AfterEach
@@ -54,8 +54,8 @@ public class P2PDiscoveryTest {
 
 	@Test
 	public void testFullCandidatePoolBlocksNoConnection() throws Exception {
-		hubStore=EtchStore.createTemp("p2p-discovery-hub");
-		peerStore=EtchStore.createTemp("p2p-discovery-peer");
+		hubStore=new MemoryStore();
+		peerStore=new MemoryStore();
 		// No ambient slots: the hub keeps candidates but dials none of them
 		LatticePropagatorConfig bounded=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(CANDIDATES),
@@ -89,7 +89,7 @@ public class P2PDiscoveryTest {
 		assertEquals(peerKey.getAccountKey(),toPeer.getVerifiedPeer());
 
 		// An outbound-only node joining later still gets its return route
-		leafStore=EtchStore.createTemp("p2p-discovery-leaf");
+		leafStore=new MemoryStore();
 		leaf=P2PNode.create(leafStore,NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
 		leaf.launch();
 		leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);
@@ -105,13 +105,13 @@ public class P2PDiscoveryTest {
 	 */
 	@Test
 	public void testOutboundOnlyNodeKeepsItsRecordAtAFullHub() throws Exception {
-		hubStore=EtchStore.createTemp("p2p-discovery-hub");
+		hubStore=new MemoryStore();
 		hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey)
 			.serveAllInbound();
 		hub.getApplication().registry().setMaxRecords(0);
 		hub.launch();
 
-		leafStore=EtchStore.createTemp("p2p-discovery-leaf");
+		leafStore=new MemoryStore();
 		leaf=P2PNode.create(leafStore,NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
 		leaf.launch();
 		leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);

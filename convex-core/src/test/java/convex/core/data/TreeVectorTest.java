@@ -82,9 +82,8 @@ public class TreeVectorTest {
 			for (int i = 0; i < n; i++) elements[i] = CVMLong.create(i);
 			AVector<CVMLong> v = Vectors.<CVMLong>create(elements);
 			for (int l = 0; l <= n; l++) {
-				// Large vectors: cuts at, just after and just before each chunk boundary
-				int inChunk = l & 15;
-				if ((n > 300) && (inChunk > 1) && (inChunk < 15)) continue;
+				// Large vectors: only the cuts that stand for all the others
+				if ((n > 300) && !isBoundaryCut(l)) continue;
 				AVector<CVMLong> prefix = v.slice(0, l);
 				AVector<CVMLong> expected = Vectors.<CVMLong>create(Arrays.copyOf(elements, l));
 				assertEquals(expected.getClass(), prefix.getClass(), "n=" + n + " l=" + l);
@@ -92,6 +91,22 @@ public class TreeVectorTest {
 				prefix.validate();
 			}
 		}
+	}
+
+	/**
+	 * Tests whether a cut stands for every cut a large vector's prefix can treat
+	 * differently. Each hex digit of the cut is its position at one tree level: in a
+	 * chunk, then among a node's 16 children. At each level the prefix keeps no,
+	 * one or several children before the cut and ends on a whole or a partial chunk,
+	 * so digits 0, 1, 2 and 15 reach every case, at, just after and just before
+	 * each boundary.
+	 */
+	private static boolean isBoundaryCut(long l) {
+		for (; l > 0; l >>= 4) {
+			int digit = (int) (l & 15);
+			if ((digit > 2) && (digit < 15)) return false;
+		}
+		return true;
 	}
 
 	@Test

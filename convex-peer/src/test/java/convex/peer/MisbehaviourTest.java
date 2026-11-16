@@ -83,6 +83,7 @@ public class MisbehaviourTest {
 	/** A remote that sends a transaction with a bad signature gets SIGNATURE, and is disconnected. */
 	@Test
 	public void aBadTransactionSignatureClosesARemoteConnection() throws Exception {
+		// Launched: a peer that is not live refuses transactions before checking them
 		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
 		try {
 			// Not started: this test thread runs it
@@ -119,7 +120,7 @@ public class MisbehaviourTest {
 	/** The connection that sends an Order with a bad signature is disconnected, whoever the Order names. */
 	@Test
 	public void aBadOrderSignatureClosesTheSendingConnection() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			// Not started: this test thread runs it
 			BeliefPropagator propagator=new BeliefPropagator(peer);
@@ -135,7 +136,7 @@ public class MisbehaviourTest {
 	/** A polled peer whose Belief holds an Order with a bad signature is disconnected. */
 	@Test
 	public void aBadOrderSignatureInAPolledBeliefClosesThePolledConnection() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			Belief polled=Belief.create(badlySignedOrder(peer));
 			AtomicBoolean closed=new AtomicBoolean();
@@ -167,7 +168,7 @@ public class MisbehaviourTest {
 	/** A challenge with a bad signature gets TRUST and is disconnected; a good one is answered and kept. */
 	@Test
 	public void aBadChallengeSignatureClosesItsConnection() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL);
 		try {
 			ReplyConnection remote=new ReplyConnection(null);
 			SignedData<ACell> bad=SignedData.create(REMOTE_A.getAccountKey(),Ed25519Signature.ZERO,
@@ -345,7 +346,7 @@ public class MisbehaviourTest {
 		List<Message> update=MissingBeliefDataTest.update(Belief.create(held,MissingBeliefDataTest.signedOrder(REMOTE_B,1001)),senderStore);
 		Message m=MissingBeliefDataTest.wire(update.get(update.size()-1)).withConnection(connection);
 
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			// Not started: this test thread runs it
 			BeliefPropagator propagator=new BeliefPropagator(peer);

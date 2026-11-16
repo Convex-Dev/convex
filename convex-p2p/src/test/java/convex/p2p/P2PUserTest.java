@@ -22,7 +22,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.node.NodeConfig;
 
@@ -35,12 +35,13 @@ public class P2PUserTest {
 	private static final AKeyPair KP = AKeyPair.generate();
 	private static final AccountKey KEY = KP.getAccountKey();
 
-	private EtchStore store;
+	private MemoryStore store;
 	private P2PNode node;
 
 	@BeforeEach
-	public void setUp() throws IOException {
-		store = EtchStore.createTemp("p2p-user-test");
+	public void setUp() {
+		// No test reopens the store, so it need not be on disk
+		store = new MemoryStore();
 		// Negative port = local-only; these tests exercise lattice behaviour, not networking
 		node = P2PNode.create(store, NodeConfig.port(-1), KP);
 	}
@@ -129,7 +130,7 @@ public class P2PUserTest {
 
 	@Test
 	public void testOwnUserShorthandRequiresKeyPair() throws IOException {
-		try (EtchStore keylessStore = EtchStore.createTemp("p2p-user-keyless2");
+		try (MemoryStore keylessStore = new MemoryStore();
 				P2PNode keyless = P2PNode.create(keylessStore, NodeConfig.port(-1), null)) {
 			assertThrows(IllegalStateException.class, keyless::p2p);
 		}

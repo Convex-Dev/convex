@@ -42,7 +42,7 @@ public class QuerySimulationTest {
 	public void testDirectZeroBalanceQueries() throws Exception {
 		AKeyPair peerKey=AKeyPair.generate();
 		try (ConvexDirect client=ConvexDirect.create(peerKey,
-				Migrations.applyAll(Init.createTestState(List.of(peerKey.getAccountKey()))))) {
+				Migrations.applyAll(Init.createState(List.of(peerKey.getAccountKey()))))) {
 			Address funded=client.getAddress();
 			AKeyPair key=AKeyPair.generate();
 			Address empty=client.createAccountSync(key.getAccountKey());

@@ -49,6 +49,9 @@ public class LatticePanelTest {
 			assertEquals(CVMLong.create(7),take(live.renders).value());
 			published.merge(CVMLong.create(12));
 			assertEquals(CVMLong.create(12),take(live.renders).value());
+			// Syncing a draft that fell behind brings the greater published value into its view
+			draft.sync();
+			assertEquals(CVMLong.create(12),take(working.renders).value());
 		}
 	}
 

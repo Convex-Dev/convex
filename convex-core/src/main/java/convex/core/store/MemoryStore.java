@@ -1,8 +1,8 @@
 package convex.core.store;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import convex.core.cvm.CVMEncoder;
@@ -34,11 +34,13 @@ public class MemoryStore extends AStore {
 	protected final CVMEncoder encoder=new CVMEncoder(this);
 
 	/**
-	 * Storage of persisted Refs for each hash value
+	 * Storage of persisted Refs for each hash value. Peers' threads read and write
+	 * it concurrently.
 	 */
-	private final HashMap<Hash, Ref<ACell>> hashRefs = new HashMap<Hash, Ref<ACell>>();
+	private final ConcurrentHashMap<Hash, Ref<ACell>> hashRefs = new ConcurrentHashMap<>();
 
-	private ACell rootData;
+	// Set and read on different peer threads
+	private volatile ACell rootData;
 
 	@Override
 	@SuppressWarnings("unchecked")
@@ -133,19 +135,37 @@ public class MemoryStore extends AStore {
 		// Children are now persisted: check this cell against them before it is
 		// recorded as persisted for the first time
 		if (!checked && (achievedStatus>=Ref.PERSISTED) && (cell.getRefCount()>0)) Cells.checkStructure(cell);
-		ref=ref.withMinimumStatus(achievedStatus);
-		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
-		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore
-		// does, so the cell's hash and status are known without another walk.
-		cell.attachRef(ref);
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
 
-			hashRefs.put(fHash, (Ref<ACell>) ref);
-			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
+			// Only what this write achieved: a status carried in on the ref is another store's
+			ref=ref.withStatus(achievedStatus);
+			// Another write of this value may have recorded it since the check above
+			ref=(Ref<T>) hashRefs.merge(fHash, (Ref<ACell>) ref, MemoryStore::higher);
+		} else {
+			ref=ref.withMinimumStatus(achievedStatus);
 		}
+		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
+		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore
+		// does, so the cell's hash and status are known without another walk.
+		cell.attachRef(ref);
+		// Outside the merge: a handler may write to this store
+		if ((topLevel||!embedded) && (noveltyHandler != null)) noveltyHandler.accept((Ref<ACell>) ref);
 		return ref;
+	}
+
+	/**
+	 * Merges a write into the entry held for its hash, so that the entry's status
+	 * never falls.
+	 *
+	 * @param held Ref the store holds for the hash
+	 * @param written Ref the write achieved for the same value
+	 * @return Ref carrying the flags of both
+	 */
+	private static Ref<ACell> higher(Ref<ACell> held, Ref<ACell> written) {
+		int flags=Ref.mergeFlags(held.getFlags(), written.getFlags());
+		return (held.getFlags()==flags) ? held : written.withFlags(flags);
 	}
 
 	/**

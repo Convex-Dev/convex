@@ -75,6 +75,11 @@ public class McpServer {
 	/** The route path for the MCP endpoint (default "/mcp") */
 	private final String routePath;
 
+	/** Default most bytes a POSTed message may have */
+	public static final long DEFAULT_MAX_REQUEST_BYTES=1_000_000L;
+
+	private volatile long maxRequestBytes=DEFAULT_MAX_REQUEST_BYTES;
+
 	/**
 	 * Creates a new McpServer with the given server info and default route "/mcp".
 	 * @param serverInfo Server info map returned in initialize responses
@@ -91,6 +96,25 @@ public class McpServer {
 	public McpServer(AMap<AString, ACell> serverInfo, String routePath) {
 		this.serverInfo = serverInfo;
 		this.routePath = routePath;
+	}
+
+	/**
+	 * Gets the most bytes a POSTed message may have.
+	 * @return Limit in bytes
+	 */
+	public long getMaxRequestBytes() {
+		return maxRequestBytes;
+	}
+
+	/**
+	 * Sets the most bytes a POSTed message may have; a longer one is refused with
+	 * HTTP 413. Defaults to {@link #DEFAULT_MAX_REQUEST_BYTES}.
+	 * @param bytes Limit in bytes
+	 * @throws IllegalArgumentException if bytes is not positive
+	 */
+	public void setMaxRequestBytes(long bytes) {
+		if (bytes<=0) throw new IllegalArgumentException("Maximum request size must be positive");
+		this.maxRequestBytes=bytes;
 	}
 
 	// ==================== Tool & Prompt Registration ====================
@@ -169,7 +193,7 @@ public class McpServer {
 		currentContext.set(ctx);
 		try {
 			boolean useSSE = acceptsEventStream(ctx);
-			ACell body = JSONReader.read(RequestBody.boundedInputStream(ctx));
+			ACell body = JSONReader.read(RequestBody.boundedInputStream(ctx, maxRequestBytes));
 
 			if (body instanceof AMap<?, ?> map) {
 				if (isNotification(map)) {
