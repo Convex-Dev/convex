@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Timeout;
 
 import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
-import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
@@ -196,12 +195,14 @@ public class NettyConnectionTest {
 
 	/** A message whose payload cannot be encoded in one frame. */
 	private static Message oversizedMessage() {
-		// Distinct blobs, since identical cells are encoded once
-		Random r=new Random(41);
-		int n=(int)(CPoSConstants.MAX_MESSAGE_LENGTH/Blob.CHUNK_LENGTH)+64;
-		ACell[] blobs=new ACell[n];
-		for (int i=0; i<n; i++) blobs[i]=Blob.createRandom(r,Blob.CHUNK_LENGTH);
-		return Message.create(MessageType.RESULT,Result.create(CVMLong.ONE,Vectors.create(blobs)));
+		// Refused as Message refuses a real one: MessageTest.testOversizedPayloadRejected
+		// builds that, about 50 MB, too costly to build again here
+		return new Message(MessageType.RESULT,Result.create(CVMLong.ONE,null),null,null) {
+			@Override public Blob getMessageData() {
+				throw new IllegalArgumentException("Multi-cell encoding exceeds maximum size of "
+					+CPoSConstants.MAX_MESSAGE_LENGTH+" bytes");
+			}
+		};
 	}
 
 	/** Any loop of the shared group counts, not only the one serving a given channel. */
