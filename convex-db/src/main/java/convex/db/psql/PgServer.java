@@ -19,6 +19,7 @@ import java.util.function.Supplier;
 import javax.net.ssl.SSLContext;
 
 import convex.core.util.Cleanup;
+import convex.core.util.Shutdown;
 
 /**
  * PostgreSQL wire protocol server backed by Convex SQL.
@@ -349,8 +350,8 @@ public class PgServer {
 			.database(database)
 			.build();
 
-		// Add shutdown hook
-		Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
+		// Before the stores close, rather than concurrently as a JVM hook of its own would run
+		Shutdown.addHook(Shutdown.SERVICE,server::stop);
 
 		server.startAndWait();
 	}

@@ -318,7 +318,7 @@ public class Server implements Closeable {
 			}
 			
 			log.debug("Attempting to sync remote state: "+stateHash + " on network: "+genesisHash);
-			State genF=RT.ensureCVM(convex.acquire(genesisHash).get(timeout,TimeUnit.MILLISECONDS),State.class);
+			State genF=RT.ensureCVM(awaitAcquired(convex.acquire(genesisHash),timeout),State.class);
 			log.debug("Retrieved Genesis State: "+genesisHash);
 			
 			// Belief acquisition
@@ -327,7 +327,7 @@ public class Server implements Closeable {
 			long timeElapsed=0;
 			while (belF==null) {
 				try {
-					belF=RT.ensureCVM(convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS),Belief.class);
+					belF=RT.ensureCVM(awaitAcquired(convex.acquire(beliefHash),timeout),Belief.class);
 				} catch (TimeoutException te) {
 					timeElapsed+=timeout;
 					log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
@@ -383,6 +383,19 @@ public class Server implements Closeable {
 			throw new LaunchException("Erring while trying to sync peer",e);
 		}  catch (TimeoutException e) {
 			throw new LaunchException("Timeout attempting to sync peer",e);
+		}
+	}
+
+	/**
+	 * Waits at most the given time for an acquisition, then cancels it unless it has
+	 * completed: one left running would go on writing to the store.
+	 */
+	private static <T extends ACell> T awaitAcquired(CompletableFuture<T> acquisition,long timeout)
+			throws InterruptedException, ExecutionException, TimeoutException {
+		try {
+			return acquisition.get(timeout,TimeUnit.MILLISECONDS);
+		} finally {
+			acquisition.cancel(false);
 		}
 	}
 

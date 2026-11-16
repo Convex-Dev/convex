@@ -18,10 +18,10 @@ public class IPUtils {
 
 	public static InetAddress tryGetIP() throws InterruptedException {
 		
-		String s=tryGetWTF().trim();
+		String s=tryGetWTF();
 		if (s!=null) {
 			try {
-				InetAddress i= InetAddress.getByName(s);
+				InetAddress i= InetAddress.getByName(s.trim());
 				return i;
 			} catch (UnknownHostException e) {
 				// continue
@@ -31,18 +31,15 @@ public class IPUtils {
 	}
 		
 	public static String tryGetWTF() throws InterruptedException {
-		HttpClient client = HttpClient.newHttpClient();
-	
 		HttpRequest request = HttpRequest.newBuilder(
 			       URI.create("https://wtfismyip.com/text"))
 			   .header("accept", "text/plain")
 			   .build();
 
-		 HttpResponse<String> response;
-		try {
-			response = client.send(request, HttpResponse.BodyHandlers.ofString());
-			 String text=response.body();
-			 return text;
+		// Closed after each call, so its selector thread does not outlive it
+		try (HttpClient client = HttpClient.newHttpClient()) {
+			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+			return response.body();
 		} catch (IOException e) {
 			return null;
 		}

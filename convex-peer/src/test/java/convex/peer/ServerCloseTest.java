@@ -32,8 +32,10 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.message.AConnection;
@@ -45,7 +47,9 @@ import convex.core.store.MemoryStore;
 /**
  * Tests that closing a peer finishes every step of its shutdown when one of them
  * fails: the components stop, the final checkpoint is written, the store it owns is
- * closed and waiting for shutdown returns.
+ * closed and waiting for shutdown returns. Also that a peer leaves none of its own
+ * work running: result deliveries end before shutdown goes on, and a sync that times
+ * out stops its acquisition.
  */
 public class ServerCloseTest {
 	static final AKeyPair KP=AKeyPair.createSeeded(160);
@@ -75,7 +79,7 @@ public class ServerCloseTest {
 	}
 
 	/** A peer connection whose GOODBYE send fails. */
-	static final class FailingGoodbye extends Convex {
+	static class FailingGoodbye extends Convex {
 		final IllegalStateException failure=new IllegalStateException("simulated GOODBYE failure");
 		final AtomicInteger closes=new AtomicInteger();
 
@@ -192,6 +196,33 @@ public class ServerCloseTest {
 			assertTimeoutPreemptively(WAIT,peer::waitForShutdown);
 
 			assertThrows(LaunchException.class,peer::launch,"a closed peer does not launch again");
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** A sync that times out cancels the acquisition it waited for, which would otherwise go on writing to the store. */
+	@Test
+	public void aSyncThatTimesOutCancelsItsAcquisition() throws Exception {
+		CompletableFuture<ACell> acquisition=new CompletableFuture<>();
+		FailingGoodbye source=new FailingGoodbye() {
+			@Override public CompletableFuture<Result> requestStatus() {
+				return CompletableFuture.completedFuture(Result.value(Maps.of(
+					Keywords.BELIEF,Strings.create("belief").getHash(),
+					Keywords.PEER,REMOTE.getAccountKey(),
+					Keywords.GENESIS,Strings.create("genesis").getHash())));
+			}
+			@SuppressWarnings("unchecked")
+			@Override public <T extends ACell> CompletableFuture<T> acquire(Hash hash,AStore store) {
+				return (CompletableFuture<T>)acquisition;
+			}
+		};
+		Server peer=createOwning(new TrackingStore(),Map.of(Keywords.TIMEOUT,1));
+		// As a launch syncing from a source does
+		source.setStore(peer.getStore());
+		try {
+			assertThrows(LaunchException.class,() -> peer.syncPeer(KP,source));
+			assertTrue(acquisition.isCancelled());
 		} finally {
 			peer.close();
 		}

@@ -6,11 +6,14 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.util.ThreadUtils;
+
 public abstract class AObserverQueue<T> {
 
 	static final Logger log = LoggerFactory.getLogger(AObserverQueue.class.getName());
 
-	private boolean running;
+	private volatile boolean running;
+	/** The queue thread while started. Guarded by this. */
 	private Thread thread;
 
 	protected final ArrayBlockingQueue<Supplier<T>> queue;
@@ -51,7 +54,7 @@ public abstract class AObserverQueue<T> {
 					loop();		
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt(); // maintain interrupt status
-					log.debug("Component thread interrupted: {}",thread);
+					log.debug("Component thread interrupted: {}",Thread.currentThread());
 					break;
 				} catch (Exception e) {
 					log.warn("Unexpected exception in "+this.getClass().getSimpleName(),e);
@@ -66,13 +69,21 @@ public abstract class AObserverQueue<T> {
 	}
 	
 	/**
-	 * Close this threaded component, including interrupting any running thread(s). 
-	 * Subclasses may override, but should call `super.close()` to close the main thread
+	 * Close this threaded component, interrupting its thread and waiting for it to end.
+	 * Closing one never started does nothing. Subclasses may override, but should call
+	 * `super.close()` to close the main thread
 	 */
-	public synchronized void close() {
-		Thread t=thread;
-		running=false;
+	public void close() {
+		Thread t;
+		synchronized (this) {
+			running=false;
+			t=thread;
+			thread=null;
+		}
+		if (t==null) return;
 		t.interrupt();
+		// Outside the lock: the queue thread closes this too as it ends
+		ThreadUtils.joinUninterruptibly(t);
 	}
 
 

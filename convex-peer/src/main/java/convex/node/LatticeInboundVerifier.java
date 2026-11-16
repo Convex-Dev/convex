@@ -2,7 +2,9 @@ package convex.node;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +24,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
+import convex.core.util.ThreadUtils;
 
 /**
  * Authenticates physically inbound lattice connections before explicitly
@@ -47,12 +50,15 @@ final class LatticeInboundVerifier {
 	private final SecureRandom random = new SecureRandom();
 	private final ConcurrentHashMap<AConnection, PendingVerification> active =
 		new ConcurrentHashMap<>();
+	/** Threads running attempts, which closing waits for. */
+	private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
+	private volatile boolean closed;
 
 	LatticeInboundVerifier(Supplier<ChallengeSigner> signerSupplier) {
 		this.signerSupplier = signerSupplier;
 	}
 
-	/** Starts at most one non-blocking authentication attempt per inbound connection. */
+	/** Starts at most one non-blocking authentication attempt per inbound connection, unless closed. */
 	void maybeStart(AConnection connection, LatticePropagator owner, AccountKey claimedKey) {
 		if (connection == null || owner == null || connection.isClosed()
 				|| connection.isTrusted() || !connection.supportsMessage()
@@ -62,16 +68,33 @@ final class LatticeInboundVerifier {
 		PendingVerification pending = new PendingVerification(owner, claimedKey, resultFuture);
 		if (active.putIfAbsent(connection, pending) != null) return;
 
+		Thread thread = null;
 		try {
-			Thread.ofVirtual().name("Lattice inbound authentication").start(
-				() -> verify(connection, pending));
+			thread = Thread.ofVirtual().name("Lattice inbound authentication").unstarted(() -> {
+				try {
+					verify(connection, pending);
+				} finally {
+					threads.remove(Thread.currentThread());
+				}
+			});
+			threads.add(thread);
+			// Both registered before the check, so a close either finds this attempt or stops it here
+			if (closed) {
+				threads.remove(thread);
+				active.remove(connection, pending);
+				return;
+			}
+			thread.start();
 		} catch (RuntimeException e) {
+			if (thread != null) threads.remove(thread);
 			active.remove(connection, pending);
 		}
 	}
 
 	private void verify(AConnection connection, PendingVerification pending) {
 		try {
+			// A close that found this thread not yet started did not wait for it
+			if (closed) return;
 			ChallengeSigner signer = signerSupplier.get();
 			if (signer == null) return;
 
@@ -124,8 +147,20 @@ final class LatticeInboundVerifier {
 		}
 	}
 
-	/** Cancels every pending attempt during propagator shutdown. */
+	/**
+	 * Cancels every pending attempt during propagator shutdown, starts no more, and
+	 * waits at most the challenge timeout for the attempts to end.
+	 */
 	void close() {
+		closed = true;
 		for (AConnection connection : active.keySet()) forget(connection);
+		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS);
+		for (Thread thread : List.copyOf(threads)) {
+			Duration left = Duration.ofNanos(Math.max(0, deadline - System.nanoTime()));
+			if (!ThreadUtils.joinUninterruptibly(thread, left) && (thread != Thread.currentThread())) {
+				log.warn("Lattice inbound authentication still running after {} ms", TIMEOUT_MS);
+				return;
+			}
+		}
 	}
 }
