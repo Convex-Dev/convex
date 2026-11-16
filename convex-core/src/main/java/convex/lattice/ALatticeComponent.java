@@ -135,6 +135,24 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
+	 * Reconciles values in the form stored at this component's place, for a parent
+	 * that reconciles its own value place by place. Called within the parent's atomic
+	 * update, so it uses only the values given. By default the stored form is the
+	 * working form and this is {@link #reconcile(ACell,ACell,ACell)}; a component
+	 * whose storage stores another form overrides this.
+	 *
+	 * @param base Stored value both sides last agreed on, or null if there was none
+	 * @param own Stored working value
+	 * @param other Stored destination value
+	 * @return Reconciled stored value
+	 * @throws MergeConflictException If the two values cannot be reconciled
+	 */
+	@SuppressWarnings("unchecked")
+	protected ACell reconcileStored(ACell base,ACell own,ACell other) {
+		return reconcile((V)base,(V)own,(V)other);
+	}
+
+	/**
 	 * Returns the atomic editing view. Domain operations and children use this
 	 * accessor so an override can consistently apply policies such as timestamping.
 	 * A subclass can wrap {@code super.cursor()} during construction; constructors
@@ -311,7 +329,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Returns the reconciliation of a transacting component, which reconciles a change
 	 * made under its claim without passing through it, or null if it is not a lattice
 	 * component. A component that cannot reconcile changes on both sides fails that
-	 * commit with an {@link UnsupportedOperationException} naming it.
+	 * commit with a {@link MergeConflictException} naming it.
 	 */
 	@SuppressWarnings("unchecked")
 	static <V extends ACell> ThreeWayMerge<V> reconciler(TransactionalComponent<V,?> source) {

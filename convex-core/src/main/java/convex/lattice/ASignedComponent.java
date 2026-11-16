@@ -5,6 +5,7 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
+import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
@@ -69,6 +70,17 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 		}
 		if (incoming==null || lattice.merge(null,incoming)==null) return storage.getOrDefault(null);
 		return storage.updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
+	}
+
+	/**
+	 * Reconciles stored envelopes: a side that changed nothing takes the other's
+	 * envelope, and envelopes changed on both sides are a conflict.
+	 */
+	@Override
+	protected ACell reconcileStored(ACell base,ACell own,ACell other) {
+		if (Utils.equals(own,base)) return other;
+		if (Utils.equals(other,base)) return own;
+		throw new MergeConflictException(getClass().getSimpleName()+" cannot reconcile signed values changed on both sides");
 	}
 
 	/** Incoming delivery stops at the signed boundary; interior paths introduce no data. */

@@ -33,6 +33,7 @@ class RegionTransactionsTest {
 	private static final Keyword FORKED=Keyword.intern("forked");
 	private static final Keyword LIVE=Keyword.intern("live");
 	private static final Keyword MORE=Keyword.intern("more");
+	private static final Keyword STRICT=Keyword.intern("strict");
 	private static final Keyword SIGNED=Keyword.intern("signed");
 	private static final Keyword OTHER=Keyword.intern("other");
 
@@ -53,9 +54,10 @@ class RegionTransactionsTest {
 			implements TransactionalComponent<ASet<CVMLong>,Unmerged> {
 		Unmerged(AForkableCursor<ASet<CVMLong>> cursor) { super(cursor); }
 		@Override public Unmerged rebind(AForkableCursor<ASet<CVMLong>> cursor) { return new Unmerged(cursor); }
+		void add(long n) { cursor().updateAndGet(s -> union(s,n)); }
 	}
 
-	/** Regions with one forked, two live and one signed region, transacting as a whole. */
+	/** Regions with one forked, two live, one strict and one signed region, transacting as a whole. */
 	private static final class App extends Regions
 			implements TransactionalComponent<Index<Keyword,ACell>,App> {
 		App(AForkableCursor<Index<Keyword,ACell>> cursor) {
@@ -63,6 +65,7 @@ class RegionTransactionsTest {
 			create(FORKED,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c.fork()));
 			create(LIVE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
 			create(MORE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
+			create(STRICT,(AForkableCursor<ASet<CVMLong>> c) -> new Unmerged(c));
 			create(SIGNED,(AForkableCursor<SignedData<ASet<CVMLong>>> c) -> new SignedSetComponent<>(SIGNING,c,OWNER::signData));
 		}
 		private App(AForkableCursor<Index<Keyword,ACell>> cursor,App source) { super(cursor,source); }
@@ -70,6 +73,7 @@ class RegionTransactionsTest {
 		Members forked() { return registered(FORKED); }
 		Members live() { return registered(LIVE); }
 		Members more() { return registered(MORE); }
+		Unmerged strict() { return registered(STRICT); }
 		SignedComponent<ASet<CVMLong>> signed() { return registered(SIGNED); }
 	}
 
@@ -211,13 +215,13 @@ class RegionTransactionsTest {
 		app.execute(view -> {
 			int attempt=attempts.incrementAndGet();
 			view.forked().add(attempt);
-			view.live().add(attempt);
-			// A concurrent change to a region this attempt also changed forces another attempt
-			if (attempt==1) app.live().add(7);
+			view.strict().add(attempt);
+			// A concurrent change to a region this attempt also changed, which cannot merge, forces another attempt
+			if (attempt==1) app.strict().add(7);
 		});
 		assertEquals(2,attempts.get());
 		assertEquals(Sets.of(2),at(root,FORKED));
-		assertEquals(Sets.of(2,7),at(root,LIVE));
+		assertEquals(Sets.of(2,7),at(root,STRICT));
 	}
 
 	@Test void aConcurrentChangeToAnotherRegionCommitsWithoutARerun() {
@@ -266,15 +270,68 @@ class RegionTransactionsTest {
 		assertEquals(CVMLong.TWO,at(root,OTHER),"a region the container does not serve keeps the destination's value");
 	}
 
-	@Test void aForkedContainerRefusesARegionBothSidesChangedWithoutARule() {
+	@Test void aForkedContainerHasARegionBothSidesChangedReconciledByItsComponent() {
 		var root=emptyRoot();
 		var app=new App(root);
 		var fork=(App)app.fork();
 		fork.live().add(1);
 		app.live().add(2);
+		fork.sync();
+		assertEquals(Sets.of(1,2),at(root,LIVE),"a set's merge takes both changes");
+	}
+
+	@Test void aForkedContainerRefusesARegionWhoseComponentCannotReconcile() {
+		var root=emptyRoot();
+		var app=new App(root);
+		var fork=(App)app.fork();
+		fork.strict().add(1);
+		app.strict().add(2);
 		var before=root.get();
-		assertThrows(MergeConflictException.class,fork::sync);
+		var failure=assertThrows(MergeConflictException.class,fork::sync);
+		assertTrue(failure.getMessage().contains("Unmerged"),"the region's own refusal");
 		assertSame(before,root.get(),"a refused reconcile changes nothing");
+	}
+
+	@Test void aForkedContainerLeavesASignedRegionBothSidesChangedToItsComponent() {
+		var root=emptyRoot();
+		var app=new App(root);
+		var fork=(App)app.fork();
+		fork.signed().cursor().updateAndGet(s -> union(s,1));
+		app.signed().cursor().updateAndGet(s -> union(s,2));
+		app.sync();
+		var before=root.get();
+		var failure=assertThrows(MergeConflictException.class,fork::sync);
+		assertTrue(failure.getMessage().contains("SignedSetComponent"),"the signed region decides, and refuses envelopes changed on both sides");
+		assertSame(before,root.get());
+	}
+
+	@Test void aForkedContainerReconcilesANestedContainerRegionByRegion() {
+		var nestedKey=Keyword.intern("nested");
+		var root=emptyRoot();
+		var app=new Regions(root);
+		var nested=app.<Index<Keyword,ACell>,Regions>create(nestedKey,Regions::new);
+		Members live=nested.create(LIVE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
+		nested.create(MORE,(AForkableCursor<ASet<CVMLong>> c) -> new Members(c));
+		var fork=app.fork();
+		ALatticeComponent<?> forkNested=fork.child(nestedKey);
+		Members forkLive=((Regions)forkNested).registered(LIVE);
+		Members forkMore=((Regions)forkNested).registered(MORE);
+		forkLive.add(1);
+		forkMore.add(3);
+		live.add(2);
+		fork.sync();
+		assertEquals(Index.of(nestedKey,Index.of(LIVE,Sets.of(1,2),MORE,Sets.of(3))),root.get());
+	}
+
+	@Test void aForkedContainerRefusesAnExplicitRegionItCannotMake() {
+		var root=emptyRoot();
+		var app=new Regions(root);
+		app.add(LIVE,new Members(BoundaryCursor.over(root.<ASet<CVMLong>>path(LIVE))));
+		var fork=app.fork();
+		fork.cursor().updateAndGet(m -> m.assoc(LIVE,Sets.of(1)));
+		root.set(root.get().assoc(LIVE,Sets.of(2)));
+		var failure=assertThrows(MergeConflictException.class,fork::sync);
+		assertTrue(failure.getMessage().contains("explicit"));
 	}
 
 	@Test void aSpanningTransactionSeesWhatALiveRegionCommitted() {
@@ -358,7 +415,7 @@ class RegionTransactionsTest {
 		assertEquals(Sets.of(1,3),at(root,LIVE));
 	}
 
-	@Test void aRegionCommitDuringAContainerTransactionMakesItRetryOnTop() {
+	@Test void aRegionCommitDuringAContainerTransactionMergesByTheRegion() {
 		var attempts=new AtomicInteger();
 		var root=liveRoot();
 		var app=new App(root);
@@ -367,8 +424,20 @@ class RegionTransactionsTest {
 			if (attempts.incrementAndGet()==1) app.live().add(7);
 			view.live().add(1);
 		});
-		assertEquals(2,attempts.get());
+		assertEquals(1,attempts.get(),"a set's merge takes both changes");
 		assertEquals(Sets.of(1,7),at(root,LIVE));
+	}
+
+	@Test void aRegionCommitDuringAContainerTransactionMakesItRetryOnTopWhereTheRegionCannotMerge() {
+		var attempts=new AtomicInteger();
+		var root=emptyRoot();
+		var app=new App(root);
+		app.execute(view -> {
+			if (attempts.incrementAndGet()==1) app.strict().add(7);
+			view.strict().add(1);
+		});
+		assertEquals(2,attempts.get());
+		assertEquals(Sets.of(1,7),at(root,STRICT));
 	}
 
 	@Test void aContainerTransactionChangingAClaimedRegionMergesWithItsCommit() {
