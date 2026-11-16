@@ -368,6 +368,7 @@ public class PeerGUI extends AbstractGUI {
 	/**
 	 * Launches an extra peer, staked from the source peer's controller account.
 	 * The launch runs off the EDT; the peer joins the list when it is running.
+	 * The peer closes with this Peer Manager, and at once if it fails to join.
 	 * @param source Connection to an existing peer
 	 * @return Future for the new peer's connection
 	 */
@@ -383,24 +384,36 @@ public class PeerGUI extends AbstractGUI {
 			addTempKey(tempKeys,HotWalletEntry.create(kp,"Generated peer key"));
 
 			// Set up Peer in base server
-			ConvexLocal convex=Convex.connect(base, a, kp);
-			AccountKey key=kp.getAccountKey();
-			Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
-			if (rcr.isError()) {
-				throw new IllegalStateException("Unable to create peer: "+rcr);
+			try (ConvexLocal convex=Convex.connect(base, a, kp)) {
+				AccountKey key=kp.getAccountKey();
+				Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
+				if (rcr.isError()) {
+					throw new IllegalStateException("Unable to create peer: "+rcr);
+				}
+
+				HashMap<Keyword, Object> config=new HashMap<>();
+				config.put(Keywords.KEYPAIR, kp);
+				config.put(Keywords.CONTROLLER, a);
+				config.put(Keywords.SOURCE, convex);
+				Server server=API.launchPeer(config);
+				// Owned from launch: listed only later, so the list cannot be what closes it
+				own(server);
+				try {
+					server.getCVMExecutor().setPeer(server.syncPeer(kp,convex));
+					server.getConnectionManager().connectToPeer(base.getHostAddress());
+					server.setHostname("localhost:"+server.getPort());
+					base.getConnectionManager().connectToPeer(server.getHostAddress());
+					return Convex.connect(server, a, kp);
+				} catch (Throwable e) {
+					disown(server);
+					try {
+						server.close();
+					} catch (Throwable closeFailure) {
+						e.addSuppressed(closeFailure);
+					}
+					throw e;
+				}
 			}
-
-			HashMap<Keyword, Object> config=new HashMap<>();
-			config.put(Keywords.KEYPAIR, kp);
-			config.put(Keywords.CONTROLLER, a);
-			config.put(Keywords.SOURCE, convex);
-			Server server=API.launchPeer(config);
-			server.getCVMExecutor().setPeer(server.syncPeer(kp,convex));
-			server.getConnectionManager().connectToPeer(base.getHostAddress());
-			server.setHostname("localhost:"+server.getPort());
-			base.getConnectionManager().connectToPeer(server.getHostAddress());
-
-			return Convex.connect(server, a, kp);
 		}).thenApplyAsync(convex->{
 			peerList.addElement(convex);
 			return convex;
