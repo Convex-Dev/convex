@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -147,6 +148,16 @@ public class GUITest {
 		} finally {
 			keyRing.remove(existing);
 		}
+	}
+
+	/** A Peer Manager that fails to launch leaves none of its temporary keys in the key ring. */
+	@Test
+	public void testFailedPeerManagerLaunchRemovesItsKeys() {
+		GUITest.assumeGUI();
+		AKeyPair genesis=AKeyPair.generate();
+		// No peers to manage, which fails once the genesis key is in the key ring, whichever step notices
+		assertThrows(Throwable.class,() -> PeerGUI.create(0,genesis,0));
+		assertNull(KeyRing.get().find(genesis.getAccountKey()));
 	}
 
 	/**

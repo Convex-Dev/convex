@@ -29,9 +29,8 @@ public class AccountChooserPanelTest {
 		Toolkit.init();
 		AKeyPair key=AKeyPair.generate();
 		try (ConvexDirect client=ConvexDirect.create(key,
-				Migrations.applyAll(Init.createState(List.of(key.getAccountKey()))))) {
-			AccountChooserPanel chooser=CompletableFuture.supplyAsync(()->new AccountChooserPanel(client), Async.EDT).get();
-
+				Migrations.applyAll(Init.createState(List.of(key.getAccountKey()))));
+				AccountChooserPanel chooser=CompletableFuture.supplyAsync(()->new AccountChooserPanel(client), Async.EDT).get()) {
 			assertTrue(chooser.setNextSequence("42"));
 			assertEquals(42, nextSequence(client));
 
