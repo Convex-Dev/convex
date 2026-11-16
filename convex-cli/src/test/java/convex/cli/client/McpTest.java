@@ -5,10 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceLock;
 
@@ -27,13 +29,31 @@ import convex.core.lang.RT;
 /**
  * Tests for the `convex mcp` stdio MCP server against an ephemeral local
  * instance. Sessions are driven by piping newline-delimited JSON-RPC into
- * stdin and parsing the response lines from stdout.
+ * stdin and parsing the response lines from stdout. Each session builds a
+ * genesis state, so the requests that change nothing share one session.
  */
 @ResourceLock("java.lang.System.in")
 public class McpTest {
 
 	static final String INIT="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\"}}\n"
 			+"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n";
+
+	/** Responses to the shared session, run once under the class's stdin lock */
+	private static List<ACell> shared;
+
+	@BeforeAll
+	static void runSharedSession() {
+		shared=session(INIT
+				+request(2,"tools/list")
+				+toolCall(3,"query","{\"source\":\"(+ 1 2)\"}")
+				+toolCall(4,"query","{\"source\":\"(fail :FOO :bad)\"}")
+				+toolCall(5,"getBalance","{\"address\":\"#12\"}")
+				+toolCall(6,"resolveCNS","{\"name\":\"convex.asset\"}")
+				+toolCall(7,"status","{}")
+				+toolCall(8,"nonsense","{}")
+				+"this is not json\n"
+				+request(9,"prompts/list"));
+	}
 
 	/**
 	 * Runs an MCP session and returns the parsed response lines
@@ -53,6 +73,16 @@ public class McpTest {
 	}
 
 	/**
+	 * Finds the response to the request with the given id
+	 */
+	static ACell response(List<ACell> responses, long id) {
+		for (ACell r: responses) {
+			if (CVMLong.create(id).equals(path(r,"id"))) return r;
+		}
+		return fail("No response with id "+id+" in "+responses);
+	}
+
+	/**
 	 * Navigates nested maps by string key
 	 */
 	static ACell path(ACell m, String... keys) {
@@ -64,48 +94,56 @@ public class McpTest {
 		return current;
 	}
 
+	static String request(int id, String method) {
+		return "{\"jsonrpc\":\"2.0\",\"id\":"+id+",\"method\":\""+method+"\"}\n";
+	}
+
 	static String toolCall(int id, String tool, String argsJson) {
 		return "{\"jsonrpc\":\"2.0\",\"id\":"+id+",\"method\":\"tools/call\","
 				+"\"params\":{\"name\":\""+tool+"\",\"arguments\":"+argsJson+"}}\n";
 	}
 
-	@Test
-	public void testInitializeAndToolsList() {
-		List<ACell> rs=session(INIT+"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n");
-		// Notification produces no response line
-		assertEquals(2,rs.size());
-
-		assertNotNull(path(rs.get(0),"result","protocolVersion"));
-		assertEquals(Strings.create("convex-cli"),path(rs.get(0),"result","serverInfo","name"));
-
-		AVector<?> tools=(AVector<?>)path(rs.get(1),"result","tools");
+	private static List<String> toolNames(ACell toolsListResponse) {
+		AVector<?> tools=(AVector<?>)path(toolsListResponse,"result","tools");
 		List<String> names=new ArrayList<>();
 		for (ACell t: tools) names.add(RT.ensureString(((AMap<?, ?>)t).get(Strings.create("name"))).toString());
+		return names;
+	}
+
+	@Test
+	public void testInitializeAndToolsList() {
+		// One line per request, the bad JSON line included; the notification produces none
+		assertEquals(10,shared.size());
+
+		ACell init=response(shared,1);
+		assertNotNull(path(init,"result","protocolVersion"));
+		assertEquals(Strings.create("convex-cli"),path(init,"result","serverInfo","name"));
+
+		List<String> names=toolNames(response(shared,2));
 		assertTrue(names.containsAll(List.of("query","transact","getBalance","resolveCNS","status")),
 				()->"Missing expected tools in: "+names);
 	}
 
 	@Test
 	public void testQueryTool() {
-		List<ACell> rs=session(INIT+toolCall(2,"query","{\"source\":\"(+ 1 2)\"}"));
-		ACell result=rs.get(1);
+		ACell result=response(shared,3);
 		assertEquals(CVMBool.FALSE,path(result,"result","isError"));
 		assertEquals(CVMLong.create(3),path(result,"result","structuredContent","value"));
 	}
 
+	/** A transaction's state change is seen by a later query in the same session */
 	@Test
 	public void testTransactStatePersists() {
 		List<ACell> rs=session(INIT
 				+toolCall(2,"transact","{\"source\":\"(def x 7)\"}")
 				+toolCall(3,"query","{\"source\":\"x\"}"));
-		assertEquals(CVMLong.create(7),path(rs.get(1),"result","structuredContent","value"));
-		assertEquals(CVMLong.create(7),path(rs.get(2),"result","structuredContent","value"));
+		assertEquals(CVMLong.create(7),path(response(rs,2),"result","structuredContent","value"));
+		assertEquals(CVMLong.create(7),path(response(rs,3),"result","structuredContent","value"));
 	}
 
 	@Test
 	public void testQueryErrorIsToolError() {
-		List<ACell> rs=session(INIT+toolCall(2,"query","{\"source\":\"(fail :FOO :bad)\"}"));
-		ACell result=rs.get(1);
+		ACell result=response(shared,4);
 		assertEquals(CVMBool.TRUE,path(result,"result","isError"));
 		assertNotNull(path(result,"result","structuredContent","errorCode"));
 	}
@@ -113,23 +151,21 @@ public class McpTest {
 	@Test
 	public void testGetBalance() {
 		// Genesis account #12 is funded on the ephemeral local instance
-		List<ACell> rs=session(INIT+toolCall(2,"getBalance","{\"address\":\"#12\"}"));
-		CVMLong balance=(CVMLong)path(rs.get(1),"result","structuredContent","balance");
+		CVMLong balance=(CVMLong)path(response(shared,5),"result","structuredContent","balance");
 		assertNotNull(balance);
 		assertTrue(balance.longValue()>0);
 	}
 
 	@Test
 	public void testResolveCNS() {
-		List<ACell> rs=session(INIT+toolCall(2,"resolveCNS","{\"name\":\"convex.asset\"}"));
-		assertEquals(CVMBool.FALSE,path(rs.get(1),"result","isError"));
-		assertNotNull(path(rs.get(1),"result","structuredContent","value"));
+		ACell result=response(shared,6);
+		assertEquals(CVMBool.FALSE,path(result,"result","isError"));
+		assertNotNull(path(result,"result","structuredContent","value"));
 	}
 
 	@Test
 	public void testStatus() {
-		List<ACell> rs=session(INIT+toolCall(2,"status","{}"));
-		ACell sc=path(rs.get(1),"result","structuredContent");
+		ACell sc=path(response(shared,7),"result","structuredContent");
 		assertEquals(CVMBool.TRUE,path(sc,"signing"));
 		AString target=RT.ensureString(path(sc,"target"));
 		assertTrue(target.toString().contains("local"),()->"Unexpected target: "+target);
@@ -137,30 +173,30 @@ public class McpTest {
 
 	@Test
 	public void testReadOnlyModeOmitsTransact() {
-		List<ACell> rs=session(INIT+"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n","--query");
-		AVector<?> tools=(AVector<?>)path(rs.get(1),"result","tools");
-		for (ACell t: tools) {
-			assertFalse(RT.ensureString(((AMap<?, ?>)t).get(Strings.create("name"))).toString().equals("transact"));
-		}
+		List<ACell> rs=session(INIT+request(2,"tools/list"),"--query");
+		assertFalse(toolNames(response(rs,2)).contains("transact"));
 	}
 
 	@Test
 	public void testUnknownToolIsProtocolError() {
-		List<ACell> rs=session(INIT+toolCall(2,"nonsense","{}"));
-		assertNotNull(path(rs.get(1),"error"));
-		assertNull(path(rs.get(1),"result"));
+		ACell result=response(shared,8);
+		assertNotNull(path(result,"error"));
+		assertNull(path(result,"result"));
 	}
 
 	@Test
 	public void testBadJsonLineIsParseError() {
-		List<ACell> rs=session(INIT+"this is not json\n");
-		assertEquals(CVMLong.create(-32700),path(rs.get(1),"error","code"));
+		// A line that is not JSON has no id to answer, so its reply is found by its code
+		for (ACell r: shared) {
+			ACell error=path(r,"error");
+			if ((error!=null)&&CVMLong.create(-32700).equals(path(error,"code"))) return;
+		}
+		fail("No parse error response in "+shared);
 	}
 
 	@Test
 	public void testPromptAvailable() {
-		List<ACell> rs=session(INIT+"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"prompts/list\"}\n");
-		AVector<?> prompts=(AVector<?>)path(rs.get(1),"result","prompts");
+		AVector<?> prompts=(AVector<?>)path(response(shared,9),"result","prompts");
 		assertTrue(prompts.count()>0);
 	}
 }
