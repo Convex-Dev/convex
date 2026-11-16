@@ -31,6 +31,8 @@ a change must not reopen. Staking economics and operator concerns are in
   client choice of a trusted, well-staked peer.
 - **Untrusted input fails closed**: bounded message sizes, bounded missing-data
   requests, juice metering, and merge paths that never throw into the peer loop.
+- **Failures are contained**: one request fails alone, whatever the failure, and
+  a peer shuts down only when it cannot advance consensus state.
 
 ## CPoS in brief
 
@@ -183,15 +185,49 @@ trust in a specific peer for submission is a separate, explicit choice.
   (`Peer.updateState`): the State is unchanged and execution moves on. Running out
   of memory or stack while storing or answering one received query, transaction,
   Order or DATA message fails that message alone, and while merging received Orders
-  drops them like any Order the merge cannot use. Only fatal conditions stop a
-  peer: a failed store write, data missing from its own store that it must hold in
-  full (an agreed Block it executes, or an Order it merges), or a JVM failure in
-  work on the peer's own state, such as executing agreed Blocks. Missing data is
-  never invalidity: a peer missing it is faulty, and treating the Block as invalid
-  would fork it from the network.
+  drops them like any Order the merge cannot use. Data missing from a peer's own
+  store that it must hold in full (an agreed Block it executes, or an Order it
+  merges) stops the peer, as [Failure containment](#failure-containment) describes.
+  Missing data is never invalidity: a peer missing it is faulty, and treating the
+  Block as invalid would fork it from the network.
 - **Upgrade boundary.** A peer that cannot apply a scheduled upgrade withdraws
   deterministically rather than diverging; the trigger is unforgeable on-chain
   state, so withdrawal is not selectively targetable. See `UPGRADE.md`.
+
+### Failure containment
+
+A peer drops the work that failed and carries on, and stops only when its own
+state is at risk:
+
+- **One request fails alone.** Each message, transaction, query, received Order,
+  Belief poll, connection attempt and observer call is handled within its own
+  boundary. Any failure there, other than a failure of the JVM itself, fails that
+  request and nothing else. Its reply keeps the meaning of a typed failure (FORMAT
+  for an invalid encoding, MISSING for missing data); any other failure is the
+  peer's: LOAD for running out of memory, so a retry may succeed, LIMIT for a stack
+  overflow, PEER otherwise. A transaction that has executed but whose result cannot
+  be produced gets PEER, so that it is not resubmitted.
+- **Bad input is rejected; false input also disconnects.** Malformed input may be
+  an honest mistake, so its connection is kept. Input that is well formed but
+  false, such as a signature that does not verify or a reply that does not match
+  its request, closes the connection it came on, unless that connection is local.
+- **The peer's own threads never end silently.** A failure that reaches the top of
+  the loop of one of its components or of its connection manager drops that pass,
+  and the thread carries on. Consensus state is held in immutable values, so the
+  last consistent state remains.
+- **The peer shuts down only when it cannot advance consensus state, or the JVM
+  has failed in its own work.** If applying or persisting consensus state fails,
+  other than by running out of memory, or a Belief merge lacks data the peer must
+  hold, the peer shuts down rather than keep voting on Blocks it has not applied,
+  writing a final checkpoint of the last state it persisted. Running out of memory
+  there is retried on the next pass. A failure of
+  the JVM itself at the top of one of the peer's loops shuts it down without a
+  checkpoint.
+- **Operators are warned of what they must act on.** A client request that fails
+  logs at debug. The first time a peer runs out of memory it logs a warning: it has
+  too little memory or commits too much to client requests. A probable defect is
+  logged once, as a warning in a request and as an error in the peer's own work.
+  Bad data from another peer logs at debug.
 
 ### Known limitations
 
@@ -246,6 +282,9 @@ Consensus code changes carry fork risk and are held to a higher standard:
 - Tests: `convex.core.cpos.BeliefMergeTest`, `BeliefVotingTest`,
   `convex.core.cvm.SnapshotStateTest`, `convex.core.StakingTest`, and the
   adversarial cases in `convex.core.lang.CoreTest`.
+- Failure containment: `convex.net.RequestFailures` for requests and
+  `convex.peer.LoopFailures` for loops in `convex-peer`; tests in
+  `PeerRequestFailureTest`, `LoopFailuresTest` and `CVMExecutorFailureTest`.
 
 ## Related
 

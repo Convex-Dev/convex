@@ -14,10 +14,13 @@ import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
+import convex.core.util.Utils;
+import convex.net.RequestFailures;
 
 public class QueryHandler extends AThreadedComponent {
 
@@ -57,6 +60,9 @@ public class QueryHandler extends AThreadedComponent {
 	/** Reusable drain buffer — only accessed from the handler thread */
 	private final ArrayList<Message> batch = new ArrayList<>();
 
+	/** One per handler, so this site warns once of each kind of failure that warrants it. */
+	private final RequestFailures failures = new RequestFailures(log);
+
 	@Override
 	protected void loop() throws InterruptedException {
 		// Block until at least one message arrives
@@ -65,36 +71,41 @@ public class QueryHandler extends AThreadedComponent {
 		LoadMonitor.up();
 		if (first == null) return;
 
-		// Drain any additional queued messages (single lock acquisition)
-		batch.clear();
-		batch.add(first);
-		queryQueue.drainTo(batch);
+		try {
+			// Drain any additional queued messages (single lock acquisition)
+			batch.add(first);
+			queryQueue.drainTo(batch);
 
-		for (int i = 0; i < batch.size(); i++) {
-			Message m = batch.get(i);
-			MessageType type = m.getType();
-			// The one guard for every request this thread handles. Anyone can send
-			// queries, at a high rate, so a request that fails in any way, including
-			// running out of memory or stack, is dropped here: it must never cost the
-			// other queued requests or end this thread. A failed query also closes its
-			// connection.
-			try {
-				switch (type) {
-				case QUERY:
-					handleQuery(m);
-					break;
-				case DATA_REQUEST:
-					handleDataRequest(m);
-					break;
-				default:
-					log.warn("Unexpected Message type on query queue: " + type);
+			for (int i = 0; i < batch.size(); i++) {
+				Message m = batch.get(i);
+				MessageType type = m.getType();
+				// The one guard for every request this thread handles. Anyone can send
+				// queries, at a high rate, so a request that fails in any way is dropped
+				// here unless the JVM itself has failed: it must never cost the other
+				// queued requests or end this thread.
+				try {
+					switch (type) {
+					case QUERY:
+						handleQuery(m);
+						break;
+					case DATA_REQUEST:
+						handleDataRequest(m);
+						break;
+					default:
+						log.warn("Unexpected Message type on query queue: " + type);
+					}
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					failures.log(e, "Dropped {} request", type);
+					if (type == MessageType.QUERY) Server.returnBestEffort(m,RequestFailures.reply(e));
+					// Only a validation failure is in the request itself: any other may be this peer's own
+					if (e instanceof ValidationException bad) server.getConnectionManager().handleBadInput(m.getConnection(),bad);
 				}
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-				log.debug("Dropped {} request: {}", type, e.toString());
-				if (type == MessageType.QUERY) m.closeConnection();
 			}
+		} finally {
+			// Released even if this pass fails: recovering from running out of memory relies on it
+			batch.clear();
 		}
-		batch.clear(); // release references
 	}
 	
 	/**
@@ -113,14 +124,15 @@ public class QueryHandler extends AThreadedComponent {
 		}
 	}
 
-	private void handleQuery(Message m) {
-		// query is a vector [id , form, address?]
-		AVector<ACell> v= m.getPayload();
+	private void handleQuery(Message m) throws BadFormatException {
+		// query is a vector [:Q id form address?]
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v==null)||(v.count()<3)) throw new BadFormatException("Query is not [:Q id form address?]");
 		ACell id = v.get(1);
 		ACell form = v.get(2);
 
-		// extract the Address, might be null
-		Address address = RT.ensureAddress(v.get(3));
+		// The address is optional, and might be null
+		Address address = (v.count()>3)?RT.ensureAddress(v.get(3)):null;
 
 		log.debug( "Processing query: {} with address: {}" , form, address);
 

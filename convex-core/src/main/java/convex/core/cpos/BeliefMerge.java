@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
@@ -39,6 +40,11 @@ import convex.core.util.Utils;
  *
  */
 public class BeliefMerge {
+	private static final System.Logger log=System.getLogger(BeliefMerge.class.getName());
+
+	/** Static: each merge is short-lived, so a probable defect is warned of once per JVM */
+	private static final AtomicBoolean warnedDefect=new AtomicBoolean();
+
 	private final Belief initialBelief;
 	private final AccountKey publicKey;
 	private final State state;
@@ -145,12 +151,23 @@ public class BeliefMerge {
 			} catch (MissingDataException e) {
 				// Missing data is the caller's to fetch, as before
 				throw e;
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			} catch (Throwable e) {
+				// A failure of the JVM itself is not this Order's: let it through
+				Utils.checkRequestFailure(e);
 				// Any other failure processing a received Order: ignore that Order, as for
 				// any other the merge does not adopt
+				logIgnored(e);
 			}
 		}
 		return result;
+	}
+
+	private static void logIgnored(Throwable e) {
+		if (Utils.isProbableDefect(e)&&warnedDefect.compareAndSet(false,true)) {
+			log.log(System.Logger.Level.WARNING,"Order ignored after a probable defect in the merge (logged at warning the first time only)",e);
+		} else {
+			log.log(System.Logger.Level.DEBUG,"Order ignored after a failure in the merge",e);
+		}
 	}
 	
 	/**

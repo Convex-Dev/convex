@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.SignedData;
 
 @SuppressWarnings("serial")
-public class BadSignatureException extends ValidationException {
+public class BadSignatureException extends MisbehaviourException {
 
 	private SignedData<?> sig;
 

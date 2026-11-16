@@ -717,7 +717,8 @@ public class InvalidPeerDataTest {
 
 	/**
 	 * A query whose handling overflows or runs out of memory fails alone: its
-	 * connection is closed and the next query in the same batch is answered.
+	 * connection is kept, since the failure may be the peer's own, and the next query
+	 * in the same batch is answered.
 	 */
 	@Test
 	public void aQueryThatFailsLeavesTheRestOfItsBatch() throws Exception {
@@ -731,7 +732,7 @@ public class InvalidPeerDataTest {
 				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",Init.GENESIS_ADDRESS).withConnection(healthy)));
 				handler.loop();
 				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-				assertTrue(failing.isClosed(),error.toString());
+				assertFalse(failing.isClosed(),error.toString());
 			}
 		} finally {
 			peer.close();
@@ -1054,14 +1055,16 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * An Error that is not fatal to the JVM, such as a stack overflow that has unwound,
-	 * leaves a component and its peer running.
+	 * An Error that is not a failure of the JVM itself, such as running out of memory, a
+	 * stack overflow that has unwound or a linkage error, leaves a component and its peer
+	 * running.
 	 */
 	@Test
 	public void aComponentRunsOnAfterANonFatalError() throws Exception {
 		Server peer=launchPeer(LOCAL);
 		try {
-			for (Error error: List.of(new StackOverflowError(),new Error("Unexpected"))) {
+			for (Error error: List.of(new StackOverflowError(),new OutOfMemoryError("Test"),
+					new NoClassDefFoundError("Test"),new Error("Unexpected"))) {
 				CompletableFuture<Void> secondLoop=new CompletableFuture<>();
 				AThreadedComponent component=throwingOnce(peer,error,secondLoop);
 				component.start();
@@ -1074,12 +1077,12 @@ public class InvalidPeerDataTest {
 		}
 	}
 
-	/** A JVM failure such as running out of memory in a component closes the peer. */
+	/** A failure of the JVM itself in a component closes the peer. */
 	@Test
 	public void aFatalErrorClosesThePeer() throws Exception {
 		Server peer=launchPeer(LOCAL);
 		try {
-			throwingOnce(peer,new OutOfMemoryError("Test"),new CompletableFuture<>()).start();
+			throwingOnce(peer,new InternalError("Test"),new CompletableFuture<>()).start();
 			awaitShutdown(peer);
 			assertFalse(peer.isRunning());
 		} finally {

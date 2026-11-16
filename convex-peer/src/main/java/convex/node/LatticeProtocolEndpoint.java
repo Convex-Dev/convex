@@ -34,6 +34,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.BoundedMessageQueue;
@@ -729,13 +730,13 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	/**
-	 * Whether a failed acquisition shows the sender at fault: its value was
-	 * malformed, or it answered a data request with an error other than :LOAD.
+	 * Whether a failed acquisition shows the sender at fault: its value or its reply
+	 * was bad, or it answered a data request with an error other than :LOAD.
 	 * Load on either side, an unanswered request and local failures count
 	 * neither way, as {@code convex.peer.ConnectionManager} treats a peer's :LOAD.
 	 */
 	private static boolean isSenderFault(Throwable failure) {
-		if (failure instanceof BadFormatException) return true;
+		if (failure instanceof ValidationException) return true;
 		if (failure instanceof ResultException e) return !ErrorCodes.LOAD.equals(e.getResult().getErrorCode());
 		return false;
 	}

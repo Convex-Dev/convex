@@ -32,8 +32,9 @@ import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ValidationException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.BoundedMessageQueue;
@@ -41,6 +42,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.RequestFailures;
 
 /**
  * Component class to handle propagation of new Beliefs from a Peer
@@ -194,8 +196,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		} catch (MissingDataException e) {
 			// The merge reads only Orders this peer holds in full: it lacks data it must
 			// hold, so it cannot proceed
-			log.error("Fatal: Belief merge is missing data this peer must hold: {}",e.getMissingHash(),e);
-			server.close();
+			server.requestShutdown("Belief merge is missing data this peer must hold: "+e.getMissingHash(),e,true);
+			// Stops this thread's loop now: the shutdown runs on a thread of its own
+			close();
 			return;
 		}
 
@@ -318,7 +321,15 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean published=false;
 		SignedData<Block>[] signedBlocks= server.transactionHandler.maybeGenerateBlocks(); 
 		if (signedBlocks!=null) {
-			belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
+			try {
+				belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
+			} catch (Throwable e) {
+				// The Blocks' transactions have left the queue: fail their clients, who would
+				// otherwise wait for ever. Proposing changes this peer's own state, so the
+				// failure itself still goes to the loop.
+				server.transactionHandler.failBlocks(signedBlocks,e);
+				throw e;
+			}
 			beliefChanged=true;
 			published=true;
 			
@@ -339,8 +350,13 @@ public class BeliefPropagator extends AThreadedComponent {
 	
 	private void observeBeliefUpdate(Belief b) {
 		Consumer<Belief> obs=beliefUpdateObserver;
-		if (obs!=null) {
+		if (obs==null) return;
+		try {
 			obs.accept(b);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			// An observer's failure is not the Belief's: propagation carries on
+			observerFailures.log(e,"Belief update observer failed");
 		}
 	}
 
@@ -401,10 +417,12 @@ public class BeliefPropagator extends AThreadedComponent {
 		} catch (MissingDataException e) {
 			// Not a failure of the received Orders: this peer's own fault, for the caller
 			throw e;
-		} catch (InvalidDataException | RuntimeException | StackOverflowError | OutOfMemoryError e) {
+		} catch (Throwable e) {
 			// The merge builds a new Belief and changes nothing else, and only its work
-			// held the stack or memory, so this peer's Belief is as it was
-			log.debug("Belief merge failed",e);
+			// held the stack or memory, so this peer's Belief is as it was, unless the JVM
+			// itself has failed
+			Utils.checkRequestFailure(e);
+			mergeFailures.log(e,"Belief merge failed");
 			return null;
 		}
 	}
@@ -424,7 +442,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				MapEntry<AccountKey, SignedData<Order>> e=orders.entryAt(i);
 				if (Cells.equals(e.getValue(),current.get(e.getKey()))) continue;
 				if (tryMerge(ts,kp,state,Belief.create(current.assocEntry(e)))==null) {
-					log.warn("Dropped an Order from peer {} that cannot be merged",e.getKey());
+					log.debug("Dropped an Order from peer {} that cannot be merged",e.getKey());
 					continue;
 				}
 				usable=usable.assocEntry(e);
@@ -484,12 +502,11 @@ public class BeliefPropagator extends AThreadedComponent {
 					server.stageData(m);
 					Consumer<Message> observer=dataStageObserver;
 					if (observer!=null) observer.accept(m);
-				} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-					// Only this DATA's work held the stack or memory, and it has unwound by
-					// here, so the DATA is simply unusable
-					log.warn("Unable to stage peer DATA message: {}",e.toString());
-					log.debug("DATA staging failure",e);
-					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
+				} catch (Throwable e) {
+					// Guard for each DATA message: a failure drops only this message, unless
+					// the JVM itself has failed
+					Utils.checkRequestFailure(e);
+					rejectReceived(m,e,"Invalid DATA message");
 				}
 				continue;
 			}
@@ -522,11 +539,13 @@ public class BeliefPropagator extends AThreadedComponent {
 				log.debug("Missing data in Belief message "+m.getHash());
 				fetchMissing(m);
 			} catch (BadFormatException e1) {
-				log.debug("Malformed Belief message");
+				rejectReceived(m,e1,"Malformed Belief message");
 			}
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// Any other failure processing the message: reject the whole message
-			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
+		} catch (Throwable e) {
+			// Any other failure processing the message: reject the whole message, unless
+			// the JVM itself has failed
+			Utils.checkRequestFailure(e);
+			rejectReceived(m,e,"Unusable Belief message");
 		}
 		return false;
 	}
@@ -537,8 +556,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			return mergeBeliefValue(orders,acquired,null);
 		} catch (MissingDataException e) {
 			log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			log.warn("Unable to merge locally acquired Belief: {}",Utils.getClassName(e));
+		} catch (Throwable e) {
+			// Guard for each polled Belief, unless the JVM itself has failed
+			Utils.checkRequestFailure(e);
+			rejectReceived(null,e,"Unusable polled Belief");
 		}
 		return false;
 	}
@@ -556,9 +577,8 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefReceivedCount++;
 		Collection<SignedData<Order>> incoming=Belief.extractOrders(value);
 		for (SignedData<Order> so: incoming) {
-			AccountKey key=null;
 			try {
-				key=so.getAccountKey();
+				AccountKey key=so.getAccountKey();
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
 				// The merge ignores Orders from unstaked keys, which anyone can make:
@@ -566,7 +586,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				if (!BeliefMerge.isValidPeer(state,key)) continue;
 				Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 				if (newOrder==null) {
-					rejectOrder(source,"Signed value in a Belief is not an Order");
+					rejectReceived(source,new BadFormatException("Signed value in a Belief is not an Order"),"Unusable Order");
 					continue;
 				}
 				if (orders.containsKey(key)) {
@@ -575,11 +595,9 @@ public class BeliefPropagator extends AThreadedComponent {
 				}
 
 				if (!so.checkSignature()) {
-					if (source!=null) {
-						server.getConnectionManager().alertBadMessage(source,"Bad Order Signature!!");
-					} else {
-						log.warn("Bad Order signature in locally acquired Belief");
-					}
+					// Held against the connection that sent it, not the key the Order names. The
+					// rest of a Belief holding a false Order is not trusted either
+					rejectReceived(source,new BadSignatureException("Bad Order signature",so),"Bad Order");
 					break;
 				}
 
@@ -593,11 +611,11 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (IOException e) {
 				log.warn("IO exception trying to merge Order",e);
 				return changed;
-			} catch (RuntimeException | StackOverflowError | OutOfMemoryError e) {
-				// Processing this Order failed, and only its work held the stack or memory:
-				// drop it, and keep the others
-				log.debug("Unusable Order from peer {}",key,e);
-				rejectOrder(source,"Unusable Order: "+Utils.getClassName(e));
+			} catch (Throwable e) {
+				// Any other failure processing this Order: reject it and carry on with the
+				// rest, unless the JVM itself has failed
+				Utils.checkRequestFailure(e);
+				rejectReceived(source,e,"Unusable Order");
 			}
 		}
 		return changed;
@@ -616,16 +634,23 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 
 	/**
-	 * Rejects one received Order, alerting the connection it arrived on, or logging if
-	 * it came from a locally acquired Belief.
+	 * Rejects one received message or Order whose processing failed: it is dropped and
+	 * logged, and bad input goes to the connection manager to handle.
 	 */
-	private void rejectOrder(Message source, String reason) {
-		if (source!=null) {
-			server.getConnectionManager().alertBadMessage(source,reason);
-		} else {
-			log.warn("{} in locally acquired Belief",reason);
+	private void rejectReceived(Message source, Throwable e, String reason) {
+		receiveFailures.log(e,"{}: {}",reason,(source==null)?"polled Belief":source.getConnection());
+		// Every validation failure reaching here is in the received input itself. A polled
+		// Belief's peer is held to account where it was polled
+		if ((source!=null)&&(e instanceof ValidationException bad)) {
+			server.getConnectionManager().handleBadInput(source.getConnection(),bad);
 		}
 	}
+
+	/** Separate logs, so each site warns once of each kind of failure. */
+	private final RequestFailures receiveFailures=new RequestFailures(log);
+	private final RequestFailures mergeFailures=new RequestFailures(log);
+	private final RequestFailures fetchFailures=new RequestFailures(log);
+	private final RequestFailures observerFailures=new RequestFailures(log);
 
 	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
 	private final AtomicBoolean fetching=new AtomicBoolean();
@@ -665,14 +690,17 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (!queuePropagation(m)) log.debug("Propagation queue full: fetched update dropped");
 					} else {
 						log.debug("Fetch of missing update data dropped: {}",error.toString());
+						// Fetched only from the update's sender, so bad input in the reply is its own
+						if (error instanceof ValidationException bad) server.getConnectionManager().handleBadInput(connection,bad);
 					}
 					return null;
 				});
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+		} catch (Throwable e) {
 			// Any failure starting this update's fetch drops it, and must clear the flag
-			// or no later fetch could start
+			// or no later fetch could start. First, so that holds even for a JVM failure
 			fetching.set(false);
-			log.debug("Unable to fetch missing update data",e);
+			Utils.checkRequestFailure(e);
+			fetchFailures.log(e,"Unable to fetch missing update data");
 		}
 	}
 
