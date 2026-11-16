@@ -1,11 +1,10 @@
 package convex.cli.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,14 +15,10 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.PFXTools;
 import convex.core.crypto.SLIP10;
-import convex.core.cvm.Keywords;
+import convex.core.cvm.Peer;
 import convex.core.data.AccountKey;
-import convex.core.data.Keyword;
 import convex.core.util.Utils;
-import convex.peer.API;
-import convex.peer.ConfigException;
-import convex.peer.LaunchException;
-import convex.peer.Server;
+import convex.etch.EtchStore;
 
 
 public class GenesisTest {
@@ -50,7 +45,7 @@ public class GenesisTest {
 		} 
 	}
 
-	@Test public void testGenesisPeer() throws TimeoutException, InterruptedException, IOException, LaunchException, ConfigException {
+	@Test public void testGenesisPeer() throws IOException {
 		CLTester importTester =  CLTester.run(
 				"key", 
 				"import",
@@ -78,14 +73,15 @@ public class GenesisTest {
 		
 		AKeyPair kp=SLIP10.deriveKeyPair(BIP39.getSeed(bip39, bipPassphrase),new int[] {44,864,0,0,0});
 		assertEquals(expectedKey,kp.getAccountKey());
-		
-		HashMap<Keyword,Object> config=new HashMap<>();
-		config.put(Keywords.STORE, TEMP_ETCH);
-		config.put(Keywords.KEYPAIR, kp);
-		Server s=API.launchPeer(config); 
-		assertEquals(expectedKey,s.getPeerKey());
-		s.shutdown();
-		
+
+		// The store holds a peer under its key, as a launch restores it, in a genesis that stakes that peer
+		try (EtchStore store=EtchStore.create(TEMP_ETCH)) {
+			Peer peer=Peer.restorePeer(store,kp,expectedKey);
+			assertNotNull(peer,"peer genesis must leave peer data under the peer key");
+			assertEquals(expectedKey,peer.getPeerKey());
+			assertNotNull(peer.getGenesisState().getPeer(expectedKey));
+		}
+
 //		tester =  CLTester.run(
 //				"peer", "start", "-n",
 //              "-v2",		
