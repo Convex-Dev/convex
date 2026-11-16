@@ -22,8 +22,13 @@ public class SignedSetComponent<T extends ACell> extends SignedComponent<ASet<T>
 		super(lattice,destination,signer);
 	}
 
+	/** Binds unsigned working storage with no signer. */
 	protected SignedSetComponent(SignedLattice<ASet<T>> lattice,AForkableCursor<ASet<T>> cursor) {
 		super(lattice,cursor);
+	}
+
+	private SignedSetComponent(SignedSetComponent<T> source,AForkableCursor<ASet<T>> cursor) {
+		super(source,cursor);
 	}
 
 	@Override protected ASet<T> reconcile(ASet<T> own,ASet<T> other) {
@@ -31,7 +36,7 @@ public class SignedSetComponent<T extends ACell> extends SignedComponent<ASet<T>
 	}
 
 	@Override public SignedSetComponent<T> rebind(AForkableCursor<ASet<T>> cursor) {
-		return new SignedSetComponent<>(lattice,cursor);
+		return new SignedSetComponent<>(this,cursor);
 	}
 
 	@Override public SignedSetComponent<T> fork() { return rebind(storage.fork()); }

@@ -44,8 +44,8 @@ public class SignedComponent<V extends ACell> extends ASignedComponent<V> {
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
 			Function<V,SignedData<V>> signer) {
-		this(lattice,SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork());
-		Objects.requireNonNull(signer,"Signer must not be null");
+		super(lattice,SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork(),
+			Objects.requireNonNull(signer,"Signer must not be null"));
 	}
 
 	/**
@@ -57,8 +57,16 @@ public class SignedComponent<V extends ACell> extends ASignedComponent<V> {
 		super(lattice,cursor);
 	}
 
+	/**
+	 * Binds existing unsigned working storage with a source's owner rule and signer,
+	 * for a {@link #rebind}. Signing remains at the original signed destination.
+	 */
+	protected SignedComponent(SignedComponent<V> source,AForkableCursor<V> cursor) {
+		super(source,cursor);
+	}
+
 	@Override public SignedComponent<V> rebind(AForkableCursor<V> cursor) {
-		return new SignedComponent<>(lattice,cursor);
+		return new SignedComponent<>(this,cursor);
 	}
 
 	@Override public SignedComponent<V> fork() { return rebind(storage.fork()); }

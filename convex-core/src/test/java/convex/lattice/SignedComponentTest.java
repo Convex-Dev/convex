@@ -208,4 +208,48 @@ public class SignedComponentTest {
 		assertEquals(Sets.of(1,2),destination.get().getValue());
 		assertEquals(2,signatures.get());
 	}
+
+	@Test
+	public void testStoredEnvelopesBothChangedReconcileByThePayloadMergeAndSignTheResult() {
+		var signatures=new AtomicInteger();
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer(signatures::incrementAndGet));
+		ACell result=component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3)));
+		SignedData<?> envelope=(SignedData<?>)result;
+		assertEquals(Sets.of(1,2,3),envelope.getValue());
+		assertTrue(envelope.checkSignature());
+		assertEquals(KEY.getAccountKey(),envelope.getAccountKey());
+		assertEquals(1,signatures.get());
+	}
+
+	@Test
+	public void testAReconciledPayloadEqualToOneSideKeepsThatSidesEnvelope() {
+		var signatures=new AtomicInteger();
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer(signatures::incrementAndGet));
+		var own=KEY.signData(Sets.of(1,2));
+		assertSame(own,component.reconcileStored(KEY.signData(Sets.of(1)),own,KEY.signData(Sets.of(2))));
+		assertEquals(0,signatures.get(),"an existing envelope is never signed again");
+	}
+
+	@Test
+	public void testANewReconciledPayloadWithoutASignerIsAConflict() {
+		var component=new SignedSetComponent<>(SIGNED,new Root<ASet<CVMLong>>());
+		assertThrows(MergeConflictException.class,() ->
+			component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3))));
+	}
+
+	@Test
+	public void testANewReconciledPayloadWithAnUnauthorisedSignerIsAConflict() {
+		var stranger=AKeyPair.createSeeded(7311);
+		Function<ASet<CVMLong>,SignedData<ASet<CVMLong>>> signer=stranger::signData;
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer);
+		assertThrows(MergeConflictException.class,() ->
+			component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3))));
+	}
+
+	@Test
+	public void testStoredEnvelopesBothChangedConflictWhereThePayloadCannotMerge() {
+		var component=new SignedComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),KEY::signData);
+		assertThrows(MergeConflictException.class,() ->
+			component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3))));
+	}
 }

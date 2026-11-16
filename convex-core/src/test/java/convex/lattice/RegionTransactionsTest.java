@@ -292,17 +292,15 @@ class RegionTransactionsTest {
 		assertSame(before,root.get(),"a refused reconcile changes nothing");
 	}
 
-	@Test void aForkedContainerLeavesASignedRegionBothSidesChangedToItsComponent() {
+	@Test void aForkedContainerHasASignedRegionBothSidesChangedReconciledAndSignedByIt() {
 		var root=emptyRoot();
 		var app=new App(root);
 		var fork=(App)app.fork();
 		fork.signed().cursor().updateAndGet(s -> union(s,1));
 		app.signed().cursor().updateAndGet(s -> union(s,2));
 		app.sync();
-		var before=root.get();
-		var failure=assertThrows(MergeConflictException.class,fork::sync);
-		assertTrue(failure.getMessage().contains("SignedSetComponent"),"the signed region decides, and refuses envelopes changed on both sides");
-		assertSame(before,root.get());
+		fork.sync();
+		assertEquals(Sets.of(1,2),signedPayload(root),"the signed region merges its payloads and signs the result");
 	}
 
 	@Test void aForkedContainerReconcilesANestedContainerRegionByRegion() {
