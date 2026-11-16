@@ -26,6 +26,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -78,6 +79,7 @@ import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 import convex.net.PeerConnectionException;
 import convex.net.impl.netty.NettyServer;
+import convex.peer.ExpectedLogs;
 
 /**
  * Tests for NodeServer class.
@@ -317,22 +319,28 @@ public class NodeServerTest {
 	/** A failure of the JVM itself while publishing stops the group's publication visibly. */
 	@Test
 	public void testFatalErrorStopsPublicationVisibly() throws Exception {
-		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
-		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
-			@Override public ACell processSnapshot(ACell value) throws IOException {
-				if (CVMLong.create(13).equals(value)) throw new InternalError("simulated publication");
-				return super.processSnapshot(value);
-			}
-		};
-		maxNodeServer.addPropagator(group);
-		maxNodeServer.launch();
-		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+		InternalError error=new InternalError("simulated publication");
+		ExpectedLogs logs=ExpectedLogs.carrying(error).open();
+		try (logs) {
+			maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+			LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
+				@Override public ACell processSnapshot(ACell value) throws IOException {
+					if (CVMLong.create(13).equals(value)) throw error;
+					return super.processSnapshot(value);
+				}
+			};
+			maxNodeServer.addPropagator(group);
+			maxNodeServer.launch();
+			CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
 
-		maxNodeServer.getCursor().set(CVMLong.create(13));
-		maxNodeServer.getHost().sync();
-		LatticePropagator.Failure recorded=failure.get(5,TimeUnit.SECONDS);
-		assertTrue(recorded.cause() instanceof InternalError);
-		assertEquals("publication processing",recorded.operation());
+			maxNodeServer.getCursor().set(CVMLong.create(13));
+			maxNodeServer.getHost().sync();
+			// Logged before the failure is recorded
+			LatticePropagator.Failure recorded=failure.get(5,TimeUnit.SECONDS);
+			assertSame(error,recorded.cause());
+			assertEquals("publication processing",recorded.operation());
+		}
+		logs.assertLogged(Level.ERROR,error);
 	}
 
 	/** Every propagation-group callback is optional, isolated fan-out. */
@@ -719,17 +727,23 @@ public class NodeServerTest {
 	/** An Error that no message can be blamed for stops the group's inbound processing visibly. */
 	@Test
 	public void testFatalErrorStopsInboundVisibly() throws Exception {
-		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new InternalError("simulated")),
-			store,NodeConfig.port(-1));
-		LatticePropagator group=propagator(maxNodeServer);
-		maxNodeServer.launch();
-		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
-		ScriptedPeer peer=new ScriptedPeer();
+		InternalError error=new InternalError("simulated");
+		ExpectedLogs logs=ExpectedLogs.carrying(error).open();
+		try (logs) {
+			maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),error),
+				store,NodeConfig.port(-1));
+			LatticePropagator group=propagator(maxNodeServer);
+			maxNodeServer.launch();
+			CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
+			ScriptedPeer peer=new ScriptedPeer();
 
-		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),peer)));
-		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof InternalError);
-		assertNotNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),peer)),
-			"a group whose inbound processing stopped refuses further messages");
+			assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),peer)));
+			// Logged before the failure is recorded
+			assertSame(error,failure.get(5,TimeUnit.SECONDS).cause());
+			assertNotNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),peer)),
+				"a group whose inbound processing stopped refuses further messages");
+		}
+		logs.assertLogged(Level.ERROR,error);
 	}
 
 	/**

@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -231,6 +232,10 @@ public class PeerRequestFailureTest {
 	/** Failures of the peer's own handling of client transactions, each answered as load or a peer error. */
 	static final List<Throwable> FAILURES=List.of(new OutOfMemoryError("simulated"),new StackOverflowError("simulated"),
 		new NoClassDefFoundError("simulated"),new AssertionError("simulated"),new IllegalStateException("simulated"));
+
+	/** What the peers log of the failures these tests inject, shared by the class's tests. After both lists. */
+	@RegisterExtension
+	static final ExpectedLogs LOGS=ExpectedLogs.carrying(CONTAINED,FAILURES);
 
 	/** A store that throws a chosen failure once, the first time it is asked to store a chosen kind of cell. */
 	static final class FaultingStore extends MemoryStore {

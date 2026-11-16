@@ -113,6 +113,19 @@ A test run that hangs at near-zero CPU is a class-initialisation deadlock: run
 `ClassInitCycles` (`convex-integration/src/test/java/convex/tools`) to find the
 cycle.
 
+### Expected log records
+
+Tests write warnings and errors only. A test that causes one on purpose captures it,
+so it is asserted and not written:
+
+- Core tests use `convex.test.LogCapture`, which takes what a `System.Logger` logs
+  on the test's own thread.
+- Peer tests use `convex.peer.ExpectedLogs`, which takes the records carrying an
+  object the test created, such as the exception it injects, and the records logged
+  on threads it names, such as a peer component's. It needs logback as the test
+  logging backend. A scope is open for the whole life of what logs, and fails if
+  nothing was logged.
+
 ## CI Workflows
 
 Four GitHub Actions workflows handle continuous integration:

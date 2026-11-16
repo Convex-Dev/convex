@@ -81,32 +81,42 @@ public class LoopFailuresTest {
 	/** A component's thread carries on after any failure of its own work. */
 	@Test
 	public void aComponentCarriesOnAfterAnyFailureOfItsOwnWork() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(InvalidPeerDataTest.LOCAL);
-		FailingComponent component=new FailingComponent(peer,OWN_WORK);
-		try {
-			component.start();
-			assertTrue(component.rounds.await(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),"the loop comes round after every failure");
-			assertTrue(peer.isRunning());
-		} finally {
-			component.close();
-			peer.close();
+		ExpectedLogs logs=ExpectedLogs.carrying(OWN_WORK).open();
+		try (logs) {
+			Server peer=InvalidPeerDataTest.launchPeer(InvalidPeerDataTest.LOCAL);
+			FailingComponent component=new FailingComponent(peer,OWN_WORK);
+			try {
+				component.start();
+				assertTrue(component.rounds.await(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),"the loop comes round after every failure");
+				assertTrue(peer.isRunning());
+			} finally {
+				component.close();
+				peer.close();
+			}
 		}
+		logs.assertLogged(Level.ERROR,OWN_WORK.get(0));
+		logs.assertLogged(Level.WARN,OWN_WORK.get(1));
 	}
 
 	/** A failure of the JVM itself in a component's loop shuts the peer down. */
 	@Test
 	public void aJvmFailureInAComponentShutsThePeerDown() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(InvalidPeerDataTest.LOCAL);
-		FailingComponent component=new FailingComponent(peer,List.of(new InternalError("simulated")));
-		try {
-			component.start();
-			// Preemptive: without the shutdown, the wait would never return
-			assertTimeoutPreemptively(Duration.ofSeconds(InvalidPeerDataTest.WAIT),() -> peer.waitForShutdown());
-			assertFalse(peer.isRunning());
-		} finally {
-			component.close();
-			peer.close();
+		InternalError failure=new InternalError("simulated");
+		ExpectedLogs logs=ExpectedLogs.carrying(failure).open();
+		try (logs) {
+			Server peer=InvalidPeerDataTest.launchPeer(InvalidPeerDataTest.LOCAL);
+			FailingComponent component=new FailingComponent(peer,List.of(failure));
+			try {
+				component.start();
+				// Preemptive: without the shutdown, the wait would never return
+				assertTimeoutPreemptively(Duration.ofSeconds(InvalidPeerDataTest.WAIT),() -> peer.waitForShutdown());
+				assertFalse(peer.isRunning());
+			} finally {
+				component.close();
+				peer.close();
+			}
 		}
+		logs.assertLogged(Level.ERROR,failure);
 	}
 
 	/** The connection manager's loop carries on after a failure of its own upkeep. */
@@ -115,11 +125,12 @@ public class LoopFailuresTest {
 	public void theConnectionManagerCarriesOnAfterAFailure() throws Exception {
 		CountDownLatch reads=new CountDownLatch(2);
 		AtomicBoolean failed=new AtomicBoolean();
+		NoClassDefFoundError failure=new NoClassDefFoundError("simulated");
 		// Read on every pass of the manager's loop: fails the first time
 		Number outgoing=new Number() {
 			@Override public long longValue() {
 				reads.countDown();
-				if (failed.compareAndSet(false,true)) throw new NoClassDefFoundError("simulated");
+				if (failed.compareAndSet(false,true)) throw failure;
 				return 2;
 			}
 			@Override public int intValue() { return (int)longValue(); }
@@ -132,11 +143,15 @@ public class LoopFailuresTest {
 		config.put(Keywords.PORT,0);
 		config.put(Keywords.STORE,new MemoryStore());
 		config.put(Keywords.OUTGOING_CONNECTIONS,outgoing);
-		Server peer=API.launchPeer(config);
-		try {
-			assertTrue(reads.await(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),"the loop comes round after the failure");
-		} finally {
-			peer.close();
+		ExpectedLogs logs=ExpectedLogs.carrying(failure).open();
+		try (logs) {
+			Server peer=API.launchPeer(config);
+			try {
+				assertTrue(reads.await(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),"the loop comes round after the failure");
+			} finally {
+				peer.close();
+			}
 		}
+		logs.assertLogged(Level.ERROR,failure);
 	}
 }
