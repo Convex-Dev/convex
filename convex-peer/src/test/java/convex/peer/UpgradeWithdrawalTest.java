@@ -59,7 +59,7 @@ public class UpgradeWithdrawalTest {
 	static final Address GENESIS = Address.create(Init.GENESIS_ADDRESS);
 
 	private Server launchIsolatedPeer() throws Exception {
-		State genesis = Init.createState(List.of(PEER_KP.getAccountKey()));
+		State genesis = GenesisStates.of(PEER_KP);
 		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
 		return servers.get(0);
 	}
@@ -144,11 +144,11 @@ public class UpgradeWithdrawalTest {
 		AccountKey k2 = AKeyPair.createSeeded(202).getAccountKey();
 
 		// Single peer: withdrawing it would leave no viable peer
-		State single = Init.createState(List.of(k1));
+		State single = GenesisStates.of(List.of(k1));
 		assertFalse(TransactionHandler.leavesAnotherViablePeer(single, k1));
 
 		// Two peers: withdrawing either still leaves the other viable
-		State two = Init.createState(List.of(k1, k2));
+		State two = GenesisStates.of(List.of(k1, k2));
 		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, k1));
 		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, k2));
 
@@ -185,7 +185,7 @@ public class UpgradeWithdrawalTest {
 		// release, so crossing it must freeze.
 		long supported = Migrations.MAX_VERSION;
 		long unsupported = supported + 1;
-		State upgraded = Migrations.applyAll(Init.createState(List.of(PEER_KP.getAccountKey())));
+		State upgraded = Migrations.applyAll(GenesisStates.of(PEER_KP));
 		long t0 = upgraded.getTimestamp().longValue();
 		long activation = t0 + 100_000;
 		State genesis = upgraded.withProtocolGlobals(supported,
@@ -252,7 +252,7 @@ public class UpgradeWithdrawalTest {
 		long supported = Migrations.MAX_VERSION;
 		long unsupported = supported + 1;
 		AccountKey myKey = PEER_KP.getAccountKey();
-		State upgraded = Migrations.applyAll(Init.createState(List.of(myKey)));
+		State upgraded = Migrations.applyAll(GenesisStates.of(PEER_KP));
 		long t0 = upgraded.getTimestamp().longValue();
 		long activation = t0 + 60L*60*1000; // 60 min ahead, so the 5-10 min pre-window fits
 		State genesis = upgraded.withProtocolGlobals(supported, upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
@@ -341,7 +341,7 @@ public class UpgradeWithdrawalTest {
 			propagator.awaitStopped();
 
 			// v1 is due, but the core account's environment it upgrades is not held
-			State genesis = Init.createState(List.of(PEER_KP.getAccountKey()));
+			State genesis = GenesisStates.of(PEER_KP);
 			long activation = genesis.getTimestamp().longValue() + 1000;
 			AccountStatus core = genesis.getAccount(Core.CORE_ADDRESS);
 			AccountStatus hollowCore = hollowStore.decode(core.getEncoding());

@@ -94,7 +94,8 @@ public class JoinNetworkTest {
 	@Test
 	public void testJoinReplaysInsteadOfAdoptingRemoteState() throws Exception {
 		AKeyPair sourceKeyPair=AKeyPair.createSeeded(987654321);
-		State genesis=Init.createState(List.of(sourceKeyPair.getAccountKey()));
+		// Shared: the soak test runs this test thousands of times in one JVM
+		State genesis=GenesisStates.of(sourceKeyPair);
 		Peer correct=Peer.create(sourceKeyPair,genesis);
 		Block block=Block.of(correct.getTimestamp(),sourceKeyPair.signData(
 				Invoke.create(Init.GENESIS_ADDRESS,1,"*address*")));

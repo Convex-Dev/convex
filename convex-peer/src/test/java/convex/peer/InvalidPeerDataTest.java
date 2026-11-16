@@ -97,7 +97,7 @@ public class InvalidPeerDataTest {
 		ArrayList<AccountKey> keys=new ArrayList<>();
 		keys.add(kp.getAccountKey());
 		for (AKeyPair o: others) keys.add(o.getAccountKey());
-		State genesis=Init.createState(keys);
+		State genesis=GenesisStates.of(keys);
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.STATE,genesis);

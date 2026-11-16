@@ -377,7 +377,7 @@ public class PeerRequestFailureTest {
 	static Server launchHaltedPeer(AKeyPair kp) throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
-		config.put(Keywords.STATE,Init.createState(List.of(kp.getAccountKey())));
+		config.put(Keywords.STATE,GenesisStates.of(kp));
 		config.put(Keywords.PORT,0);
 		config.put(Keywords.STORE,new MemoryStore());
 		// Each round produces a Block at once, however soon after the last
@@ -888,7 +888,7 @@ public class PeerRequestFailureTest {
 	public void aRejectionThatFailsWhileThePeerCannotTakeTransactionsLeavesTheRest() throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,LOCAL);
-		config.put(Keywords.STATE,Init.createState(List.of(LOCAL.getAccountKey())));
+		config.put(Keywords.STATE,GenesisStates.of(LOCAL));
 		config.put(Keywords.PORT,0);
 		config.put(Keywords.STORE,new MemoryStore());
 		// Created but not launched, so not live: every transaction is rejected
