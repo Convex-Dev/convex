@@ -14,9 +14,10 @@ application thread — no unbounded buffering, no polling threads.
 Two send methods — blocking and non-blocking — with no transport-specific concepts:
 
 - **`sendMessage(m)`** — blocks the calling (virtual) thread until space is available,
-  and returns false if none frees within the send timeout. On a Netty event loop it
-  does not wait: the loops empty every connection's queue, so a full queue returns
-  false at once. A message that cannot be sent for any other reason throws:
+  and returns false if none frees within the send timeout. On a Netty event loop, or
+  an ingress worker delivering what connections receive, it does not wait: the loops
+  empty every connection's queue and a worker serves many connections, so a full
+  queue returns false at once. A message that cannot be sent for any other reason throws:
   `ClosedChannelException` if the connection is closed, another `IOException` if the
   write fails, `InterruptedException` if the wait is interrupted, and
   `IllegalArgumentException` if the message is too large for one frame. Used by

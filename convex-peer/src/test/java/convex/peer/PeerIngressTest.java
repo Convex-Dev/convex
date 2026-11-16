@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -21,12 +22,14 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -175,6 +178,59 @@ public class PeerIngressTest {
 			assertEquals(held, heldResult.get(WAIT, TimeUnit.SECONDS).getValue());
 		} finally {
 			release.countDown();
+			server.close();
+		}
+	}
+
+	/**
+	 * A connection the peer has verified as a staked peer's own link is served in the
+	 * priority lane: it is answered while ordinary connections hold every worker the
+	 * ordinary lane may use.
+	 */
+	@Test
+	public void testVerifiedConnectionServedWhileOrdinaryLaneIsFull() throws Exception {
+		AKeyPair peerPair = InboundVerificationTest.LOCAL;
+		AccountKey peerKey = peerPair.getAccountKey();
+		Server server = InboundVerificationTest.launch(peerPair);
+		Keyword held = Keyword.intern("held");
+		int ordinaryWorkers = Config.INGRESS_WORKERS - Config.INGRESS_RESERVED_WORKERS;
+		CountDownLatch entered = new CountDownLatch(ordinaryWorkers);
+		CountDownLatch release = new CountDownLatch(1);
+		List<Convex> ordinary = new ArrayList<>();
+		try (Convex verified = Convex.connect(server.getHostAddress(), HERO, InboundVerificationTest.REMOTE_A)) {
+			// Proves the peer it dialled, then sends a Belief, which has the peer verify it
+			assertEquals(peerKey, verified.verifyPeer(peerKey, server.getPeer().getNetworkID()).get(WAIT, TimeUnit.SECONDS));
+			verified.setDialledPeer(peerKey);
+			CompletableFuture<AConnection> outcome = InboundVerificationTest.nextOutcome(server, true);
+			verified.message(Message.createBelief(server.getBelief()));
+			assertTrue(outcome.get(WAIT, TimeUnit.SECONDS).isTrusted());
+
+			// Runs where the payload was decoded: holding it holds that worker
+			server.setMessageReceiveObserver(m -> {
+				if (m.getType() != MessageType.QUERY) return;
+				AVector<?> v = RT.ensureVector(m.getPayload());
+				if ((v == null) || !held.equals(v.get(2))) return;
+				entered.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+			});
+			List<CompletableFuture<Result>> heldResults = new ArrayList<>();
+			for (int i = 0; i < ordinaryWorkers; i++) {
+				Convex c = connect(server);
+				ordinary.add(c);
+				heldResults.add(c.query(held));
+			}
+			assertTrue(entered.await(WAIT, TimeUnit.SECONDS));
+
+			Result r = verified.query("(+ 2 2)").get(WAIT, TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(4), r.getValue());
+			for (CompletableFuture<Result> f : heldResults) assertFalse(f.isDone());
+		} finally {
+			release.countDown();
+			for (Convex c : ordinary) c.close();
 			server.close();
 		}
 	}
