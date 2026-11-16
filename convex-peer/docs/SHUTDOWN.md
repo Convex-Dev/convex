@@ -72,11 +72,41 @@ it runs, polling loops included, shuts down its executors, cancels its timers an
 releases the resources it owns. Once a close returns, nothing the component started
 may keep the JVM from exiting or do work that is no longer needed.
 
+Every close in Convex follows the same rules:
+
+1. It marks the component closed first, under the lock that starting new work
+   checks. Work started without that lock registers itself and then checks, so a
+   close either finds it or it sees the close and does not start.
+2. Every step runs whatever an earlier step threw, JVM errors included.
+3. It waits for the threads it stops. An interrupt does not cut the wait short: the
+   closing thread's interrupt status is restored once the wait is over. A thread
+   that may be reading or writing the store is waited for, not interrupted. A wait
+   may be bounded, and a close that stops waiting logs what is still running.
+4. It reports failures once: the first is thrown, with later ones suppressed on it,
+   and a JVM error outranks an exception. Callers close with try-with-resources.
+5. It ends in one state, closed: closing again does nothing, and every signal that
+   the close has finished is given.
+6. It works in this order: stop admitting work, stop the workers and wait for them,
+   save, release files and sockets, then signal that it has finished.
+
+Two exceptions:
+
+- If the host's final save fails, the host stays open, so that closing it again
+  retries the save.
+- A network channel waiting for space in a full queue retries the message on a
+  thread of its own, which no close waits for. The thread ends within the
+  internal timeout (8 seconds) of its channel closing, and nothing it does then
+  reaches the store: it only offers the message to a queue that is no longer
+  drained, and a closing lattice node refuses data requests.
+
+Resources shared by the whole process, such as the virtual-thread executor, the
+network event loops and the shared HTTP clients, belong to no component, and no
+close shuts them down.
+
 ## What each close leaves alone
 
 - Closing the host syncs only the applications its automatic sync names, and never
   closes the store. A closed host refuses syncs, checkpoints and flushes.
-  If its final save fails, the host stays open and closing it again retries.
 - Closing the node neither publishes pending host state nor flushes the store; it
   sends only what the host has already published. It never closes the store, which
   belongs to whoever created it. The host and its applications remain usable.

@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disconnect a connection that sends false data, such as a bad signature, and keep one that sends malformed data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
 - Report failures to clients as clear errors rather than stack traces, empty results or no reply, and keep routine failures out of operator warning logs.
 - Limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
-- Poll the peers a peer has verified first, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
+- Poll the peers a peer has verified first, one poll at a time and sooner after one that went well, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
 
 ### Fixed
 
@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep all the consensus data peers send each other, so they no longer fetch it again. ([CPoS scheduling](convex-peer/docs/PROPAGATION.md#cpos-scheduling))
 - Correct Convex DB's SQL results, binary data and prepared statements across transactions, and report errors with SQLSTATE codes. ([#836](https://github.com/Convex-Dev/convex/issues/836))
 - Keep lattice edits that retry after a conflict, and stop long-running lattice applications holding saved data in memory. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
+- Shut peers, lattice nodes, clients and the desktop apps down completely: closing one stops the threads, requests and connections it started, and finishes even when a step fails. ([What each close stops](convex-peer/docs/SHUTDOWN.md#what-each-close-stops))
 
 ## [0.8.19] - 2026-11-07
 
