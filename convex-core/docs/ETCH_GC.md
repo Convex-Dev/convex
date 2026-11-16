@@ -81,8 +81,8 @@ that binding; `EtchStatusIntegrityTest` pins them with regression tests.
   caches a ref bound to a foreign store; `AStore.isForeign` is the guard and the
   `RefCache` checks ownership on every insertion. Caching a decoded cell never
   adopts an attached foreign ref or its persistence claims. An insertion never lowers
-  the status cached for its hash, and `refForHash` reads the file rather than answer
-  with a cached decoded cell, which makes no claim about the file. A stale insertion
+  the status cached for its hash. A cached decoded cell makes no claim about the file,
+  so `refForHash` answers with one only when the file holds no entry. A stale insertion
   into a slot another hash has just vacated can still cache a lower status than the
   file records.
 
