@@ -2,15 +2,18 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -28,6 +31,8 @@ import convex.core.init.Init;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
+import convex.net.ingress.Destination;
+import convex.net.ingress.QueueDestination;
 
 /** Verifies the bounded queues used for externally submitted Peer workloads. */
 class InboundQueueBackpressureTest {
@@ -40,8 +45,7 @@ class InboundQueueBackpressureTest {
 		for (int i=0;i<Config.QUERY_QUEUE_SIZE;i++) assertTrue(handler.offerQuery(QUERY));
 		assertFalse(handler.offerQuery(QUERY));
 
-		ArrayBlockingQueue<Message> queue=queryQueue(handler);
-		assertBlockingRetryResumes(() -> handler.offerQueryBlocking(QUERY),queue);
+		assertBlockingRetryResumes(QUERY,(QueueDestination)handler.getDestination());
 	}
 
 	@Test
@@ -50,8 +54,34 @@ class InboundQueueBackpressureTest {
 		for (int i=0;i<Config.TRANSACTION_QUEUE_SIZE;i++) assertTrue(handler.offerTransaction(TRANSACTION));
 		assertFalse(handler.offerTransaction(TRANSACTION));
 
-		assertBlockingRetryResumes(() -> handler.offerTransactionBlocking(TRANSACTION),
-				handler.txMessageQueue);
+		assertBlockingRetryResumes(TRANSACTION,handler.txMessageQueue);
+	}
+
+	/**
+	 * A request refused by a full queue is routed to that queue as a destination, which
+	 * signals once its handler takes from it.
+	 */
+	@Test
+	void fullRequestQueueRoutesToItsDestination() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		try (Server server=Server.create(config)) { // not launched: queues are not drained
+			for (int i=0;i<Config.TRANSACTION_QUEUE_SIZE;i++) assertNull(server.processMessage(TRANSACTION));
+			Predicate<Message> refused=server.processMessage(TRANSACTION);
+			assertSame(server.transactionHandler.getDestination(),refused);
+			Destination d=(Destination)refused;
+			assertFalse(d.tryOffer(TRANSACTION));
+
+			CountDownLatch room=new CountDownLatch(1);
+			d.whenCapacity(room::countDown);
+			assertEquals(1,room.getCount(),"no room until the handler takes a message");
+			server.transactionHandler.txMessageQueue.poll(0,TimeUnit.MILLISECONDS);
+			assertEquals(0,room.getCount());
+			assertNull(server.processMessage(TRANSACTION));
+
+			for (int i=0;i<Config.QUERY_QUEUE_SIZE;i++) assertNull(server.processMessage(QUERY));
+			assertSame(server.queryHandler.getDestination(),server.processMessage(QUERY));
+		}
 	}
 
 	/**
@@ -89,29 +119,17 @@ class InboundQueueBackpressureTest {
 		}
 	}
 
-	private static void assertBlockingRetryResumes(CheckedBooleanSupplier retry,
-			ArrayBlockingQueue<Message> queue) throws Exception {
+	/** A wait for room in a full queue ends when its consumer takes a message. */
+	private static void assertBlockingRetryResumes(Message m, QueueDestination queue) throws Exception {
 		CountDownLatch started=new CountDownLatch(1);
 		CompletableFuture<Boolean> result=CompletableFuture.supplyAsync(() -> {
 			started.countDown();
-			return retry.get();
+			return queue.test(m);
 		});
 
 		assertTrue(started.await(1,TimeUnit.SECONDS));
 		assertFalse(result.isDone(),"Retry should wait while the bounded queue is full");
-		assertTrue(queue.poll()!=null);
+		assertNotNull(queue.poll(0,TimeUnit.MILLISECONDS));
 		assertTrue(result.get(1,TimeUnit.SECONDS));
-	}
-
-	@SuppressWarnings("unchecked")
-	private static ArrayBlockingQueue<Message> queryQueue(QueryHandler handler) throws Exception {
-		Field field=QueryHandler.class.getDeclaredField("queryQueue");
-		field.setAccessible(true);
-		return (ArrayBlockingQueue<Message>) field.get(handler);
-	}
-
-	@FunctionalInterface
-	private interface CheckedBooleanSupplier {
-		boolean get();
 	}
 }

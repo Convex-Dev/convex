@@ -256,7 +256,7 @@ convex.query(q).thenCompose(r -> convex.transact(next(r)));
   connection, so its replies are handed off as Netty's are.
 - **In-JVM clients** (`LocalConnection`, `ConvexLocal`), used by the REST API, its faucet and x402.
   A request is committed when the server's work queue accepts it, and the caller waits inside the
-  server's retry (`AThreadedComponent.offerBlocking`, a fixed 8 s). To follow the deadline rule:
+  server's retry (the full queue's `Destination.test`, a fixed 8 s). To follow the deadline rule:
   - the request's deadline reaches that retry, the `Function<Message, Predicate<Message>>` from
     `Server.processMessage`;
   - closing a `LocalConnection` wakes the wait;

@@ -1,6 +1,8 @@
 package convex.peer;
 
 import convex.core.lang.RT;
+import convex.net.ingress.Destination;
+import convex.net.ingress.QueueDestination;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -104,7 +106,7 @@ public class TransactionHandler extends AThreadedComponent {
 	/**
 	 * Queue for incoming (unverified) transaction messages
 	 */
-	protected final ArrayBlockingQueue<Message> txMessageQueue;
+	protected final QueueDestination txMessageQueue;
 	
 	/**
 	 * Queue for valid received Transactions submitted for clients of this Peer
@@ -118,28 +120,29 @@ public class TransactionHandler extends AThreadedComponent {
 
 	public TransactionHandler(Server server) {
 		super(server);
-		txMessageQueue= new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);
+		txMessageQueue=new QueueDestination(Config.TRANSACTION_QUEUE_SIZE,Config.DEFAULT_INTERNAL_TIMEOUT);
+		txMessageQueue.setConsumer(thread);
 		transactionQueue=new ArrayBlockingQueue<>(3 * Config.TRANSACTION_QUEUE_SIZE);
 	}
-	
+
 	/**
 	 * Offer a transaction for handling
 	 * @param m Message offered
 	 * @return True if queued for handling, false otherwise
 	 */
 	public boolean offerTransaction(Message m) {
-		return txMessageQueue.offer(m);
+		return txMessageQueue.tryOffer(m);
 	}
 
 	/**
-	 * Offer a transaction for handling, blocking until space is available or timeout.
-	 * Used as the retry predicate for backpressure. Does not wait on this handler's
-	 * own thread, for example in a local client's callback for a transaction result.
-	 * @param m Message offered
-	 * @return True if queued for handling, false on timeout or interruption
+	 * Gets the queue of transaction messages as a destination, which signals when it
+	 * has room and, tested, waits a bounded time for it, except on this handler's own
+	 * thread.
+	 *
+	 * @return Transaction message destination
 	 */
-	public boolean offerTransactionBlocking(Message m) {
-		return offerBlocking(txMessageQueue, m);
+	Destination getDestination() {
+		return txMessageQueue;
 	}
 	
 	/**

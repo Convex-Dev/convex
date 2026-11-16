@@ -62,14 +62,15 @@ Client receives Result
 
 ## Stage 1: Network Ingress
 
-**Thread:** Netty worker event loop
+**Threads:** Netty event loop, then an ingress worker
 
-1. Decode bytes → `Message`
-2. `server.deliverMessage(m)` — decode payload, observe
-3. `processMessage(m)` — route by type, TRANSACT → `txMessageQueue.offer()`
-4. If queue full: return `txnRetry` predicate → backpressure (virtual thread blocks)
+1. The event loop frames bytes into a `Message` and admits it to the peer's ingress
+2. An ingress worker: `server.receiveMessage(m)` — decode payload, observe
+3. `processMessage(m)` — route by type, TRANSACT → `txMessageQueue.tryOffer()`
+4. If queue full: the queue is returned as a `Destination`; the message waits at the
+   head of its connection, which stops being read, until the queue signals room
 
-**Queue:** `txMessageQueue` — `ArrayBlockingQueue(10,000)`
+**Queue:** `txMessageQueue` — a `QueueDestination` of 10,000
 
 ## Stage 2: TransactionHandler
 

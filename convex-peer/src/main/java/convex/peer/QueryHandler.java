@@ -1,7 +1,6 @@
 package convex.peer;
 
 import java.util.ArrayList;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -21,6 +20,8 @@ import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.RequestFailures;
+import convex.net.ingress.Destination;
+import convex.net.ingress.QueueDestination;
 
 public class QueryHandler extends AThreadedComponent {
 
@@ -29,31 +30,31 @@ public class QueryHandler extends AThreadedComponent {
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
-	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Config.QUERY_QUEUE_SIZE);
+	private final QueueDestination queryQueue = new QueueDestination(Config.QUERY_QUEUE_SIZE,Config.DEFAULT_INTERNAL_TIMEOUT);
 
 	public QueryHandler(Server server) {
 		super(server);
-		queryQueue= new ArrayBlockingQueue<>(Config.QUERY_QUEUE_SIZE);
+		queryQueue.setConsumer(thread);
 	}
-	
+
 	/**
-	 * Offer a transaction for handling
+	 * Offer a query or data request for handling
 	 * @param m Message offered
 	 * @return True if queued for handling, false otherwise
 	 */
 	public boolean offerQuery(Message m) {
-		return queryQueue.offer(m);
+		return queryQueue.tryOffer(m);
 	}
 
 	/**
-	 * Offer a query for handling, blocking until space is available or timeout.
-	 * Used as the retry predicate for backpressure. Does not wait on this handler's
-	 * own thread, for example in a local client's callback for a query result.
-	 * @param m Message offered
-	 * @return True if queued for handling, false on timeout or interruption
+	 * Gets the queue of queries and data requests as a destination, which signals
+	 * when it has room and, tested, waits a bounded time for it, except on this
+	 * handler's own thread.
+	 *
+	 * @return Query destination
 	 */
-	public boolean offerQueryBlocking(Message m) {
-		return offerBlocking(queryQueue, m);
+	Destination getDestination() {
+		return queryQueue;
 	}
 	
 

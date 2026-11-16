@@ -68,6 +68,7 @@ import convex.etch.EtchStore;
 import convex.net.AServer;
 import convex.net.RequestFailures;
 import convex.net.Transports;
+import convex.net.ingress.Destination;
 import convex.net.ingress.Ingress;
 import convex.net.ingress.IngressLimits;
 import convex.net.impl.netty.NettyServer;
@@ -180,14 +181,6 @@ public class Server implements Closeable {
 	 * network threads. Created at launch.
 	 */
 	private Ingress ingress;
-
-	/**
-	 * Pre-allocated retry predicates for backpressure. These are returned by
-	 * processMessage when a queue is full, and block until space is available.
-	 * Zero allocation on the reject path — method references are bound once.
-	 */
-	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
-	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -612,14 +605,15 @@ public class Server implements Closeable {
 	 * is offered once to its dedicated queue and dropped if full. Lightweight control
 	 * messages are handled inline.
 	 *
-	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
-	 * target queue is full, returns a pre-allocated retry predicate instead of an error,
-	 * which a caller that may wait tests to wait for space for a bounded time.
+	 * <p>Non-blocking: a single {@code queue.offer()} and return. If the target queue
+	 * is full, returns that queue as a {@link Destination} instead of an error: an
+	 * ingress keeps the message until the destination signals room, and a caller that
+	 * may wait tests it to wait for space for a bounded time.
 	 *
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
 	 *
 	 * @param m Message to process (already decoded)
-	 * @return a retry Predicate for a saturated request queue, otherwise null
+	 * @return the Destination of a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> processMessage(Message m) {
 		try {
@@ -627,11 +621,11 @@ public class Server implements Closeable {
 			switch (type) {
 			case TRANSACT:
 				if (transactionHandler.offerTransaction(m)) return null;
-				return txnRetry;
+				return transactionHandler.getDestination();
 
 			case QUERY: case DATA_REQUEST:
 				if (queryHandler.offerQuery(m)) return null;
-				return queryRetry;
+				return queryHandler.getDestination();
 
 			// Propagation is best-effort. A full queue drops this update rather than
 			// pausing the connection and blocking later protocol messages.
@@ -717,13 +711,12 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Delivers an inbound message: decodes payload, observes, and dispatches.
-	 * Returns a blocking retry predicate only for a saturated request queue.
-	 *
-	 * This is the primary entry point for both Netty and ConvexLocal message delivery.
+	 * Delivers an inbound message on the caller's thread: decodes payload, observes,
+	 * and dispatches, handling control messages inline. This is the entry point for
+	 * local clients such as ConvexLocal.
 	 *
 	 * @param m Message to deliver
-	 * @return a retry Predicate for a saturated request queue, otherwise null
+	 * @return the Destination of a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
 		if (!prepareMessage(m)) return null;
@@ -795,11 +788,11 @@ public class Server implements Closeable {
 	 * peers, handling it as one from any inbound connection.
 	 *
 	 * @param m DATA_REQUEST message
-	 * @return a retry Predicate if the query queue is full, otherwise null
+	 * @return the query Destination if the query queue is full, otherwise null
 	 */
 	Predicate<Message> deliverDataRequest(Message m) {
 		if (queryHandler.offerQuery(m)) return null;
-		return queryRetry;
+		return queryHandler.getDestination();
 	}
 
 	/**
