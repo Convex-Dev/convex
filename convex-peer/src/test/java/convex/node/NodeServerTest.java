@@ -1836,7 +1836,8 @@ public class NodeServerTest {
 		final CountDownLatch decoded = new CountDownLatch(1);
 
 		BlockingMessage() {
-			super(MessageType.PING, Vectors.of(MessageTag.PING, CVMLong.ONE), null, null);
+			// No request ID: delivered without a connection, it has nowhere to be answered
+			super(MessageType.PING, Vectors.of(MessageTag.PING, null), null, null);
 		}
 
 		@Override
