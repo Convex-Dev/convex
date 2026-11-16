@@ -24,6 +24,7 @@ import convex.core.util.Utils;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.net.PeerConnectionException;
+import convex.net.RequestFailures;
 
 /**
  * Replicates one host's published root.
@@ -72,6 +73,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(NodeServer.class);
 
+	private final RequestFailures mergeFailures=new RequestFailures(log);
 	private final AStore store;
 	private final NodeConfig config;
 	private final AForkableCursor<V> cursor;
@@ -598,18 +600,16 @@ public class NodeServer<V extends ACell> implements Closeable {
 			host.mergeAt(value,path);
 			return null;
 		} catch (ClassCastException e) {
-			log.warn("Rejected inbound lattice value of wrong type: {}",
+			mergeFailures.log(e,"Rejected inbound lattice value of wrong type: {}",
 				(value==null) ? "null" : value.getClass().getSimpleName());
 			return MergeOutcome.REJECTED;
 		} catch (OutOfMemoryError e) {
 			// The memory may be held by other work, so this says nothing about the sender
-			log.warn("Unable to merge inbound lattice value: out of memory");
-			log.debug("Inbound lattice value failure",e);
+			mergeFailures.log(e,"Unable to merge inbound lattice value");
 			return MergeOutcome.FAILED;
 		} catch (Throwable e) {
 			Utils.checkRequestFailure(e);
-			log.warn("Rejected inbound lattice value after {}",e.getClass().getSimpleName());
-			log.debug("Inbound lattice value failure",e);
+			mergeFailures.log(e,"Rejected inbound lattice value");
 			return MergeOutcome.REJECTED;
 		}
 	}

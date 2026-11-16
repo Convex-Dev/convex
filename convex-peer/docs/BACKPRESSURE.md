@@ -161,7 +161,8 @@ pushes filling it never stop polling ([PEER_PRIORITY.md](PEER_PRIORITY.md#livene
 ## Connection Limiting
 
 - **Limit:** `Config.MAX_CLIENT_CONNECTIONS` (default 1024)
-- **Enforcement:** `NettyServer.initChannel()` rejects and closes if limit reached
+- **Enforcement:** `NettyServer.initChannel()` rejects and closes if limit reached,
+  logging at debug, since any remote can cause it
 - **Cleanup:** `DefaultChannelGroup` auto-removes channels on close
 - **Shutdown:** `clientChannels.close()` provides clean bulk teardown
 

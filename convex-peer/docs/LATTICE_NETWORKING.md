@@ -484,6 +484,12 @@ Store failures while the node runs are surfaced by `NodeServer` and host sync;
 saving failures by the host's `checkpoint()` or `flush()`. Listener failures are
 surfaced independently to the application that owns the transport.
 
+A received value that fails to merge, or a message whose handling fails with an
+`Error`, is logged as a peer logs a failed request
+([failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment)): at
+debug, except that the first out-of-memory failure and the first probable defect
+of each node, and of each group's message handling, warn.
+
 ### Removing a group while the node runs
 
 Remove a group from every application-owned listener, then remove it from the

@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
@@ -45,6 +47,7 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.text.Text;
+import convex.test.LogCapture;
 
 @Execution(value = ExecutionMode.CONCURRENT)
 public class BeliefMergeTest {
@@ -284,24 +287,42 @@ public class BeliefMergeTest {
 
 	/**
 	 * A received Order that fails to read with a contained Error is ignored, and other
-	 * Orders in the same Belief are merged.
+	 * Orders in the same Belief are merged. A probable defect is logged as a warning the
+	 * first time in the JVM, which may have been in an earlier test.
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	@Test
-	public void testMergeIgnoresOrderThatFailsToRead() throws InvalidDataException {
+	@ResourceLock("java.util.logging:convex.core.cpos.BeliefMerge")
+	public void testMergeIgnoresOrderThatFailsToRead() throws InvalidDataException, ReflectiveOperationException {
 		Peer b0 = initialPeerState(0);
-		Peer b2 = initialPeerState(2);
-		b2 = b2.updateTimestamp(b2.getTimestamp() + 200);
-		b2 = b2.proposeBlock(Block.of(b2.getTimestamp()));
+		Peer proposer = initialPeerState(2);
+		proposer = proposer.updateTimestamp(proposer.getTimestamp() + 200);
+		Peer b2 = proposer.proposeBlock(Block.of(proposer.getTimestamp()));
 		SignedData<Order> good = b2.getBelief().getOrders().get(KEYS[2]);
 
 		// Stack overflow first: an out of memory reaching JUnit would abort the whole run
-		for (Error error: new Error[] {new StackOverflowError(), new OutOfMemoryError(),
-				new NoClassDefFoundError(), new AssertionError()}) {
-			Index orders = Index.create(KEYS[2], good).assocEntry(MapEntry.fromRefs(KEYS[1].getRef(), unreadable(error)));
-			Peer merged = b0.mergeBeliefs(Belief.create(orders));
-			assertNull(merged.getBelief().getOrders().get(KEYS[1]), error.toString());
-			assertEquals(b2.getPeerOrder().getBlocks(), merged.getPeerOrder().getBlocks(), error.toString());
+		List<Error> errors=List.of(new StackOverflowError(), new OutOfMemoryError(),
+				new NoClassDefFoundError(), new AssertionError());
+		List<LogCapture.Entry> logged=LogCapture.capture(BeliefMerge.class.getName(), () -> {
+			for (Error error: errors) {
+				Index orders = Index.create(KEYS[2], good).assocEntry(MapEntry.fromRefs(KEYS[1].getRef(), unreadable(error)));
+				Peer merged = merge(b0, Belief.create(orders));
+				assertNull(merged.getBelief().getOrders().get(KEYS[1]), error.toString());
+				assertEquals(b2.getPeerOrder().getBlocks(), merged.getPeerOrder().getBlocks(), error.toString());
+			}
+		});
+		for (LogCapture.Entry e: logged) {
+			assertEquals("WARNING", e.level());
+			assertTrue(errors.contains(e.thrown()), e.toString());
+		}
+	}
+
+	/** Merges a Belief into a Peer, as an action that throws no checked exception. */
+	private static Peer merge(Peer peer, Belief belief) {
+		try {
+			return peer.mergeBeliefs(belief);
+		} catch (InvalidDataException e) {
+			throw new AssertionError(e);
 		}
 	}
 
