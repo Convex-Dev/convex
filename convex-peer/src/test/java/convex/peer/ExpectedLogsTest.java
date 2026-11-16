@@ -3,8 +3,12 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -46,6 +50,56 @@ public class ExpectedLogsTest {
 			other.warn("This thread, another logger");
 		}
 		assertEquals(List.of(log.getName()),logs.records().stream().map(ExpectedLogs.Entry::logger).toList());
+	}
+
+	@Test
+	public void keepsOnlyTheNextRecordOnAThreadThatExpectsOne() throws Exception {
+		ExpectedLogs logs=ExpectedLogs.onThreads(log.getName()).open();
+		// Keeps the second record out of the test output
+		ExpectedLogs later=ExpectedLogs.onThreads(log.getName(),Thread.currentThread()).open();
+		Thread other=new Thread(() -> log.warn("Not expected on this thread"));
+		ExpectedLogs elsewhere=ExpectedLogs.onThreads(log.getName(),other).open();
+		try (logs; later; elsewhere) {
+			logs.expectOnThisThread();
+			log.warn("Expected");
+			log.warn("After the expected record");
+			other.start();
+			other.join();
+		}
+		assertEquals(1,logs.records().size());
+		assertEquals(1,later.records().size());
+		assertEquals(1,elsewhere.records().size());
+	}
+
+	@Test
+	public void closeWaitsForTheRecordAThreadExpects() throws Exception {
+		ExpectedLogs logs=ExpectedLogs.onThreads(log.getName()).open();
+		CountDownLatch armed=new CountDownLatch(1);
+		CountDownLatch release=new CountDownLatch(1);
+		Thread other=new Thread(() -> {
+			logs.expectOnThisThread();
+			armed.countDown();
+			try {
+				release.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			log.warn("Logged after close began");
+		});
+		other.start();
+		assertTrue(armed.await(5,TimeUnit.SECONDS));
+		CompletableFuture<Void> closing=CompletableFuture.runAsync(logs::close);
+		release.countDown();
+		closing.get(5,TimeUnit.SECONDS);
+		assertEquals(1,logs.records().size());
+		other.join();
+	}
+
+	@Test
+	public void closesIfLoggedWithoutARecord() {
+		ExpectedLogs logs=ExpectedLogs.carrying(new Object()).ifLogged().open();
+		logs.close();
+		assertEquals(List.of(),logs.records());
 	}
 
 	@Test

@@ -6,7 +6,9 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -27,8 +29,9 @@ import ch.qos.logback.core.spi.FilterReply;
  * every other record is written as usual. A scope matches a record that carries one of
  * the objects the test created to cause it, as the record's throwable, among that
  * throwable's causes and suppressed throwables, or as a message argument; or a record
- * of the logger given to it, logged on one of the threads given to it. If several open
- * scopes match a record, the one opened first keeps it.
+ * of the logger given to it, logged on one of the threads given to it, or as the next
+ * record of that logger on a thread that called {@link #expectOnThisThread()}. If
+ * several open scopes match a record, the one opened first keeps it.
  *
  * <p>Open a scope before starting what logs and close it after stopping that, since a
  * component's threads log after the test's own work returns. Closing fails if the
@@ -90,6 +93,8 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 	private final Set<Object> carried=Collections.newSetFromMap(new IdentityHashMap<>());
 	private final String threadLogger;
 	private final Set<Thread> threads=Collections.newSetFromMap(new IdentityHashMap<>());
+	/** Threads whose next record of the logger is expected: Thread equality is identity */
+	private final Set<Thread> nextOn=ConcurrentHashMap.newKeySet();
 	private final List<Entry> kept=Collections.synchronizedList(new ArrayList<>());
 	private final boolean required;
 
@@ -120,11 +125,20 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 	 * the given threads: the test's own, or those of a component it started.
 	 *
 	 * @param logger Name of the logger
-	 * @param threads Threads whose records the test expects
+	 * @param threads Threads whose records the test expects, if any
 	 * @return New scope, to open with {@link #open()}
 	 */
 	public static ExpectedLogs onThreads(String logger, Thread... threads) {
 		return new ExpectedLogs(List.of(),logger,List.of(threads),true);
+	}
+
+	/**
+	 * Has this scope match the next record of its logger logged on the calling thread,
+	 * and {@link #close()} wait for it. Code a test injects into a component calls this
+	 * before failing, since it runs on a thread the component may share with others.
+	 */
+	public void expectOnThisThread() {
+		nextOn.add(Thread.currentThread());
 	}
 
 	/**
@@ -159,13 +173,19 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 	}
 
 	/**
-	 * Closes this scope.
+	 * Closes this scope, once every thread that called {@link #expectOnThisThread()} has
+	 * logged its record, waiting up to 10 seconds for them.
 	 *
-	 * @throws AssertionError if the scope kept no record, unless made with {@link #ifLogged()}
+	 * @throws AssertionError if the scope kept no record, unless made with
+	 * {@link #ifLogged()}, or an expected thread did not log its record
 	 */
 	@Override
 	public void close() {
-		OPEN.remove(this);
+		try {
+			awaitExpected();
+		} finally {
+			OPEN.remove(this);
+		}
 		if (required&&kept.isEmpty()) throw new AssertionError("Expected a log record that was not logged");
 	}
 
@@ -205,7 +225,11 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 	}
 
 	private boolean matches(String logger, Object[] params, Throwable t) {
-		if (logger.equals(threadLogger)&&threads.contains(Thread.currentThread())) return true;
+		if (logger.equals(threadLogger)) {
+			Thread current=Thread.currentThread();
+			// keep() takes the thread out of nextOn once the record is kept
+			if (threads.contains(current)||nextOn.contains(current)) return true;
+		}
 		if (carries(t)) return true;
 		if (params!=null) {
 			for (Object p: params) {
@@ -228,6 +252,29 @@ public final class ExpectedLogs implements AutoCloseable, BeforeAllCallback, Aft
 
 	private void keep(Level level, String logger, Throwable thrown) {
 		kept.add(new Entry(level,logger,thrown));
+		// After adding: close() waits for nextOn to empty, then checks what was kept
+		if (logger.equals(threadLogger)&&nextOn.remove(Thread.currentThread())) {
+			synchronized (nextOn) {
+				nextOn.notifyAll();
+			}
+		}
+	}
+
+	/** Waits for the records expected on threads that called expectOnThisThread(). */
+	private void awaitExpected() {
+		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+		synchronized (nextOn) {
+			while (!nextOn.isEmpty()) {
+				long left=deadline-System.nanoTime();
+				if (left<=0) throw new AssertionError("Expected a log record on "+nextOn+" that was not logged");
+				try {
+					nextOn.wait(TimeUnit.NANOSECONDS.toMillis(left)+1);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new AssertionError("Interrupted awaiting an expected log record",e);
+				}
+			}
+		}
 	}
 
 	/** The throwable of a record: given separately, or as its last argument. */

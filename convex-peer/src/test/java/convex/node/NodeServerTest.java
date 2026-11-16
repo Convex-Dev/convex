@@ -286,8 +286,11 @@ public class NodeServerTest {
 		CompletableFuture<LatticePropagator.Failure> failure=broken.nextFailure();
 		CompletableFuture<ACell> announced=healthy.nextAnnounce();
 
-		maxNodeServer.getCursor().set(CVMLong.create(23));
-		maxNodeServer.getHost().sync();
+		// The node warns of the group it isolates as it syncs
+		try (ExpectedLogs logs=ExpectedLogs.carrying(broken).open()) {
+			maxNodeServer.getCursor().set(CVMLong.create(23));
+			maxNodeServer.getHost().sync();
+		}
 		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
 		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
 		assertTrue(maxNodeServer.isRunning());
@@ -297,9 +300,14 @@ public class NodeServerTest {
 	@Test
 	public void testGroupOutOfMemoryOnPublicationIsIsolated() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName()).open();
 		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create()) {
 			@Override public ACell processSnapshot(ACell value) throws IOException {
-				if (CVMLong.create(13).equals(value)) throw new OutOfMemoryError("simulated publication");
+				if (CVMLong.create(13).equals(value)) {
+					// The group warns of the publication it isolates
+					logs.expectOnThisThread();
+					throw new OutOfMemoryError("simulated publication");
+				}
 				return super.processSnapshot(value);
 			}
 		};
@@ -307,9 +315,11 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 		CompletableFuture<LatticePropagator.Failure> failure=group.nextFailure();
 
-		maxNodeServer.getCursor().set(CVMLong.create(13));
-		maxNodeServer.getHost().sync();
-		assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+		try (logs) {
+			maxNodeServer.getCursor().set(CVMLong.create(13));
+			maxNodeServer.getHost().sync();
+			assertTrue(failure.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+		}
 		CompletableFuture<ACell> announced=group.nextAnnounce();
 		maxNodeServer.getCursor().set(CVMLong.create(23));
 		maxNodeServer.getHost().sync();
@@ -353,20 +363,24 @@ public class NodeServerTest {
 		maxNodeServer.addPropagator(healthy);
 		CompletableFuture<LatticePropagator.Failure> failureSignal=broken.nextFailure();
 
-		maxNodeServer.launch();
-		assertTrue(maxNodeServer.isRunning(),"a failed propagator group must not fail launch");
-		assertEquals("initial view materialisation",
-			failureSignal.get(5,TimeUnit.SECONDS).operation());
-		assertTrue(broken.getStatus().hasFailures());
-		assertFalse(healthy.getStatus().hasFailures());
-		assertTrue(healthy.getStatus().isOperational());
-		CompletableFuture<ACell> announced=healthy.nextAnnounce();
-		maxNodeServer.getCursor().set(CVMLong.create(23));
-		maxNodeServer.getHost().sync();
+		// The node warns of each failure of the group it isolates
+		ExpectedLogs logs=ExpectedLogs.carrying(broken).open();
+		try (logs) {
+			maxNodeServer.launch();
+			assertTrue(maxNodeServer.isRunning(),"a failed propagator group must not fail launch");
+			assertEquals("initial view materialisation",
+				failureSignal.get(5,TimeUnit.SECONDS).operation());
+			assertTrue(broken.getStatus().hasFailures());
+			assertFalse(healthy.getStatus().hasFailures());
+			assertTrue(healthy.getStatus().isOperational());
+			CompletableFuture<ACell> announced=healthy.nextAnnounce();
+			maxNodeServer.getCursor().set(CVMLong.create(23));
+			maxNodeServer.getHost().sync();
 
-		assertEquals(CVMLong.create(23),store.getRootData());
-		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
-		maxNodeServer.close();
+			assertEquals(CVMLong.create(23),store.getRootData());
+			assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
+			maxNodeServer.close();
+		}
 		assertEquals(NodeServer.LifecycleState.STOPPED,maxNodeServer.getLifecycleState());
 	}
 
@@ -2918,7 +2932,10 @@ public class NodeServerTest {
 			assertNotNull(durableBefore, "launch should establish the initial durable snapshot");
 			testStore.failRootWrites = true;
 
-			endpoint.handleIncomingMessage(latticeValue(CVMLong.create(42), null));
+			// The group warns that handling the message failed
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeProtocolEndpoint.class.getName(),Thread.currentThread()).open()) {
+				endpoint.handleIncomingMessage(latticeValue(CVMLong.create(42), null));
+			}
 
 			assertEquals(CVMLong.create(42), node.getLocalValue(),
 				"successful merge remains visible in memory");

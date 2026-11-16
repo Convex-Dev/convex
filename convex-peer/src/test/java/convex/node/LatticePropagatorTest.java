@@ -54,6 +54,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.SetLattice;
+import convex.peer.ExpectedLogs;
 
 /**
  * Tests for automatic lattice propagation using LatticePropagator.
@@ -179,7 +180,10 @@ public class LatticePropagatorTest {
 
 		LatticePropagator group=new LatticePropagator(new MemoryStore());
 		group.start();
-		group.start();
+		// Starting again warns of the redundant call
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+			group.start();
+		}
 		assertTrue(group.isRunning());
 		assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
 		assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
@@ -334,7 +338,11 @@ public class LatticePropagatorTest {
 			LatticePropagator isolated=new LatticePropagator(isolatedStore,manager);
 			isolated.setMaxDeltaMessageSize(1);
 			CompletableFuture<ACell> announced=isolated.nextAnnounce();
-			ACell published=isolated.processSnapshot(expected);
+			ACell published;
+			// The group warns that the root exceeds its delta limit
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				published=isolated.processSnapshot(expected);
+			}
 
 			assertEquals(published,announced.get(5,TimeUnit.SECONDS));
 			assertEquals(published.getHash(),
