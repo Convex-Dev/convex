@@ -30,14 +30,21 @@ public final class Cleanup {
 	private void record(Throwable t) {
 		if (failure==null) {
 			failure=t;
-		} else if (failure!=t) {
+		} else if (failure==t) {
+			return;
+		} else if ((t instanceof Error)&&!(failure instanceof Error)) {
+			// An Error outranks an exception, so a caller handling exceptions cannot swallow it
+			t.addSuppressed(failure);
+			failure=t;
+		} else {
 			failure.addSuppressed(t);
 		}
 	}
 
 	/**
-	 * Throws the first recorded failure, with later ones added to it as suppressed,
-	 * or returns if no step failed. Unchecked failures, and failures of the declared
+	 * Throws the first recorded Error, or if no step threw one the first recorded
+	 * failure, with the other failures added to it as suppressed; returns if no step
+	 * failed. Unchecked failures, and failures of the declared
 	 * type, are thrown as they are. Any other checked failure is wrapped: an
 	 * IOException in an UncheckedIOException, anything else in a RuntimeException.
 	 *

@@ -54,6 +54,33 @@ public class CleanupTest {
 	}
 
 	@Test
+	public void anErrorOutranksExceptionsBeforeAndAfterIt() {
+		IOException before=new IOException("before");
+		InternalError error=new InternalError("error");
+		IllegalStateException after=new IllegalStateException("after");
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(()->{ throw before; });
+		cleanup.run(()->{ throw error; });
+		cleanup.run(()->{ throw after; });
+
+		InternalError thrown=assertThrows(InternalError.class,()->cleanup.finish(IOException.class));
+		assertSame(error,thrown);
+		assertArrayEquals(new Throwable[] {before,after},thrown.getSuppressed());
+	}
+
+	@Test
+	public void theFirstErrorOutranksALaterOne() {
+		OutOfMemoryError first=new OutOfMemoryError("first");
+		InternalError second=new InternalError("second");
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(()->{ throw first; });
+		cleanup.run(()->{ throw second; });
+
+		assertSame(first,assertThrows(OutOfMemoryError.class,cleanup::finish));
+		assertArrayEquals(new Throwable[] {second},first.getSuppressed());
+	}
+
+	@Test
 	public void theSameFailureTwiceIsReportedOnce() {
 		IllegalStateException failure=new IllegalStateException("shared");
 		Cleanup cleanup=new Cleanup();
