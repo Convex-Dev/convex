@@ -41,9 +41,6 @@ class InboundVerifier {
 
 	static final long TIMEOUT_MS = 5000;
 
-	/** The longest back-off, as a power of two times the poll delay. */
-	static final int MAX_BACKOFF_DOUBLINGS = 8;
-
 	/** An attempt in flight: its reply future and a signal that its thread has finished. */
 	private record Attempt(CompletableFuture<Message> reply, CompletableFuture<Void> stopped) {}
 
@@ -160,23 +157,10 @@ class InboundVerifier {
 				entries.remove(conn);
 			} else {
 				int failures = entry.failures() + 1;
-				long delay = backoff(server.getConnectionManager().getPollDelay(), failures);
+				long delay = ConnectionManager.backoff(server.getConnectionManager().getPollDelay(), failures);
 				entries.put(conn, new Entry(failures, server.getTimestamp() + delay, null));
 			}
 		}
-	}
-
-	/**
-	 * Delay before the next attempt after a number of failures: the poll delay, doubled
-	 * for each failure after the first, up to {@link #MAX_BACKOFF_DOUBLINGS} doublings.
-	 *
-	 * @param pollDelay Poll delay in milliseconds
-	 * @param failures Failures so far, at least one
-	 * @return Delay in milliseconds
-	 */
-	static long backoff(long pollDelay, int failures) {
-		int doublings = Math.min(Math.max(failures - 1, 0), MAX_BACKOFF_DOUBLINGS);
-		return pollDelay << doublings;
 	}
 
 	/** Forgets a connection that has closed. An attempt in flight forgets it as it ends. */

@@ -83,8 +83,8 @@ On a network thread the verifier only checks whether to start: whether the conne
 trusted, has an attempt in flight, or is backing off. Signing, sending, waiting up to 5 s
 for the answer and checking it run on a virtual thread.
 
-A failed attempt delays the next one for that connection by the poll delay, doubling with
-each further failure up to 2⁸ poll delays. The verifier forgets a connection when it is
+A failed attempt delays the next one for that connection, with the same waits as polling
+([Polling and Back-off](#polling-and-back-off)). The verifier forgets a connection when it is
 trusted or closes. Closes are reported by the network listeners, and swept up when an
 attempt starts for transports that do not report them.
 

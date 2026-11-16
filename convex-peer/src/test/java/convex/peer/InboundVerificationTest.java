@@ -92,15 +92,6 @@ public class InboundVerificationTest {
 		return outcome;
 	}
 
-	@Test
-	public void backOffDoublesToACap() {
-		assertEquals(2000,InboundVerifier.backoff(2000,1));
-		assertEquals(4000,InboundVerifier.backoff(2000,2));
-		assertEquals(2000L<<InboundVerifier.MAX_BACKOFF_DOUBLINGS,
-			InboundVerifier.backoff(2000,InboundVerifier.MAX_BACKOFF_DOUBLINGS+1));
-		assertEquals(2000L<<InboundVerifier.MAX_BACKOFF_DOUBLINGS,InboundVerifier.backoff(2000,1000));
-	}
-
 	/** DATA from an unverified connection is ignored; from a trusted one it is stored. */
 	@Test
 	public void onlyTrustedDataIsStored() throws Exception {

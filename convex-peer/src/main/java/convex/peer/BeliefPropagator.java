@@ -99,8 +99,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		Config.BELIEF_QUEUE_SIZE);
 
 	/**
-	 * Ordered DATA and BELIEF messages received from any connection. DATA must
-	 * remain ahead of the root that references it until both reach this thread.
+	 * Ordered BELIEF messages received from any connection, and DATA from trusted
+	 * ones. DATA must remain ahead of the root that references it until both reach
+	 * this thread.
 	 */
 	// TODO: use config if provided
 	private final BoundedMessageQueue propagationQueue = new BoundedMessageQueue(
