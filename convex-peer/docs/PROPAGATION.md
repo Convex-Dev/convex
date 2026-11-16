@@ -131,8 +131,9 @@ A fetch that fails, or takes longer than the poll delay, is dropped.
 
 Periodic status polling remains the recovery of last resort, including for idle
 peers which have outbound connections but receive no inbound propagation. One
-random outbound peer is probed per interval; an unchanged Belief hash costs no
-acquisition.
+outbound peer is probed per interval, chosen as
+[PEER_PRIORITY.md](PEER_PRIORITY.md#polling-and-back-off) describes; an unchanged
+Belief hash costs no acquisition.
 
 Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
 queue off the Netty event loop. This preserves the DATA-before-root order for a
@@ -149,11 +150,9 @@ would make queue byte accounting encode the complete value as one wire frame,
 which is both unnecessary and invalid when the value exceeds the 50 MB frame
 limit. The propagator drains every retained acquired Belief alongside wire
 updates and compares all signed Orders before performing one merge; values from
-different peers never overwrite each other in a shared pending slot. Polling is
-deferred only while this queue is full, and capacity is checked again before
-acquisition: pushes filling the wire queue never defer it. A STATUS timeout is initially only a missed health probe; a
-connection is retired if it remains unresponsive for a full minute, while any
-non-connectivity result resets that period.
+different peers never overwrite each other in a shared pending slot. Polling
+waits for room in this queue, checked again before acquisition, and never for the
+wire queue: pushes filling the wire queue never defer it.
 
 ## Memory budgets
 

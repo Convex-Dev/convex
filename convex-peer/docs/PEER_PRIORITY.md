@@ -26,9 +26,11 @@ Peers push Beliefs only on connections they opened, so every pushed Belief arriv
 inbound connection that anyone could have opened. Three things keep junk from stopping
 consensus:
 
-1. **Polling.** `ConnectionManager` polls one of the peers it chose by stake and verified
-   every poll interval, and acquires that peer's Belief into a queue of its own. Polling
-   waits only for room in that queue (`BeliefPropagator.hasBeliefPollCapacity`), so pushes
+1. **Polling.** `ConnectionManager` polls one of the peers it connected to every poll
+   interval, preferring those that have proved their key
+   ([Polling and Back-off](#polling-and-back-off)), and acquires that peer's Belief into a
+   queue of its own. Polling waits for room in that queue
+   (`BeliefPropagator.hasBeliefPollCapacity`), never for the propagation queue, so pushes
    filling the propagation queue cannot stop it.
 2. **Cheap rejection.** `BeliefPropagator` drops an Order from a key that is not a staked
    peer before checking its signature or storing it, and an Order no newer than the one
@@ -112,6 +114,54 @@ key; see [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).
 
 A peer's outbound connection still answers a CHALLENGE sent back on it, as any client with
 a key pair does, so released peers that challenge inbound connections can verify it.
+
+### Polling and Back-off
+
+A consensus peer's outbound links come from the peers `tryRandomConnect` picks by stake,
+the peers an operator dials with `connectToPeer`, and the peer it was launched from
+(`:source`). Every link carries the peer's key pair, so every link can be verified.
+
+| A remote peer that is | Is |
+|---|---|
+| Not linked | Dialled when picked by stake and its wait has passed |
+| Linked, not verified | Challenged again on the same link, for the key the link is filed under, when its wait has passed. Polled only when no verified link is due |
+| Verified | Polled: each poll interval polls one verified link whose wait has passed, picked at random, or, if there is none, one unverified link |
+
+A Belief is judged by its signed Orders, not by its sender ([Principle](#principle)), so
+polling an unverified link is safe; verified links are preferred, as CAD015 asks of
+trusted sources.
+
+**Back-off.** Each failure by a remote peer doubles its wait, from one poll interval up to
+256 of them (512 s at the default `:poll-delay`). A failure is:
+
+- a dial that fails, that is refused for the peer's answer to the identity challenge, or
+  that reaches a peer with another key;
+- a challenge that is not passed, or not answered within 2 s;
+- a STATUS error or a malformed status;
+- a Belief acquisition that fails, times out or yields something other than a Belief.
+
+A full queue of polled Beliefs is not a failure. Only a good poll of a verified link
+clears the count. A dial or a challenge that succeeds makes the peer due at once but keeps
+its count, so a peer that connects but never serves a poll keeps backing off. Polling an
+unverified link leaves its count alone, unless the reply is false input.
+
+While no link is verified, a peer that could not be reached (its dial reached no one, or it
+did not reply) is dialled whatever its wait, so a peer whose own network failed reconnects as soon
+as it returns. A peer that answered wrongly still waits.
+
+**False input.** A reply that is false rather than malformed, such as a challenge answer
+signed for another challenge or a polled Belief with a forged Order signature, closes the
+link at once, as [Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment)
+describes. It also sends the peer straight to the longest wait, from where its next failure
+closes its link again. This holds on an unverified link and for a dial refused for it: the
+sender there may not be the peer, but redialling the same address sooner would reach the
+same sender.
+
+**Closing.** A link with no reply to STATUS or to a challenge for a minute is closed; any
+reply restarts the minute. A failure that leaves a peer's wait at its cap, the ninth in a
+row, also closes its link. An unverified link is kept while no link is verified, since it
+is then all there is to poll. A remote peer keeps its count when its link closes, so a
+redial waits too.
 
 ## Generic Message API
 
