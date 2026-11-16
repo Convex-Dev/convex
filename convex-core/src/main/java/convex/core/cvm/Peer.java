@@ -286,6 +286,7 @@ public class Peer {
 	@SuppressWarnings("unchecked")
 	public static AMap<Keyword, ACell> getPeerData(AStore store, ACell rootKey) throws IOException {
 		Hash root = store.getRootHash();
+		if (root==null) return null; // no root set
 		Ref<ACell> ref=store.refForHash(root);
 		if (ref==null) return null; // not found case
 		if (ref.getStatus()<Ref.PERSISTED) return null; // not fully in store
