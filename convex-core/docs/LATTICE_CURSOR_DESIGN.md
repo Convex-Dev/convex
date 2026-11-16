@@ -12,9 +12,9 @@ component-owned working state and batched signing.
 
 ```text
 ACursor<V>                                get / atomic update / persist / path
-└── AForkableCursor<V>                    typed paths; fork(); sync(merge)
+└── AForkableCursor<V>                    typed paths; fork(); reconcile(merge)
     ├── Root<V>                           atomic value holder; the outermost boundary
-    ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
+    ├── ForkedCursor<V>                   working copy; reconciles with a plug-in three-way merge
     ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
     ├── BoundaryCursor<V>                 writes pass through; claims stop here
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
@@ -262,12 +262,9 @@ working root. Sync is the separate reconciliation of that fork with its
 publication destination. Neither step implies publication beyond its destination.
 
 `fork()` creates an isolated working copy, a `ForkedCursor`, retaining its
-destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
-that publication: an unchanged copy adopts the destination, an unchanged destination
-accepts the working value, and divergent changes invoke the supplied function.
-Both tests are by value, so a destination persisted since the last sync counts as
-unchanged. `reconcile(merge)` is the same with a `ThreeWayMerge`, which also receives the value
-both sides last agreed on.
+destination and reconciliation baseline. Each `reconcile(merge)` supplies the policy
+for that publication as a `ThreeWayMerge`, which receives the value both sides last
+agreed on, the working value and the destination's value.
 
 A three-way merge is total: it is given every case, and a side that changed nothing
 contributes nothing. It decides the value only, whatever the value's structure.

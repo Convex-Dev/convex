@@ -183,7 +183,7 @@ class OwnedComponentsTest {
 			var draft=edits.fork();
 			draft.set(CVMLong.TWO);
 			assertSame(signed,owners.get(A));
-			draft.sync(MaxLattice.INSTANCE::merge);
+			draft.reconcile((base,own,other) -> MaxLattice.INSTANCE.merge(own,other));
 			assertEquals(CVMLong.TWO,owners.get(A).getValue());
 		}
 	}

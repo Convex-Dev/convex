@@ -78,7 +78,7 @@ class ComponentSyncTest {
 		assertNull(root.get(),"Recreated children must edit the new storage");
 		assertEquals(1,ticks.get());
 		draft.items.sync();
-		draft.cursor().sync((a,b) -> { throw new AssertionError("Editing views do not reconcile"); });
+		draft.cursor().reconcile((base,a,b) -> { throw new AssertionError("Editing views do not reconcile"); });
 		assertNull(root.get(),"Child and editing views must not publish the enclosing fork");
 		assertSame(root.get(),live.sync());
 		assertSame(draft.cursor().get(),draft.sync());
@@ -165,7 +165,7 @@ class ComponentSyncTest {
 		fork.set(CVMLong.TWO);
 		assertSame(CVMLong.TWO,view.sync());
 		assertSame(CVMLong.TWO,root.get(),"The bound fork is the publication boundary");
-		assertSame(CVMLong.TWO,fork.sync((own,other) -> own));
+		assertSame(CVMLong.TWO,fork.reconcile((base,own,other) -> own));
 		assertSame(CVMLong.TWO,root.get());
 	}
 
@@ -182,7 +182,7 @@ class ComponentSyncTest {
 		assertSame(CVMLong.ONE,parent.get().get(VALUE));
 		assertSame(CVMLong.TWO,parent.get().get(SIBLING));
 		assertSame(initial,root.get(),"Child publication must not publish its destination further");
-		parent.sync((own,other) -> own);
+		parent.reconcile((base,own,other) -> own);
 		assertSame(parent.get(),root.get());
 	}
 

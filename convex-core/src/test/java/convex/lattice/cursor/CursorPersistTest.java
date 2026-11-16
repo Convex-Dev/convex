@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BinaryOperator;
 
 import org.junit.jupiter.api.Test;
 
@@ -69,7 +68,7 @@ public class CursorPersistTest {
 		ABlob a=blob(3);
 		ABlob b=blob(4);
 		fork.updateAndGet(s -> s.include(a));
-		fork.sync((own,other) -> own.includeAll(other));
+		fork.reconcile((base,own,other) -> own.includeAll(other));
 		fork.updateAndGet(s -> s.include(b));
 
 		fork.persist(this::record);
@@ -83,24 +82,24 @@ public class CursorPersistTest {
 	@Test public void persistNeverRewindsABaselineMovedBySync() throws IOException {
 		Root<ASet<ACell>> root=Root.create(Sets.empty());
 		var fork=root.fork();
-		BinaryOperator<ASet<ACell>> noMerge=(own,other) -> {
+		ThreeWayMerge<ASet<ACell>> noMerge=(base,own,other) -> {
 			throw new AssertionError("Only this fork writes its destination, so no merge is needed");
 		};
 		ABlob a=blob(5);
 		ABlob b=blob(6);
 		ABlob c=blob(7);
 		fork.updateAndGet(s -> s.include(a));
-		fork.sync(noMerge);
+		fork.reconcile(noMerge);
 
 		var calls=new AtomicInteger();
 		fork.persist(Persisters.after(value -> {
 			// The second call persists the baseline: a sync lands first and moves it.
 			if (calls.incrementAndGet()==2) {
 				fork.updateAndGet(s -> s.include(b));
-				fork.sync(noMerge);
+				fork.reconcile(noMerge);
 			}
 		},store));
 		fork.updateAndGet(s -> s.include(c));
-		assertEquals(Sets.of(a,b,c),fork.sync(noMerge));
+		assertEquals(Sets.of(a,b,c),fork.reconcile(noMerge));
 	}
 }
