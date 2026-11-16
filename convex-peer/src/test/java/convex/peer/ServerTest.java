@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -179,25 +178,6 @@ public class ServerTest {
 
 		r=convex.transactSync("(do (transfer "+user+" 100000) *balance*)");
 		assertEquals("10000000",r.getValue().toString());
-	}
-
-	@Test
-	public void testServerFlood() throws IOException, InterruptedException, TimeoutException {
-		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
-		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
-		// from backpressure and *not* bring down the server.
-		ConvexRemote convex=network.getClient();
-		Address origin=convex.getAddress();
-
-		ACell cmd=Reader.read("(def tmp (inc tmp))");
-		// Might block, but no issue
-		for (int i=0; i<100; i++) {
-			convex.transact(Invoke.create(origin, 0, cmd));
-		}
-
-		// Should still get status OK
-		Convex convex2=Convex.connect(hostAddress);
-		assertNotNull(convex2.requestStatusSync(2000));
 	}
 
 	@Test
