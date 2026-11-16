@@ -1,5 +1,20 @@
 package convex.restapi.api;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+import convex.api.ContentTypes;
+import convex.core.data.AMap;
+import convex.core.data.Blob;
+import convex.core.exceptions.ParseException;
+import convex.core.json.JSONReader;
+import convex.core.store.AStore;
+import convex.core.util.JSON;
+import convex.restapi.handler.RequestBody;
+import io.javalin.http.ContentTooLargeResponse;
 import convex.peer.Server;
 import convex.core.cvm.Address;
 import convex.core.data.AString;
@@ -42,7 +57,97 @@ public abstract class ABaseAPI extends AGenericAPI {
 		this.restServer=restServer;
 		this.server=restServer.getServer();
 	}
-	
+
+	/**
+	 * Gets JSON body from a Context as a Java Object
+	 * @param ctx Request context
+	 * @return JSON Object
+	 * @throws BadRequestResponse if the JSON body is invalid
+	 * @throws ContentTooLargeResponse if the body exceeds the server's request limit
+	 */
+	protected Map<String, Object> getJSONBody(Context ctx) {
+		try {
+			Map<String, Object> req= RT.jvm(JSON.parse(readBodyText(ctx)));
+			return req;
+		} catch (IllegalArgumentException | ParseException e) {
+			throw new BadRequestResponse("Invalid JSON body");
+		}
+	}
+
+	/**
+	 * Gets JSON body from a Context as a CVM Value
+	 * @param ctx Request context
+	 * @return JSON AMap
+	 * @throws BadRequestResponse if the JSON body is invalid
+	 * @throws ContentTooLargeResponse if the body exceeds the server's request limit
+	 */
+	protected AMap<AString, ACell> readJSONBody(Context ctx) {
+		InputStream body=RequestBody.boundedInputStream(ctx,restServer.getMaxRequestBytes());
+		try {
+			AMap<AString, ACell> req= JSONReader.readObject(body);
+			return req;
+		} catch (IllegalArgumentException | ParseException | IOException e) {
+			throw new BadRequestResponse("Invalid JSON body: "+e.getMessage());
+		}
+	}
+
+	/**
+	 * Gets CVX body from a Context as a cell
+	 * @param ctx Request context
+	 * @return CVM Value
+	 * @throws BadRequestResponse if the body is invalid
+	 * @throws ContentTooLargeResponse if the body exceeds the server's request limit
+	 */
+	@SuppressWarnings("unchecked")
+	protected <T extends ACell> T getCVXBody(Context ctx) {
+		String body=readBodyText(ctx);
+		try {
+			String contentType = ctx.contentType();
+			T req;
+
+			// Check for JSON content type and use JSON.parse
+			if (ContentTypes.JSON.equals(contentType)) {
+				req = (T) JSON.parse(body);
+			} else {
+				// Default to Reader.read for other content types
+				req = (T) Reader.read(body);
+			}
+			return req;
+		} catch (Exception e) {
+			throw new BadRequestResponse("Invalid CVX body");
+		}
+	}
+
+	/**
+	 * Gets body from a Context as a cell
+	 * @param ctx Request context
+	 * @param store Store to decode the cell into
+	 * @return CVM Value
+	 * @throws BadRequestResponse if the body is invalid
+	 * @throws ContentTooLargeResponse if the body exceeds the server's request limit
+	 */
+	protected <T extends ACell> T getRawBody(Context ctx, AStore store) {
+		byte[] bs=RequestBody.readBytes(ctx,restServer.getMaxRequestBytes());
+		try {
+			T result=store.decodeMultiCell(Blob.wrap(bs));
+			return result;
+		} catch (Exception e) {
+			throw new BadRequestResponse("Invalid Raw body");
+		}
+	}
+
+	/** Reads the body whole as text, in its declared character encoding or UTF-8. */
+	private String readBodyText(Context ctx) {
+		String encoding=ctx.characterEncoding();
+		Charset charset;
+		try {
+			charset=(encoding==null) ? StandardCharsets.UTF_8 : Charset.forName(encoding);
+		} catch (IllegalArgumentException e) {
+			throw new BadRequestResponse("Unsupported character encoding: "+encoding);
+		}
+		return new String(RequestBody.readBytes(ctx,restServer.getMaxRequestBytes()),charset);
+	}
+
 
 	public static String getHostname(Context ctx) {
 		String host =ctx.header("X-Forwarded-Host");

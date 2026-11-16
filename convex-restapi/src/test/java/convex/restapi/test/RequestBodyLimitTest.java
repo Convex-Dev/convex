@@ -43,6 +43,15 @@ public class RequestBodyLimitTest extends ARESTTest {
 	}
 
 	@Test
+	public void testChunkedBoundary() throws IOException, InterruptedException {
+		// A chunked body declares no length, so only the read itself bounds it
+		byte[] exact = validMcpBody((int) RESTServer.MAX_REQUEST_BODY_BYTES);
+		assertEquals(200, postBytes("/mcp", ContentTypes.JSON, exact, true).statusCode());
+		byte[] oversized = validMcpBody((int) RESTServer.MAX_REQUEST_BODY_BYTES+1);
+		assertEquals(413, postBytes("/mcp", ContentTypes.JSON, oversized, true).statusCode());
+	}
+
+	@Test
 	public void testChunkedBodiesAreBoundedAcrossStreamingParsers() throws IOException, InterruptedException {
 		byte[] oversized = new byte[(int) RESTServer.MAX_REQUEST_BODY_BYTES+1];
 		Arrays.fill(oversized, (byte) ' ');

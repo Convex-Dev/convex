@@ -265,6 +265,14 @@ public class RESTServer implements Closeable {
 		return restConfig;
 	}
 
+	/**
+	 * Gets the most bytes a request body may have ({@code rest.maxRequestBytes}).
+	 * @return Limit in bytes
+	 */
+	public long getMaxRequestBytes() {
+		return maxRequestBytes;
+	}
+
 	/** Gets the stable configured venue DID, or null when no base URL is configured. */
 	public AString getVenueDID() {
 		return venueDID;
@@ -353,6 +361,7 @@ public class RESTServer implements Closeable {
 				"title", "Convex MCP",
 				"version", Utils.getVersion()
 			));
+			mcpServer.setMaxRequestBytes(maxRequestBytes);
 			mcpAPI = new McpAPI(this, mcpServer);
 			mcpServer.addRoutes(routes);
 			mcpAPI.addRoutes(routes);
@@ -398,7 +407,7 @@ public class RESTServer implements Closeable {
 	private Javalin buildApp(Integer port) {
 		int bindPort = (port == null) ? DEFAULT_PORT : port;
 		Javalin app = Javalin.create(config -> {
-			// RequestBody relies on this limit to bound chunked as well as fixed-length bodies.
+			// A backstop: handlers read bodies through RequestBody, which applies the same limit
 			config.http.maxRequestSize=maxRequestBytes;
 
 			config.bundledPlugins.enableCors(cors -> {
