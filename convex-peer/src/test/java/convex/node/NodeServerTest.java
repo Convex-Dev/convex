@@ -657,7 +657,7 @@ public class NodeServerTest {
 		List<Error> errors=List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"),
 			new NoClassDefFoundError("simulated"));
 		for (Error error: errors) {
-			ExpectedLogs logs=ExpectedLogs.carrying(error).ifLogged().open();
+			ExpectedLogs logs=ExpectedLogs.onThreads(NodeServer.class.getName(),Thread.currentThread()).ifLogged().open();
 			try (logs; TestNode<AInteger> node=new TestNode<>(new PoisonedLattice(CVMLong.create(7),error),store,NodeConfig.port(-1))) {
 				var c=node.getCursor();
 				c.set(CVMLong.create(5));
