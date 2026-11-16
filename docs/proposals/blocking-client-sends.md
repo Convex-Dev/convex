@@ -36,11 +36,11 @@ Result's source for client users.
 - `transact` returns before queuing when the sequence number must be looked up, a pre-compile is
   pending or an earlier transaction is still waiting, and sends later from a virtual thread. Its
   return then says nothing about whether the transaction was queued.
-- Callers' callbacks run on the thread that completes the future: the Netty event loop for a reply,
-  the JDK's single shared timer thread for a timeout. A callback that blocks there stalls every
-  connection that thread serves. `transact` holds the client's monitor across its blocking send, so
-  a reply callback on the event loop that calls `transact` meanwhile blocks the loop that would free
-  the room.
+- Callers' callbacks run on the thread that completes the future: a client ingress worker for a
+  reply, the JDK's single shared timer thread for a timeout. A callback that blocks there stalls
+  every connection that thread serves. `transact` holds the client's monitor across its blocking
+  send, so a reply callback that calls `transact` meanwhile holds its worker until that send finds
+  room.
 - `querySync` and `requestStatusSync` start their own timer only after the blocking send returns:
   `requestStatusSync(2000)` can take about 10 s. `transactSync` subtracts the time the send took,
   but can still time out with the message never sent.
@@ -51,7 +51,7 @@ Result's source for client users.
 |---|---|---|
 | Request | One correlated exchange: its deadline, its state (waiting for room or queued) and its future | `AConnection` (`RequestFuture`) |
 | Send queue | Committed messages, emptied only by the transport | `NettyConnection` outbound `BoundedMessageQueue` (128 messages or 16 MiB for a client) |
-| Transport thread | Writes the send queue to the socket; reads replies and matches them to requests | Netty event loop; the NIO client's selector thread |
+| Transport thread | Writes the send queue to the socket; frames replies for the client ingress, whose workers match them to requests | Netty event loop; the NIO client's selector thread |
 | Client | Turns outcomes into Results; sequences transactions | `Convex`, `AConvexConnected`, `ConvexRemote`, `ConvexLocal` |
 | Server | Pauses reading, queues work, sheds load with `:LOAD` | Unchanged ([BACKPRESSURE.md](../../convex-peer/docs/BACKPRESSURE.md)) |
 
@@ -256,7 +256,7 @@ convex.query(q).thenCompose(r -> convex.transact(next(r)));
   connection, so its replies are handed off as Netty's are.
 - **In-JVM clients** (`LocalConnection`, `ConvexLocal`), used by the REST API, its faucet and x402.
   A request is committed when the server's work queue accepts it, and the caller waits inside the
-  server's retry (`AThreadedComponent.offerBlocking`, a fixed 8 s). To follow the deadline rule:
+  server's retry (the full queue's `Destination.test`, a fixed 8 s). To follow the deadline rule:
   - the request's deadline reaches that retry, the `Function<Message, Predicate<Message>>` from
     `Server.processMessage`;
   - closing a `LocalConnection` wakes the wait;

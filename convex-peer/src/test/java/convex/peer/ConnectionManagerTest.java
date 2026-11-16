@@ -649,6 +649,56 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/**
+	 * A link filed with no peer chosen, such as the launch source, answers challenges for
+	 * the peer it proves once it is verified.
+	 */
+	@Test
+	public void testLinkVerifiedLaterAnswersForItsPeer() throws Exception {
+		Server server=createPollingServer();
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AKeyPair remote=AKeyPair.createSeeded(281);
+			AccountKey key=remote.getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(282));
+			link.answerer=remote;
+			manager.addConnection(key,link);
+
+			manager.verifyDueLinks();
+			assertNull(link.getDialledPeer(),"nothing recorded before the link is verified");
+			manager.verifyDueLinks();
+			assertEquals(key,link.getVerifiedPeer());
+			assertEquals(key,link.getDialledPeer());
+		} finally {
+			server.close();
+		}
+	}
+
+	/** A link keeps the peer chosen before dialling, whatever key it is filed under and proves. */
+	@Test
+	public void testChosenDialledPeerIsKept() throws Exception {
+		Server server=createPollingServer();
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AKeyPair remote=AKeyPair.createSeeded(284);
+			AccountKey key=remote.getAccountKey();
+			AccountKey chosen=AKeyPair.createSeeded(285).getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(286));
+			link.setDialledPeer(chosen);
+			link.answerer=remote;
+			manager.addConnection(key,link);
+
+			manager.verifyDueLinks();
+			manager.verifyDueLinks();
+			assertEquals(key,link.getVerifiedPeer());
+			assertEquals(chosen,link.getDialledPeer());
+		} finally {
+			server.close();
+		}
+	}
+
 	/** A challenge passed verifies a link, but only a good poll clears its peer's failures. */
 	@Test
 	public void testChallengeVerifiesLinkAndKeepsFailures() throws Exception {

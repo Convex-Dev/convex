@@ -1,8 +1,9 @@
 # Peer ingress decode and routing
 
-- Status: Proposed
+- Status: Implemented on `develop`, for Netty and NIO connections;
+  [BACKPRESSURE.md](../../convex-peer/docs/BACKPRESSURE.md) describes it as built
 - Tracking issue: [#608](https://github.com/Convex-Dev/convex/issues/608)
-- Last updated: 2026-07-28
+- Last updated: 2026-11-16
 
 ## Summary
 
@@ -13,15 +14,16 @@ destination queue.
 That boundary should:
 
 1. admit raw messages under per-connection and global count/byte limits;
-2. schedule connections fairly, with additional capacity for verified Peers;
+2. schedule connections fairly, with a priority lane and reserved capacity for
+   verified Peers;
 3. decode the message once, away from network I/O threads;
 4. classify it and perform all initial routing;
 5. retain backpressure until the selected destination accepts the message.
 
 This is not intended to add a generic middleware layer. It replaces the current
-decode, observation, routing and retry paths with one `PeerIngressRouter`-style
-component. Existing transaction, query and Belief workers remain responsible
-for their domain work.
+decode, observation, routing and retry paths with one component, `Ingress` in
+`convex.net.ingress`. Existing transaction, query and Belief workers remain
+responsible for their domain work.
 
 ## Context
 
@@ -63,8 +65,10 @@ Once decoded, messages already have useful domain boundaries:
 | --- | --- |
 | `TRANSACT` | `TransactionHandler` |
 | `QUERY`, `DATA_REQUEST` | `QueryHandler` |
-| `BELIEF` | trusted or untrusted `BeliefPropagator` queue |
-| `PING`, `STATUS`, `CHALLENGE`, `GOODBYE`, verification `RESULT` | bounded control handler |
+| `BELIEF`, and `DATA` from a verified connection | the one `BeliefPropagator` propagation queue, which drops a push when full ([PEER_PRIORITY.md](../../convex-peer/docs/PEER_PRIORITY.md#liveness)) |
+| `DATA` from any other connection | ignored, and starts verification of that connection |
+| `PING`, `STATUS`, `CHALLENGE`, `GOODBYE` | bounded control handler |
+| `RESULT` on an accepted connection | completes this Peer's own request on it (a verification challenge or a fetch of missing data); any other is ignored |
 | outbound client `RESULT`, reverse `CHALLENGE`, reverse `DATA_REQUEST` | outbound connection/client handler |
 
 These destinations should remain. The new ingress component ends when one of
@@ -105,8 +109,16 @@ them has accepted the message.
    queue and no second executor submission between decode and routing.
 4. **Workers never wait for a full destination.** A blocked message remains at
    its connection head and is retried after a real destination-capacity signal.
-5. **Trust is verified.** Only `AConnection.isTrusted()` traffic receives the
-   verified-Peer service class.
+   A destination may instead drop, as the propagation queue does; it never
+   pauses the connection.
+5. **Trust is verified.** Only a connection whose remote Peer has proved its key
+   receives the verified-Peer service class: on an accepted connection, a staked
+   Peer's own link verified as [PEER_PRIORITY.md](../../convex-peer/docs/PEER_PRIORITY.md#verifying-an-inbound-connection)
+   describes; on an outbound connection, a Peer verified by `Convex.verifyPeer`.
+   Each ingress is given the rule for its own connections; the ingress itself
+   holds no trust policy. This is the priority
+   [CAD015](https://docs.convex.world/docs/cad/peercomms) asks for messages from
+   trusted sources.
 6. **Priority is non-starving.** Verified traffic has more service and reserved
    decode capacity, but untrusted traffic continues to make bounded progress.
 7. **Memory is bounded globally and locally.** A fast connection can consume
@@ -129,8 +141,9 @@ socket -> frame -> raw admission -> decode -> classify -> destination.tryOffer
                               same ingress worker
 ```
 
-The implementation may use a different class name, but this document calls the
-owner `PeerIngressRouter`.
+There is one `Ingress` per Peer `Server`, serving its accepted connections, and
+one shared by the process's outbound client connections, so a flood on accepted
+channels cannot delay the replies a Peer's own outbound links receive.
 
 ### Per-connection ingress state
 
@@ -162,50 +175,70 @@ bytes. Admission:
 2. reserves per-connection and global encoded-byte credit;
 3. appends the message to the connection FIFO;
 4. activates the connection if it was previously idle;
-5. returns immediately.
+5. returns immediately, saying whether the transport may keep reading.
 
-If credit is unavailable, the adapter applies the existing parking-ticket
-pattern: disable `autoRead` for that channel and retry admission away from the
-event loop. Once credit falls below the low-water mark, resumption is scheduled
-on the channel's event loop. Bytes already held in
-`ByteToMessageDecoder`'s cumulation must also be made eligible for decoding.
+The transport has already allocated the framed message, so admission always
+takes it, and asks the transport to pause once the connection or the global
+total reaches its high-water mark. A connection therefore overshoots by at most
+one frame. Netty pauses by turning `autoRead` off, signalled only together with
+an emitted frame so that `ByteToMessageDecoder` requests no further read. Once
+credit falls below the low-water mark, resumption is scheduled on the channel's
+event loop, and bytes already held in the decoder's cumulation are made
+eligible for decoding.
 
-Netty receive allocators should additionally cap bytes or read attempts per
-socket read loop. This reduces event-loop monopolisation before application
-admission, but it is defence in depth rather than the fairness mechanism.
+Netty receive allocators are not capped. Once the event loop only frames
+messages, event-loop responsiveness measurements show whether a cap on bytes or
+read attempts per socket read loop is needed as defence in depth.
 
 ### Fair scheduler
 
 The scheduler selects active connections rather than selecting individual
 messages from one global FIFO.
 
-Weighted deficit round-robin is the preferred model:
+The model is weighted surplus round-robin:
 
 - encoded length is the principal service cost;
 - every message has a minimum cost, preventing floods of tiny frames from being
   effectively free;
-- a connection consumes at most its available byte/message quantum before
-  returning to the end of its lane;
+- a connection's head message is served whenever its credit is positive, and
+  the connection repays any overrun in later rounds before it is served again;
+- a connection returns to the end of its lane when its credit is spent or its
+  FIFO is empty;
 - FIFO ordering is preserved within the connection.
+
+Serving the head whenever credit is positive keeps a large message from waiting
+many rounds: under classic deficit round-robin, a 4 MB update in the verified
+lane would wait about 64 rounds of its 64 KB quantum before it could be decoded.
+
+A turn serves a connection while its credit is positive: at most its quantum
+plus one message. A connection that joins its lane waits at most one turn of
+every other connection in it. With the ordinary quantum about the size of one
+client transaction, a round of 100 busy clients is about 100 transaction
+decodes, a few milliseconds over two workers. This, not the priority lane, is
+what stops a client burst delaying Peer updates: they are served between client
+messages instead of after the whole burst.
 
 Two lanes are required:
 
-- **verified Peer**: the connection has a challenge-verified trusted key;
-- **untrusted/client**: all other network connections, including outbound
-  sockets before verification.
+- **verified Peer**: the connection's remote Peer has proved its key (design
+  invariant 5);
+- **ordinary**: all other network connections, including outbound sockets
+  before verification.
 
-Verified Peers receive a larger quantum. Strict priority is not acceptable:
-untrusted challenge and status traffic must make progress so a legitimate
-connection can become trusted.
+A connection's lane is read each time it rejoins the scheduler, so a connection
+verified while active moves at its next turn. The lanes take turns while both
+have connections waiting, and verified Peers receive a larger quantum. Strict
+priority is not acceptable: ordinary challenge and status traffic must make
+progress so a legitimate connection can become verified.
 
 Queue weighting alone cannot guarantee verified-Peer latency because decode is
-not pre-emptible. With `N` concurrent decode permits, untrusted work may occupy
+not pre-emptible. With `N` concurrent decode permits, ordinary work may occupy
 at most `N - 1`. This leaves capacity for already-verified Peer traffic during
-sustained hostile input. The configured decoder count must therefore be at
-least two when hard trusted-capacity reservation is enabled.
+sustained hostile input, such as a flood of maximum-size frames. One decoder
+for ordinary work reproduces the measured stall, so `N` is at least three.
 
-Defaults for worker count, quantum and queue limits should be selected from
-benchmarks rather than fixed by this proposal.
+Defaults for worker count, quantum and queue limits are documented constants
+in `Config`, chosen from the before and after measurements.
 
 ### Decode and classification
 
@@ -229,16 +262,27 @@ There is no decoded-message scheduler between steps 2 and 4.
 
 ### Destination admission
 
-Each destination exposes a non-blocking offer and a capacity signal. The exact
-API is an implementation detail, but it must have the equivalent of:
+Each destination exposes a non-blocking offer and a capacity signal:
 
 ```java
 boolean tryOffer(Message message);
-void signalWhenCapacityAvailable(Runnable action);
+void whenCapacity(Runnable action);
 ```
 
 The signal must be race-safe and driven by an actual dequeue/capacity change;
-workers must not poll or sleep.
+workers must not poll or sleep. After a signal the worker offers once more, so
+a dequeue between a failed offer and the registration is not lost.
+
+A destination is also a `Predicate<Message>` whose test waits a bounded time,
+for callers that may wait, such as the local fast path. The delivery contract
+stays `Function<Message,Predicate<Message>>`: a route returns null when the
+message has left ingress, or the destination that refused it. Deliveries
+outside the Peer, such as lattice clients, may still return a plain predicate;
+the ingress runs it as an opaque retry on a virtual thread while that
+connection stays blocked, with `:LOAD` for a request it refuses, as today.
+
+A blocked head that is still refused at the internal timeout (8 s, as today) is
+answered with `:LOAD` if it is a request and dropped otherwise.
 
 If the destination accepts the message:
 
@@ -261,17 +305,23 @@ originating socket without blocking an ingress worker.
 ### Control messages
 
 Protocol/control messages should not be handled on the event loop or inline in
-the decode scheduler. A small bounded control handler should receive:
+the decode scheduler. A small bounded control handler, `ControlHandler`,
+receives through one queue:
 
 - `PING` and `STATUS`;
-- `CHALLENGE` and verification `RESULT`;
+- `CHALLENGE`;
 - `GOODBYE`;
 - any future cheap protocol-control messages.
 
+A `RESULT` that completes this Peer's own request, such as the answer to a
+verification challenge, completes its future on the ingress worker; the
+request's owner does its work in its own thread, as `InboundVerifier` and
+`Acquiror` do.
+
 This keeps ingress work limited to decode, classification and admission.
 Per-connection limits prevent an untrusted control-message flood from claiming
-unbounded control capacity. The control handler must retain enough service for
-challenge/response to promote legitimate connections.
+unbounded control capacity, and capacity signals wake blocked connections in
+scheduler order, so one queue retains service for challenge/response.
 
 ### Outbound connection routing
 
@@ -280,32 +330,38 @@ fair scheduler.
 
 Their route profile differs from an accepted Peer-server channel:
 
-- a decoded `RESULT` completes its awaiting future;
-- a reverse `CHALLENGE` reaches the client control handler;
+- a `RESULT` completes its awaiting future on the ingress worker;
+- a reverse `CHALLENGE` is answered by the route on the worker;
 - an enabled reverse `DATA_REQUEST` reaches its configured handler;
 - unexpected messages are rejected or logged according to current semantics.
 
-Future completion occurs only after decode, so synchronous future continuations
-cannot accidentally move decode back onto the Netty event loop.
+Future completion runs on an ingress worker, so synchronous future
+continuations, including the result decode, cannot move decode back onto the
+Netty event loop. A continuation that sends must not park a worker:
+`NettyConnection.sendMessage` waits for queue space only off event loops and
+ingress workers.
 
 After `verifyPeer` succeeds, `setTrustedKey` promotes the connection to the
 verified-Peer scheduler lane. Status-based fallback identification does not.
-The trusted key must be safely published to ingress workers, for example with a
-`volatile` field or an explicit scheduler state transition.
+The key is held in a `volatile` field, and the scheduler reads it each time the
+connection rejoins its lane.
 
 ### Local decoded fast path
 
 `ConvexLocal` and other controlled in-process callers often already hold a
-decoded payload. They should call the same decoded routing function without
-entering the raw network FIFO:
+decoded payload. They call the same routing function, `Server.deliverMessage`,
+on their own thread without entering the raw network FIFO:
 
 ```text
-routeDecoded(message) -> destination.tryOffer
+deliverMessage(message) -> destination.tryOffer
 ```
 
-This preserves one source of routing truth without imposing a network
-scheduling hop on local queries. A full destination still returns the existing
-bounded load/backpressure result to the local caller.
+Decode is a no-op for a decoded message. This preserves one source of routing
+truth without imposing a network scheduling hop on local queries, which keep
+using no queue at all ([MESSAGING.md](../../convex-peer/docs/MESSAGING.md)). The
+local path uses neither ingress fairness nor byte accounting. A full
+destination makes the local caller wait through the destination's bounded
+test, and then returns the existing load result, as today.
 
 ## Message lifecycle
 
@@ -329,9 +385,11 @@ contained by the ingress worker. The current best-effort error response should
 be preserved where an ID and return path can be determined. Repeated malformed
 input may feed the existing per-connection rejection policy.
 
-An ordinary exception must not terminate an ingress worker. Serious JVM errors
-follow the repository's existing containment policy and should disable or close
-the affected connection rather than silently lose the sole dispatcher.
+An ordinary exception must not terminate an ingress worker: each turn is
+contained per message, as `RequestFailures` does. A JVM failure closes the
+affected connection rather than silently losing a worker, and on a Peer
+`Server`'s ingress also requests the Peer's shutdown, as `LoopFailures` does for
+every other Peer loop.
 
 ### Disconnect
 
@@ -346,12 +404,16 @@ Disconnect is the single cleanup sink for a connection:
 
 ### Shutdown
 
-Server shutdown:
+Server shutdown closes the connection manager, then the network listeners, then
+the ingress, then the domain handlers. Closing the ingress:
 
 1. stops new admission;
-2. either drains accepted ingress work or rejects it deterministically;
-3. waits for ingress workers to finish within the configured lifecycle bound;
-4. closes domain handlers and network resources in the established order.
+2. discards accepted ingress work, releasing its credit;
+3. waits for ingress workers to finish their current turn;
+4. stops the deadline timer.
+
+The shared client ingress uses daemon threads and closes from the same shutdown
+hook as the Netty client event loops.
 
 No virtual thread, capacity callback or Netty event-loop task may keep the
 process alive after shutdown.
@@ -389,22 +451,22 @@ The implementation replaces, rather than wraps:
 
 ## Configuration
 
-The following should be operator-configurable or derived from a small set of
-documented defaults:
+The settings are documented constants in `Config`, alongside the existing
+queue sizes, with no new Peer configuration keywords. Starting values, before
+tuning from measurements:
 
-| Setting | Purpose |
-| --- | --- |
-| decoder worker count | maximum concurrent ingress decode/routing work |
-| maximum untrusted decodes | preserves verified-Peer capacity |
-| per-connection message limit | bounds tiny-message bursts |
-| per-connection byte limit | bounds large-message bursts |
-| global ingress byte limit | bounds total retained encoded data |
-| trusted/untrusted quantum | weighted scheduler policy |
-| minimum message cost | prevents tiny-frame monopolisation |
-| control queue capacity | bounds protocol-control work |
+| Setting | Purpose | Starting value |
+| --- | --- | --- |
+| decoder worker count | maximum concurrent ingress decode/routing work | 3 |
+| maximum ordinary decodes | preserves verified-Peer capacity | worker count − 1 |
+| per-connection message limit | bounds tiny-message bursts | 32, resuming at 16 |
+| per-connection byte limit | bounds large-message bursts | 1 MB, resuming at 512 KB |
+| global ingress byte limit | bounds total retained encoded data | 64 MB |
+| verified/ordinary quantum | weighted scheduler policy | 64 KB / 2 KB |
+| minimum message cost | prevents tiny-frame monopolisation | 512 bytes |
+| control queue capacity | bounds protocol-control work | as the query queue |
 
-High and low water marks should be distinct to avoid rapidly toggling
-`autoRead`.
+High and low water marks are distinct to avoid rapidly toggling `autoRead`.
 
 ## Anticipated code changes
 
@@ -418,11 +480,12 @@ High and low water marks should be distinct to avoid rapidly toggling
 - Replace `Server.deliverMessage`, `Server.receiveAction` and the duplicated
   initial routing path.
 - Add a bounded control handler.
-- Add non-blocking capacity signals to transaction, query, Belief and control
+- Add non-blocking capacity signals to the transaction, query and control
   destinations.
-- Move outbound result decode before future completion.
-- Make trusted-key publication safe across threads.
-- Adapt the NIO transport to the same ingress contract.
+- Complete outbound result futures on ingress workers, so their continuations
+  decode there.
+- Adapt the NIO transport to the same ingress contract: pausing clears
+  `OP_READ`, resuming restores it and wakes the selector.
 - Retain a decoded fast path for `ConvexLocal`.
 
 ## Verification
@@ -527,16 +590,9 @@ Rejected initially. It couples ingress routing to encoding details, still needs
 a general decode/error stage and does not remove destination backpressure
 requirements.
 
-## Open implementation choices
+### Pause a connection for a full Belief queue
 
-- Default worker count and reserved trusted capacity.
-- Initial per-connection and global byte limits.
-- Trusted and untrusted scheduler quanta.
-- Whether the control handler uses one queue or separate verification and
-  ordinary-control queues.
-- The exact race-safe destination-capacity notification API.
-- Whether decoded local callers may bypass fairness only, or both fairness and
-  ingress byte accounting.
-
-These choices require benchmarks and implementation tests; they do not change
-the architectural boundary established by this proposal.
+Rejected. Pushed Beliefs and DATA are best-effort: when the propagation queue is
+full they are dropped and the connection is never paused, so pushes cannot
+hold up the polling that keeps consensus live
+([PEER_PRIORITY.md](../../convex-peer/docs/PEER_PRIORITY.md#liveness)).

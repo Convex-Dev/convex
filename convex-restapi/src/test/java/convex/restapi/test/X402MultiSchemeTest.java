@@ -67,14 +67,19 @@ public class X402MultiSchemeTest extends ARESTTest {
 		convex = Convex.connect(peerServer);
 		convex.setAddress(newAccount(), kp);
 
-		// Stub external facilitator speaking the standard /verify /settle /supported API
+		// Stub external facilitator speaking the standard /verify /settle /supported API.
+		// It reads each request body, as a real facilitator does: Jetty resets a connection
+		// whose body is unread at the response, and the reset can discard the response.
 		stubFacilitator = Javalin.create(config -> {
 			config.routes.get("/facilitator/supported", ctx -> ctx.contentType("application/json").result(
 					"{\"kinds\":[{\"x402Version\":2,\"scheme\":\"exact\",\"network\":\"" + BASE_NETWORK
 							+ "\"}],\"extensions\":[],\"signers\":{}}"));
-			config.routes.post("/facilitator/verify", ctx -> ctx.contentType("application/json")
-					.result("{\"isValid\":true,\"payer\":\"0xPayer\"}"));
+			config.routes.post("/facilitator/verify", ctx -> {
+				ctx.body();
+				ctx.contentType("application/json").result("{\"isValid\":true,\"payer\":\"0xPayer\"}");
+			});
 			config.routes.post("/facilitator/settle", ctx -> {
+				ctx.body();
 				stubSettleCalls.incrementAndGet();
 				ctx.contentType("application/json").result("{\"success\":true,\"payer\":\"0xPayer\","
 						+ "\"transaction\":\"" + EVM_TX + "\",\"network\":\"" + BASE_NETWORK + "\"}");

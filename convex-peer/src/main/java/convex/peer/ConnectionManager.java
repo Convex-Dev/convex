@@ -447,7 +447,12 @@ public class ConnectionManager extends AConnectionManager {
 		for (Map.Entry<AccountKey,Convex> e : connections.entrySet()) {
 			AccountKey peerKey=e.getKey();
 			Convex link=e.getValue();
-			if (!link.isConnected() || isVerified(peerKey,link)) continue;
+			if (!link.isConnected()) continue;
+			if (isVerified(peerKey,link)) {
+				// Also a link verified after it was filed, such as the launch source
+				recordDialledPeer(link,peerKey);
+				continue;
+			}
 			if (challenges.containsKey(peerKey) || !isDue(peerKey,now)) continue;
 			challenges.put(peerKey,new Challenge(link,link.verifyPeer(peerKey,networkID),now+POLL_TIMEOUT_MILLIS));
 		}
@@ -479,6 +484,18 @@ public class ConnectionManager extends AConnectionManager {
 	 */
 	private static boolean isVerified(AccountKey peerKey, Convex link) {
 		return peerKey.equals(link.getVerifiedPeer());
+	}
+
+	/**
+	 * Records the key a link has proved as the peer it answers challenges for, unless a
+	 * peer was chosen before dialling: that one is kept, so the link never answers for a
+	 * peer other than the one it set out to reach.
+	 *
+	 * @param link Link to a peer
+	 * @param proved Key the link has proved, or null if none
+	 */
+	private static void recordDialledPeer(Convex link, AccountKey proved) {
+		if ((proved!=null)&&(link.getDialledPeer()==null)) link.setDialledPeer(proved);
 	}
 
 	private boolean hasVerifiedLink() {
@@ -755,6 +772,9 @@ public class ConnectionManager extends AConnectionManager {
 			}
 			convex.setStore(server.getStore());
 			convex.setKeyPair(server.getKeyPair());
+			// The peer this link answers challenges for: the key chosen before dialling,
+			// set before anything is sent on it
+			convex.setDialledPeer(expectedPeer);
 
 			boolean requireExpectedPeer=expectedPeer!=null && "tls".equalsIgnoreCase(hostAddress.getScheme());
 			CompletableFuture<AccountKey> identity=requireExpectedPeer
@@ -773,6 +793,9 @@ public class ConnectionManager extends AConnectionManager {
 						: new IOException("Unable to identify peer at " + hostAddress));
 					return;
 				}
+				// Dialled without a key: answer for the key verification found, if any.
+				// Set before the link is filed, so before any Belief is sent on it.
+				recordDialledPeer(convex,convex.getVerifiedPeer());
 
 				Convex existing=null;
 				synchronized (ConnectionManager.this) {

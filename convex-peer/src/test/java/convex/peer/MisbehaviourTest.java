@@ -425,15 +425,17 @@ public class MisbehaviourTest {
 	}
 
 	/**
-	 * DATA that breaks its required shape, here by holding an embedded cell, is rejected
-	 * and its connection kept: malformed input may be an honest mistake.
+	 * DATA from a trusted connection that breaks its required shape, here by holding an
+	 * embedded cell, is rejected and its connection kept: malformed input may be an
+	 * honest mistake.
 	 */
 	@Test
 	public void badlyShapedDataKeepsItsConnection() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A);
 		try {
 			BeliefPropagator propagator=peer.getBeliefPropagator();
 			ReplyConnection remote=new ReplyConnection(null);
+			remote.setTrustedKey(REMOTE_A.getAccountKey());
 			Message bad=Message.create(MessageType.DATA,Vectors.of(MessageTag.DATA,CVMLong.ONE)).withConnection(remote);
 			assertThrows(BadFormatException.class,() -> peer.stageData(bad));
 			// Staged after the bad one, in queue order: once it is, the bad one has been handled

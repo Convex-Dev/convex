@@ -197,12 +197,9 @@ public class MessageAPITest extends ARESTTest {
 
 	@Test
 	public void testHugePayload() throws Exception {
-		// Just over the limit, deliberately. The server rejects on Content-Length without
-		// reading the body, so a body far above the limit is still in flight when the socket
-		// closes — the resulting TCP reset discards the 413 that was already written, and the
-		// client sees "header parser received no bytes" instead. Draining an oversized body to
-		// avoid that is exactly what rejecting early exists to prevent, so the reset is accepted
-		// behaviour for very large bodies; what must be deterministic is the limit itself.
+		// Just over the limit, deliberately: within the bound the server reads before
+		// answering, so the 413 arrives. A body far beyond that bound is not read, and the
+		// connection reset that follows can discard the 413; that is accepted.
 		byte[] huge = new byte[(int) RESTServer.MAX_REQUEST_BODY_BYTES + 4096];
 		HttpResponse<byte[]> resp = postRaw(huge);
 		assertEquals(413, resp.statusCode(), "Oversized payload should use the request-size response");

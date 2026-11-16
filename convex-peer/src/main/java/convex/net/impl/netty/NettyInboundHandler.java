@@ -15,18 +15,21 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.util.Utils;
+import convex.net.ingress.IngressChannel;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 
 /**
- * Decodes inbound messages from a single client channel and delivers them to the server.
+ * Frames inbound messages from a single channel and hands each to its sink: an
+ * ingress channel, which decodes and routes it on a worker, or a delivery function.
  *
- * <p>One instance is created per inbound connection. Implements per-channel backpressure:
- * when the server cannot accept a message (queue full), this handler pauses reads on
- * its channel and retries on a virtual thread. Only the affected client is throttled —
- * all other clients continue at full speed.
+ * <p>One instance is created per connection. Implements per-channel backpressure:
+ * when the sink cannot take more (an ingress channel at its limit, or a delivery
+ * function whose queue is full and whose retry runs on a virtual thread), this
+ * handler pauses reads on its channel until the sink resumes it. Only the affected
+ * connection is throttled — all others continue at full speed.
  *
  * <p>The backpressure mechanism leverages TCP flow control: pausing socket reads causes
  * the kernel receive buffer to fill, which triggers a TCP zero-window advertisement
@@ -46,12 +49,47 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 	static final Logger log = LoggerFactory.getLogger(NettyInboundHandler.class.getName());
 
+	/** Where framed messages go. Called on the event loop. */
+	interface InboundSink {
+		/**
+		 * Takes a framed message.
+		 *
+		 * @param m Message framed from the channel
+		 * @return true to keep reading; false to pause until
+		 *         {@link NettyInboundHandler#resume()} is called
+		 */
+		boolean admit(Message m);
+
+		/** Releases the sink once the channel has closed. */
+		void disconnected();
+	}
+
 	/**
-	 * Delivery function. Returns null if accepted, or a blocking retry predicate
-	 * if the message could not be queued (backpressure signal).
+	 * Gets a sink that admits framed messages to an ingress channel.
+	 *
+	 * @param channel Ingress channel of the connection
+	 * @return Sink
 	 */
-	private final Function<Message, Predicate<Message>> deliver;
+	static InboundSink sinkOf(IngressChannel channel) {
+		return new InboundSink() {
+			@Override
+			public boolean admit(Message m) {
+				return channel.admit(m);
+			}
+
+			@Override
+			public void disconnected() {
+				channel.disconnect();
+			}
+		};
+	}
+
+	/** Where framed messages go; replaced only before the channel's first read. */
+	private volatile InboundSink sink;
 	private Consumer<Throwable> failureAction=e -> log.warn("Inbound message handling error",e);
+
+	/** Context of this handler, once added to its pipeline. */
+	private volatile ChannelHandlerContext context;
 
 	void setFailureAction(Consumer<Throwable> action) {
 		failureAction=action;
@@ -80,12 +118,12 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	private long receivedCount=0;
 
 	/**
-	 * Per-channel backpressure flag. When true, decode() returns without consuming
-	 * bytes, stopping the ByteToMessageDecoder loop. This preserves message ordering
-	 * — remaining bytes stay in the cumulation buffer and are decoded in order after
-	 * the retry completes.
+	 * Per-channel backpressure flag, set when the sink pauses reading. When true,
+	 * decode() returns without consuming bytes, stopping the ByteToMessageDecoder
+	 * loop. This preserves message ordering — remaining bytes stay in the cumulation
+	 * buffer and are decoded in order after the sink resumes. Event loop only.
 	 */
-	private volatile boolean backpressured = false;
+	private boolean paused = false;
 
 	/** The server connection whose reply backlog can pause reads, or null for a client channel. */
 	private NettyServerConnection replies;
@@ -120,8 +158,37 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 	public NettyInboundHandler(Function<Message, Predicate<Message>> deliver,
 			Predicate<Message> returnAction, int maxMessageLength) {
-		this.deliver=deliver;
+		this.sink=new DeliverySink(deliver);
 		setMaxMessageLength(maxMessageLength);
+	}
+
+	/**
+	 * Replaces the delivery function with another sink, such as an ingress channel.
+	 * Call before the channel's first read.
+	 *
+	 * @param sink Sink for framed messages
+	 */
+	void setSink(InboundSink sink) {
+		this.sink=sink;
+	}
+
+	/**
+	 * Resumes reading after the sink paused it. Any thread.
+	 */
+	void resume() {
+		ChannelHandlerContext ctx=context;
+		if (ctx==null) return;
+		ctx.channel().eventLoop().execute(() -> {
+			paused=false;
+			// A message held for the reply backlog resumes reading when that drains
+			if (ctx.channel().isActive() && held==null) resumeReading(ctx);
+		});
+	}
+
+	@Override
+	public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+		context=ctx;
+		super.handlerAdded(ctx);
 	}
 
 	/**
@@ -153,6 +220,11 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		try {
 			super.channelInactive(ctx);
 		} finally {
+			try {
+				sink.disconnected();
+			} catch (Exception e) {
+				log.debug("Inbound sink release failed: {}", e.getMessage());
+			}
 			AConnection conn = connection;
 			if (conn != null) {
 				conn.closeRequests();
@@ -189,14 +261,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-		// Gate: stop decoding while a message is being retried on a virtual thread, or
-		// held until replies drain. ByteToMessageDecoder sees no progress and stops its
+		// Gate: stop decoding while the sink has paused reading, or a message is held
+		// until replies drain. ByteToMessageDecoder sees no progress and stops its
 		// loop. Remaining bytes stay in the cumulation buffer, preserving order.
 		if (failed) {
 			in.skipBytes(in.readableBytes());
 			return;
 		}
-		if (backpressured || held != null) return;
+		if (paused || held != null) return;
 
 		try {
 	   		in.markReaderIndex(); // mark reader position, may revert to this if no complete message
@@ -278,39 +350,62 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	}
 
 	/**
-	 * Delivers a decoded message. If the server cannot take it yet, pauses reading and
-	 * retries on a virtual thread, resuming reading on the event loop when done.
-	 * Event loop only.
+	 * Hands a framed message to the sink, pausing reading if it can take no more until
+	 * it resumes. Event loop only.
 	 */
 	private void dispatch(ChannelHandlerContext ctx, Message m) {
-		Predicate<Message> retry = deliver.apply(m);
-		if (retry == null) return;
-		// Queue full — pause this channel, retry on virtual thread
-		backpressured = true;
+		if (sink.admit(m)) return;
+		// A resume the sink has already posted runs after this, on this event loop
+		paused = true;
 		ctx.channel().config().setAutoRead(false);
+	}
 
-		Thread.startVirtualThread(() -> {
-			try {
-				boolean delivered = retry.test(m);
-				if (!delivered) {
-					// Timeout — return :LOAD error
-					try {
-						m.returnResult(Result.SERVER_LOADED);
-					} catch (Exception e) {
-						// best effort
+	/**
+	 * Delivers each message with a delivery function. If the function cannot take a
+	 * message yet, its retry runs on a virtual thread while reading pauses.
+	 */
+	private final class DeliverySink implements InboundSink {
+		/**
+		 * Delivery function. Returns null if accepted, or a blocking retry predicate
+		 * if the message could not be queued (backpressure signal).
+		 */
+		private final Function<Message, Predicate<Message>> deliver;
+
+		DeliverySink(Function<Message, Predicate<Message>> deliver) {
+			this.deliver=deliver;
+		}
+
+		@Override
+		public boolean admit(Message m) {
+			Predicate<Message> retry = deliver.apply(m);
+			if (retry == null) return true;
+			ChannelHandlerContext ctx=context;
+			Thread.startVirtualThread(() -> {
+				try {
+					boolean delivered = retry.test(m);
+					if (!delivered) {
+						// Timeout — return :LOAD error
+						try {
+							m.returnResult(Result.SERVER_LOADED);
+						} catch (Exception e) {
+							// best effort
+						}
 					}
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					try { failureAction.accept(e); }
+					finally { ctx.close(); }
+				} finally {
+					resume();
 				}
-			} catch (Throwable e) {
-				Utils.checkRequestFailure(e);
-				try { failureAction.accept(e); }
-				finally { ctx.close(); }
-			} finally {
-				ctx.channel().eventLoop().execute(() -> {
-					backpressured = false;
-					if (ctx.channel().isActive()) resumeReading(ctx);
-				});
-			}
-		});
+			});
+			return false;
+		}
+
+		@Override
+		public void disconnected() {
+			// Nothing held: a retry in progress finishes on its own thread
+		}
 	}
 
 	/** Whether a message is held back until this channel's replies drain. */
@@ -329,7 +424,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		held = null;
 		try {
 			dispatch(ctx,m);
-			if (!backpressured) resumeReading(ctx);
+			if (!paused) resumeReading(ctx);
 		} catch (Throwable e) {
 			// Resumed delivery runs as an event-loop task, outside decode's failure path.
 			Utils.checkRequestFailure(e);

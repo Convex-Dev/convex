@@ -338,50 +338,98 @@ public class Message {
 	}
 
 	/**
+	 * Responds to a CHALLENGE message with the bound answer, as
+	 * {@link #answerBoundChallenge(AKeyPair, SignedData, AccountKey)} gives it.
+	 *
+	 * @param keyPair Key pair to sign the response with
+	 * @param dialledKey Key of the peer this connection was opened to reach
+	 */
+	public void respondToBoundChallenge(AKeyPair keyPair, AccountKey dialledKey) {
+		respondToChallenge(challenge -> answerBoundChallenge(keyPair,challenge,dialledKey));
+	}
+
+	/**
 	 * Validates and answers one signed possession challenge. This shared path is used
 	 * by both message-based and direct in-process transports.
 	 */
-	@SuppressWarnings("unchecked")
 	public static Result answerChallenge(AKeyPair keyPair,SignedData<ACell> signedData,
 			Predicate<ACell> contextValidator) {
 		try {
-			if (keyPair==null) return Result.error(ErrorCodes.TRUST,Strings.create("No signing key"));
-			if (signedData==null) return Result.error(ErrorCodes.FORMAT,Strings.create("Missing signed data"));
-			if (!signedData.checkSignature()) {
-				return Result.error(ErrorCodes.TRUST,Strings.create("Invalid challenge signature"));
-			}
-			ACell challenge=signedData.getValue();
-			if (!(challenge instanceof AVector<?> rawValues)) {
-				return Result.error(ErrorCodes.FORMAT,Strings.create("Invalid challenge data"));
-			}
-			AVector<ACell> values=(AVector<ACell>)rawValues;
-			long n=values.count();
-			Hash token=(n>=1)?RT.ensureHash(values.get(0)):null;
-			if (n<2 || n>3 || token==null) {
-				return Result.error(ErrorCodes.FORMAT,Strings.create("Invalid challenge elements"));
-			}
-
-			ACell rawTarget=values.get(1);
-			if (rawTarget!=null) {
-				AccountKey targetKey=RT.ensureAccountKey(rawTarget);
-				if (targetKey==null || !keyPair.getAccountKey().equals(targetKey)) {
-					return Result.error(ErrorCodes.TRUST,Strings.create("Wrong target key"));
-				}
-			}
-
-			ACell contextID=(n==3)?values.get(2):null;
-			if (contextValidator!=null && !contextValidator.test(contextID)) {
-				return Result.error(ErrorCodes.TRUST,Strings.create("Context mismatch"));
-			}
-
-			AccountKey challengerKey=signedData.getAccountKey();
-			AVector<ACell> responseValues=(contextID!=null)
-				?Vectors.of(token,challengerKey,contextID)
-				:Vectors.of(token,(ACell)challengerKey);
+			ChallengeParts parts=readChallenge(keyPair,signedData,contextValidator);
+			if (parts.error()!=null) return parts.error();
+			AVector<ACell> responseValues=(parts.context()!=null)
+				?Vectors.of(parts.token(),parts.challenger(),parts.context())
+				:Vectors.of(parts.token(),(ACell)parts.challenger());
 			return Result.value(keyPair.signData(responseValues));
 		} catch (Exception e) {
 			return Result.error(ErrorCodes.UNEXPECTED,Strings.create(e.getMessage()));
 		}
+	}
+
+	/**
+	 * Validates a challenge as {@link #answerChallenge(AKeyPair, SignedData, Predicate)}
+	 * does, accepting any context, and answers it with the bound form
+	 * {@code [token, challengerKey, contextID, dialledKey]}. The context slot is nil when
+	 * the challenge had none, so the answer always has four elements.
+	 *
+	 * @param keyPair Key pair to sign the answer with
+	 * @param signedData Signed challenge
+	 * @param dialledKey Key of the peer the answering connection was opened to reach
+	 * @return Result holding the signed answer, or an error
+	 */
+	public static Result answerBoundChallenge(AKeyPair keyPair,SignedData<ACell> signedData,
+			AccountKey dialledKey) {
+		try {
+			if (dialledKey==null) return Result.error(ErrorCodes.ARGUMENT,Strings.create("No dialled key"));
+			ChallengeParts parts=readChallenge(keyPair,signedData,null);
+			if (parts.error()!=null) return parts.error();
+			AVector<ACell> responseValues=Vectors.of(parts.token(),parts.challenger(),
+				parts.context(),dialledKey);
+			return Result.value(keyPair.signData(responseValues));
+		} catch (Exception e) {
+			return Result.error(ErrorCodes.UNEXPECTED,Strings.create(e.getMessage()));
+		}
+	}
+
+	/** The parts of a valid challenge that an answer signs, or the error for an invalid one. */
+	private record ChallengeParts(Hash token, AccountKey challenger, ACell context, Result error) {
+		static ChallengeParts error(Keyword code, String message) {
+			return new ChallengeParts(null,null,null,Result.error(code,Strings.create(message)));
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static ChallengeParts readChallenge(AKeyPair keyPair,SignedData<ACell> signedData,
+			Predicate<ACell> contextValidator) {
+		if (keyPair==null) return ChallengeParts.error(ErrorCodes.TRUST,"No signing key");
+		if (signedData==null) return ChallengeParts.error(ErrorCodes.FORMAT,"Missing signed data");
+		if (!signedData.checkSignature()) {
+			return ChallengeParts.error(ErrorCodes.TRUST,"Invalid challenge signature");
+		}
+		ACell challenge=signedData.getValue();
+		if (!(challenge instanceof AVector<?> rawValues)) {
+			return ChallengeParts.error(ErrorCodes.FORMAT,"Invalid challenge data");
+		}
+		AVector<ACell> values=(AVector<ACell>)rawValues;
+		long n=values.count();
+		Hash token=(n>=1)?RT.ensureHash(values.get(0)):null;
+		if (n<2 || n>3 || token==null) {
+			return ChallengeParts.error(ErrorCodes.FORMAT,"Invalid challenge elements");
+		}
+
+		ACell rawTarget=values.get(1);
+		if (rawTarget!=null) {
+			AccountKey targetKey=RT.ensureAccountKey(rawTarget);
+			if (targetKey==null || !keyPair.getAccountKey().equals(targetKey)) {
+				return ChallengeParts.error(ErrorCodes.TRUST,"Wrong target key");
+			}
+		}
+
+		ACell contextID=(n==3)?values.get(2):null;
+		if (contextValidator!=null && !contextValidator.test(contextID)) {
+			return ChallengeParts.error(ErrorCodes.TRUST,"Context mismatch");
+		}
+		return new ChallengeParts(token,signedData.getAccountKey(),contextID,null);
 	}
 
 	/**
@@ -440,6 +488,35 @@ public class Message {
 			throw new MisbehaviourException("Challenge response answers another challenge");
 		}
 		return remoteKey;
+	}
+
+	/**
+	 * Validates a bound challenge answer, as made by
+	 * {@link #answerBoundChallenge(AKeyPair, SignedData, AccountKey)}: a valid signature
+	 * over exactly {@code [token, ownKey, contextID, ownKey]}.
+	 *
+	 * @param result    The Result from the challenge response
+	 * @param token     The random token sent in the challenge
+	 * @param ownKey    The challenger's own key, expected as both the challenger and the dialled key
+	 * @param contextID Context ID sent in the challenge, or null if none was sent
+	 * @return The verified remote AccountKey, or null if validation fails
+	 */
+	@SuppressWarnings("unchecked")
+	public static AccountKey verifyBoundChallengeResponse(Result result, Hash token, AccountKey ownKey, ACell contextID) {
+		if (result == null || result.isError()) return null;
+		if (!(result.getValue() instanceof SignedData<?> rv)) return null;
+		SignedData<ACell> response = (SignedData<ACell>) rv;
+		if (!response.checkSignature()) return null;
+
+		if (!(response.getValue() instanceof AVector<?> inner)) return null;
+		AVector<ACell> values = (AVector<ACell>) inner;
+		if (values.count() != 4) return null;
+		if (!token.equals(values.get(0))) return null;
+		if (!ownKey.equals(values.get(1))) return null;
+		if (!Utils.equals(contextID, values.get(2))) return null;
+		if (!ownKey.equals(values.get(3))) return null;
+
+		return response.getAccountKey();
 	}
 
 	public static Message createGoodBye() {

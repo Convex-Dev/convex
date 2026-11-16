@@ -563,19 +563,25 @@ public class PeerRequestFailureTest {
 		}
 	}
 
-	/** DATA whose staging fails is dropped alone: a good Order sent after it is still merged. */
+	/**
+	 * DATA from a trusted connection whose staging fails is dropped alone: a good Order
+	 * sent after it is still merged.
+	 */
 	@Test
 	public void dataThatFailsToStageIsDroppedAlone() throws Exception {
 		for (Error error: CONTAINED) {
 			Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
 			try {
+				CompletableFuture<Message> failed=new CompletableFuture<>();
 				peer.getBeliefPropagator().setDataStageObserver(m -> {
+					failed.complete(m);
 					throw error;
 				});
 				Message data=Message.createDataMessage(List.of(Blob.wrap(new byte[200])),(int)CPoSConstants.MAX_MESSAGE_LENGTH);
-				InvalidPeerDataTest.connect(peer).sendMessage(InvalidPeerDataTest.wire(data));
+				InvalidPeerDataTest.connectAs(peer,REMOTE_A).sendMessage(InvalidPeerDataTest.wire(data));
 				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 				InvalidPeerDataTest.checkGoodOrderMerges(peer,good,Belief.create(good));
+				assertTrue(failed.isDone(),error+": the DATA was staged, and failed, before the Order merged");
 			} finally {
 				peer.close();
 			}

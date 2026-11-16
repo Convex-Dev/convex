@@ -27,6 +27,7 @@ import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.IncomingHandler;
+import convex.net.ingress.Ingress;
 import convex.peer.Config;
 import convex.peer.Server;
 import io.netty.bootstrap.ServerBootstrap;
@@ -79,6 +80,11 @@ public class NettyServer extends AServer {
 	 * or a blocking retry predicate if the queue was full.
 	 */
 	private Function<Message, Predicate<Message>> deliver;
+
+	/** Ingress that decodes and routes messages of accepted connections, or null to deliver on the event loop. */
+	private volatile Ingress ingress;
+	private volatile Function<Message, Predicate<Message>> ingressRoute;
+
 	private volatile Function<AConnection,IncomingHandler> connectionHandler;
 	/** Close futures on channels can finish before their disconnect callbacks. */
 	private final Set<AcceptedConnection> incomingHandlers=ConcurrentHashMap.newKeySet();
@@ -123,7 +129,6 @@ public class NettyServer extends AServer {
 
 	public static NettyServer create(Server server) {
 		NettyServer ns=new NettyServer(null);
-		ns.receiveAction=server.getReceiveAction();
 		ns.deliver=server::deliverMessage;
 		Object maxConns=server.getConfig().get(Keywords.MAX_CONNECTIONS);
 		if (maxConns!=null) {
@@ -185,6 +190,9 @@ public class NettyServer extends AServer {
 				 if (accepted!=null) inbound.setFailureAction(accepted::reportFailure);
             	 NettyServerConnection conn=new NettyServerConnection(ch,inbound,outbound);
             	 inbound.setConnection(conn);
+				 Ingress in=ingress;
+				 // A connection handler's own dispatch replaces the ingress
+				 if (accepted==null && in!=null) inbound.setSink(NettyInboundHandler.sinkOf(in.register(conn,ingressRoute,inbound::resume)));
 				 inbound.setDisconnectAction((accepted==null) ? getDisconnectAction() : accepted);
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
 				 if (accepted!=null) {
@@ -324,6 +332,19 @@ public class NettyServer extends AServer {
 	 */
 	public void setReceiveAction(Consumer<Message> handler) {
 		receiveAction=handler;
+	}
+
+	/**
+	 * Routes the messages of connections accepted after this call through an ingress,
+	 * which decodes and routes them on its workers instead of the event loop. A
+	 * connection handler ({@link #setConnectionHandler}) takes precedence.
+	 *
+	 * @param ingress Ingress to register accepted connections with
+	 * @param route Delivery of each message, called on an ingress worker
+	 */
+	public void setIngress(Ingress ingress, Function<Message, Predicate<Message>> route) {
+		this.ingressRoute=route;
+		this.ingress=ingress;
 	}
 
 	/**

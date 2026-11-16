@@ -148,6 +148,13 @@ public class InvalidPeerDataTest {
 		return MissingBeliefDataTest.connect(peer,m -> true);
 	}
 
+	/** A connection the peer trusts as a staked peer's, as verification leaves it: DATA from it is stored. */
+	static LocalConnection connectAs(Server peer, AKeyPair kp) {
+		LocalConnection senderEnd=connect(peer);
+		senderEnd.getPaired().setTrustedKey(kp.getAccountKey());
+		return senderEnd;
+	}
+
 	static Message wire(Message m) {
 		return MissingBeliefDataTest.wire(m);
 	}
@@ -337,7 +344,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * Deeply nested DATA is stored, and a good Order sent after it is merged.
+	 * Deeply nested DATA from a trusted connection is stored, and a good Order sent after
+	 * it is merged.
 	 */
 	@Test
 	public void deeplyNestedDataIsStored() throws Exception {
@@ -351,7 +359,7 @@ public class InvalidPeerDataTest {
 			ACell outermost=branches.get(0);
 			Message data=Message.createDataMessage(branches,(int)CPoSConstants.MAX_MESSAGE_LENGTH);
 
-			LocalConnection senderEnd=connect(peer);
+			LocalConnection senderEnd=connectAs(peer,REMOTE_A);
 			senderEnd.sendMessage(wire(data));
 			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 			senderEnd.sendMessage(wire(Message.createBelief(Belief.create(good))));
@@ -508,7 +516,7 @@ public class InvalidPeerDataTest {
 	/**
 	 * A local client, as the REST API uses, acquires a value the peer has persisted,
 	 * and is refused at once, with nothing written, a value the peer has only stored,
-	 * as DATA from any connection leaves it.
+	 * as DATA from a trusted connection leaves it.
 	 */
 	@Test
 	public void acquiringAValueNotPersisted() throws Exception {
@@ -761,7 +769,10 @@ public class InvalidPeerDataTest {
 		}
 	}
 
-	/** DATA that runs out of memory as it is staged is dropped, and a good Order sent after it is merged. */
+	/**
+	 * DATA from a trusted connection that runs out of memory as it is staged is dropped,
+	 * and a good Order sent after it is merged.
+	 */
 	@Test
 	public void dataThatRunsOutOfMemoryIsDropped() throws Exception {
 		OutOfMemoryError error=new OutOfMemoryError("simulated");
@@ -773,7 +784,7 @@ public class InvalidPeerDataTest {
 				BlockingQueue<Belief> updates=ownOrderUpdates(peer);
 				Blob cell=Blobs.createRandom(400);
 				store.failOnce(cell.getHash(),error);
-				LocalConnection senderEnd=connect(peer);
+				LocalConnection senderEnd=connectAs(peer,REMOTE_A);
 				senderEnd.sendMessage(wire(Message.createDataMessage(List.of(cell),(int)CPoSConstants.MAX_MESSAGE_LENGTH)));
 				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 				senderEnd.sendMessage(wire(Message.createBelief(Belief.create(good))));
@@ -791,8 +802,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * An update whose cells run out of memory as the peer keeps them on receipt is merged
-	 * all the same: keeping them only spares later fetches.
+	 * An update from a trusted connection whose cells run out of memory as the peer keeps
+	 * them on receipt is merged all the same: keeping them only spares later fetches.
 	 */
 	@Test
 	public void anUpdateThatRunsOutOfMemoryAsItIsKeptIsStillMerged() throws Exception {
@@ -806,7 +817,7 @@ public class InvalidPeerDataTest {
 				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 				Belief belief=Belief.create(good);
 				store.failOnce(belief.getHash(),error);
-				connect(peer).sendMessage(wire(Message.createBelief(belief)));
+				connectAs(peer,REMOTE_A).sendMessage(wire(Message.createBelief(belief)));
 
 				Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
 				assertNotNull(merged,"the good Order is merged");

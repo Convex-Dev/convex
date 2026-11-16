@@ -71,6 +71,9 @@ import convex.etch.EtchStore;
 import convex.net.AServer;
 import convex.net.RequestFailures;
 import convex.net.Transports;
+import convex.net.ingress.Destination;
+import convex.net.ingress.Ingress;
+import convex.net.ingress.IngressLimits;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
 
@@ -124,18 +127,6 @@ public class Server implements Closeable {
 
 	private Consumer<Message> messageReceiveObserver=null;
 
-	/**
-	 * Blocking message consumer for the NIO path and tests. Delegates to
-	 * {@link #deliverMessage} and, if a retry predicate is returned, blocks the
-	 * caller's thread until the message is accepted or times out.
-	 */
-	Consumer<Message> receiveAction = m->{
-		Predicate<Message> retry = deliverMessage(m);
-		if (retry != null) {
-			if (!retry.test(m)) returnBestEffort(m,Result.SERVER_LOADED);
-		}
-	};
-
 	/** One per boundary, so each warns once of each kind of failure that warrants it. */
 	private final RequestFailures dispatchFailures=new RequestFailures(log);
 	private final RequestFailures decodeFailures=new RequestFailures(log);
@@ -167,12 +158,20 @@ public class Server implements Closeable {
 	protected final QueryHandler queryHandler=new QueryHandler(this);
 
 	/**
-	 * Pre-allocated retry predicates for backpressure. These are returned by
-	 * processMessage when a queue is full, and block until space is available.
-	 * Zero allocation on the reject path — method references are bound once.
+	 * Verifies connections opened to this peer, so that the cells staked peers push are stored
 	 */
-	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
-	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
+	private final InboundVerifier verifier=new InboundVerifier(this);
+
+	/**
+	 * Answers the control messages received on network connections.
+	 */
+	private final ControlHandler controlHandler=new ControlHandler(this);
+
+	/**
+	 * Decodes and routes the messages received on network connections, off the
+	 * network threads. Created at launch.
+	 */
+	private Ingress ingress;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -221,7 +220,8 @@ public class Server implements Closeable {
 		} else {
 			this.nio= NIOServer.create(this);
 		}
-		
+		nio.setDisconnectAction(verifier::forget);
+
 	}
 
 	private Peer establishPeer() throws ConfigException, LaunchException, InterruptedException {
@@ -240,7 +240,7 @@ public class Server implements Closeable {
 				Convex c=null;
 				boolean synced=false;
 				try {
-					c=Convex.connect(source);
+					c=connectToSource(source,keyPair);
 					c.setStore(getStore());
 					Peer peer=syncPeer(keyPair,c);
 					synced=true;
@@ -287,6 +287,21 @@ public class Server implements Closeable {
 		} catch (IOException e) {
 			throw new LaunchException("IO Exception while establishing peer: "+e,e);
 		}
+	}
+
+	/**
+	 * Opens the client a peer syncs from and keeps as its link to its launch source. A
+	 * Server source gets an in-process client with this peer's key pair, so that the
+	 * source can challenge the link; any other source is connected as
+	 * {@link Convex#connect(Object)} does.
+	 *
+	 * @param source Launch source: a Convex client, a Server, or a peer address
+	 * @param keyPair This peer's key pair
+	 * @return Client connected to the source
+	 */
+	static Convex connectToSource(Object source, AKeyPair keyPair) throws IOException, TimeoutException, InterruptedException {
+		if (source instanceof Server s) return Convex.connect(s,null,keyPair);
+		return Convex.connect(source);
 	}
 
 	public Peer syncPeer(AKeyPair keyPair, Convex convex) throws LaunchException, InterruptedException {
@@ -521,6 +536,14 @@ public class Server implements Closeable {
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
 
+			// Before the listeners, which register each connection they accept with it
+			ingress=new Ingress("Peer server",IngressLimits.defaults(),AConnection::isTrusted,
+				e -> requestShutdown("JVM failure in ingress",e,false));
+			if (nio instanceof NettyServer ns) {
+				ns.setIngress(ingress,this::receiveMessage);
+			} else if (nio instanceof NIOServer ns) {
+				ns.setIngress(ingress,this::receiveMessage);
+			}
 			nio.setPort(port);
 			nio.launch();
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
@@ -530,6 +553,8 @@ public class Server implements Closeable {
 				int securePort=Utils.toInt(tlsPort);
 				if (securePort<0 || securePort>65535) throw new ConfigException("Invalid TLS port");
 				tls=NettyServer.create(this);
+				tls.setDisconnectAction(verifier::forget);
+				tls.setIngress(ingress,this::receiveMessage);
 				tls.setPort(securePort);
 				Object context=config.get(Config.TLS_CONTEXT);
 				if (context!=null && !(context instanceof SSLContext)) {
@@ -548,6 +573,7 @@ public class Server implements Closeable {
 
 			// Start threaded components
 			manager.start();
+			controlHandler.start();
 			queryHandler.start();
 			propagator.start();
 			transactionHandler.start();
@@ -583,19 +609,19 @@ public class Server implements Closeable {
 	 * Dispatches a decoded inbound message to the appropriate handler.
 	 *
 	 * <p>Client requests are offered to bounded queues and may request connection
-	 * backpressure when full. BELIEF and DATA propagation is offered once to its
-	 * dedicated queue and dropped if full. Lightweight control messages are handled
-	 * inline.
+	 * backpressure when full. BELIEF propagation, and DATA from a trusted connection,
+	 * is offered once to its dedicated queue and dropped if full. Lightweight control
+	 * messages are handled inline.
 	 *
-	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
-	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
-	 * the caller (typically {@code NettyInboundHandler}) parks the
-	 * channel and lets the predicate block on a virtual thread until space is available.
+	 * <p>Non-blocking: a single {@code queue.offer()} and return. If the target queue
+	 * is full, returns that queue as a {@link Destination} instead of an error: an
+	 * ingress keeps the message until the destination signals room, and a caller that
+	 * may wait tests it to wait for space for a bounded time.
 	 *
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
 	 *
 	 * @param m Message to process (already decoded)
-	 * @return a retry Predicate for a saturated request queue, otherwise null
+	 * @return the Destination of a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> processMessage(Message m) {
 		try {
@@ -603,11 +629,11 @@ public class Server implements Closeable {
 			switch (type) {
 			case TRANSACT:
 				if (transactionHandler.offerTransaction(m)) return null;
-				return txnRetry;
+				return transactionHandler.getDestination();
 
 			case QUERY: case DATA_REQUEST:
 				if (queryHandler.offerQuery(m)) return null;
-				return queryRetry;
+				return queryHandler.getDestination();
 
 			// Propagation is best-effort. A full queue drops this update rather than
 			// pausing the connection and blocking later protocol messages.
@@ -654,15 +680,29 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Offers DATA to the propagation queue so it retains wire order off the I/O thread.
-	 * Accepted from any connection: DATA is staging only, and nothing it holds counts
-	 * until a valid Belief refers to it.
+	 * Offers DATA from a trusted connection to the propagation queue, so it retains wire
+	 * order off the I/O thread. DATA from any other connection is ignored, and starts
+	 * verification of that connection: an update it preceded completes through the
+	 * missing-data fetch.
 	 */
 	private boolean processData(Message message) {
+		AConnection connection=message.getConnection();
+		if (connection==null || !connection.isTrusted()) {
+			verifier.maybeStart(connection);
+			return false;
+		}
 		return propagator.queuePropagation(message);
 	}
 
-	/** Stages a previously authorised DATA message on the Belief propagator thread. */
+	/** The verifier of connections opened to this peer. For tests. */
+	InboundVerifier getInboundVerifier() {
+		return verifier;
+	}
+
+	/**
+	 * Stores the cells of a DATA message from a trusted connection, on the Belief
+	 * propagator thread.
+	 */
 	void stageData(Message message) throws IOException, BadFormatException {
 		AVector<?> payload=RT.ensureVector(message.getPayload());
 		// Bounded by the inbound message length only: novelty has no cell-count limit
@@ -679,16 +719,43 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Delivers an inbound message: decodes payload, observes, and dispatches.
-	 * Returns a blocking retry predicate only for a saturated request queue.
-	 *
-	 * This is the primary entry point for both Netty and ConvexLocal message delivery.
+	 * Delivers an inbound message on the caller's thread: decodes payload, observes,
+	 * and dispatches, handling control messages inline. This is the entry point for
+	 * local clients such as ConvexLocal.
 	 *
 	 * @param m Message to deliver
-	 * @return a retry Predicate for a saturated request queue, otherwise null
+	 * @return the Destination of a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
-		if (completeReply(m)) return null;
+		if (!prepareMessage(m)) return null;
+		return processMessage(m);
+	}
+
+	/**
+	 * Takes a message received on a network connection, on an ingress worker. As
+	 * {@link #deliverMessage(Message)}, except that control messages go to the
+	 * control handler.
+	 *
+	 * @param m Message received
+	 * @return null if placed or handled, otherwise the destination that refused it
+	 */
+	Predicate<Message> receiveMessage(Message m) {
+		if (!prepareMessage(m)) return null;
+		switch (m.getType()) {
+			case PING: case STATUS: case CHALLENGE: case GOODBYE:
+				return controlHandler.offer(m);
+			default:
+				return processMessage(m);
+		}
+	}
+
+	/**
+	 * Completes a reply, or decodes and observes a message for dispatch.
+	 *
+	 * @return true if the message is to be dispatched
+	 */
+	private boolean prepareMessage(Message m) {
+		if (completeReply(m)) return false;
 		try {
 			m.getPayload(getStore());
 		} catch (Throwable e) {
@@ -703,10 +770,10 @@ public class Server implements Closeable {
 			}
 			// After the reply. A validation failure here is in the message's own encoding
 			if (e instanceof ValidationException bad) manager.handleBadInput(m.getConnection(),bad);
-			return null;
+			return false;
 		}
 		observeMessageReceived(m);
-		return processMessage(m);
+		return true;
 	}
 
 	/**
@@ -729,11 +796,11 @@ public class Server implements Closeable {
 	 * peers, handling it as one from any inbound connection.
 	 *
 	 * @param m DATA_REQUEST message
-	 * @return a retry Predicate if the query queue is full, otherwise null
+	 * @return the query Destination if the query queue is full, otherwise null
 	 */
 	Predicate<Message> deliverDataRequest(Message m) {
 		if (queryHandler.offerQuery(m)) return null;
-		return queryRetry;
+		return queryHandler.getDestination();
 	}
 
 	/**
@@ -889,12 +956,16 @@ public class Server implements Closeable {
 	/**
 	 * Process an incoming message that represents a Belief. Whoever sent it, each
 	 * Order it carries is judged on its own (signature, stake and age), so it joins the
-	 * ordered propagation queue behind any DATA from the same connection.
+	 * ordered propagation queue behind any DATA from the same connection. The cells it
+	 * carries are kept only if the connection is trusted. A Belief from an untrusted
+	 * connection also starts verification of that connection.
 	 * @param m Belief message to process
 	 * @return true if queued, false if the queue is full and the Belief was dropped
 	 */
 	protected boolean processBelief(Message m) {
-		return propagator.queuePropagation(m);
+		boolean queued=propagator.queuePropagation(m);
+		verifier.maybeStart(m.getConnection());
+		return queued;
 	}
 
 	/**
@@ -1018,9 +1089,13 @@ public class Server implements Closeable {
 		// Close manager, we don't want any management actions during shutdown!
 		cleanup.run(manager::close);
 
-		// Stop ingress before worker/store shutdown.
+		// Stop ingress before worker/store shutdown: listeners first, so nothing more is admitted
 		cleanup.run(nio::close);
 		if (tls!=null) cleanup.run(tls::close);
+		if (ingress!=null) cleanup.run(ingress::close);
+		// After ingress, so that no new verification starts
+		cleanup.run(verifier::close);
+		cleanup.run(controlHandler::close);
 
 		// Shut down propagator, no point sending any more Beliefs
 		cleanup.run(propagator::close);
@@ -1039,7 +1114,7 @@ public class Server implements Closeable {
 	/** Waits for the closed components to stop, then writes the final checkpoint if asked. */
 	private void stopComponentsAndCheckpoint(boolean persist) {
 		boolean writersStopped=awaitComponentsStopped(
-			queryHandler,propagator,transactionHandler,executor);
+			controlHandler,queryHandler,propagator,transactionHandler,executor);
 		// A fetch of missing Belief data writes to the store too; bounded by its own timeout
 		writersStopped&=propagator.awaitFetchStopped(manager.getPollDelay());
 		// Result deliveries never wait on a client, so they end soon after their connections close
@@ -1188,14 +1263,6 @@ public class Server implements Closeable {
 
 	public HashMap<Keyword, Object> getConfig() {
 		return config;
-	}
-
-	/**
-	 * Gets the action to perform for an incoming client message
-	 * @return Message consumer
-	 */
-	public Consumer<Message> getReceiveAction() {
-		return receiveAction;
 	}
 
 	/**

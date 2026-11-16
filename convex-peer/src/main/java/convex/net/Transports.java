@@ -9,6 +9,7 @@ import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -32,9 +33,7 @@ public final class Transports {
 
 	public static final Transport NETTY = new NettyTransport("tcp", () -> null, true);
 
-	/** Cannot pause reading: its one selector thread serves every NIO connection. */
-	public static final Transport NIO = (endpoint, receive, limit) ->
-		Connection.connect(socketAddress(endpoint, "tcp"), receive, limit);
+	public static final Transport NIO = new NIOTransport();
 
 	public static final Transport TCP = Config.USE_NETTY_CLIENT ? NETTY : NIO;
 
@@ -86,6 +85,24 @@ public final class Transports {
 				throws IOException, InterruptedException {
 			InetSocketAddress address=socketAddress(endpoint, scheme);
 			return NettyConnection.connectWithDelivery(address, delivery, limit, context.get(), verifyHostname);
+		}
+	}
+
+	/** The NIO TCP transport, which pauses a connection's reading when its delivery asks to wait. */
+	private static final class NIOTransport implements Transport {
+		@Override
+		public AConnection connect(URI endpoint, Consumer<Message> receiveAction, int limit)
+				throws IOException, TimeoutException {
+			return connectWithDelivery(endpoint, message -> {
+				receiveAction.accept(message);
+				return null;
+			}, limit);
+		}
+
+		@Override
+		public AConnection connectWithDelivery(URI endpoint, Function<Message, Predicate<Message>> delivery, int limit)
+				throws IOException, TimeoutException {
+			return Connection.connectWithDelivery(socketAddress(endpoint, "tcp"), delivery, limit);
 		}
 	}
 

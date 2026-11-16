@@ -423,20 +423,25 @@ public class ServerTest {
 	}
 
 	/**
-	 * DATA and Beliefs join the ordered propagation queue whoever sends them, with no
-	 * reply: each Order is judged on its own when merged.
+	 * Beliefs join the ordered propagation queue whoever sends them, with no reply: each
+	 * Order is judged on its own when merged. DATA joins it only from a trusted connection.
 	 */
 	@Test
-	public void testPropagationAcceptedFromAnyConnection() throws Exception {
+	public void testPropagationQueueTakesDataOnlyFromTrustedConnections() throws Exception {
+		checkPropagationQueue(false);
+		checkPropagationQueue(true);
+	}
+
+	private void checkPropagationQueue(boolean trusted) throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE,new MemoryStore());
 		Server server=Server.create(config); // not launched: queue is not drained
 		try {
-			// The server's end of a connection from an unverified sender, recording replies
+			// The server's end of a connection from a sender, recording replies
 			ArrayList<Message> replies=new ArrayList<>();
 			LocalConnection sender=LocalConnection.createPair(replies::add,m -> true);
 			AConnection serverEnd=sender.getPaired();
-			assertFalse(serverEnd.isTrusted());
+			if (trusted) serverEnd.setTrustedKey(network.SERVER.getPeerKey());
 
 			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
 				.withConnection(serverEnd);
@@ -445,7 +450,11 @@ public class ServerTest {
 			for (int i=1; i<Config.BELIEF_QUEUE_SIZE; i++) assertNull(server.processMessage(belief));
 
 			BeliefPropagator propagator=server.getBeliefPropagator();
-			assertFalse(propagator.queuePropagation(belief),"the sender's DATA and Beliefs filled the queue");
+			if (trusted) {
+				assertFalse(propagator.queuePropagation(belief),"the sender's DATA and Beliefs filled the queue");
+			} else {
+				assertTrue(propagator.queuePropagation(belief),"the untrusted sender's DATA was not queued");
+			}
 			assertTrue(replies.isEmpty(),"nothing is refused or answered");
 		} finally {
 			server.close();
@@ -754,7 +763,11 @@ public class ServerTest {
 			assertTrue(propagator.hasBeliefPollCapacity(),"pushes filling their queue must not stop polling");
 			assertNull(server.processMessage(belief));
 
-			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);
+			// From a trusted connection, so that the DATA reaches the full queue
+			LocalConnection trusted=LocalConnection.create(m -> true);
+			trusted.setTrustedKey(network.SERVER.getPeerKey());
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
+				.withConnection(trusted);
 			assertNull(server.processMessage(data));
 		} finally {
 			server.close();
@@ -786,7 +799,10 @@ public class ServerTest {
 		Server server=network.SERVER;
 		Blob value=Blobs.createRandom(400);
 		Message sent=Message.createDataMessage(List.of(value),1024);
-		Message incoming=Message.create(sent.getMessageData());
+		// DATA is staged only from a connection trusted as a staked peer's
+		LocalConnection conn=LocalConnection.create(m -> true);
+		conn.setTrustedKey(server.getPeerKey());
+		Message incoming=Message.create(conn,sent.getMessageData());
 		CompletableFuture<Message> staged=new CompletableFuture<>();
 		server.getBeliefPropagator().setDataStageObserver(staged::complete);
 

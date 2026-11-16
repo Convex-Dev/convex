@@ -73,7 +73,8 @@ import convex.peer.Server;
  * This can be used by both peers and JVM-based clients.
  *
  * Futures returned by a client may complete on the thread that delivers the
- * reply, such as a network event loop or a local peer's own thread. Stages
+ * reply, such as an ingress worker shared by many connections or a local peer's
+ * own thread. Stages
  * attached with non-async methods such as {@code thenApply} then run on that
  * thread, so they must not block: chain further requests with
  * {@code thenCompose}, and attach only work that must wait with an
@@ -151,6 +152,12 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected AccountKey verifiedPeer = null;
 
+	/**
+	 * Key of the peer this client was opened to reach, or null. Set before the client
+	 * sends anything, and read when answering a challenge on the receive thread.
+	 */
+	protected volatile AccountKey dialledPeer = null;
+
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
@@ -173,6 +180,26 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected void setVerifiedPeer(AccountKey key) {
 		verifiedPeer = key;
+	}
+
+	/**
+	 * Records the key of the peer this client was opened to reach. While set, the
+	 * client answers a challenge in the bound form naming this key
+	 * ({@link Message#answerBoundChallenge}) instead of the plain form.
+	 *
+	 * @param key Peer key, or null to answer plainly
+	 */
+	public void setDialledPeer(AccountKey key) {
+		dialledPeer = key;
+	}
+
+	/**
+	 * Gets the key of the peer this client was opened to reach.
+	 *
+	 * @return Peer key, or null if none is recorded
+	 */
+	public AccountKey getDialledPeer() {
+		return dialledPeer;
 	}
 
 	/**

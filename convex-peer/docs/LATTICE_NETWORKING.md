@@ -421,7 +421,8 @@ least one, so a single peer cannot crowd out the rest. A request beyond either
 limit makes its route stop reading until a permit frees, and is answered with
 `:LOAD` only if none frees within 8 seconds. Values and other messages a peer
 sends over such a route enter the group's queue as they do on an inbound
-connection, and wait for room in the same way.
+connection, and wait for room in the same way, but are offered by a worker of the
+client ingress rather than the event loop ([BACKPRESSURE.md](BACKPRESSURE.md#connections-a-node-opens)).
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
 logical root publication. It does not wait for every propagator group to
