@@ -612,7 +612,7 @@ public class ConnectionManagerTest {
 	 */
 	@Test
 	public void testLinkVerifiedLaterAnswersForItsPeer() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(280));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AKeyPair remote=AKeyPair.createSeeded(281);
@@ -635,7 +635,7 @@ public class ConnectionManagerTest {
 	/** A link keeps the peer chosen before dialling, whatever key it is filed under and proves. */
 	@Test
 	public void testChosenDialledPeerIsKept() throws Exception {
-		Server server=createPollingServer(AKeyPair.createSeeded(283));
+		Server server=createPollingServer();
 		try {
 			ConnectionManager manager=server.getConnectionManager();
 			AKeyPair remote=AKeyPair.createSeeded(284);
