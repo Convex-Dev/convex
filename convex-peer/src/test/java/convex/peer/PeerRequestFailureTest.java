@@ -44,6 +44,7 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
@@ -163,7 +164,7 @@ public class PeerRequestFailureTest {
 		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
 		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
 		try (logs) {
-			Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+			Server peer=InvalidPeerDataTest.createPeer(LOCAL);
 			try {
 				for (Error error: withOwn(CONTAINED,outOfMemory)) {
 					// Not started: this test thread runs it
@@ -186,7 +187,7 @@ public class PeerRequestFailureTest {
 	/** A query whose handling fails is answered with the failure's code, and its connection is kept. */
 	@Test
 	public void aQueryThatFailsIsAnsweredAndKeepsItsConnection() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL);
 		try {
 			for (Error error: CONTAINED) {
 				// Not started: this test thread runs it
@@ -206,7 +207,7 @@ public class PeerRequestFailureTest {
 	/** A query without an address, which the protocol allows, is answered. */
 	@Test
 	public void aQueryWithoutAnAddressIsAnswered() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL);
 		try {
 			// Not started: this test thread runs it
 			QueryHandler handler=new QueryHandler(peer);
@@ -230,13 +231,14 @@ public class PeerRequestFailureTest {
 		OutOfMemoryError outOfMemory=new OutOfMemoryError("simulated");
 		ExpectedLogs logs=ExpectedLogs.carrying(outOfMemory).open();
 		try (logs) {
-			Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+			Server peer=InvalidPeerDataTest.createPeer(LOCAL);
 			try {
+				// The peer holds its Belief, as a launched peer does
+				Hash held=Cells.persist(peer.getBelief(),peer.getStore()).getHash();
 				for (Error error: withOwn(CONTAINED,outOfMemory)) {
 					QueryHandler handler=new QueryHandler(peer);
 					ReplyConnection failing=new ReplyConnection(error);
 					ReplyConnection healthy=new ReplyConnection(null);
-					Hash held=peer.getBelief().getHash();
 					assertTrue(handler.offerQuery(Message.createDataRequest(CVMLong.create(1),held).withConnection(failing)));
 					assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",ORIGIN).withConnection(healthy)));
 					handler.loop();
@@ -602,7 +604,7 @@ public class PeerRequestFailureTest {
 	/** A Belief message whose Orders cannot be read is rejected alone, and nothing is thrown. */
 	@Test
 	public void aBeliefMessageThatFailsIsRejectedAlone() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL,REMOTE_A,REMOTE_B);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL,REMOTE_A,REMOTE_B);
 		try {
 			for (Error error: CONTAINED) {
 				// Not started: this test thread runs it
@@ -1014,7 +1016,7 @@ public class PeerRequestFailureTest {
 	/** A failure of the JVM itself while answering a query is not contained. */
 	@Test
 	public void aJvmFailureAnsweringAQueryIsNotContained() throws Exception {
-		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
+		Server peer=InvalidPeerDataTest.createPeer(LOCAL);
 		try {
 			QueryHandler handler=new QueryHandler(peer);
 			ReplyConnection failing=new ReplyConnection(new InternalError("simulated"));

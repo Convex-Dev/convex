@@ -91,17 +91,34 @@ public class InvalidPeerDataTest {
 
 	/** Launches a peer as {@link #launchPeer(AKeyPair, AKeyPair...)} does, on the given store. */
 	static Server launchPeer(AStore store, AKeyPair kp, AKeyPair... others) throws Exception {
-		ArrayList<AccountKey> keys=new ArrayList<>();
-		keys.add(kp.getAccountKey());
-		for (AKeyPair o: others) keys.add(o.getAccountKey());
-		State genesis=GenesisStates.of(keys);
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
-		config.put(Keywords.STATE,genesis);
+		config.put(Keywords.STATE,genesis(kp,others));
 		config.put(Keywords.PORT,0);
 		config.put(Keywords.STORE,store);
 		config.put(Keywords.POLL_DELAY,LONG_POLL_DELAY);
 		return API.launchPeer(config);
+	}
+
+	/**
+	 * Creates a peer on the network {@link #launchPeer(AKeyPair, AKeyPair...)} would, but
+	 * does not launch it, for a test that runs one of its components on the test thread.
+	 * It is not live, so it refuses transactions, and its store holds nothing.
+	 */
+	static Server createPeer(AKeyPair kp, AKeyPair... others) throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		server.getCVMExecutor().setPeer(Peer.createGenesisPeer(kp,genesis(kp,others)));
+		return server;
+	}
+
+	/** The genesis State of a network of the given keys, all equally staked. */
+	static State genesis(AKeyPair kp, AKeyPair... others) {
+		ArrayList<AccountKey> keys=new ArrayList<>();
+		keys.add(kp.getAccountKey());
+		for (AKeyPair o: others) keys.add(o.getAccountKey());
+		return GenesisStates.of(keys);
 	}
 
 	/** Timestamp for Blocks: valid against the genesis State. */
