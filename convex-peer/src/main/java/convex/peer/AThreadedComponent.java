@@ -24,6 +24,9 @@ public abstract class AThreadedComponent {
 	private class ComponentTask implements Runnable {
 		@Override
 		public void run() {
+			// Here, not in the constructor: the thread is named when it starts
+			LoopFailures failures=new LoopFailures(log,server,getThreadName());
+
 			// Run main component loop
 			while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 				try {
@@ -33,18 +36,8 @@ public abstract class AThreadedComponent {
 					log.trace("Component thread interrupted: {}",thread);
 					Thread.currentThread().interrupt();
 					break;
-				} catch (Exception e) {
-					log.error("Unexpected error in component loop: {}",thread,e);
-				} catch (Error e) {
-					if (!isFatal(e)) {
-						// A defect some input reached, or an overflow that has unwound: the next iteration can run
-						log.error("Unexpected error in component loop: {}",thread,e);
-						continue;
-					}
-					// Stop the peer rather than leave it running without this component
-					log.error("Fatal error in component loop, closing server: {}",thread,e);
-					server.close();
-					break;
+				} catch (Throwable e) {
+					if (!failures.handle(e)) break;
 				}
 			}
 			
@@ -54,19 +47,7 @@ public abstract class AThreadedComponent {
 		}
 	}
 	
-	/**
-	 * Tests whether an Error leaves the JVM unable to run the peer reliably: a virtual
-	 * machine error other than a stack overflow, or a linkage error.
-	 *
-	 * @param e Error to test
-	 * @return True if the Error is fatal
-	 */
-	static boolean isFatal(Error e) {
-		if (e instanceof StackOverflowError) return false;
-		return (e instanceof VirtualMachineError)||(e instanceof LinkageError);
-	}
-
-	public double getLoad() {
+	public double getLoad() {  
 		return LoadMonitor.getLoad(thread);
 	}
 

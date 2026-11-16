@@ -45,12 +45,16 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.RequestFailures;
 
 /**
  * Server component for handling client transactions and producing Blocks
@@ -163,7 +167,58 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
 	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
-	private static final Result ERR_STACK=Result.error(ErrorCodes.LIMIT, Strings.intern("Transaction exceeded this peer's stack depth")).withSource(SourceCodes.PEER);
+
+	private final RequestFailures failures=new RequestFailures(log);
+
+	/**
+	 * For both observers, apart from intake's log, so an observer's defect does not use
+	 * up intake's one warning.
+	 */
+	private final RequestFailures observerFailures=new RequestFailures(log);
+
+	private static final Result ERR_RESULT_UNAVAILABLE=Result.error(ErrorCodes.PEER,
+		Strings.intern("TX executed, but result not delivered")).withSource(SourceCodes.PEER);
+
+	/** Separate logs, so each site warns once of each kind of failure. */
+	private final RequestFailures resultFailures=new RequestFailures(log);
+	private final RequestFailures deliveryFailures=new RequestFailures(log);
+
+	private static final Result ERR_BLOCK_FAILED=Result.error(ErrorCodes.PEER, Strings.intern("Block production failed")).withSource(SourceCodes.PEER);
+
+	/** Separate from intake's log, so each site warns once of each kind of failure. */
+	private final RequestFailures blockFailures=new RequestFailures(log);
+
+	/**
+	 * Gets the signed value a transaction message carries, or null if the message does
+	 * not have that shape.
+	 */
+	@SuppressWarnings("unchecked")
+	private static SignedData<ATransaction> transactionOf(Message m) {
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v==null)||(v.count()<3)) return null;
+		return (v.get(2) instanceof SignedData<?> sd)?(SignedData<ATransaction>)sd:null;
+	}
+
+	/** Rejects one client transaction whose handling failed. */
+	private void reject(Message m, Throwable e) {
+		failures.log(e,"Rejected transaction for connection {}",m.getConnection());
+		sendRejection(m,RequestFailures.reply(e));
+		// After the reply, for a local client that stays open; a remote one may be closed
+		// before it is written. Every validation failure here is in the client's own input
+		if (e instanceof ValidationException bad) server.getConnectionManager().handleBadInput(m.getConnection(),bad);
+	}
+
+	/**
+	 * Sends a rejection to a client, dropping it if it cannot be sent, unless the JVM
+	 * itself has failed.
+	 */
+	private static void sendRejection(Message m, Result r) {
+		try {
+			m.returnResult(r);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+		}
+	}
 	
 	private Result checkPeerState() {
 		try {
@@ -192,7 +247,8 @@ public class TransactionHandler extends AThreadedComponent {
 		Result problem=checkPeerState();
 		if (problem!=null) {
 			for (Message msg: messages) {
-				msg.returnResult(problem);
+				// Each reply guarded: one client's failing reply must not cost the others theirs
+				sendRejection(msg,problem);
 			}
 			return;
 		}
@@ -208,8 +264,9 @@ public class TransactionHandler extends AThreadedComponent {
 			Message m=messages.get(i);
 			this.receivedTransactionCount++;
 			try {
-				AVector<ACell> v = m.getPayload();
-				SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
+				SignedData<ATransaction> sd=transactionOf(m);
+				// Checked explicitly, so that FORMAT is never inferred from an arbitrary failure below
+				if (sd==null) throw new BadFormatException("Transaction message without a signed transaction");
 				Result error=peer.checkTransactionFast(sd);
 				if (error!=null) {
 					m.returnResult(error.withSource(SourceCodes.PEER));
@@ -217,17 +274,11 @@ public class TransactionHandler extends AThreadedComponent {
 				}
 				sigs[i]=sd;
 				toVerify.add(sd);
-			} catch (Exception e) {
-				// Guard for each received transaction, with the one in Phase 3: a payload
-				// that is not as it should be rejects only this transaction
-				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
-			} catch (StackOverflowError e) {
-				// Too deep for this peer: the same transaction would fail again, so a limit
-				m.returnResult(ERR_STACK);
-			} catch (OutOfMemoryError e) {
-				// The peer's heap ran out, which may be its load rather than this
-				// transaction, so busy: a retry may succeed
-				m.returnResult(Result.SERVER_LOADED);
+			} catch (Throwable e) {
+				// Guard for each received transaction, with the one in Phase 3: any failure
+				// rejects only this transaction, unless the JVM itself has failed
+				Utils.checkRequestFailure(e);
+				reject(m,e);
 			}
 		}
 
@@ -237,8 +288,10 @@ public class TransactionHandler extends AThreadedComponent {
 		// re-checked individually in Phase 3 under per-tx exception handling.
 		try {
 			Peer.preValidateSignatures(toVerify);
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
-			// Ignore — per-tx handling in Phase 3 produces correct per-client errors
+		} catch (Throwable e) {
+			// Ignore, unless the JVM itself has failed: Phase 3 checks each signature
+			// again under each transaction's own guard
+			Utils.checkRequestFailure(e);
 		}
 
 		// Phase 3: Check cached signature results, persist fully, queue valid transactions.
@@ -260,11 +313,9 @@ public class TransactionHandler extends AThreadedComponent {
 			SignedData<ATransaction> sd=sigs[i];
 			if (sd==null) continue; // already rejected in Phase 1
 			Message m=messages.get(i);
+			Hash h=null; // set once this message may have registered an interest
 			try {
-				if (!sd.checkSignature()) {
-					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
-					continue;
-				}
+				if (!sd.checkSignature()) throw new BadSignatureException("Bad transaction signature",sd);
 				Result affordability=checkTransactionAffordability(
 					server.getPeer().getConsensusState(),sd.getValue());
 				if (affordability!=null) {
@@ -273,30 +324,32 @@ public class TransactionHandler extends AThreadedComponent {
 				}
 				// Force full persistence of the SignedData cell tree. If any referenced
 				// cell is not present in the store (dangling Ref from a faulty or partial
-				// message) this throws MissingDataException before we queue the tx.
-				sd=Cells.persist(sd, store);
+				// message) this throws MissingDataException before we queue the tx, and
+				// a tree with invalid structure is the client's malformed input
+				sd=Cells.persistReceived(sd, store);
+				// Inside the guard: the reply to a duplicate can fail, and must cost
+				// only this transaction
+				h=sd.getHash();
+				if (!registerInterest(h, m)) continue;
 			} catch (MissingDataException e) {
-				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Transaction data not available: "+e.getMissingHash())).withSource(SourceCodes.PEER));
+				// sendRejection: a reply that fails must not escape the guard from here
+				sendRejection(m,Result.error(ErrorCodes.MISSING, Strings.create("Transaction data not available: "+e.getMissingHash())).withSource(SourceCodes.PEER));
 				continue;
 			} catch (IOException e) {
-				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
+				sendRejection(m,Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
 				continue;
-			} catch (Exception e) {
-				// Guard for each received transaction, with the one in Phase 1: a payload
-				// that is not as it should be rejects only this transaction
-				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
-				continue;
-			} catch (StackOverflowError e) {
-				// Too deep for this peer: the same transaction would fail again, so a limit
-				m.returnResult(ERR_STACK);
-				continue;
-			} catch (OutOfMemoryError e) {
-				// The peer's heap ran out, which may be its load rather than this
-				// transaction, so busy: a retry may succeed
-				m.returnResult(Result.SERVER_LOADED);
+			} catch (Throwable e) {
+				// Guard for each received transaction, with the one in Phase 1: any failure
+				// rejects only this transaction, unless the JVM itself has failed
+				Utils.checkRequestFailure(e);
+				// Only this message's interest: one left behind would refuse the
+				// client's resubmission as already pending
+				if (h!=null) interests.remove(h,m);
+				reject(m,e);
 				continue;
 			}
-			if (!registerInterest(sd.getHash(), m)) continue;
+			// Outside the guard: an ArrayBlockingQueue allocates nothing here, and an
+			// interrupt must reach the loop so the peer can shut down
 			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
 			this.clientTransactionCount++;
@@ -317,7 +370,13 @@ public class TransactionHandler extends AThreadedComponent {
 	private void observeTransactionRequest(SignedData<ATransaction> sd) {
 		Consumer<SignedData<ATransaction>> observer=this.requestObserver;
 		if (observer!=null) {
-			observer.accept(sd);
+			try {
+				observer.accept(sd);
+			} catch (Throwable e) {
+				// The transaction is already queued: the observer's failure costs nothing else
+				Utils.checkRequestFailure(e);
+				observerFailures.log(e,"Transaction request observer failed");
+			}
 		}
 	}
 
@@ -355,26 +414,40 @@ public class TransactionHandler extends AThreadedComponent {
 		ArrayList<Message> recipients=new ArrayList<>();
 		ArrayList<Result> results=new ArrayList<>();
 		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
-		for (long j = 0; j < nTrans; j++) {
-			SignedData<ATransaction> t = block.getTransactions().get(j);
-			Hash h = t.getHash();
-			Message m = interests.remove(h);
-			if (m == null) continue;
-			Result res;
-			try {
-				res=br.getResults().get(j);
-				extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
-				extInfo.put(Keywords.TX,t.getHash());
-				res=res.withExtraInfo(extInfo);
-			} catch (Exception e) {
-				res=Result.error(ErrorCodes.FATAL, "Failed to produce result").withSource(SourceCodes.PEER);
+		try {
+			for (long j = 0; j < nTrans; j++) {
+				SignedData<ATransaction> t = block.getTransactions().get(j);
+				Hash h = t.getHash();
+				Message m = interests.remove(h);
+				if (m == null) continue;
+				// Listed at once, the error a placeholder: whatever fails below, this client
+				// is answered, as its interest is gone
+				recipients.add(m);
+				results.add(ERR_RESULT_UNAVAILABLE);
+				Result res;
+				try {
+					res=br.getResults().get(j);
+					extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
+					extInfo.put(Keywords.TX,h);
+					res=res.withExtraInfo(extInfo);
+				} catch (Throwable e) {
+					// Guard for each client's result. The transaction has executed and its
+					// interest is gone, so the client gets an error rather than nothing.
+					Utils.checkRequestFailure(e);
+					resultFailures.log(e,"Failed to produce result for transaction {}",h);
+					// PEER even for running out of memory: LOAD would invite a retry of a
+					// transaction that has already executed
+					res=ERR_RESULT_UNAVAILABLE;
+				}
+				observeTransactionResponse(t,res);
+				results.set(results.size()-1,res);
 			}
-			observeTransactionResponse(t,res);
-			recipients.add(m);
-			results.add(res);
+		} finally {
+			// Even if the loop failed: every client listed has lost its interest
+			if (!recipients.isEmpty()) {
+				Thread.ofVirtual().name("Transaction results for block "+blockNum).start(() -> deliverResults(recipients,results));
+			}
 		}
-		if (recipients.isEmpty()) return;
-		Thread.ofVirtual().name("Transaction results for block "+blockNum).start(() -> deliverResults(recipients,results));
 	}
 
 	/**
@@ -382,15 +455,16 @@ public class TransactionHandler extends AThreadedComponent {
 	 * client's connection is closed or its reader is not draining, which is normal
 	 * operation, or if the server is shedding load.
 	 */
-	private static void deliverResults(ArrayList<Message> recipients, ArrayList<Result> results) {
+	private void deliverResults(ArrayList<Message> recipients, ArrayList<Result> results) {
 		for (int i=0; i<recipients.size(); i++) {
 			Message m=recipients.get(i);
 			boolean reported;
 			try {
 				reported=m.returnResult(results.get(i));
-			} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+			} catch (Throwable e) {
 				// Guard for each result: one that cannot be sent costs no other client its result
-				log.warn("Failed to deliver transaction result for connection {}",m.getConnection(),e);
+				Utils.checkRequestFailure(e);
+				deliveryFailures.log(e,"Failed to deliver transaction result for connection {}",m.getConnection());
 				continue;
 			}
 			if (!reported && log.isDebugEnabled()) {
@@ -411,7 +485,14 @@ public class TransactionHandler extends AThreadedComponent {
 	private void observeTransactionResponse(SignedData<ATransaction> sd, Result r) {
 		BiConsumer<SignedData<ATransaction>,Result> observer=this.responseObserver;
 		if (observer!=null) {
-			observer.accept(sd,r);
+			try {
+				observer.accept(sd,r);
+			} catch (Throwable e) {
+				// Runs on the CVM executor's thread: the observer's failure must cost
+				// neither this client's result nor the peer
+				Utils.checkRequestFailure(e);
+				observerFailures.log(e,"Transaction response observer failed");
+			}
 		}
 	}
 	
@@ -469,29 +550,43 @@ public class TransactionHandler extends AThreadedComponent {
 			newTransactions.clear();
 			lastBlockPublishedTime=timestamp;
 			return signedBlocks;
-		} catch (Exception | StackOverflowError | OutOfMemoryError e) {
+		} catch (Throwable e) {
 			// Guard for Block production from received transactions, which runs on the
-			// Belief propagator's thread: a failure drops these transactions, not the thread
-			log.warn("Exception preparing new block",e);
-			return null;
-		} finally {
-			// Defence in depth: if anything in block production threw, transactions may
-			// still be in newTransactions with registered interests. Clients must never
-			// hang — notify each interested client of the failure and clear interests
-			// before discarding. Phase 3 intake persistence is the primary guard that
-			// stops faulty transactions ever reaching here; this is a safety net.
-			if (!newTransactions.isEmpty()) {
-				log.warn("Discarded "+newTransactions.size()+" potentially faulty / malicious transactions");
-				for (SignedData<ATransaction> sd : newTransactions) {
-					Hash h=sd.getHash();
-					Message m=interests.remove(h);
-					if (m!=null) {
-						m.returnResult(Result.error(ErrorCodes.PEER, Strings.create("Block production failed")).withSource(SourceCodes.PEER));
-					}
-				}
+			// Belief propagator's thread: a failure fails these transactions, not the thread
+			Utils.checkRequestFailure(e);
+			try {
+				failTransactions(newTransactions,e);
+			} finally {
+				// Never carried into a later Block: their clients may already have been
+				// told they failed
 				newTransactions.clear();
 			}
+			// Last: logging can itself run out of memory
+			blockFailures.log(e,"Block production failed; {} transactions rejected",ntrans);
+			return null;
 		}
+	}
+
+	/**
+	 * Fails the clients of transactions taken from the queue for Blocks that could not
+	 * be produced or proposed: running out of memory is answered as load, any other
+	 * failure as a peer error.
+	 */
+	void failTransactions(Iterable<SignedData<ATransaction>> txs, Throwable cause) {
+		// LOAD as at intake: running out of memory says nothing about the transactions
+		Result r=(cause instanceof OutOfMemoryError)?Result.SERVER_LOADED:ERR_BLOCK_FAILED;
+		for (SignedData<ATransaction> sd: txs) {
+			// Removing the interest lets the client resubmit; the peer's own transactions have none
+			Message m=interests.remove(sd.getHash());
+			if (m!=null) sendRejection(m,r);
+		}
+	}
+
+	/** Fails the clients of the transactions in Blocks this peer could not propose. */
+	void failBlocks(SignedData<Block>[] blocks, Throwable cause) {
+		for (SignedData<Block> b: blocks) failTransactions(b.getValue().getTransactions(),cause);
+		// Last: logging can itself run out of memory
+		blockFailures.log(cause,"Block proposal failed; its transactions rejected");
 	}
 
 	/**

@@ -157,7 +157,21 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	 */
 	public SignedComponent<V> draft(K owner,Function<V,SignedData<V>> signer) {
 		SignedLattice<V> rule=rule(owner);
-		return new SignedComponent<>(rule,slot(rule),signer);
+		return createDraft(rule,slot(rule),signer);
+	}
+
+	/**
+	 * Creates the draft {@link #draft} opens. Override to supply a draft that
+	 * reconciles changes on both sides; the default refuses them.
+	 *
+	 * @param rule Owner-bound rule for the draft's entry
+	 * @param slot Signed entry the draft publishes into
+	 * @param signer Signing capability for publication
+	 * @return New draft over the entry
+	 */
+	protected SignedComponent<V> createDraft(SignedLattice<V> rule,AForkableCursor<SignedData<V>> slot,
+			Function<V,SignedData<V>> signer) {
+		return new SignedComponent<>(rule,slot,signer);
 	}
 
 	private SignedLattice<V> rule(K owner) {

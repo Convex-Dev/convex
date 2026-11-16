@@ -19,6 +19,7 @@ import convex.core.util.ConsumerDispatcher;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.RequestFailures;
 
 /**
  * Component handling CVM execution loop with a Peer Server
@@ -74,7 +75,6 @@ public class CVMExecutor extends AThreadedComponent {
 		maybeWarnUpgrade();
 
 		try {
-			boolean stateAdvanced=false;
 			synchronized(this) {
 				if (beliefUpdate!=null) {
 					peer=peer.updateBelief(beliefUpdate);
@@ -83,15 +83,11 @@ public class CVMExecutor extends AThreadedComponent {
 				// Trigger State update (if any new Blocks are confirmed)
 				Peer updatedPeer=peer.updateState();
 				if (updatedPeer!=peer) {
-					peer=updatedPeer;
-					persistPeerData();
+					// Persisted before it becomes this peer's: if persisting fails, the next pass retries it
+					peer=server.persistPeerData(updatedPeer);
 					maybeCallObservers(peer);
-					stateAdvanced=true;
 				}
 			}
-			if (stateAdvanced) completeStatePositionWaiters();
-
-			server.transactionHandler.maybeReportTransactions(peer);
 		} catch (UpgradeError e) {
 			// A required network upgrade cannot be applied by this peer (see UPGRADE.md).
 			// UpgradeError is an Error, so it bypasses applyBlock's catch(Exception) and is
@@ -99,12 +95,34 @@ public class CVMExecutor extends AThreadedComponent {
 			// Whatever the cause, the peer cannot proceed: freeze consensus (executor and
 			// propagator both cease) until the operator fixes the cause and restarts.
 			server.haltConsensus(e);
-		} catch (Exception e) {
-			// A State this peer cannot compute or persist from what it holds: it cannot proceed
-			log.error("Fatal exception encountered in CVM Executor",e);
-			server.close();
+		} catch (OutOfMemoryError e) {
+			// This pass's work is dropped and the peer keeps the last state it persisted:
+			// the loop warns, and the next pass retries
+			throw e;
+		} catch (Throwable e) {
+			// A JVM failure is the loop's, which shuts the peer down without a checkpoint
+			if ((e instanceof VirtualMachineError vme)&&Utils.isJvmFailure(vme)) throw vme;
+			// Applying or persisting consensus state failed: carrying on would leave this
+			// peer voting on Blocks it has not applied
+			server.requestShutdown("CVM executor could not advance consensus state",e,true);
+			// Stops this thread's loop now: the shutdown runs on a thread of its own
+			close();
+			return;
+		}
+
+		// Work for clients, apart from the state step: its failure costs them, not the peer
+		try {
+			// Every pass, not only after an advance: completes any that a failed pass left waiting
+			completeStatePositionWaiters();
+			server.transactionHandler.maybeReportTransactions(peer);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			reportFailures.log(e,"Failed to report a state update to clients");
 		}
 	}
+
+	/** Failures of the work for clients that follows the state step. */
+	private final RequestFailures reportFailures=new RequestFailures(log);
 
 	/**
 	 * Warns the operator when the consensus schedule already contains a network
@@ -257,7 +275,8 @@ public class CVMExecutor extends AThreadedComponent {
 		if (added&&(peer!=null)) {
 			try {
 				observer.accept(peer);
-			} catch (Exception e) {
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				log.debug("State update observer failed during registration",e);
 			}
 		}

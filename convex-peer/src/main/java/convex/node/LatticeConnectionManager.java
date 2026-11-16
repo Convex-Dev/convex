@@ -42,6 +42,7 @@ import convex.core.data.Vectors;
 import convex.core.store.AStore;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.ValidationException;
 import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
@@ -1346,8 +1347,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			verification.whenComplete((result, ex) -> {
 				try {
 					if (ex != null) {
-						rejectPendingAdmission(peerKey, pending,
-							PeerConnectionException.wrap("Could not verify peer "+peerKey,ex));
+						PeerRefusedException refused=refusalFor(ex,"Peer "+peerKey);
+						rejectPendingAdmission(peerKey, pending, (refused!=null) ? refused
+							: PeerConnectionException.wrap("Could not verify peer "+peerKey,ex));
 					} else if (result==null || !peerKey.equals(result)
 							|| convex.getVerifiedPeer()==null
 							|| !peerKey.equals(convex.getVerifiedPeer())) {
@@ -2163,7 +2165,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 						return;
 					}
 					closeSilently(peer);
-					failIdentification(intent,(failure!=null) ? failure
+					PeerRefusedException refused=(failure!=null) ? refusalFor(failure,"The node at "+endpoint) : null;
+					failIdentification(intent,(refused!=null) ? refused
+						: (failure!=null) ? failure
 						: (key==null) ? new PeerRefusedException("The node at "+endpoint+" proved no key")
 						: new PeerRefusedException("The node at "+endpoint+" proved key "+key+", which "
 							+intent.target+" does not list"));
@@ -2507,6 +2511,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 		notifyPeerAdmitted(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
 		log.debug("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
+	}
+
+	/**
+	 * Returns the refusal for a peer whose challenge reply proves it misbehaved, as a
+	 * forged signature does, or null for any other failure.
+	 */
+	private static PeerRefusedException refusalFor(Throwable failure,String peer) {
+		Throwable cause=PeerConnectionException.unwrap(failure);
+		if (!(cause instanceof ValidationException)) return null;
+		return new PeerRefusedException(peer+" failed identity challenge: "+cause.getMessage(),cause);
 	}
 
 	/** Rejects one still-current limbo client and schedules its desired peer retry. */

@@ -33,9 +33,11 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
@@ -371,7 +373,8 @@ public final class Result extends ARecordGeneric {
 	}
 
 	/**
-	 * Constructs a result from a caught exception. An {@link InterruptedException},
+	 * Constructs a result from a caught exception. Invalid data is {@code :FORMAT}, or
+	 * {@code :SIGNATURE} for a signature that does not verify. An {@link InterruptedException},
 	 * directly or as the cause of an {@link ExecutionException} or
 	 * {@link CompletionException}, gives an {@code :INTERRUPTED} error without changing
 	 * the calling thread's interrupt status: the interrupt may come from another thread.
@@ -397,8 +400,14 @@ public final class Result extends ARecordGeneric {
 			String msg=e.getMessage();
 			Result err= Result.error(ErrorCodes.FORMAT,Strings.create(msg));
 			// TODO: kill these after debugging
-			err=err.withInfo(Keywords.TRACE, Strings.join(e.getStackTrace(),"\n")); 
+			err=err.withInfo(Keywords.TRACE, Strings.join(e.getStackTrace(),"\n"));
 			return err;
+		}
+		if (e instanceof BadSignatureException) {
+			return Result.error(ErrorCodes.SIGNATURE,Strings.create(e.getMessage()));
+		}
+		if (e instanceof ValidationException) {
+			return Result.error(ErrorCodes.FORMAT,Strings.create(e.getMessage()));
 		}
 		if (e instanceof MissingDataException) {
 			// return MISSING_RESULT;

@@ -5,7 +5,7 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 
 /**
- * One side's change, carried onto a destination that may have changed since the
+ * One side's change, reconciled with a destination that may have changed since the
  * base, as an update function the destination can retry. Each application is given
  * the destination's current value as {@code other}.
  *
@@ -35,11 +35,7 @@ final class Reconciler<V extends ACell> implements UnaryOperator<V> {
 		return own;
 	}
 
-	/**
-	 * Reconciles by the merge, skipping it where the result is known by reference, which
-	 * costs nothing. Own was built from base, so while base is still held, own's unchanged
-	 * parts are already the held cells.
-	 */
+	/** Reconciles by the merge, skipping it where the result is known by reference, which costs nothing. */
 	static <V extends ACell> V reconcile(V base,V own,V other,ThreeWayMerge<V> merge) {
 		if (other==base) return own;
 		if (own==base) return other;

@@ -54,6 +54,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
+import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
@@ -65,6 +66,7 @@ import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.net.AServer;
+import convex.net.RequestFailures;
 import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
@@ -127,15 +129,14 @@ public class Server implements Closeable {
 	Consumer<Message> receiveAction = m->{
 		Predicate<Message> retry = deliverMessage(m);
 		if (retry != null) {
-			if (!retry.test(m)) {
-				try {
-					m.returnResult(Result.SERVER_LOADED);
-				} catch (Exception e) {
-					// best effort
-				}
-			}
+			if (!retry.test(m)) returnBestEffort(m,Result.SERVER_LOADED);
 		}
 	};
+
+	/** One per boundary, so each warns once of each kind of failure that warrants it. */
+	private final RequestFailures dispatchFailures=new RequestFailures(log);
+	private final RequestFailures decodeFailures=new RequestFailures(log);
+	private final RequestFailures observerFailures=new RequestFailures(log);
 
 	/**
 	 * Manages authenticated outbound connections to other peers in the network.
@@ -427,8 +428,13 @@ public class Server implements Closeable {
 
 	private void observeMessageReceived(Message m) {
 		Consumer<Message> obs=messageReceiveObserver;
-		if (obs!=null) {
+		if (obs==null) return;
+		try {
 			obs.accept(m);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			// An observer's failure is not the message's: it is still processed
+			observerFailures.log(e,"Message receive observer failed");
 		}
 	}
 	
@@ -614,24 +620,19 @@ public class Server implements Closeable {
 				return null;
 			default:
 				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
+				manager.handleBadInput(m.getConnection(),new BadFormatException("Unrecognised message type"));
 				return null;
 			}
 		} catch (MissingDataException e) {
+			// Before the catch-all: the reply names the missing data
 			Hash missingHash = e.getMissingHash();
-			log.info("Missing data: {} in message of type {}", missingHash, m.getType());
-			try {
-				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Missing data: "+missingHash)).withSource(SourceCodes.PEER));
-			} catch (Exception e2) {
-				// best effort -- some message types don't have return handlers
-			}
+			log.debug("Missing data: {} in message of type {}", missingHash, m.getType());
+			returnBestEffort(m,Result.error(ErrorCodes.MISSING, Strings.create("Missing data: "+missingHash)).withSource(SourceCodes.PEER));
 			return null;
-		} catch (Exception e) {
-			log.warn("Unexpected error processing peer message",e);
-			try {
-				m.returnResult(Result.fromException(e).withID(m.getID()));
-			} catch (Exception e2) {
-				// best effort
-			}
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			dispatchFailures.log(e,"Failed to process {} message",m.getType());
+			returnBestEffort(m,RequestFailures.reply(e));
 			return null;
 		}
 	}
@@ -674,14 +675,18 @@ public class Server implements Closeable {
 		if (completeReply(m)) return null;
 		try {
 			m.getPayload(getStore());
-		} catch (Exception e) {
-			log.debug("Failed to decode message: {}", e.getMessage());
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			decodeFailures.log(e,"Failed to decode message");
 			try {
 				ACell id = m.getRequestID();
-				m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
-			} catch (Exception e2) {
+				m.returnMessage(Message.createResult(RequestFailures.reply(e).withID(id)));
+			} catch (Throwable e2) {
 				// best effort -- connection may be bad
+				Utils.checkRequestFailure(e2);
 			}
+			// After the reply. A validation failure here is in the message's own encoding
+			if (e instanceof ValidationException bad) manager.handleBadInput(m.getConnection(),bad);
 			return null;
 		}
 		observeMessageReceived(m);
@@ -737,10 +742,18 @@ public class Server implements Closeable {
 	 * Silently ignores failures (message may not have a return handler or ID).
 	 */
 	private boolean returnError(Message m, Keyword errorCode, AString message) {
+		return returnBestEffort(m,Result.error(errorCode, message).withSource(SourceCodes.PEER));
+	}
+
+	/**
+	 * Replies to a message if it can: a message type may have no return handler, or its
+	 * connection may have failed.
+	 */
+	static boolean returnBestEffort(Message m, Result r) {
 		try {
-			return m.returnResult(Result.error(errorCode, message).withSource(SourceCodes.PEER));
-		} catch (Exception e) {
-			// best effort — some message types don't have return handlers
+			return m.returnResult(r);
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
 			return false;
 		}
 	}
@@ -895,9 +908,20 @@ public class Server implements Closeable {
 	 * @return Updated Peer value with persisted data, sharing the current Peer's transaction index
 	 * @throws IOException In case of any IO Error
 	 */
-	@SuppressWarnings("unchecked")
 	public Peer persistPeerData() throws IOException {
-		Peer peer=getPeer();
+		return persistPeerData(getPeer());
+	}
+
+	/**
+	 * Writes the given Peer's data to the configured store, as {@link #persistPeerData()}
+	 * does for the current Peer.
+	 *
+	 * @param peer Peer to persist
+	 * @return Peer value with persisted data, sharing the given Peer's transaction index
+	 * @throws IOException In case of any IO Error
+	 */
+	@SuppressWarnings("unchecked")
+	Peer persistPeerData(Peer peer) throws IOException {
 		AMap<Keyword,ACell> peerData = peer.toData();
 
 		// Set up root key for Peer persistence. Default is Peer Account Key
@@ -928,6 +952,29 @@ public class Server implements Closeable {
 	@Override
 	public void close() {
 		close(true);
+	}
+
+	/**
+	 * Shuts this peer down from one of its own threads. The shutdown runs on a thread of
+	 * its own, so the calling thread can return and be joined.
+	 *
+	 * @param reason Why the peer is shutting down
+	 * @param cause Failure that requires it
+	 * @param checkpoint Whether to write the final checkpoint
+	 */
+	void requestShutdown(String reason, Throwable cause, boolean checkpoint) {
+		log.error("Shutting down peer: {}",reason,cause);
+		// Not on the caller's thread: close joins the components, the caller's among them,
+		// and it holds this Server while it does, which a second close would wait on.
+		// A platform thread: holding this Server while it joins would pin a virtual
+		// thread's carrier
+		Thread.ofPlatform().name("Peer shutdown").start(() -> {
+			try {
+				close(checkpoint);
+			} catch (Throwable e) {
+				log.error("Peer shutdown failed",e);
+			}
+		});
 	}
 
 	/** Performs normal shutdown, optionally writing a final peer checkpoint. */

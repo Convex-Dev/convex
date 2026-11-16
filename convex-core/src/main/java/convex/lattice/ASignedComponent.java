@@ -16,9 +16,11 @@ import convex.lattice.generic.SignedLattice;
  * into its supplied destination using its explicit signer. Live instances over
  * the same path share edits immediately. Construction and reads create no state.
  *
- * <p>The owner-bound lattice supplies the same rule for local authoring and
- * incoming envelopes. Incoming merges preserve accepted signatures and cannot
- * navigate inside the envelope. A live view's sync only reads. A domain subclass
+ * <p>The owner-bound lattice supplies the rule for incoming envelopes. Incoming
+ * merges preserve accepted signatures and cannot navigate inside the envelope. Local
+ * changes on both sides, at a draft's sync or a transaction's commit, are a conflict
+ * unless a subclass reconciles them (see {@link #reconcile(ACell,ACell)}): the
+ * payload's lattice may keep one whole side. A live view's sync only reads. A domain subclass
  * can implement {@link #rebind} to retain its API on an unsigned fork: edits then
  * stay private and sync signs the reconciled batch into the original destination.
  * Neither lifecycle publishes the containing map. {@link SignedComponent} supplies
@@ -53,11 +55,6 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 		this.lattice=Objects.requireNonNull(lattice);
 		this.destination=null;
 		this.signer=null;
-	}
-
-	/** Reconciles unsigned drafts using the payload policy bound to their owner. */
-	@Override protected V reconcile(V own,V other) {
-		return lattice.getValueLattice().merge(own,other);
 	}
 
 	/**

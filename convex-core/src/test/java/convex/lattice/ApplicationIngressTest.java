@@ -55,11 +55,11 @@ class ApplicationIngressTest {
 		}
 		/** A path no child resolves is reduced to a root by the lattice, then merged here. */
 		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
-			Index<Keyword,ACell> reduced=LatticeOps.reduce(rule,value,path);
+			Index<Keyword,ACell> reduced=LatticeComponent.reduce(rule,value,path);
 			return reduced==null?cursor().get():merge(reduced);
 		}
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.reconcile(rule,LatticeContext.EMPTY,own,other);
+			return LatticeComponent.reconcile(rule,LatticeContext.EMPTY,own,other);
 		}
 		<T extends ACell> AForkableCursor<T> resolve(ACell... path) {
 			return LatticeComponent.resolve(cursor(),rule,path);

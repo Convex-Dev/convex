@@ -71,7 +71,8 @@ public final class ConsumerDispatcher<V> implements Consumer<V> {
 		for (Consumer<? super V> consumer:consumers) {
 			try {
 				consumer.accept(value);
-			} catch (Exception e) {
+			} catch (Throwable e) {
+				Utils.checkRequestFailure(e);
 				log.log(System.Logger.Level.DEBUG,"Consumer failed during dispatch",e);
 			}
 		}

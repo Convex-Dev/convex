@@ -25,7 +25,9 @@ import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
+import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
@@ -34,14 +36,25 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MisbehaviourException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.PeerConnectionException;
+import convex.net.PeerRefusedException;
+import convex.net.RequestFailures;
 import convex.net.Transports;
 
 /**
@@ -114,6 +127,10 @@ public class ConnectionManager extends AConnectionManager {
 	/** Manager-owned sockets currently awaiting remote peer identification. */
 	private final Set<Convex> pendingConnections=ConcurrentHashMap.newKeySet();
 
+	/** One per site, so each warns once of each kind of failure that warrants it. */
+	private final RequestFailures pollFailures=new RequestFailures(log);
+	private final RequestFailures connectFailures=new RequestFailures(log);
+
 	/** Background thread for connection maintenance and belief polling. */
 	private Thread thread;
 
@@ -137,6 +154,7 @@ public class ConnectionManager extends AConnectionManager {
 		lastPollTime = server.getTimestamp();
 
 		thread = Thread.ofVirtual().name("Connection Manager thread at " + server.getPort()).start(() -> {
+			LoopFailures failures=new LoopFailures(log,server,"connection manager");
 			while (server.isRunning() && !Thread.currentThread().isInterrupted()) {
 				try {
 					LoadMonitor.down();
@@ -147,8 +165,8 @@ public class ConnectionManager extends AConnectionManager {
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
 					break;
-				} catch (Exception e) {
-					log.error("Unexpected error in connection manager loop", e);
+				} catch (Throwable e) {
+					if (!failures.handle(e)) break;
 				}
 			}
 		});
@@ -351,7 +369,7 @@ public class ConnectionManager extends AConnectionManager {
 			// Close clears the records; a dial ending after it must not refill them
 			if (closed) return;
 			if (e != null) {
-				log.debug("Failed to connect to Peer at {}: {}", connectTarget, e.getMessage());
+				connectFailures.log(e,"Failed to connect to Peer at {}",connectTarget);
 				recordFailure(chosen,true);
 			} else if (connections.get(chosen) != linked) {
 				// Identification filed the link under the key that answered, not the one chosen
@@ -408,6 +426,9 @@ public class ConnectionManager extends AConnectionManager {
 					makeDue(peerKey);
 				} else {
 					failLink(peerKey,link,false);
+					// After the failure is counted, which a link closed for bad input still keeps
+					ValidationException bad=badAnswer(challenge.answer());
+					if (bad!=null) handleBadInput(peerKey,link,bad);
 				}
 			} else if (now>=challenge.deadline()) {
 				challenges.remove(peerKey,challenge);
@@ -432,6 +453,18 @@ public class ConnectionManager extends AConnectionManager {
 			return answer.getNow(null);
 		} catch (CancellationException | CompletionException e) {
 			return null;
+		}
+	}
+
+	/** Gets the bad input a challenge's answer was rejected for, or null if there was none. */
+	private static ValidationException badAnswer(CompletableFuture<AccountKey> answer) {
+		try {
+			answer.getNow(null);
+			return null;
+		} catch (CancellationException e) {
+			return null;
+		} catch (CompletionException e) {
+			return (PeerConnectionException.unwrap(e) instanceof ValidationException bad) ? bad : null;
 		}
 	}
 
@@ -595,15 +628,9 @@ public class ConnectionManager extends AConnectionManager {
 			unresponsiveSince.remove(peerKey);
 
 			AMap<Keyword, ACell> status = API.ensureStatusMap(result.getValue());
-			if (status == null) {
-				log.warn("Dubious status response message: {}", result);
-				return PollOutcome.ANSWERED_WRONGLY;
-			}
+			if (status == null) throw new BadFormatException("Status reply is not a status");
 			Hash h = RT.ensureHash(status.get(Keywords.BELIEF));
-			if (h==null) {
-				log.warn("Status response has no Belief hash: {}",result);
-				return PollOutcome.ANSWERED_WRONGLY;
-			}
+			if (h==null) throw new BadFormatException("Status reply has no Belief hash");
 			if (h.equals(server.getBelief().getHash())) return PollOutcome.GOOD;
 			if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return PollOutcome.NO_FAULT;
 
@@ -611,24 +638,35 @@ public class ConnectionManager extends AConnectionManager {
 			try {
 				acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 			} catch (ExecutionException | TimeoutException e) {
-				if (server.isLive()) log.info("Belief poll could not acquire {}: {}",h,e.toString());
+				// Bad input in the polled peer's reply goes to the handler below
+				if (e.getCause() instanceof ValidationException bad) throw bad;
+				if (server.isLive()) pollFailures.log(e,"Belief poll of {} could not acquire {}",peerKey,h);
 				return PollOutcome.ANSWERED_WRONGLY;
 			}
-			if (!(acquired instanceof Belief belief)) {
-				log.warn("Peer returned non-Belief value for advertised Belief hash {}",h);
-				return PollOutcome.ANSWERED_WRONGLY;
+			if (!(acquired instanceof Belief belief)) throw new BadFormatException("Advertised Belief is not a Belief");
+			// Checked here, where the polled peer is known
+			State state=server.getPeer().getConsensusState();
+			for (SignedData<Order> so: Belief.extractOrders(belief)) {
+				// Only the Orders the merge would check: unstaked keys it drops unchecked
+				if (!BeliefMerge.isValidPeer(state,so.getAccountKey())) continue;
+				if (!so.checkSignature()) throw new BadSignatureException("Bad Order signature in polled Belief",so);
 			}
 			if (!server.queueBelief(belief)) {
 				log.debug("Discarding acquired Belief because the local queue filled during polling");
 			}
 			return PollOutcome.GOOD;
 		} catch (InterruptedException e) {
+			// Before the catch-all: an interrupt stops the manager, it is not a failed poll
 			throw e;
-		} catch (Exception t) {
+		} catch (ValidationException e) {
+			// The polled peer's own input, and the poll's other steps throw none
+			handleBadInput(peerKey,connection,e);
+			return PollOutcome.ANSWERED_WRONGLY;
+		} catch (Throwable e) {
+			Utils.checkRequestFailure(e);
+			// Failures while closing are expected
+			if (server.isLive()) pollFailures.log(e,"Belief poll of {} failed",peerKey);
 			// Nothing here is known to be the peer's doing, so it is not counted against it
-			if (server.isLive()) {
-				log.info("Belief Polling failed: {}", t.getClass().toString() + " : " + t.getMessage());
-			}
 			return PollOutcome.NO_FAULT;
 		}
 	}
@@ -696,6 +734,12 @@ public class ConnectionManager extends AConnectionManager {
 				? convex.verifyPeer(expectedPeer,server.getPeer().getNetworkID()) : identifyPeer(convex);
 			identity.whenComplete((peerKey, ex) -> {
 				pendingConnections.remove(convex);
+				Throwable cause=(ex!=null)?PeerConnectionException.unwrap(ex):null;
+				if (cause instanceof ValidationException bad) handleBadInput(null,convex,bad);
+				if (cause instanceof MisbehaviourException) {
+					result.completeExceptionally(new PeerRefusedException("Peer at "+hostAddress+" failed identity challenge",cause));
+					return;
+				}
 				if (peerKey == null || ex != null) {
 					convex.close();
 					result.completeExceptionally(ex != null ? ex
@@ -720,12 +764,13 @@ public class ConnectionManager extends AConnectionManager {
 				if (existing != convex) convex.close();
 				result.complete(existing);
 			});
-		} catch (Exception e) {
+		} catch (Throwable e) {
+			// First, so the connection is not left open even for a JVM failure
 			if (opened!=null) pendingConnections.remove(opened);
 			closeSilently(opened);
+			// Also restores an interrupt, which throwing cleared, for the caller
+			Utils.checkRequestFailure(e);
 			result.completeExceptionally(e);
-			// Throwing an interrupt cleared this thread's status: restore it for the caller
-			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 		}
 		return result;
 	}
@@ -741,6 +786,10 @@ public class ConnectionManager extends AConnectionManager {
 			}
 			return fallbackIdentify(convex);
 		}).exceptionallyCompose(ex -> {
+			Throwable cause=PeerConnectionException.unwrap(ex);
+			// A reply that proves misbehaviour is never overridden by the remote's own status
+			if (cause instanceof MisbehaviourException) return CompletableFuture.failedFuture(ex);
+			if (cause instanceof ValidationException bad) handleBadInput(null,convex,bad);
 			log.debug("Peer verification not available at {}: {}", convex.getHostAddress(), ex.getMessage());
 			return fallbackIdentify(convex);
 		});
@@ -774,17 +823,61 @@ public class ConnectionManager extends AConnectionManager {
 			Hash h = RT.ensureHash(ctx);
 			return (h == null) || h.equals(networkID);
 		});
+		// After the reply, for a local client that stays open; a remote one may be closed first
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v==null)||(v.count()!=3)||!(v.get(2) instanceof SignedData<?> challenge)) {
+			handleBadInput(m.getConnection(),new BadFormatException("Invalid challenge format"));
+		} else if (!challenge.checkSignature()) {
+			handleBadInput(m.getConnection(),new BadSignatureException("Bad challenge signature",challenge));
+		}
 	}
 
-	// ========== Alerts ==========
+	// ========== Bad input ==========
 
 	/**
-	 * Called to signal a bad / corrupt message from a Peer.
-	 * @param m Message of concern
-	 * @param reason Reason message considered bad
+	 * Handles bad input that the remote end of a connection sent, given the failure that
+	 * rejected it. False input, a {@link MisbehaviourException}, closes the connection
+	 * unless it is local; malformed input keeps it.
+	 *
+	 * @param connection Connection the input came on
+	 * @param failure Failure that rejected the input
 	 */
-	public void alertBadMessage(Message m, String reason) {
-		log.warn(reason);
+	public void handleBadInput(AConnection connection, ValidationException failure) {
+		if (connection==null) return;
+		if (!disconnects(failure)) {
+			log.debug("Rejected malformed input from {}: {}",connection.getRemoteAddress(),failure.getMessage());
+			return;
+		}
+		// A local connection is this process's own client, such as the REST API, relaying
+		// for others it must handle itself
+		if (connection instanceof LocalConnection) {
+			log.debug("Misbehaviour on a local connection, kept open: {}",failure.getMessage());
+			return;
+		}
+		log.debug("Closing connection to {} after misbehaviour: {}",connection.getRemoteAddress(),failure.getMessage());
+		connection.close();
+	}
+
+	/**
+	 * Handles bad input from a peer this peer connected to, as
+	 * {@link #handleBadInput(AConnection, ValidationException)} does for any connection.
+	 *
+	 * @param peerKey Key the peer was connected under, or null if it was not yet connected
+	 * @param connection Connection to the peer
+	 * @param failure Failure that rejected the input
+	 */
+	void handleBadInput(AccountKey peerKey, Convex connection, ValidationException failure) {
+		if (!disconnects(failure)) {
+			log.debug("Rejected malformed input from peer {}: {}",peerKey,failure.getMessage());
+			return;
+		}
+		// Closed even if no longer mapped to its key: the misbehaving connection must go
+		if (!closeConnection(peerKey,connection,"Misbehaviour: "+failure.getMessage())) closeSilently(connection);
+	}
+
+	/** This peer's policy: whether bad input closes the connection it came on. */
+	private static boolean disconnects(ValidationException failure) {
+		return failure instanceof MisbehaviourException;
 	}
 
 	/**

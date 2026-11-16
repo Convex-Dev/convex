@@ -90,7 +90,6 @@ public final class BoundaryCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override public V updateAndGet(UnaryOperator<V> updateFunction) { return write(() -> source.updateAndGet(updateFunction)); }
 	@Override public V getAndAccumulate(V x,BinaryOperator<V> accumulatorFunction) { return write(() -> source.getAndAccumulate(x,accumulatorFunction)); }
 	@Override public V accumulateAndGet(V x,BinaryOperator<V> accumulatorFunction) { return write(() -> source.accumulateAndGet(x,accumulatorFunction)); }
-	@Override public V sync(BinaryOperator<V> merge) { return write(() -> source.sync(merge)); }
 	@Override public V reconcile(ThreeWayMerge<V> merge) { return write(() -> source.reconcile(merge)); }
 
 	@Override public V persist(Persister persister) throws IOException { return source.persist(persister); }

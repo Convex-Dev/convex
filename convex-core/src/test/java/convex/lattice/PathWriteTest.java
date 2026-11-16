@@ -19,6 +19,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.PathCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.IndexLattice;
 import convex.lattice.generic.JSONLattice;
@@ -27,12 +28,13 @@ import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.MapLattice;
 
 /**
- * Tests for {@link LatticeOps#assocIn}: the write engine creates an absent base from
- * the {@link ALattice} it is given, never invents a container below it and never
- * replaces one that cannot hold its key. Typed intermediates come from the component that
- * owns each level, which declares them with {@code LatticeComponent.resolve}.
+ * Path writes: {@link PathCursor#assocExisting} never invents a container and never
+ * replaces one that cannot hold its key, and {@link LatticeComponent#assocIn} also
+ * creates an absent base from the {@link ALattice} it is given. Typed intermediates come
+ * from the component that owns each level, which declares them with
+ * {@code LatticeComponent.resolve}.
  */
-public class LatticeOpsTest {
+public class PathWriteTest {
 
 	static final Keyword KEY_A = Keyword.intern("a");
 	static final Keyword KEY_B = Keyword.intern("b");
@@ -43,7 +45,7 @@ public class LatticeOpsTest {
 		// KeyedLattice.zero() -> Index.EMPTY
 		KeyedLattice kl = KeyedLattice.create("a", LWWLattice.INSTANCE);
 
-		ACell result = LatticeOps.assocIn(null, CVMLong.create(42), kl, KEY_A);
+		ACell result = LatticeComponent.assocIn(null, CVMLong.create(42), kl, KEY_A);
 
 		assertNotNull(result);
 		assertTrue(result instanceof Index, "Root should be Index, got " + result.getClass().getSimpleName());
@@ -57,7 +59,7 @@ public class LatticeOpsTest {
 		// MapLattice.zero() -> Maps.empty()
 		MapLattice<Keyword, ACell> ml = MapLattice.create(LWWLattice.INSTANCE);
 
-		ACell result = LatticeOps.assocIn(null, CVMLong.create(7), ml, KEY_A);
+		ACell result = LatticeComponent.assocIn(null, CVMLong.create(7), ml, KEY_A);
 
 		assertNotNull(result);
 		assertTrue(result instanceof AHashMap, "Root should be AHashMap, got " + result.getClass().getSimpleName());
@@ -79,7 +81,7 @@ public class LatticeOpsTest {
 		KeyedLattice outer = KeyedLattice.create("a", inner);
 
 		assertThrows(IllegalStateException.class,
-			() -> LatticeOps.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
+			() -> LatticeComponent.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
 
 		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null);
 		LatticeComponent.resolve(root,outer,KEY_A,KEY_B).set(CVMLong.create(99));
@@ -96,7 +98,7 @@ public class LatticeOpsTest {
 	@Test
 	public void testJSONRequiresExplicitContainers() {
 		assertThrows(IllegalStateException.class,
-			() -> LatticeOps.assocIn(null, CVMLong.create(3), JSONLattice.INSTANCE,
+			() -> LatticeComponent.assocIn(null, CVMLong.create(3), JSONLattice.INSTANCE,
 				Strings.create("a"), Strings.create("b")));
 	}
 
@@ -104,7 +106,7 @@ public class LatticeOpsTest {
 	public void testNullLatticeAndNullDataThrows() {
 		// No lattice + null root -> should throw
 		assertThrows(IllegalStateException.class, () -> {
-			LatticeOps.assocIn(null, CVMLong.create(1), null, KEY_A);
+			LatticeComponent.assocIn(null, CVMLong.create(1), null, KEY_A);
 		});
 	}
 
@@ -114,7 +116,7 @@ public class LatticeOpsTest {
 		// Existing non-null structure -> no lattice needed
 		Index<Keyword, ACell> existing = Index.<Keyword, ACell>none().assoc(KEY_A, CVMLong.create(1));
 
-		ACell result = LatticeOps.assocIn(existing, CVMLong.create(2), null, KEY_A);
+		ACell result = LatticeComponent.assocIn(existing, CVMLong.create(2), null, KEY_A);
 
 		assertTrue(result instanceof Index);
 		assertEquals(CVMLong.create(2), ((Index<Keyword, ACell>) result).get(KEY_A));
@@ -127,7 +129,7 @@ public class LatticeOpsTest {
 		Index<Keyword, ACell> existing = Index.<Keyword, ACell>none().assoc(KEY_A, CVMLong.create(1));
 		MapLattice<Keyword, ACell> ml = MapLattice.create(LWWLattice.INSTANCE);
 
-		ACell result = LatticeOps.assocIn(existing, CVMLong.create(2), ml, KEY_A);
+		ACell result = LatticeComponent.assocIn(existing, CVMLong.create(2), ml, KEY_A);
 
 		assertTrue(result instanceof Index, "Existing Index should be preserved, not replaced by HashMap");
 		assertEquals(CVMLong.create(2), ((Index<Keyword, ACell>) result).get(KEY_A));
@@ -137,7 +139,7 @@ public class LatticeOpsTest {
 	public void testLeafLatticeZeroNullThrows() {
 		// LWWLattice.zero() returns null -> can't create container through it
 		assertThrows(IllegalStateException.class, () -> {
-			LatticeOps.assocIn(null, CVMLong.create(1), LWWLattice.INSTANCE, KEY_A);
+			LatticeComponent.assocIn(null, CVMLong.create(1), LWWLattice.INSTANCE, KEY_A);
 		});
 	}
 
@@ -147,14 +149,14 @@ public class LatticeOpsTest {
 		KeyedLattice kl = KeyedLattice.create("a", LWWLattice.INSTANCE);
 
 		assertThrows(IllegalStateException.class, () -> {
-			LatticeOps.assocIn(null, CVMLong.create(1), kl, KEY_A, KEY_B);
+			LatticeComponent.assocIn(null, CVMLong.create(1), kl, KEY_A, KEY_B);
 		});
 	}
 
 	@Test
 	public void testEmptyPathReturnsValue() {
 		// Zero-length path just returns the value
-		ACell result = LatticeOps.assocIn(CVMLong.create(1), CVMLong.create(2), null);
+		ACell result = LatticeComponent.assocIn(CVMLong.create(1), CVMLong.create(2), null);
 		assertEquals(CVMLong.create(2), result);
 	}
 
@@ -165,15 +167,15 @@ public class LatticeOpsTest {
 		ACell data = Maps.of(list, Vectors.of(1, 2));
 
 		assertEquals(Maps.of(list, Vectors.of(1, 9)),
-			LatticeOps.assocExisting(data, CVMLong.create(9), list, CVMLong.ONE));
+			PathCursor.assocExisting(data, CVMLong.create(9), list, CVMLong.ONE));
 		PathWriteException named = assertThrows(PathWriteException.class,
-			() -> LatticeOps.assocExisting(data, CVMLong.ONE, list, Strings.create("x")));
+			() -> PathCursor.assocExisting(data, CVMLong.ONE, list, Strings.create("x")));
 		assertEquals(1, named.getIndex());
 		assertEquals(Strings.create("x"), named.getKey());
 		assertEquals(1, assertThrows(PathWriteException.class,
-			() -> LatticeOps.assocExisting(data, CVMLong.ONE, list, CVMLong.create(2))).getIndex());
+			() -> PathCursor.assocExisting(data, CVMLong.ONE, list, CVMLong.create(2))).getIndex());
 		assertEquals(0, assertThrows(PathWriteException.class,
-			() -> LatticeOps.assocExisting(Index.none(), CVMLong.ONE, CVMLong.ONE)).getIndex());
+			() -> PathCursor.assocExisting(Index.none(), CVMLong.ONE, CVMLong.ONE)).getIndex());
 	}
 
 	/** A path cursor whose container cannot hold its key leaves the value as it was. */
@@ -193,7 +195,7 @@ public class LatticeOpsTest {
 	public void testIndexLatticeCreatesIndex() {
 		IndexLattice<Keyword, ACell> il = IndexLattice.create(LWWLattice.INSTANCE);
 
-		ACell result = LatticeOps.assocIn(null, CVMLong.create(5), il, KEY_A);
+		ACell result = LatticeComponent.assocIn(null, CVMLong.create(5), il, KEY_A);
 
 		assertTrue(result instanceof Index);
 		assertEquals(CVMLong.create(5), ((Index<Keyword, ACell>) result).get(KEY_A));

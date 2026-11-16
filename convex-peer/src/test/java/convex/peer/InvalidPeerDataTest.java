@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -661,20 +662,29 @@ public class InvalidPeerDataTest {
 		}
 	}
 
-	/** A store that throws a chosen Error once, the first time it is asked to store a chosen cell. */
+	/**
+	 * A store that throws a chosen Error once, the first time it is asked to store a
+	 * chosen cell at a chosen status or above.
+	 */
 	static final class FaultingStore extends MemoryStore {
 		volatile Hash failing;
+		volatile int minStatus;
 		volatile Error error;
 
 		void failOnce(Hash hash, Error e) {
+			failOnce(hash,Ref.UNKNOWN,e);
+		}
+
+		void failOnce(Hash hash, int status, Error e) {
 			error=e;
+			minStatus=status;
 			failing=hash;
 		}
 
 		@Override
 		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
 			Hash target=failing;
-			if ((target!=null)&&target.equals(ref.getHash())) {
+			if ((target!=null)&&(status>=minStatus)&&target.equals(ref.getHash())) {
 				failing=null;
 				throw error;
 			}
@@ -717,7 +727,8 @@ public class InvalidPeerDataTest {
 
 	/**
 	 * A query whose handling overflows or runs out of memory fails alone: its
-	 * connection is closed and the next query in the same batch is answered.
+	 * connection is kept, since the failure may be the peer's own, and the next query
+	 * in the same batch is answered.
 	 */
 	@Test
 	public void aQueryThatFailsLeavesTheRestOfItsBatch() throws Exception {
@@ -731,7 +742,7 @@ public class InvalidPeerDataTest {
 				assertTrue(handler.offerQuery(Message.createQuery(2,"(+ 2 3)",Init.GENESIS_ADDRESS).withConnection(healthy)));
 				handler.loop();
 				assertEquals(CVMLong.create(5),healthy.result(2).getValue(),error.toString());
-				assertTrue(failing.isClosed(),error.toString());
+				assertFalse(failing.isClosed(),error.toString());
 			}
 		} finally {
 			peer.close();
@@ -762,8 +773,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * A staked peer's Order that runs out of memory as it is stored is dropped. A good
-	 * Order from another peer in the same Belief is still merged.
+	 * A staked peer's Order that runs out of memory as the merge persists it is dropped. A
+	 * good Order from another peer in the same Belief is still merged.
 	 */
 	@Test
 	public void anOrderThatRunsOutOfMemoryIsDropped() throws Exception {
@@ -774,7 +785,8 @@ public class InvalidPeerDataTest {
 			long ts=blockTime(peer);
 			SignedData<Order> unusable=order(REMOTE_A,1,block(REMOTE_A,ts));
 			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,ts));
-			store.failOnce(unusable.getHash(),new OutOfMemoryError("simulated"));
+			// Persisted: keeping the update's cells first stores them only
+			store.failOnce(unusable.getHash(),Ref.PERSISTED,new OutOfMemoryError("simulated"));
 
 			connect(peer).sendMessage(wire(Message.createBelief(Belief.create(unusable,good))));
 
@@ -820,25 +832,25 @@ public class InvalidPeerDataTest {
 			long ts=blockTime(peer);
 			SignedData<Order> good=order(REMOTE_B,ts,block(REMOTE_B,ts));
 			List<Message> sent=updateMissingABlock(ts,1,good,senderStore);
-			for (Message m: sent) {
-				// Staging the update for its fetch is the first time the peer stores it
-				if (m.getType()==MessageType.BELIEF) store.failOnce(m.getPayload().getHash(),new OutOfMemoryError("simulated"));
-			}
-			LocalConnection senderEnd=connect(peer);
+			// The fetch is the first to store the part the update left out
+			store.failOnce(MissingBeliefDataTest.leftOut(sent),new OutOfMemoryError("simulated"));
+			LocalConnection senderEnd=MissingBeliefDataTest.connect(peer,MissingBeliefDataTest.answeringFrom(senderStore));
 			for (Message m: sent) senderEnd.sendMessage(wire(m));
 
 			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			CompletableFuture<?> fetch=peer.getBeliefPropagator().getMissingDataFetch();
+			assertNotNull(fetch,"the missing data is fetched");
+			fetch.get(WAIT,TimeUnit.SECONDS);
 			assertNull(store.failing,"the fetch ran out of memory");
-			assertNull(peer.getBeliefPropagator().getMissingDataFetch(),"no fetch started");
 
 			SignedData<Order> later=order(REMOTE_B,ts+1,block(REMOTE_B,ts),block(REMOTE_B,ts+1));
 			LocalConnection laterEnd=connect(peer);
 			for (Message m: updateMissingABlock(ts+1,9,later,senderStore)) laterEnd.sendMessage(wire(m));
 			merged=updates.poll(WAIT,TimeUnit.SECONDS);
 			assertNotNull(merged,"the later good Order is merged");
-			assertNotNull(peer.getBeliefPropagator().getMissingDataFetch(),"later missing data is fetched");
+			assertNotSame(fetch,peer.getBeliefPropagator().getMissingDataFetch(),"later missing data is fetched");
 			assertTrue(peer.isLive());
 		} finally {
 			peer.close();
@@ -863,6 +875,31 @@ public class InvalidPeerDataTest {
 			assertNotNull(merged,"the good Order is merged");
 			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
 			assertNull(store.failing,"staging the DATA ran out of memory");
+			assertTrue(peer.isLive());
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * An update whose cells run out of memory as the peer keeps them on receipt is merged
+	 * all the same: keeping them only spares later fetches.
+	 */
+	@Test
+	public void anUpdateThatRunsOutOfMemoryAsItIsKeptIsStillMerged() throws Exception {
+		FaultingStore store=new FaultingStore();
+		Server peer=launchPeer(store,LOCAL,REMOTE_A,REMOTE_B);
+		try {
+			BlockingQueue<Belief> updates=ownOrderUpdates(peer);
+			SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
+			Belief belief=Belief.create(good);
+			store.failOnce(belief.getHash(),new OutOfMemoryError("simulated"));
+			connect(peer).sendMessage(wire(Message.createBelief(belief)));
+
+			Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
+			assertNotNull(merged,"the good Order is merged");
+			assertEquals(good,merged.getOrders().get(REMOTE_B.getAccountKey()));
+			assertNull(store.failing,"keeping the update ran out of memory");
 			assertTrue(peer.isLive());
 		} finally {
 			peer.close();
@@ -1054,14 +1091,16 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * An Error that is not fatal to the JVM, such as a stack overflow that has unwound,
-	 * leaves a component and its peer running.
+	 * An Error that is not a failure of the JVM itself, such as running out of memory, a
+	 * stack overflow that has unwound or a linkage error, leaves a component and its peer
+	 * running.
 	 */
 	@Test
 	public void aComponentRunsOnAfterANonFatalError() throws Exception {
 		Server peer=launchPeer(LOCAL);
 		try {
-			for (Error error: List.of(new StackOverflowError(),new Error("Unexpected"))) {
+			for (Error error: List.of(new StackOverflowError(),new OutOfMemoryError("Test"),
+					new NoClassDefFoundError("Test"),new Error("Unexpected"))) {
 				CompletableFuture<Void> secondLoop=new CompletableFuture<>();
 				AThreadedComponent component=throwingOnce(peer,error,secondLoop);
 				component.start();
@@ -1074,12 +1113,12 @@ public class InvalidPeerDataTest {
 		}
 	}
 
-	/** A JVM failure such as running out of memory in a component closes the peer. */
+	/** A failure of the JVM itself in a component closes the peer. */
 	@Test
 	public void aFatalErrorClosesThePeer() throws Exception {
 		Server peer=launchPeer(LOCAL);
 		try {
-			throwingOnce(peer,new OutOfMemoryError("Test"),new CompletableFuture<>()).start();
+			throwingOnce(peer,new InternalError("Test"),new CompletableFuture<>()).start();
 			awaitShutdown(peer);
 			assertFalse(peer.isRunning());
 		} finally {

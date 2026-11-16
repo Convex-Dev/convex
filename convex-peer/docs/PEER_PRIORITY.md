@@ -76,10 +76,10 @@ Lattice nodes do verify connections opened to them; see
 | `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |
-| `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted) |
-| `LatticeConnectionManager.tryVerifyPeer()` | Async fire-and-forget verification |
-| `ConnectionManager.processChallenge()` | One-liner via `respondToChallenge()` with networkID context |
-| `NodeServer.processChallenge()` | One-liner via `respondToChallenge()` |
+| `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted), unless the reply proves misbehaviour |
+| `LatticeConnectionManager` | Holds a dialled client in limbo until it proves its key ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md)) |
+| `ConnectionManager.processChallenge()` | Answers via `respondToChallenge()` with networkID context; disconnects a challenge whose signature does not verify |
+| `LatticeProtocolEndpoint.processChallenge()` | Answers via `respondToChallenge()` with the transport key |
 | `ConvexLocal.sendChallenge()` | Routes through server message delivery |
 | `ConvexDirect.sendChallenge()` | Optimised direct path using local peer key |
 | `ConvexHTTP.sendChallenge()` | Via generic `/api/v1/message` endpoint |
@@ -95,7 +95,7 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 
 - **token** — random 16-byte nonce, proves response matches this challenge
 - **otherKey** — the key of the other party
-- **contextID** — optional; peer Server uses networkID (genesis hash), NodeServer uses null
+- **contextID** — optional; peer Server uses networkID (genesis hash), lattice nodes use `Message.LATTICE_PEER_CHALLENGE_CONTEXT`
 - CHALLENGE messages use ID-based correlation like QUERY/STATUS/TRANSACT
 
 ### Connection Flow
@@ -104,13 +104,13 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 1. Connect to remote address
 2. Try `verifyPeer(null, networkID)` — discovery mode with network context
 3. If verified → `verifiedPeer` set, `AConnection.trustedKey` set, peer key proven
-4. If verification fails → fall back to `requestStatus()` (untrusted, self-reported key)
-5. Add connection keyed by peer identity
+4. If the remote proves no key → fall back to `requestStatus()` (untrusted, self-reported key)
+5. If the reply proves misbehaviour (a forged signature, or a reply signed for another
+   challenge) → close the connection and fail with `PeerRefusedException`; no fallback
+6. Add connection keyed by peer identity
 
-**Lattice `LatticeConnectionManager`**:
-1. Connect to remote address
-2. If key pair available, fire async `verifyPeer(peerKey)` — non-blocking
-3. Connection immediately usable; `verifiedPeer` set when verification completes
+**Lattice `LatticeConnectionManager`** holds a dialled client in limbo until it proves its
+key; see [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).
 
 A peer's outbound connection still answers a CHALLENGE sent back on it, as any client with
 a key pair does, so released peers that challenge inbound connections can verify it.
@@ -151,8 +151,11 @@ as it returns. A peer that answered wrongly still waits.
 **Closing.** A link with no reply to STATUS or to a challenge for a minute is closed; any
 reply restarts the minute. A failure that leaves a peer's wait at its cap, the ninth in a
 row, also closes its link. An unverified link is kept while no link is verified, since it
-is then all there is to poll. A remote peer keeps its count when its link closes, so a
-redial waits too.
+is then all there is to poll. False input in a reply, such as a challenge answer signed for
+another challenge, closes the link at once, as
+[Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment) describes,
+and counts as a failure. A remote peer keeps its count when its link closes, so a redial
+waits too.
 
 ## Generic Message API
 

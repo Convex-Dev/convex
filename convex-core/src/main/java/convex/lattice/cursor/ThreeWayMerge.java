@@ -9,8 +9,7 @@ import convex.core.data.ACell;
  *
  * <p>A merge is total: it is given every case, and a side that changed nothing
  * contributes nothing. The caller may skip it where the result is already known by
- * reference. Its result is built on {@code other}, the value held, so cells held
- * there, which may be persisted, stay held wherever the result equals them.</p>
+ * reference.</p>
  *
  * @param <V> Value type
  */

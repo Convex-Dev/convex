@@ -9,45 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Report incoming network-handler and DLFS HTTP failures to application callbacks with their original exceptions.
-- Let embedders receive original GUI cleanup and P2P bootstrap exceptions through per-instance failure handlers.
-- Bind whole Swing views to lattice components with replaceable update triggers and automatic cleanup; includes a local draft example. ([Lattice views](convex-gui/docs/LATTICE_VIEWS.md))
-- Provide live read-only database bindings and enforce read-only JDBC and PostgreSQL connections. ([Read-only access](convex-db/docs/JDBC.md#read-only-access), [#803](https://github.com/Convex-Dev/convex/issues/803))
-- Let embedders handle incoming connections directly or wrap standard lattice delivery, with backpressure and connection cleanup. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers), [#821](https://github.com/Convex-Dev/convex/issues/821))
-- Run exclusive lattice transactions in separate regions of a container at the same time, through a `BoundaryCursor` that stops claims while writes pass straight through; a region's claimed commit merges a container change it did not see; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
+- Bind Swing views to lattice components, updating them automatically. ([Lattice views](convex-gui/docs/LATTICE_VIEWS.md))
+- Open Convex DB databases read-only, live in Java or through JDBC and PostgreSQL. ([#803](https://github.com/Convex-Dev/convex/issues/803))
+- Let embedders handle incoming connections and component failures themselves. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers))
 
 ### Changed
 
+- Rework lattice cursors and transactions: transactions run on any component and in separate regions at once, and writes compare by value and reach only places that exist; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
+- Disconnect a connection that sends false data, such as a bad signature, and keep one that sends malformed data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
+- Report failures to clients as clear errors rather than stack traces, empty results or no reply, and keep routine failures out of operator warning logs.
+- Limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
 - Poll the peers a peer has verified first, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
-- Let operators limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
-- Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
-- Run exclusive lattice transactions on any component, holding up writes through the nearest transactional boundary, a `BoundaryCursor` or else the root; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
-- Run colliding lattice transactions one at a time after two conflicts on their own value.
-- Publish forks of social feeds and follows when both sides changed, using the same rules as incoming merges.
-- Build signed, stamped and default lattice cursor views on one writable view base; see [Class hierarchy](convex-core/docs/LATTICE_CURSOR_DESIGN.md#class-hierarchy) when upgrading.
-- Compare by value in every lattice cursor write, so compare-and-set accepts an equal value and fails only when the cursor's own value differs, and writing an equal value changes nothing; see [Values and the cells that hold them](convex-core/docs/LATTICE_CURSOR_DESIGN.md#values-and-the-cells-that-hold-them) when upgrading.
-- Write through a lattice cursor only where its place exists: a read-only cursor, and a path whose entry or container is missing, refuse every write, and a new entry is created by writing its container or through a component's entry view; see [Atomic operations and paths](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths) when upgrading.
-- Refuse a lattice transaction on a place that does not exist, before its callback runs: an ordinary write creates a component's record, and transactions follow; see [Forks and transactions](convex-core/docs/LATTICE_APPLICATIONS.md#forks-and-transactions) when upgrading.
-- Commit a transaction on a lattice region container across all its regions, and allow forking a region container; a container now syncs only the regions it made, so code that registers an existing region syncs it itself. See [Forks and transactions](convex-core/docs/LATTICE_APPLICATIONS.md#forks-and-transactions) when upgrading.
 
 ### Fixed
 
+- Keep peers running when a request or one of their own tasks fails, even by running out of memory; a peer stops only when it cannot advance consensus. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
 - Validate data that peers and lattice nodes receive more strictly before using it.
-- Keep an Etch store usable, verifiable and safe to reopen after a write or sync stops part-way. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
-- Keep an idle Etch v3 store at its last clean checkpoint, so a hard kill of a node with nothing new to save needs no repair. ([#844](https://github.com/Convex-Dev/convex/issues/844))
-- Pass healthy Etch stores holding large vectors, blobs or signed values through `etch validate`, and repair them without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
-- Store a value a lattice node pulls from a peer without announcing it before the node has merged it, so the node's next update carries those cells to its other peers.
-- Isolate upgrade-verification reports and failure counters between concurrent runs.
-- Close and report failed inbound message delivery after a backed-up reply queue drains, instead of stranding the connection.
-- Keep expected SQL rejections and malformed PostgreSQL frames out of operator warning logs while retaining internal-error reporting.
-- Accept SQL binary literals and JDBC byte parameters consistently in binary columns, expressions and key lookups.
-- Reject unsupported SQL column declarations instead of silently storing them as untyped columns. ([#793](https://github.com/Convex-Dev/convex/issues/793))
-- Keep prepared SQL reads, writes and batches bound to the current transaction across commits and rollbacks. ([#835](https://github.com/Convex-Dev/convex/issues/835))
-- Correct SQL text and date comparisons, integer division and joined sums and averages. ([#836](https://github.com/Convex-Dev/convex/issues/836))
-- Report SQL syntax and numeric execution errors with SQLSTATE codes through JDBC and PostgreSQL clients. ([#800](https://github.com/Convex-Dev/convex/issues/800))
-- Release PostgreSQL statements retained by portals after their named statement is replaced or closed. ([#801](https://github.com/Convex-Dev/convex/issues/801))
-- Stamp a lattice edit that retries after losing a race no earlier than the edit it lost to, so last-write-wins merges keep it. ([Signing and stamping composition](convex-core/docs/LATTICE_CURSOR_DESIGN.md#signing-and-stamping-composition))
-- Stop long-running lattice applications keeping saved data in memory: a component given a persistence function now persists at each sync, a host sync releases saved data even when a write lands during it, and a DLFS file write no longer brings saved data back when a save lands during it. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
+- Keep Etch stores safe to reopen after a crash or hard kill, with nothing to repair when idle. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
+- Validate and repair Etch stores holding large values without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
+- Pass lattice data a node pulls from one peer on to its other peers.
+- Keep all the consensus data peers send each other, so they no longer fetch it again. ([CPoS scheduling](convex-peer/docs/PROPAGATION.md#cpos-scheduling))
+- Correct Convex DB's SQL results, binary data and prepared statements across transactions, and report errors with SQLSTATE codes. ([#836](https://github.com/Convex-Dev/convex/issues/836))
+- Keep lattice edits that retry after a conflict, and stop long-running lattice applications holding saved data in memory. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
 
 ## [0.8.19] - 2026-11-07
 

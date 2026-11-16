@@ -9,7 +9,6 @@ import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.store.Persister;
 import convex.core.util.Utils;
-import convex.lattice.LatticeOps;
 
 /**
  * Atomic read/write access to one immutable CVM value.
@@ -129,7 +128,7 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
-		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, key));
+		getAndUpdate(bv -> (V) PathCursor.assocExisting(bv, value, key));
 	}
 
 	/**
@@ -144,7 +143,7 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {
-		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, keys));
+		getAndUpdate(bv -> (V) PathCursor.assocExisting(bv, value, keys));
 	}
 
 	/**

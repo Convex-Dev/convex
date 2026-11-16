@@ -27,7 +27,6 @@ import convex.lattice.ALatticeApplication;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.LatticeOps;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
 
@@ -46,11 +45,11 @@ class NodeApplicationIngressTest {
 		}
 		/** A path delivery is reduced to a root by the lattice, then merged here. */
 		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
-			Index<Keyword,ACell> reduced=LatticeOps.reduce(LATTICE,value,path);
+			Index<Keyword,ACell> reduced=LatticeComponent.reduce(LATTICE,value,path);
 			return reduced==null?cursor().get():merge(reduced);
 		}
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.reconcile(LATTICE,LatticeContext.EMPTY,own,other);
+			return LatticeComponent.reconcile(LATTICE,LatticeContext.EMPTY,own,other);
 		}
 		@Override protected void beforeSync() { preparations++; }
 	}

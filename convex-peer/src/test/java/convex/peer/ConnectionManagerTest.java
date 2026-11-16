@@ -660,6 +660,41 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/** An answer signed for another challenge is false input, which closes the link at once. */
+	@Test
+	public void testChallengeAnsweredForAnotherClosesLink() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(270));
+		try {
+			AtomicLong clock=new AtomicLong(START_TIME);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AKeyPair remote=AKeyPair.createSeeded(271);
+			AccountKey key=remote.getAccountKey();
+			PollingConvex link=pollingLink(server);
+			link.setKeyPair(AKeyPair.createSeeded(272));
+			manager.addConnection(key,link);
+
+			// The first challenge goes unanswered, so the link has one to replay
+			manager.verifyDueLinks();
+			clock.addAndGet(ConnectionManager.POLL_TIMEOUT_MILLIS);
+			manager.verifyDueLinks();
+			assertTrue(link.isConnected());
+
+			link.answerer=remote;
+			link.replayFirst=true;
+			advanceUntilDue(manager,clock,key);
+			manager.verifyDueLinks();
+			assertEquals(2,link.challengeCount);
+			manager.verifyDueLinks();
+			assertFalse(link.isConnected(),"a replayed answer closes the link");
+			assertNull(manager.getConnection(key));
+			assertNull(link.getVerifiedPeer());
+			assertFalse(manager.isDue(key),"the replayed answer counts as a failure");
+		} finally {
+			server.close();
+		}
+	}
+
 	@Test
 	public void testUnansweredChallengesCloseLinkAfterMinute() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(251));
@@ -1085,6 +1120,9 @@ public class ConnectionManagerTest {
 		int statusCount;
 		/** Key pair that answers challenges, or null to leave them unanswered. */
 		AKeyPair answerer;
+		/** Whether to answer the first challenge received instead of each one sent. */
+		boolean replayFirst;
+		SignedData<ACell> firstChallenge;
 		int challengeCount;
 
 		PollingConvex() {
@@ -1102,8 +1140,10 @@ public class ConnectionManagerTest {
 
 		@Override protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
 			challengeCount++;
+			if (firstChallenge==null) firstChallenge=data;
 			if (answerer==null) return new CompletableFuture<>();
-			return CompletableFuture.completedFuture(Message.answerChallenge(answerer,data,context -> true));
+			SignedData<ACell> answered=replayFirst ? firstChallenge : data;
+			return CompletableFuture.completedFuture(Message.answerChallenge(answerer,answered,context -> true));
 		}
 
 		@SuppressWarnings("unchecked")

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -22,6 +23,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.message.Message;
 import convex.core.store.MemoryStore;
@@ -154,6 +156,20 @@ public class AcquirorTest {
 		}
 	}
 
+	/** An Error from the source still fails the acquisition. */
+	@Test
+	public void testErrorFailsAcquisition() throws Exception {
+		Blob expected = Blobs.createRandom(400);
+		AssertionError defect = new AssertionError("defect in the source");
+		try (MemoryStore store = new MemoryStore();
+				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes -> { throw defect; })) {
+			CompletableFuture<ACell> acquired = acquiror.getFuture();
+			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+			assertTrue(acquired.isCompletedExceptionally());
+			assertSame(defect, assertThrows(ExecutionException.class, acquired::get).getCause());
+		}
+	}
+
 	/** A fetch that fails with an Error fails this acquisition alone, and its worker ends. */
 	@Test
 	public void testErrorFailsOnlyThisAcquisition() throws Exception {
@@ -173,23 +189,24 @@ public class AcquirorTest {
 
 	@Test
 	public void testResponseCardinalityMustMatchRequest() throws Exception {
-		assertMalformedResponse(Vectors.empty());
-		assertMalformedResponse(Vectors.of(CVMLong.ZERO, CVMLong.ONE));
+		assertRejectedResponse(Vectors.empty(), BadFormatException.class);
+		assertRejectedResponse(Vectors.of(CVMLong.ZERO, CVMLong.ONE), BadFormatException.class);
 	}
 
+	/** A cell other than the one requested is false, not malformed. */
 	@Test
 	public void testResponseHashMustMatchRequest() throws Exception {
-		assertMalformedResponse(Vectors.of(Blobs.createRandom(400)));
+		assertRejectedResponse(Vectors.of(Blobs.createRandom(400)), MisbehaviourException.class);
 	}
 
-	private static void assertMalformedResponse(ACell response) throws Exception {
+	private static void assertRejectedResponse(ACell response, Class<? extends Throwable> type) throws Exception {
 		Blob expected = Blobs.createRandom(400);
 		try (MemoryStore store = new MemoryStore();
 				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes ->
 					CompletableFuture.completedFuture(Result.create(null, response)))) {
 			ExecutionException error = org.junit.jupiter.api.Assertions.assertThrows(
 				ExecutionException.class, () -> acquiror.getFuture().get(5, TimeUnit.SECONDS));
-			assertInstanceOf(BadFormatException.class, error.getCause());
+			assertInstanceOf(type, error.getCause());
 		}
 	}
 
