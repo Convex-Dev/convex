@@ -710,38 +710,32 @@ public class LatticePropagatorTest {
 		}
 	}
 
-	/** A close whose caller is interrupted still waits for the publication worker, and keeps the interrupt. */
+	/**
+	 * A close whose caller is interrupted still waits out the drain for a publication
+	 * worker held in a store write, and keeps the interrupt.
+	 */
 	@Test
 	public void testInterruptedCloseStillWaitsForThePublicationWorker() throws Exception {
 		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
-			LatticePropagator propagator = new LatticePropagator(store);
+			LatticePropagator propagator = new LatticePropagator(store, LatticePropagatorConfig.create(
+				Maps.of(LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100))));
 			propagator.start();
-			AtomicBoolean closeReturned = new AtomicBoolean();
 			try {
 				propagator.triggerBroadcast(CVMLong.create(776));
 				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
 					"the publication worker should enter the controlled store write");
-				Thread worker = store.heldThread();
-				Thread closer = Thread.currentThread();
-				// Lets the write finish once the close waits for it, so a close that does
-				// not wait finds the worker still running
-				Thread.ofVirtual().start(() -> {
-					while (closer.getState() != Thread.State.TIMED_WAITING && !closeReturned.get()) {
-						Thread.onSpinWait();
-					}
-					store.release();
-				});
-				closer.interrupt();
-				propagator.close();
-				boolean ended = !worker.isAlive();
-				closeReturned.set(true);
-				assertTrue(Thread.interrupted(), "close keeps the interrupt");
-				assertTrue(ended, "the worker ended before close returned");
+				// Having waited out the drain, the group warns that its worker did not drain
+				// in time; a wait the interrupt cut short warns of nothing
+				try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+					Thread.currentThread().interrupt();
+					propagator.close();
+					assertTrue(Thread.interrupted(), "close keeps the interrupt");
+				}
 			} finally {
-				closeReturned.set(true);
 				Thread.interrupted();
 				store.release();
 			}
+			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
 			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
 		}
 	}
