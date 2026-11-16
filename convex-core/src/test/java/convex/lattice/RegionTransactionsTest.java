@@ -212,13 +212,28 @@ class RegionTransactionsTest {
 			int attempt=attempts.incrementAndGet();
 			view.forked().add(attempt);
 			view.live().add(attempt);
-			// A concurrent change to the container's value forces another attempt
-			if (attempt==1) root.set(root.get().assoc(OTHER,CVMLong.ONE));
+			// A concurrent change to a region this attempt also changed forces another attempt
+			if (attempt==1) app.live().add(7);
 		});
 		assertEquals(2,attempts.get());
 		assertEquals(Sets.of(2),at(root,FORKED));
-		assertEquals(Sets.of(2),at(root,LIVE));
-		assertEquals(CVMLong.ONE,at(root,OTHER));
+		assertEquals(Sets.of(2,7),at(root,LIVE));
+	}
+
+	@Test void aConcurrentChangeToAnotherRegionCommitsWithoutARerun() {
+		var attempts=new AtomicInteger();
+		var root=liveRoot();
+		var app=new App(root);
+		app.execute(view -> {
+			attempts.incrementAndGet();
+			view.live().add(1);
+			app.more().add(2);
+			root.set(root.get().assoc(OTHER,CVMLong.ONE));
+		});
+		assertEquals(1,attempts.get(),"disjoint changes merge");
+		assertEquals(Sets.of(1),at(root,LIVE));
+		assertEquals(Sets.of(2),at(root,MORE),"a region changed meanwhile keeps that change");
+		assertEquals(CVMLong.ONE,at(root,OTHER),"so does a key the container does not serve");
 	}
 
 	@Test void anExclusiveTransactionBringsInManagedRegionsToo() {
@@ -258,7 +273,7 @@ class RegionTransactionsTest {
 		fork.live().add(1);
 		app.live().add(2);
 		var before=root.get();
-		assertThrows(UnsupportedOperationException.class,fork::sync);
+		assertThrows(MergeConflictException.class,fork::sync);
 		assertSame(before,root.get(),"a refused reconcile changes nothing");
 	}
 
@@ -370,30 +385,35 @@ class RegionTransactionsTest {
 		assertEquals(Sets.of(1,9),at(root,LIVE),"both survive");
 	}
 
-	@Test void anEscalatedRegionTransactionMergesWhatTheContainerWroteUnderItsClaim() throws Exception {
+	@Test void aRegionThatCanMergeCommitsWithAChangeToItsOwnValue() {
 		var attempts=new AtomicInteger();
 		var root=liveRoot();
 		var app=new App(root);
 		app.live().execute(m -> {
-			int attempt=attempts.incrementAndGet();
-			if (attempt<2) {
-				// A change to the region's own value makes the second run take its claim
-				root.set(root.get().assoc(LIVE,Sets.of(100+attempt)));
-			} else {
-				// Under the region's claim, a write that does not pass through its boundary goes ahead
-				Thread other=Thread.ofPlatform().start(() -> app.execute(view -> view.live().add(9)));
-				try { other.join(); } catch (InterruptedException e) { throw new AssertionError(e); }
-			}
+			attempts.incrementAndGet();
+			root.set(root.get().assoc(LIVE,Sets.of(101)));
 			m.add(1);
 		});
-		assertEquals(2,attempts.get());
-		assertEquals(Sets.of(1,9,101),at(root,LIVE),"the container's change and the region's run both survive");
+		assertEquals(1,attempts.get(),"a set's merge takes both changes");
+		assertEquals(Sets.of(1,101),at(root,LIVE));
+	}
+
+	@Test void aRegionThatCannotMergeRerunsUnderItsClaim() {
+		var attempts=new AtomicInteger();
+		var root=liveRoot();
+		var region=new Unmerged(BoundaryCursor.over(root.<ASet<CVMLong>>path(LIVE)));
+		region.execute(m -> {
+			if (attempts.incrementAndGet()==1) root.set(root.get().assoc(LIVE,Sets.of(9)));
+			m.cursor().updateAndGet(s -> union(s,1));
+		});
+		assertEquals(2,attempts.get(),"a change on both sides is a conflict");
+		assertEquals(Sets.of(1,9),at(root,LIVE),"the rerun starts from the change");
 	}
 
 	@Test void aRegionThatCannotReconcileFailsRatherThanLoseAContainerChange() {
 		var root=liveRoot();
 		var region=new Unmerged(BoundaryCursor.over(root.<ASet<CVMLong>>path(LIVE)));
-		var failure=assertThrows(UnsupportedOperationException.class,() -> region.exclusive().execute(m -> {
+		var failure=assertThrows(MergeConflictException.class,() -> region.exclusive().execute(m -> {
 			root.set(root.get().assoc(LIVE,Sets.of(9)));
 			m.cursor().set(Sets.of(1));
 		}));

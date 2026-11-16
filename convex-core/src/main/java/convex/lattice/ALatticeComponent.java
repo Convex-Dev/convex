@@ -101,15 +101,17 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Resolves a working snapshot that conflicts with a concurrently changed
 	 * destination. Called by {@link #reconcile(ACell,ACell,ACell)} only when both sides
 	 * changed, within the destination's atomic update. Implementations must use the
-	 * supplied values without mutating working state. Staged components must define
-	 * this operation; live views do not need it.
+	 * supplied values without mutating working state. A component that can merge the
+	 * destination's changes, such as a CRDT, overrides this; by default a change on both
+	 * sides is a conflict.
 	 *
 	 * @param own Working value
 	 * @param other Destination value
 	 * @return Reconciled value
+	 * @throws MergeConflictException If the two values cannot be reconciled
 	 */
 	protected V reconcile(V own,V other) {
-		throw new UnsupportedOperationException(getClass().getSimpleName()+" cannot reconcile changes on both sides");
+		throw new MergeConflictException(getClass().getSimpleName()+" cannot reconcile changes on both sides");
 	}
 
 	/**
@@ -128,9 +130,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * @return Reconciled value
 	 */
 	protected V reconcile(V base,V own,V other) {
-		if (Utils.equals(own,base) || Utils.equals(own,other)) return other;
+		if (Utils.equals(own,base)) return other;
 		// Other changed nothing, so this never conflicts
 		if (Utils.equals(other,base)) return LatticeOps.mergeChanges(base,own,other);
+		// Both changed, even to equal values: two increments to the same count are two changes
 		return reconcile(own,other);
 	}
 

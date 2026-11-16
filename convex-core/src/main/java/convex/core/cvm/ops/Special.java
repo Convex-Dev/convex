@@ -109,7 +109,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	 * @return Special instance, or null if not found
 	 */
 	public static final Special<?> create(int opCode) {
-		if ((opCode<BASE)||(opCode>LIMIT)) return null;
+		if ((opCode<BASE)||(opCode>=LIMIT)) return null;
 		return specials[opCode-BASE];
 	}
 	

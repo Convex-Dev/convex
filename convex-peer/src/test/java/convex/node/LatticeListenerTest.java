@@ -11,6 +11,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +29,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.MaxLattice;
+import convex.net.IncomingHandler;
 
 /** Tests application-owned inbound transport composition. */
 public class LatticeListenerTest {
@@ -167,6 +169,136 @@ public class LatticeListenerTest {
 			}
 			assertTrue(node.isRunning());
 			assertTrue(listener.isRunning());
+		}
+	}
+
+	@Test
+	public void testSelectorOutOfMemoryDeniesOnlyThatConnection() throws Exception {
+		try (AStore store=new MemoryStore();
+				NodeServer<convex.core.data.prim.AInteger> node=
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
+				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
+			LatticePropagator group=new LatticePropagator(store);
+			node.addPropagator(group);
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> {
+				throw new OutOfMemoryError("simulated");
+			});
+			node.launch();
+			listener.launch();
+
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				Result denied=client.message(Message.createPing(6)).get(5,TimeUnit.SECONDS);
+				assertEquals(ErrorCodes.TRUST,denied.getErrorCode());
+			}
+			listener.setSelector(connection -> group);
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ZERO,queryRoot(client,7).getValue());
+			}
+			assertTrue(node.isRunning());
+			assertTrue(listener.isRunning());
+		}
+	}
+
+	/** A group that throws a chosen Error once when accepting, delivering to or releasing a connection. */
+	private static final class FaultingGroup extends LatticePropagator {
+		volatile Error onAccept;
+		volatile Error onDeliver;
+		volatile Error onRemove;
+
+		FaultingGroup(AStore store) {
+			super(store);
+		}
+
+		@Override public IncomingHandler accept(AConnection connection) {
+			Error accepting=onAccept;
+			if (accepting!=null) {
+				onAccept=null;
+				throw accepting;
+			}
+			IncomingHandler inner=super.accept(connection);
+			return new IncomingHandler() {
+				@Override public Predicate<Message> handle(Message message) {
+					Error delivering=onDeliver;
+					if (delivering!=null) {
+						onDeliver=null;
+						throw delivering;
+					}
+					return inner.handle(message);
+				}
+				@Override public void close() {
+					inner.close();
+				}
+			};
+		}
+
+		@Override public void removeInboundConnection(AConnection connection) {
+			Error removing=onRemove;
+			if (removing!=null) {
+				onRemove=null;
+				throw removing;
+			}
+			super.removeInboundConnection(connection);
+		}
+	}
+
+	/** Running out of memory accepting or delivering to one connection fails that connection alone. */
+	@Test
+	public void testGroupOutOfMemoryFailsOnlyThatConnection() throws Exception {
+		try (AStore store=new MemoryStore();
+				NodeServer<convex.core.data.prim.AInteger> node=
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
+				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
+			FaultingGroup group=new FaultingGroup(store);
+			node.addPropagator(group);
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> group);
+			node.launch();
+			listener.launch();
+
+			group.onAccept=new OutOfMemoryError("simulated accept");
+			CompletableFuture<LatticePropagator.Failure> accepting=group.nextFailure();
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				client.message(Message.createPing(1));
+				assertTrue(accepting.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+			}
+			group.onDeliver=new OutOfMemoryError("simulated delivery");
+			CompletableFuture<LatticePropagator.Failure> delivering=group.nextFailure();
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				client.message(Message.createPing(2));
+				assertTrue(delivering.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+			}
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ZERO,queryRoot(client,3).getValue());
+			}
+			assertTrue(node.isRunning());
+			assertTrue(listener.isRunning());
+		}
+	}
+
+	/** Running out of memory releasing one connection does not stop the listener closing. */
+	@Test
+	public void testCloseCompletesDespiteOutOfMemoryReleasingAConnection() throws Exception {
+		try (AStore store=new MemoryStore();
+				NodeServer<convex.core.data.prim.AInteger> node=
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store))) {
+			FaultingGroup group=new FaultingGroup(store);
+			node.addPropagator(group);
+			LatticeListener listener=new LatticeListener(NodeConfig.port(0));
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> group);
+			node.launch();
+			listener.launch();
+			try (ConvexRemote first=ConvexRemote.connect(listener.getHostAddress());
+					ConvexRemote second=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ZERO,queryRoot(first,1).getValue());
+				assertEquals(CVMLong.ZERO,queryRoot(second,2).getValue());
+				group.onRemove=new OutOfMemoryError("simulated release");
+				listener.close();
+				assertFalse(listener.isRunning());
+				assertNull(group.onRemove,"releasing a connection ran out of memory");
+			}
+			assertTrue(node.isRunning());
 		}
 	}
 

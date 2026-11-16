@@ -171,6 +171,8 @@ release:
   constant names, dependency bumps, build plumbing, test-only refactors and agent
   tooling. Embedders read the code, so Java API changes share one entry pointing
   at the design notes.
+- A fix for an exploitable flaw gets no entry of its own: at most one general
+  hardening headline, never the flaw or what it allowed.
 - A breaking change gets one entry pointing at its doc.
 
 Then:

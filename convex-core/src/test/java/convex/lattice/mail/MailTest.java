@@ -237,17 +237,16 @@ public class MailTest {
 		assertTrue(mail.mailbox(BOB_DID).deposited().isEmpty());
 	}
 
-	/** A concurrent write before the commit reruns the same envelope without duplicating it or leaking the failed attempt. */
-	@Test void retryKeepsOnlyCommittedSends() {
-		var envelope=aliceToBob(1000,"retry");
-		var abandoned=aliceToBob(1001,"first attempt only");
+	/** A concurrent deposit before the commit merges with a send, without running it again. */
+	@Test void aConcurrentDepositMergesWithASend() {
+		var envelope=aliceToBob(1000,"send");
 		var concurrent=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1002,Strings.create("concurrent"));
 		var armed=new AtomicBoolean();
 		var root=new Root<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>>(Mail.LATTICE.zero()) {
 			@Override public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> updateAndGet(
 					UnaryOperator<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> update) {
 				if (armed.compareAndSet(true,false)) {
-					// Another writer deposits before the first transaction can commit.
+					// Another writer deposits before the transaction can commit.
 					super.set(get().assoc(CAROL_DID,Index.create(concurrent.key(),concurrent.signed())));
 				}
 				return super.updateAndGet(update);
@@ -257,10 +256,10 @@ public class MailTest {
 		armed.set(true);
 		var attempts=new AtomicInteger();
 		mail.execute(draft -> {
+			attempts.incrementAndGet();
 			draft.send(envelope);
-			if (attempts.incrementAndGet()==1) draft.send(abandoned);
 		});
-		assertEquals(2,attempts.get());
+		assertEquals(1,attempts.get());
 		assertEquals(List.of(envelope),mail.mailbox(BOB_DID).deposited());
 		assertEquals(List.of(concurrent),mail.mailbox(CAROL_DID).deposited());
 	}

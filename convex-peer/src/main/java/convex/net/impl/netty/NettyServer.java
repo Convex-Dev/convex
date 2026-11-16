@@ -190,8 +190,10 @@ public class NettyServer extends AServer {
 					 try {
 						 accepted.open(factory.apply(conn));
 					 } catch (Throwable e) {
-						 if (e instanceof VirtualMachineError && !(e instanceof StackOverflowError)) throw e;
-						 log.warn("Incoming connection handler failed",e);
+						 // A failure setting up one connection refuses that connection alone
+						 Utils.checkRequestFailure(e);
+						 log.warn("Incoming connection handler failed: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+						 log.debug("Incoming connection handler failure",e);
 						 if (!accepted.opened) accepted.open(null);
 						 conn.close();
 					 }

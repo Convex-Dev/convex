@@ -1023,6 +1023,23 @@ public class Utils {
 		throw (T) t;
 	}
 
+	/**
+	 * Checks a failure of one unit of work, such as one message, one connection or one
+	 * cleanup step, before the caller contains it, so that the work fails alone.
+	 * Rethrows the failure if it is a failure of the JVM itself:
+	 * a {@link VirtualMachineError} other than {@link StackOverflowError} or
+	 * {@link OutOfMemoryError}. Otherwise returns, restoring the current thread's
+	 * interrupt status if the failure is an {@link InterruptedException}.
+	 *
+	 * @param e Failure of one unit of work
+	 */
+	public static void checkRequestFailure(Throwable e) {
+		if ((e instanceof VirtualMachineError vme) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) {
+			throw vme;
+		}
+		if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+	}
+
 	@SuppressWarnings("unchecked")
 	public static <T> T[] copyOfRangeExcludeNulls(T[] entries, int offset, int length) {
 		int newLen = length;

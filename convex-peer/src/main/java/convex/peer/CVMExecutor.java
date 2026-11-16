@@ -93,21 +93,14 @@ public class CVMExecutor extends AThreadedComponent {
 
 			server.transactionHandler.maybeReportTransactions(peer);
 		} catch (UpgradeError e) {
-			// A required network upgrade cannot be applied by this release (see UPGRADE.md).
+			// A required network upgrade cannot be applied by this peer (see UPGRADE.md).
 			// UpgradeError is an Error, so it bypasses applyBlock's catch(Exception) and is
 			// never turned into an invalid block - state at the boundary is left uncommitted.
-			if (e.isRetryable()) {
-				// Peer-local (e.g. missing store data): resync-and-retry may succeed with no
-				// release change, so do NOT freeze. The loop retries on subsequent iterations.
-				Server.upgradeLog.warn("Upgrade to protocol version {} could not be applied due to a local condition; will retry",
-						e.getVersion(), e);
-			} else {
-				// Deterministic: this release cannot proceed. Freeze consensus (executor and
-				// propagator both cease) until the operator updates and restarts.
-				server.haltConsensus(e);
-			}
+			// Whatever the cause, the peer cannot proceed: freeze consensus (executor and
+			// propagator both cease) until the operator fixes the cause and restarts.
+			server.haltConsensus(e);
 		} catch (Exception e) {
-			// This is some fatal failure
+			// A State this peer cannot compute or persist from what it holds: it cannot proceed
 			log.error("Fatal exception encountered in CVM Executor",e);
 			server.close();
 		}

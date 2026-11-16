@@ -6,14 +6,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.math.BigInteger;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.List;
 import java.util.function.Function;
 
 
@@ -480,6 +484,26 @@ public class UtilsTest {
 	
 	@Test public void testVersion() {
 		assertNotEquals("SNAPSHOT",Utils.getVersion());
+	}
+
+	@Test public void testCheckRequestFailure() {
+		// A failure of the JVM itself is rethrown
+		InternalError internal=new InternalError("simulated");
+		assertSame(internal,assertThrows(InternalError.class,() -> Utils.checkRequestFailure(internal)));
+		assertThrows(UnknownError.class,() -> Utils.checkRequestFailure(new UnknownError("simulated")));
+
+		// Anything else is left to the caller, and does not interrupt the thread
+		List<Throwable> contained=List.of(new StackOverflowError(),new OutOfMemoryError(),
+			new NoClassDefFoundError(),new AssertionError(),new IllegalStateException(),
+			new IOException(),new SocketTimeoutException());
+		for (Throwable e: contained) {
+			Utils.checkRequestFailure(e);
+			assertFalse(Thread.interrupted(),e.toString());
+		}
+
+		// An interruption is kept for the thread to act on
+		Utils.checkRequestFailure(new InterruptedException());
+		assertTrue(Thread.interrupted());
 	}
 
 }

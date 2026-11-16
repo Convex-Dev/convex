@@ -2,6 +2,7 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,18 +21,27 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.api.Convex;
 import convex.core.Result;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
+import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
+import convex.core.lang.Core;
+import convex.core.store.MemoryStore;
 
 /**
  * Tests the peer-level response to a required upgrade this release cannot apply:
@@ -268,6 +278,40 @@ public class UpgradeWithdrawalTest {
 			// State did not advance: b was never defined
 			Result q2 = convex.querySync("b");
 			assertTrue(q2.isError());
+		} finally {
+			s.close();
+		}
+	}
+
+	/**
+	 * An upgrade that finds data missing from the peer's store withdraws the peer like
+	 * any other failed upgrade, and is not retried.
+	 */
+	@Test
+	public void testMissingDataAtUpgradeWithdraws() throws Exception {
+		Server s = launchIsolatedPeer();
+		try (MemoryStore hollowStore = new MemoryStore()) {
+			// Stop Belief updates, so the executor computes only the Belief given here
+			BeliefPropagator propagator = s.getBeliefPropagator();
+			propagator.close();
+			propagator.awaitStopped();
+
+			// v1 is due, but the core account's environment it upgrades is not held
+			State genesis = Init.createState(List.of(PEER_KP.getAccountKey()));
+			long activation = genesis.getTimestamp().longValue() + 1000;
+			AccountStatus core = genesis.getAccount(Core.CORE_ADDRESS);
+			AccountStatus hollowCore = hollowStore.decode(core.getEncoding());
+			State pending = genesis.withProtocolGlobals(0, Vectors.of(CVMLong.create(activation)))
+					.putAccount(Core.CORE_ADDRESS, hollowCore);
+			s.getCVMExecutor().setPeer(Peer.create(PEER_KP, pending));
+
+			SignedData<Block> block = PEER_KP.signData(Block.of(activation));
+			Order order = Order.create().append(block).withConsensusPoints(new long[] {1,1,1,1}).withTimestamp(1);
+			s.getCVMExecutor().queueUpdate(Belief.create(PEER_KP.signData(order)));
+
+			UpgradeError halt = s.awaitConsensusHalt().get(10, TimeUnit.SECONDS);
+			assertEquals(1L, halt.getVersion());
+			assertInstanceOf(MissingDataException.class, halt.getCause());
 		} finally {
 			s.close();
 		}

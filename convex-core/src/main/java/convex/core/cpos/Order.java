@@ -352,7 +352,12 @@ public class Order extends ARecordGeneric {
 	
 	@Override
 	public void validateStructure() throws InvalidDataException {
-		super.validateStructure();
+		if (!(values.get(IX_BLOCKS) instanceof AVector)) throw new InvalidDataException("Blocks should be a vector",this);
+	}
+
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
 		long [] cps=getConsensusPoints();
 		int n=cps.length;
 		if (n==0) return; // no supplied levels means no confirmation claims
