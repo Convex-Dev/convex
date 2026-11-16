@@ -514,8 +514,12 @@ public class NodeServerTest {
 		assertTrue(maxNodeServer.mergeIncoming(CVMLong.create(7)));
 		assertEquals(CVMLong.create(7), c.get());
 
-		// A wrong-type value is rejected; the cursor is unchanged
-		assertFalse(maxNodeServer.mergeIncoming(convex.core.data.Blob.wrap(new byte[8])));
+		// A wrong-type value is rejected without a warning, as bad data from another node; the cursor is unchanged
+		ExpectedLogs logs=ExpectedLogs.onThreads(NodeServer.class.getName(),Thread.currentThread()).ifLogged().open();
+		try (logs) {
+			assertFalse(maxNodeServer.mergeIncoming(convex.core.data.Blob.wrap(new byte[8])));
+		}
+		assertEquals(List.of(),logs.records());
 		assertEquals(CVMLong.create(7), c.get());
 	}
 
@@ -631,17 +635,25 @@ public class NodeServerTest {
 	/**
 	 * #561: a merge that fails, including by overflowing the stack on a maliciously
 	 * deep value or running out of memory, is rejected and leaves the cursor unchanged.
+	 * Running out of memory, and a probable defect, warn the first time at a node; a
+	 * stack overflow is the sender's bad data, which does not.
 	 */
 	@Test
 	public void testFailedMergeRejected() throws IOException {
 		List<Error> errors=List.of(new StackOverflowError("simulated"),new OutOfMemoryError("simulated"),
 			new NoClassDefFoundError("simulated"));
 		for (Error error: errors) {
-			try (TestNode<AInteger> node=new TestNode<>(new PoisonedLattice(CVMLong.create(7),error),store,NodeConfig.port(-1))) {
+			ExpectedLogs logs=ExpectedLogs.carrying(error).ifLogged().open();
+			try (logs; TestNode<AInteger> node=new TestNode<>(new PoisonedLattice(CVMLong.create(7),error),store,NodeConfig.port(-1))) {
 				var c=node.getCursor();
 				c.set(CVMLong.create(5));
 				assertFalse(node.mergeIncoming(CVMLong.create(7)),error.toString());
 				assertEquals(CVMLong.create(5),c.get(),error.toString());
+			}
+			if (error instanceof StackOverflowError) {
+				assertEquals(List.of(),logs.records());
+			} else {
+				logs.assertLogged(Level.WARN,error);
 			}
 		}
 	}
@@ -684,7 +696,8 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testOutOfMemoryInMergeFailsOnlyItsMessage() throws Exception {
-		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),new OutOfMemoryError("simulated")),
+		OutOfMemoryError error=new OutOfMemoryError("simulated");
+		maxNodeServer=new TestNode<>(new PoisonedLattice(CVMLong.create(13),error),
 			store,NodeConfig.port(-1));
 		maxNodeServer.addPropagator(new LatticePropagator(store,LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(2)))));
@@ -693,11 +706,15 @@ public class NodeServerTest {
 		ScriptedPeer sender=new ScriptedPeer();
 		ScriptedPeer honest=new ScriptedPeer();
 
-		group.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),sender)); // reject 1
-		group.handleIncomingMessage(rootValue(1,CVMLong.create(13),sender));
-		group.handleIncomingMessage(rootValue(2,CVMLong.create(42),honest));
-		assertEquals(ErrorCodes.LOAD,sender.awaitResult(1).getErrorCode(),
-			"the message whose merge ran out of memory fails with a load error");
+		ExpectedLogs logs=ExpectedLogs.carrying(error).open();
+		try (logs) {
+			group.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),sender)); // reject 1
+			group.handleIncomingMessage(rootValue(1,CVMLong.create(13),sender));
+			group.handleIncomingMessage(rootValue(2,CVMLong.create(42),honest));
+			assertEquals(ErrorCodes.LOAD,sender.awaitResult(1).getErrorCode(),
+				"the message whose merge ran out of memory fails with a load error");
+		}
+		logs.assertLogged(Level.WARN,error);
 		assertFalse(sender.isClosed(),"running out of memory is not the sender's fault, so not a second reject");
 		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
 		assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
@@ -714,12 +731,18 @@ public class NodeServerTest {
 		LatticePropagator group=propagator(maxNodeServer);
 		maxNodeServer.launch();
 		ScriptedPeer faulting=new ScriptedPeer();
-		faulting.onReply=new OutOfMemoryError("simulated");
+		OutOfMemoryError error=new OutOfMemoryError("simulated");
+		faulting.onReply=error;
 		ScriptedPeer honest=new ScriptedPeer();
 
-		assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),faulting)));
-		assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
-		assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
+		ExpectedLogs logs=ExpectedLogs.carrying(error).open();
+		try (logs) {
+			assertNull(group.deliverIncomingMessage(rootValue(1,CVMLong.create(13),faulting)));
+			assertNull(group.deliverIncomingMessage(rootValue(2,CVMLong.create(42),honest)));
+			// Handled in order, so the failure was logged before this reply
+			assertFalse(honest.awaitResult(2).isError(),"a later message is handled");
+		}
+		logs.assertLogged(Level.WARN,error);
 		assertNull(faulting.onReply,"replying ran out of memory");
 		assertTrue(faulting.isClosed(),"the connection whose reply ran out of memory is closed");
 	}

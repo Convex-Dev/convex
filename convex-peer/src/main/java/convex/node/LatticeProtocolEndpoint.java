@@ -46,6 +46,7 @@ import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.core.util.FutureUtils;
 import convex.lattice.cursor.Root;
+import convex.net.RequestFailures;
 import convex.peer.Config;
 
 /**
@@ -70,6 +71,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private static final Logger log=LoggerFactory.getLogger(LatticeProtocolEndpoint.class);
 	private static final long CONNECTION_SWEEP_INTERVAL=30_000L;
 
+	private final RequestFailures messageFailures=new RequestFailures(log);
 	private final LatticePropagator propagator;
 	private final NodeServer<?> node;
 	private final LatticePropagatorConfig config;
@@ -780,8 +782,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			handle(message);
 		} catch (Error e) {
 			Utils.checkRequestFailure(e);
-			log.warn("Rejected propagation message after {}",e.getClass().getSimpleName());
-			log.debug("Propagation message failure",e);
+			messageFailures.log(e,"Rejected propagation message");
 			closeFaultingConnection(message);
 		}
 	}
