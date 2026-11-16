@@ -703,6 +703,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	/** The latest fetch, completing once it has been dropped or its update queued again. */
 	private volatile CompletableFuture<?> missingDataFetch=null;
 
+	/** The acquisition behind the latest fetch, which closing this component stops. */
+	private volatile Acquiror fetchAcquiror=null;
+
 	/**
 	 * Fetches what an update lacks from the connection it arrived on: whoever sent a
 	 * delta holds everything it refers to (CAD015). At most one fetch is outstanding.
@@ -727,6 +730,9 @@ public class BeliefPropagator extends AThreadedComponent {
 			long timeout=server.getConnectionManager().getPollDelay();
 			Acquiror acquiror=Acquiror.fromMessages(update.getHash(),store,hashes ->
 				connection.request(Message.createDataRequest(null,hashes),timeout));
+			fetchAcquiror=acquiror;
+			// A close that ran before the line above found no fetch to stop
+			if (!server.isRunning()) acquiror.close();
 			missingDataFetch=acquiror.<ACell>getFuture()
 				.orTimeout(timeout,TimeUnit.MILLISECONDS)
 				.handle((value,error) -> {
@@ -756,6 +762,38 @@ public class BeliefPropagator extends AThreadedComponent {
 	 */
 	CompletableFuture<?> getMissingDataFetch() {
 		return missingDataFetch;
+	}
+
+	/** Also stops a fetch of missing update data, which would otherwise write to the store after the peer closes it. */
+	@Override
+	public void close() {
+		super.close();
+		Acquiror fetch=fetchAcquiror;
+		if (fetch!=null) fetch.close();
+	}
+
+	/**
+	 * Waits at most the given time for a fetch that closing stopped to end. An
+	 * interrupt does not end the wait, and is restored once it is over.
+	 *
+	 * @return true if no fetch is running
+	 */
+	boolean awaitFetchStopped(long timeoutMillis) {
+		Acquiror fetch=fetchAcquiror;
+		if (fetch==null) return true;
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+		boolean interrupted=false;
+		try {
+			while (true) {
+				try {
+					return fetch.awaitTermination(Math.max(0,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
+				} catch (InterruptedException e) {
+					interrupted=true;
+				}
+			}
+		} finally {
+			if (interrupted) Thread.currentThread().interrupt();
+		}
 	}
 
 	private void observeOrderUpdate(SignedData<Order> so) {

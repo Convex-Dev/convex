@@ -1,5 +1,6 @@
 package convex.net.impl.netty;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.LinkedHashSet;
 
@@ -7,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.message.Message;
+import convex.core.util.ThreadUtils;
 import convex.peer.Config;
 import io.netty.channel.Channel;
 
@@ -211,12 +213,21 @@ final class ServerOutboundQueue {
 		}
 	}
 
-	/** Stops the writer. Replies still queued are discarded: their channels are closed by now. */
+	/**
+	 * Stops the writer and waits for it, at most the internal timeout. Replies still
+	 * queued are discarded: their channels are closed by now.
+	 */
 	void close() {
 		synchronized (this) {
 			running = false;
 			notifyAll();
 		}
-		if (writer != null) writer.interrupt();
+		if (writer == null) return;
+		writer.interrupt();
+		// Bounded: the writer only hands replies to Netty, which never waits, so this is prompt
+		if (!ThreadUtils.joinUninterruptibly(writer, Duration.ofMillis(Config.DEFAULT_INTERNAL_TIMEOUT))
+				&& (writer != Thread.currentThread())) {
+			log.warn("Server outbound writer did not stop within {} ms", Config.DEFAULT_INTERNAL_TIMEOUT);
+		}
 	}
 }

@@ -13,7 +13,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
@@ -930,6 +932,50 @@ public class LatticeConnectionManagerTest {
 		assertEquals(0,manager.getConnectionCount());
 	}
 
+	/** A client still answering its challenge closes with the manager, not when the challenge times out. */
+	@Test public void testCloseClosesAClientBeingIdentified() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		manager.maintainConnections();
+		UnverifiedPeer challenged=new UnverifiedPeer(AKeyPair.createSeeded(201).getAccountKey());
+		manager.endpointDials.remove(ENDPOINT).complete(challenged);
+		assertTrue(challenged.isConnected(),"waiting for its challenge to be answered");
+		manager.close();
+		assertTrue(connecting.isCancelled());
+		assertFalse(challenged.isConnected());
+	}
+
+	/** Closing interrupts a probe running on a worker, and returns once the worker has ended. */
+	@Test public void testCloseWaitsForAWorker() throws Exception {
+		AccountKey key=candidate(1);
+		StubInbound inbound=new StubInbound();
+		inbound.setTrustedKey(key);
+		Thread closer=Thread.currentThread();
+		CountDownLatch started=new CountDownLatch(1);
+		AtomicBoolean closeReturned=new AtomicBoolean();
+		AtomicBoolean ended=new AtomicBoolean();
+		manager.setInboundProbe(connection -> {
+			started.countDown();
+			try {
+				new CountDownLatch(1).await();
+			} catch (InterruptedException e) {
+				// Ends only once the close waits for it, so a close that does not wait finds it running
+				while (closer.getState()!=Thread.State.TIMED_WAITING && !closeReturned.get()) Thread.onSpinWait();
+			}
+			ended.set(true);
+			return new CompletableFuture<>();
+		},AConnection::close);
+		manager.workerProbes=true;
+		manager.upgradeInboundConnection(inbound);
+		now.addAndGet(KEEP_ALIVE);
+		manager.maintainConnections();
+		assertTrue(started.await(5,TimeUnit.SECONDS));
+		manager.close();
+		boolean waited=ended.get();
+		closeReturned.set(true);
+		assertTrue(waited,"the worker ended before close returned");
+	}
+
 	private static PeerTarget target(List<AccountKey> keys,String... endpoints) {
 		AVector<AString> uris=Vectors.empty();
 		for (String endpoint:endpoints) uris=uris.conj(Strings.create(endpoint));
@@ -1094,6 +1140,8 @@ public class LatticeConnectionManagerTest {
 		final Map<Object,CompletableFuture<Void>> probes=new HashMap<>();
 		int openCount;
 		boolean respond=true;
+		/** Probes run as the manager runs them, on its workers. */
+		boolean workerProbes;
 		TestManager(AtomicLong now) { super(new MemoryStore(),now::get); }
 		@Override CompletableFuture<Convex> openPeer(DesiredPeer peer) {
 			openCount++;
@@ -1107,6 +1155,7 @@ public class LatticeConnectionManagerTest {
 			return future;
 		}
 		@Override CompletableFuture<?> probePeer(Object route) {
+			if (workerProbes) return super.probePeer(route);
 			CompletableFuture<Void> future=new CompletableFuture<>();
 			probes.put(route,future);
 			if (respond) future.complete(null);

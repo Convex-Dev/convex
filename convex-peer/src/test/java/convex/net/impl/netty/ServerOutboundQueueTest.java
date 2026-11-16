@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -240,6 +243,44 @@ public class ServerOutboundQueueTest {
 			queue.close();
 			client.finishAndReleaseAll();
 			peer.finishAndReleaseAll();
+		}
+	}
+
+	/** Closing stops the writer and returns once it has ended, though it was handing a reply to Netty. */
+	@Test
+	public void testCloseWaitsForTheWriter() throws Exception {
+		Message m = message(100);
+		Thread closer = Thread.currentThread();
+		CountDownLatch writing = new CountDownLatch(1);
+		AtomicBoolean closing = new AtomicBoolean();
+		AtomicBoolean closeReturned = new AtomicBoolean();
+		AtomicBoolean written = new AtomicBoolean();
+		ServerOutboundQueue queue = new ServerOutboundQueue(1 << 20, 1 << 20, true);
+		EmbeddedChannel ch = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+			@Override
+			public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+				writing.countDown();
+				// Held until the close waits, so a close that does not wait finds the write unfinished
+				while (!(closing.get() && closer.getState() == Thread.State.TIMED_WAITING) && !closeReturned.get()) {
+					Thread.onSpinWait();
+				}
+				written.set(true);
+				promise.trySuccess();
+			}
+		});
+		try {
+			NettyServerConnection conn = connection(ch, queue);
+			assertTrue(conn.trySendMessage(m));
+			assertTrue(writing.await(5, TimeUnit.SECONDS));
+			closing.set(true);
+			queue.close();
+			boolean waited = written.get();
+			closeReturned.set(true);
+			assertTrue(waited, "the writer finished before close returned");
+		} finally {
+			closeReturned.set(true);
+			queue.close();
+			ch.finishAndReleaseAll();
 		}
 	}
 

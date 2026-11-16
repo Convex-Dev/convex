@@ -3,8 +3,11 @@ package convex.peer;
 import convex.core.lang.RT;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -53,6 +56,7 @@ import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.RequestFailures;
 
@@ -445,9 +449,36 @@ public class TransactionHandler extends AThreadedComponent {
 		} finally {
 			// Even if the loop failed: every client listed has lost its interest
 			if (!recipients.isEmpty()) {
-				Thread.ofVirtual().name("Transaction results for block "+blockNum).start(() -> deliverResults(recipients,results));
+				Thread delivery=Thread.ofVirtual().name("Transaction results for block "+blockNum).unstarted(() -> {
+					try {
+						deliverResults(recipients,results);
+					} finally {
+						deliveries.remove(Thread.currentThread());
+					}
+				});
+				// Tracked before it starts, so a wait for deliveries cannot miss it
+				deliveries.add(delivery);
+				delivery.start();
 			}
 		}
+	}
+
+	/** Threads delivering a block's results, which the peer's shutdown waits for */
+	private final Set<Thread> deliveries=ConcurrentHashMap.newKeySet();
+
+	/**
+	 * Waits at most the given time for result deliveries under way to finish. An
+	 * interrupt does not end the wait, and is restored once it is over.
+	 *
+	 * @return true if none is still running
+	 */
+	boolean awaitDeliveriesStopped(long timeoutMillis) {
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+		for (Thread delivery:List.copyOf(deliveries)) {
+			Duration left=Duration.ofNanos(Math.max(0,deadline-System.nanoTime()));
+			if (!ThreadUtils.joinUninterruptibly(delivery,left)) return false;
+		}
+		return true;
 	}
 
 	/**

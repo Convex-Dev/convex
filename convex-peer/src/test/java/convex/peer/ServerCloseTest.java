@@ -14,23 +14,29 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.Result;
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -186,6 +192,50 @@ public class ServerCloseTest {
 			assertTimeoutPreemptively(WAIT,peer::waitForShutdown);
 
 			assertThrows(LaunchException.class,peer::launch,"a closed peer does not launch again");
+		} finally {
+			peer.close();
+		}
+	}
+
+	/** The wait a peer's shutdown makes for result deliveries returns once one under way has finished. */
+	@Test
+	public void waitingForDeliveriesReturnsOnceTheyHaveFinished() throws Exception {
+		AKeyPair kp=InvalidPeerDataTest.LOCAL;
+		Server peer=InvalidPeerDataTest.launchPeer(kp);
+		try {
+			SignedData<ATransaction> tx=kp.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
+			Block block=Block.of(InvalidPeerDataTest.blockTime(peer),tx);
+			BlockResult br=BlockResult.create(peer.getPeer().getConsensusState(),new Result[] {Result.value(CVMLong.create(3))});
+			Thread waiter=Thread.currentThread();
+			AtomicBoolean waiting=new AtomicBoolean();
+			AtomicBoolean waitReturned=new AtomicBoolean();
+			CompletableFuture<Result> delivered=new CompletableFuture<>();
+			AConnection client=new AConnection() {
+				@Override public boolean sendMessage(Message msg) { return trySendMessage(msg); }
+				@Override public boolean trySendMessage(Message msg) {
+					// Held until the wait has begun, so a wait that returns early finds it unfinished
+					while (!(waiting.get() && waiter.getState()==Thread.State.TIMED_WAITING) && !waitReturned.get()) {
+						Thread.onSpinWait();
+					}
+					delivered.complete(msg.toResult());
+					return true;
+				}
+				@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.3",30000); }
+				@Override public boolean isClosed() { return false; }
+				@Override public void close() {}
+				@Override public long getReceivedCount() { return 0; }
+			};
+			// Not started: this test thread runs it
+			TransactionHandler handler=new TransactionHandler(peer);
+			assertTrue(handler.offerTransaction(Message.createTransaction(1,tx).withConnection(client)));
+			handler.loop();
+			handler.reportTransactions(block,br,0);
+			waiting.set(true);
+			assertTrue(handler.awaitDeliveriesStopped(WAIT.toMillis()));
+			boolean finished=delivered.isDone();
+			waitReturned.set(true);
+			assertTrue(finished,"the delivery finished before the wait returned");
+			assertEquals(CVMLong.create(3),delivered.get().getValue());
 		} finally {
 			peer.close();
 		}

@@ -2,6 +2,7 @@ package convex.node;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -157,6 +159,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Attempts to reach a node known only by its endpoint and learn its key, before giving up. */
 	static final int MAX_ENDPOINT_ATTEMPTS = 3;
 
+	private static final ThreadFactory WORKER_THREADS=Thread.ofVirtual().name("Lattice connection worker").factory();
+	private static final ThreadFactory DATA_REQUEST_THREADS=Thread.ofVirtual().name("Lattice data request").factory();
+
 	/** Initial reconnection delay (milliseconds). */
 	static final long INITIAL_BACKOFF_MS = 1_000L;
 
@@ -224,7 +229,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private final Map<AccountKey,CompletableFuture<Void>> disconnectWaiters=new HashMap<>();
 	private final Map<AccountKey,HealthCheck> health=new HashMap<>();
 	private final LongSupplier clock;
-	private ExecutorService workers=Executors.newVirtualThreadPerTaskExecutor();
+	/** Threads of {@link #workers}, which closing interrupts and waits for. */
+	private final Set<Thread> workerThreads=ConcurrentHashMap.newKeySet();
+	private final ThreadFactory workerFactory=task -> tracked(workerThreads,WORKER_THREADS,task);
+	/** Dials, and probes of routes, which may block. */
+	private ExecutorService workers=Executors.newThreadPerTaskExecutor(workerFactory);
+	/**
+	 * Threads serving data requests, which closing waits for. They read the store, so
+	 * are never interrupted: NIO closes an interrupted thread's file channel for every
+	 * user of the store (#776).
+	 */
+	private final Set<Thread> dataRequests=ConcurrentHashMap.newKeySet();
+	/** Clients opened to a node not yet identified, which closing closes. Lock held. */
+	private final Set<Convex> identifying=new HashSet<>();
 	private Function<AConnection,CompletableFuture<?>> inboundProbe;
 	private Consumer<AConnection> inboundFailure;
 
@@ -664,7 +681,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void start() {
 		if (running) return;
-		if (workers.isShutdown()) workers=Executors.newVirtualThreadPerTaskExecutor();
+		if (workers.isShutdown()) workers=Executors.newThreadPerTaskExecutor(workerFactory);
 		accepting = true;
 		running = true;
 		maintenanceThread = Thread.ofVirtual().name("Lattice connection maintenance").start(this::maintenanceLoop);
@@ -680,7 +697,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		Cleanup cleanup=new Cleanup();
 		cleanup.run(this::stopMaintenance);
 		cleanup.run(this::closeAllConnections);
-		cleanup.run(workers::shutdownNow);
+		cleanup.run(this::stopWorkers);
 		log.debug("LatticeConnectionManager closed");
 		cleanup.finish();
 	}
@@ -744,6 +761,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<CompletableFuture<AConnection>> routeWaiters;
 		List<CompletableFuture<Void>> stateWaiters;
 		List<EndpointIntent> unidentified;
+		List<Convex> challenged;
 		List<CompletableFuture<Void>> disconnected;
 		synchronized (connectionLock) {
 			active = new ArrayList<>(connections.values());
@@ -753,6 +771,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			// Attempts in flight find their intent gone and close what they opened
 			unidentified = new ArrayList<>(endpointIntents.values());
 			endpointIntents.clear();
+			// Closed now rather than when their challenge is answered or times out
+			challenged = new ArrayList<>(identifying);
+			identifying.clear();
 			waiters = new ArrayList<>(connectionWaiters.values());
 			connectionWaiters.clear();
 			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
@@ -774,6 +795,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		// An Error closing one connection leaves the rest to close and every waiter to complete
 		Cleanup cleanup=new Cleanup();
 		for (Convex connection : active) cleanup.run(() -> closeSilently(connection));
+		for (Convex connection : challenged) cleanup.run(() -> closeSilently(connection));
 		for (PendingConnection pc : pending) {
 			pc.admission.completeExceptionally(new CancellationException("Connection manager closed"));
 			cleanup.run(() -> closeSilently(pc.connection));
@@ -1524,11 +1546,53 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	private void startDataRequest(Message message,Semaphore route,Semaphore pool) {
 		try {
-			Thread.ofVirtual().name("Lattice data request").start(() -> serveDataRequest(message,route,pool));
+			Thread request=tracked(dataRequests,DATA_REQUEST_THREADS,() -> serveDataRequest(message,route,pool));
+			try {
+				request.start();
+			} catch (Throwable t) {
+				dataRequests.remove(request);
+				throw t;
+			}
 		} catch (Throwable t) {
 			pool.release();
 			route.release();
 			throw t;
+		}
+	}
+
+	/** An unstarted thread that runs a task, in the given set from now until the task ends. */
+	private static Thread tracked(Set<Thread> threads,ThreadFactory factory,Runnable task) {
+		Thread thread=factory.newThread(() -> {
+			try {
+				task.run();
+			} finally {
+				threads.remove(Thread.currentThread());
+			}
+		});
+		// Tracked before it starts, so closing cannot miss it
+		threads.add(thread);
+		return thread;
+	}
+
+	/**
+	 * Stops the dial and probe workers, interrupting them, then waits at most the
+	 * admission timeout in all for them and for data requests being served. A caller on
+	 * one of these threads does not wait for itself.
+	 */
+	private void stopWorkers() {
+		workers.shutdownNow();
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(ADMISSION_TIMEOUT_MS);
+		awaitThreads(workerThreads,deadline,"Lattice connection workers");
+		awaitThreads(dataRequests,deadline,"Lattice data requests");
+	}
+
+	private static void awaitThreads(Set<Thread> threads,long deadline,String what) {
+		for (Thread thread:List.copyOf(threads)) {
+			Duration left=Duration.ofNanos(Math.max(0,deadline-System.nanoTime()));
+			if (!ThreadUtils.joinUninterruptibly(thread,left) && (thread!=Thread.currentThread())) {
+				log.warn("{} still running after {} ms",what,ADMISSION_TIMEOUT_MS);
+				return;
+			}
 		}
 	}
 
@@ -2155,6 +2219,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				identified=CompletableFuture.failedFuture(e);
 			}
 			identified.whenComplete((key,failure) -> {
+				synchronized (connectionLock) { identifying.remove(peer); }
 				try {
 					if (failure==null && key!=null && intent.admits(key)) {
 						admitIdentified(intent,key,peer);
@@ -2185,7 +2250,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private CompletableFuture<AccountKey> identify(Convex peer,AccountKey expected) {
 		ChallengeSigner signer=challengeSigner;
 		if (signer==null) throw new IllegalStateException("Identifying a node by its endpoint needs this node's key");
-		if (!accepting) throw new CancellationException("Connection manager is closed");
+		synchronized (connectionLock) {
+			// Under the lock closing takes: a close either finds this client or stops it here
+			if (!accepting) throw new CancellationException("Connection manager is closed");
+			identifying.add(peer);
+		}
 		restrictOutboundToLimbo(peer);
 		peer.setChallengeSigner(signer);
 		if (expected!=null) {

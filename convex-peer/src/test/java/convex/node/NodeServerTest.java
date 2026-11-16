@@ -1357,6 +1357,33 @@ public class NodeServerTest {
 		}
 	}
 
+	/** Closing the manager waits for a request being served, which reads the store uninterrupted. */
+	@Test
+	public void testCloseWaitsForADataRequestBeingServed() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore()) {
+			LatticeConnectionManager manager = new LatticeConnectionManager(servingStore);
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			ScriptedPeer peer = new ScriptedPeer();
+			Thread closer = null;
+			try {
+				assertNull(manager.dataRequestDelivery().apply(dataRequest(81, value, peer)));
+				assertTrue(servingStore.requested.await(5, TimeUnit.SECONDS));
+				closer = Thread.ofVirtual().start(manager::close);
+				while (closer.getState() != Thread.State.TIMED_WAITING) {
+					assertTrue(closer.isAlive(), "closing waits for the request being served");
+					Thread.onSpinWait();
+				}
+				servingStore.release.countDown();
+				closer.join();
+				assertServed(value, peer.awaitResult(81));
+			} finally {
+				servingStore.release.countDown();
+				if (closer == null) manager.close();
+			}
+		}
+	}
+
 	private static Message dataRequest(long id, Blob value, AConnection connection) {
 		return Message.createDataRequest(CVMLong.create(id), value.getHash()).withConnection(connection);
 	}

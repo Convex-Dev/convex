@@ -1035,6 +1035,12 @@ public class Server implements Closeable {
 	private void stopComponentsAndCheckpoint(boolean persist) {
 		boolean writersStopped=awaitComponentsStopped(
 			queryHandler,propagator,transactionHandler,executor);
+		// A fetch of missing Belief data writes to the store too; bounded by its own timeout
+		writersStopped&=propagator.awaitFetchStopped(manager.getPollDelay());
+		// Result deliveries never wait on a client, so they end soon after their connections close
+		if (!transactionHandler.awaitDeliveriesStopped(Config.DEFAULT_INTERNAL_TIMEOUT)) {
+			log.warn("Transaction result deliveries still running at peer shutdown");
+		}
 		if (!persist || (getPeer()==null) || Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) return;
 		if (!writersStopped) {
 			log.error("Peer writers did not stop cleanly; skipping the final checkpoint for "

@@ -311,6 +311,36 @@ public class MissingBeliefDataTest {
 	}
 
 	/**
+	 * Closing the peer stops a fetch still outstanding, rather than leaving it to write
+	 * to the store after the peer has closed it.
+	 */
+	@Test
+	public void closingThePeerStopsAnOutstandingFetch() throws Exception {
+		MemoryStore senderStore=new MemoryStore();
+		SignedData<Order> orderA=signedOrder(REMOTE_A,1000);
+		update(Belief.create(orderA),senderStore);
+		List<Message> sent=update(Belief.create(orderA,signedOrder(REMOTE_B,1001)),senderStore);
+
+		Server peer=launchPeer(LOCAL);
+		CompletableFuture<?> fetch;
+		try {
+			// The sender holds every request unanswered
+			LinkedBlockingQueue<Message> requests=new LinkedBlockingQueue<>();
+			LocalConnection senderEnd=connect(peer,m -> {
+				if (m.getType()==MessageType.DATA_REQUEST) requests.add(m);
+				return true;
+			});
+			for (Message m: sent) senderEnd.sendMessage(wire(m));
+			assertNotNull(requests.poll(10,TimeUnit.SECONDS),"the miss is fetched");
+			fetch=peer.getBeliefPropagator().getMissingDataFetch();
+			assertFalse(fetch.isDone());
+		} finally {
+			peer.close();
+		}
+		assertTrue(fetch.isDone(),"closing the peer stops the fetch");
+	}
+
+	/**
 	 * A peer's connection to another peer serves its store to requests sent back along it,
 	 * and the receiving peer takes the reply as the answer to its request.
 	 */
