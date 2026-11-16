@@ -21,7 +21,12 @@ import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cvm.Keywords;
+import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
+import convex.core.store.MemoryStore;
+import convex.net.ingress.Ingress;
+import convex.net.ingress.IngressLimits;
 
 public class NIOServerTest {
 
@@ -55,6 +60,34 @@ public class NIOServerTest {
 			}
 			s.close();
 			assertNull(s.getHostAddress(),"close must wait until the listener is released");
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	@Test public void testNIOServerRoutesOnIngress() throws Exception {
+		LinkedBlockingQueue<Message> onAction=new LinkedBlockingQueue<>();
+		LinkedBlockingQueue<Boolean> onWorker=new LinkedBlockingQueue<>();
+		Ingress ingress=new Ingress("test",IngressLimits.defaults(),c->false,e->{});
+		try (NIOServer s = new NIOServer(onAction::offer)) {
+			s.setIngress(ingress, m -> {
+				onWorker.offer(Ingress.isWorkerThread());
+				try {
+					m.getPayload(new MemoryStore());
+				} catch (BadFormatException e) {
+					throw new IllegalStateException(e);
+				}
+				m.returnResult(Result.value(CVMLong.ONE));
+				return null;
+			});
+			s.launch();
+			try (Convex c=ConvexRemote.connectNIO(s.getHostAddress())) {
+				Result r=c.query(Keywords.FOO).get(10, TimeUnit.SECONDS);
+				assertEquals(CVMLong.ONE, r.getValue());
+			}
+			assertEquals(Boolean.TRUE, onWorker.poll(10, TimeUnit.SECONDS), "routed on an ingress worker");
+			assertTrue(onAction.isEmpty(), "the receive action is not used");
+		} finally {
+			ingress.close();
 		}
 	}
 }

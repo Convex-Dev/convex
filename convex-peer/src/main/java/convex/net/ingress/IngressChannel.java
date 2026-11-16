@@ -84,6 +84,17 @@ public final class IngressChannel {
 	}
 
 	/**
+	 * Tests whether the transport should still not read this connection: the last
+	 * {@link #admit(Message)} returned false, and the resume action has not been
+	 * called since.
+	 *
+	 * @return true while reading is paused
+	 */
+	public boolean isPaused() {
+		return ingress.isPaused(this);
+	}
+
+	/**
 	 * Gets the connection this channel serves.
 	 *
 	 * @return Connection

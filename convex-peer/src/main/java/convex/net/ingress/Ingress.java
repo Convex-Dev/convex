@@ -157,6 +157,12 @@ public final class Ingress implements AutoCloseable {
 		}
 	}
 
+	boolean isPaused(IngressChannel c) {
+		synchronized (lock) {
+			return c.paused;
+		}
+	}
+
 	void disconnect(IngressChannel c) {
 		List<Runnable> after = new ArrayList<>(1);
 		synchronized (lock) {

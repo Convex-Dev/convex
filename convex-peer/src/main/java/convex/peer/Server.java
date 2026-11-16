@@ -545,7 +545,11 @@ public class Server implements Closeable {
 			// Before the listeners, which register each connection they accept with it
 			ingress=new Ingress("Peer server",IngressLimits.defaults(),AConnection::isTrusted,
 				e -> requestShutdown("JVM failure in ingress",e,false));
-			if (nio instanceof NettyServer ns) ns.setIngress(ingress,this::receiveMessage);
+			if (nio instanceof NettyServer ns) {
+				ns.setIngress(ingress,this::receiveMessage);
+			} else if (nio instanceof NIOServer ns) {
+				ns.setIngress(ingress,this::receiveMessage);
+			}
 			nio.setPort(port);
 			nio.launch();
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)

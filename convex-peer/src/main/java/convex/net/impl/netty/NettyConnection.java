@@ -27,9 +27,9 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
 import convex.core.message.AConnection;
+import convex.net.ingress.ClientIngress;
 import convex.net.ingress.Ingress;
 import convex.net.ingress.IngressChannel;
-import convex.net.ingress.IngressLimits;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -58,9 +58,6 @@ public class NettyConnection extends AConnection {
 	static volatile EventLoopGroup workerGroup = null;
 
 	static volatile Bootstrap clientBootstrap = null;
-
-	/** Ingress that decodes and routes what every client connection receives */
-	private static volatile Ingress clientIngress = null;
 
 	private volatile Channel channel;
 
@@ -112,27 +109,6 @@ public class NettyConnection extends AConnection {
 				}
 			});
 			return workerGroup;
-		}
-	}
-
-	/**
-	 * Gets the ingress shared by the client connections of this process, which
-	 * serves verified peers' connections in its priority lane.
-	 */
-	static Ingress getClientIngress() {
-		Ingress ingress = clientIngress;
-		if (ingress != null) return ingress;
-
-		synchronized (NettyConnection.class) {
-			if (clientIngress != null) return clientIngress;
-			clientIngress = new Ingress("Client", IngressLimits.defaults(), AConnection::isTrusted,
-				e -> log.error("JVM failure in client ingress", e));
-			Shutdown.addHook(Shutdown.CONNECTION, () -> {
-				Ingress ci = clientIngress;
-				clientIngress = null;
-				if (ci != null) ci.close();
-			});
-			return clientIngress;
 		}
 	}
 
@@ -197,7 +173,7 @@ public class NettyConnection extends AConnection {
 		NettyInboundHandler inbound=new NettyInboundHandler(delivery,null,maxMessageLength);
 		NettyConnection client=new NettyConnection(null,inbound);
 		inbound.setConnection(client);
-		IngressChannel ingress=getClientIngress().register(client,delivery,inbound::resume);
+		IngressChannel ingress=ClientIngress.get().register(client,delivery,inbound::resume);
 		inbound.setSink(NettyInboundHandler.sinkOf(ingress));
 		SslHandler ssl;
 		if (sslContext==null) {

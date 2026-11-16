@@ -15,6 +15,8 @@ import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +26,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.util.Utils;
 import convex.net.AServer;
+import convex.net.ingress.Ingress;
 import convex.peer.Config;
 import convex.peer.Server;
 
@@ -33,8 +36,10 @@ import convex.peer.Server;
  * Allocates a single thread for the selector.
  *
  * Incoming messages are associated with a Connection (which is created if
- * required), then placed on the receive message queue. This will block if the
- * receive queue is full (thereby applying back-pressure to clients)
+ * required). With an ingress set, they are admitted to it and decoded there, and
+ * the selector stops reading a connection while the ingress asks (thereby
+ * applying back-pressure to clients); otherwise they are passed to the receive
+ * action on the selector thread.
  *
  */
 @Deprecated()
@@ -57,7 +62,9 @@ public class NIOServer extends AServer {
 
 	private Consumer<Message> receiveAction;
 
-	
+	private volatile Ingress ingress;
+	private volatile Function<Message, Predicate<Message>> ingressRoute;
+
 	protected NIOServer(Consumer<Message> receiveAction) {
 		this.receiveAction=receiveAction;
 	}
@@ -258,7 +265,26 @@ public class NIOServer extends AServer {
 	}
 
 	private Connection createClientConnection(SocketChannel sc) throws IOException {
-		return Connection.create(sc, getReceiveAction(), null);
+		Ingress in = ingress;
+		if (in == null) return Connection.create(sc, getReceiveAction(), null);
+		ReadGate gate = new ReadGate(sc, selector);
+		Connection conn = Connection.create(sc, gate, null);
+		conn.setGate(gate);
+		gate.setChannel(in.register(conn, ingressRoute, gate::resume));
+		return conn;
+	}
+
+	/**
+	 * Decodes and routes the messages of each connection this server accepts on an
+	 * ingress, instead of passing them to the receive action on the selector thread.
+	 * Call before launch.
+	 *
+	 * @param ingress Ingress to register accepted connections with
+	 * @param route Delivery of each message, called on an ingress worker
+	 */
+	public void setIngress(Ingress ingress, Function<Message, Predicate<Message>> route) {
+		this.ingressRoute = route;
+		this.ingress = ingress;
 	}
 
 	@Override
@@ -282,8 +308,8 @@ public class NIOServer extends AServer {
 			if (n < 0) {
 				closeKey(key);
 				log.trace("EOS on channel?");
-			} else if (n==0) {
-				log.trace("No bytes received for key: {}", key);
+			} else {
+				conn.afterRead();
 			}
 		} catch (ClosedChannelException | SocketException e) {
 			log.trace("Channel closed ("+Utils.getClassName(e)+") from: {}", conn.getRemoteAddress());
@@ -337,6 +363,7 @@ public class NIOServer extends AServer {
 			log.debug("Unable to close NIO client channel",e);
 		}
 		if (attachment instanceof Connection connection) {
+			connection.releaseIngress();
 			connection.closeRequests();
 			try {
 				getDisconnectAction().accept(connection);

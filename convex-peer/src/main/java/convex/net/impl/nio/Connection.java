@@ -18,6 +18,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,7 @@ import convex.core.message.AConnection;
 import convex.net.MessageReceiver;
 import convex.net.MessageSender;
 import convex.net.impl.HandlerException;
+import convex.net.ingress.ClientIngress;
 import convex.peer.Config;
 
 /**
@@ -86,6 +89,9 @@ public class Connection extends AConnection {
 
 	private final MessageReceiver receiver;
 	private final MessageSender sender;
+
+	/** Admits received messages to an ingress, or null to hand them to the receive action. */
+	private volatile ReadGate gate;
 
 	private Connection(ByteChannel channel, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey, int maxMessageLength) {
@@ -187,9 +193,37 @@ public class Connection extends AConnection {
 	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize,
 			int maxMessageLength) throws IOException, TimeoutException {
+		return open(socketAddress, receiveAction, null, trustedPeerKey, sendBufferSize, receiveBufferSize,
+			maxMessageLength);
+	}
+
+	/**
+	 * Creates a Connection by connecting to a remote address, whose received
+	 * messages are decoded and delivered on the client ingress. The selector stops
+	 * reading this connection while the ingress asks, as when a delivery's retry
+	 * waits.
+	 *
+	 * @param socketAddress Address to connect to
+	 * @param delivery Delivery of each received message, called on an ingress worker
+	 * @param maxMessageLength Longest message to receive
+	 * @return New Connection instance
+	 * @throws IOException      If connection fails because of any IO problem
+	 * @throws TimeoutException If the connection cannot be established within the
+	 *                          timeout period
+	 */
+	public static Connection connectWithDelivery(InetSocketAddress socketAddress,
+			Function<Message, Predicate<Message>> delivery, int maxMessageLength) throws IOException, TimeoutException {
+		return open(socketAddress, null, delivery, null, Config.SOCKET_SEND_BUFFER_SIZE,
+			Config.SOCKET_RECEIVE_BUFFER_SIZE, maxMessageLength);
+	}
+
+	private static Connection open(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
+			Function<Message, Predicate<Message>> delivery, AccountKey trustedPeerKey, int sendBufferSize,
+			int receiveBufferSize, int maxMessageLength) throws IOException, TimeoutException {
 		ensureSelectorLoop();
-		
+
 		SocketChannel clientChannel = SocketChannel.open();
+		Connection pc = null;
 		boolean connected=false;
 		try {
 			clientChannel.configureBlocking(false);
@@ -216,13 +250,21 @@ public class Connection extends AConnection {
 				}
 			}
 
-			Connection pc = create(clientChannel, receiveAction, trustedPeerKey, maxMessageLength);
+			if (delivery == null) {
+				pc = create(clientChannel, receiveAction, trustedPeerKey, maxMessageLength);
+			} else {
+				ReadGate gate = new ReadGate(clientChannel, selector);
+				pc = create(clientChannel, gate, trustedPeerKey, maxMessageLength);
+				pc.gate = gate;
+				gate.setChannel(ClientIngress.get().register(pc, delivery, gate::resume));
+			}
 			pc.startClientListening();
 			connected=true;
 			log.trace("Connect succeeded for host: {}", socketAddress);
 			return pc;
 		} finally {
 			if (!connected) {
+				if (pc != null) pc.releaseIngress();
 				try {
 					clientChannel.close();
 				} catch (IOException e) {
@@ -389,9 +431,15 @@ public class Connection extends AConnection {
 				lastActivity=System.currentTimeMillis();
 				if (channel instanceof SocketChannel) {
 					SocketChannel chan = (SocketChannel) channel;
-					// register interest in both reads and writes
+					// Writes only: a client connection's read interest is its gate's, and a
+					// server connection is read by its server's selector
 					try {
-						chan.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, this);
+						SelectionKey key = chan.keyFor(selector);
+						if (key != null) {
+							key.interestOpsOr(SelectionKey.OP_WRITE);
+						} else {
+							chan.register(selector, SelectionKey.OP_WRITE, this);
+						}
 					} catch (CancelledKeyException e) {
 						// ignore. Must have got cancelled elsewhere?
 					}
@@ -422,8 +470,29 @@ public class Connection extends AConnection {
 		} catch (IOException e) {
 			// Best effort: close is idempotent and has no useful recovery path.
 		} finally {
+			releaseIngress();
 			closeRequests();
 		}
+	}
+
+	/** Releases this connection's ingress channel, if it has one. Idempotent. */
+	void releaseIngress() {
+		ReadGate g = gate;
+		if (g != null && g.getChannel() != null) g.getChannel().disconnect();
+	}
+
+	/**
+	 * Admits this server-side connection's received messages to an ingress, instead
+	 * of its receive action. Call before its first read.
+	 */
+	void setGate(ReadGate gate) {
+		this.gate = gate;
+	}
+
+	/** After a read on the selector thread: stops reading while the ingress asks. */
+	void afterRead() {
+		ReadGate g = gate;
+		if (g != null) g.afterRead();
 	}
 	
 	@Override
@@ -540,6 +609,8 @@ public class Connection extends AConnection {
 			if (n<0) {
 				log.trace("Closing connection due to EOS");
 				closeKey(key);
+			} else {
+				conn.afterRead();
 			}
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
@@ -584,10 +655,12 @@ public class Connection extends AConnection {
 	public int handleChannelRecieve() throws IOException, BadFormatException, HandlerException {
 		int total=0;
 		int recd;
+		ReadGate g=gate;
 		do {
 			recd=receiver.receiveFromChannel(channel);
 			if (recd>0) total+=recd;
-		} while (recd>0);
+			// Stop at the read whose messages filled the ingress: it holds those already framed
+		} while (recd>0 && (g==null || !g.isPauseAsked()));
 		if (total>0) lastActivity=System.currentTimeMillis();
 		return (total==0 && recd<0) ? -1 : total;
 	}
@@ -606,8 +679,8 @@ public class Connection extends AConnection {
 		synchronized(pc.sender) { 
 			boolean allSent = pc.sender.maybeSendBytes();
 			if (allSent) {
-				// deregister interest in writing
-				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+				// deregister interest in writing, atomically: a gate may change read interest meanwhile
+				key.interestOpsAnd(~SelectionKey.OP_WRITE);
 			} else {
 				// we want to continue writing
 			}

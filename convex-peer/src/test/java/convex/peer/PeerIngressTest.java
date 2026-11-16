@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -42,15 +43,17 @@ public class PeerIngressTest {
 	private static final AKeyPair KP = AKeyPair.createSeeded(608);
 	private static final Address HERO = Address.create(Init.GENESIS_ADDRESS);
 
-	/** Counts decodes by whether they run on a network event loop. */
+	/** Counts decodes by whether they run on a network thread: a Netty event loop or an NIO selector. */
 	static final class RecordingStore extends MemoryStore {
 		final AtomicLong onEventLoop = new AtomicLong();
 		final AtomicLong elsewhere = new AtomicLong();
 
 		@Override
 		public <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
-			// The event loops' threads are named by NettyConnection's thread factory
-			if (Thread.currentThread().getName().startsWith("convex-netty")) {
+			// Named by NettyConnection's thread factory, and by the NIO client and server selectors
+			String name = Thread.currentThread().getName();
+			if (name.startsWith("convex-netty") || name.startsWith("Connection NIO client selector")
+					|| name.startsWith("NIO Server loop")) {
 				onEventLoop.incrementAndGet();
 			} else {
 				elsewhere.incrementAndGet();
@@ -118,6 +121,24 @@ public class PeerIngressTest {
 			assertFalse(t.isError(), t.toString());
 
 			assertEquals(0, clientStore.onEventLoop.get(), "no result decoded on a network thread");
+			assertTrue(clientStore.elsewhere.get() >= 2, "results are decoded by the client");
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testNIOClientDecodesResultsOffSelector() throws Exception {
+		Server server = launch(new MemoryStore());
+		RecordingStore clientStore = new RecordingStore();
+		try (ConvexRemote client = ConvexRemote.connectNIO(server.getHostAddress())) {
+			client.setStore(clientStore);
+			Result q = client.query("(+ 1 2)").get(WAIT, TimeUnit.SECONDS);
+			assertEquals(CVMLong.create(3), q.getValue());
+			Result s = client.requestStatus().get(WAIT, TimeUnit.SECONDS);
+			assertFalse(s.isError(), s.toString());
+
+			assertEquals(0, clientStore.onEventLoop.get(), "no result decoded on the selector");
 			assertTrue(clientStore.elsewhere.get() >= 2, "results are decoded by the client");
 		} finally {
 			server.close();
