@@ -710,6 +710,42 @@ public class LatticePropagatorTest {
 		}
 	}
 
+	/** A close whose caller is interrupted still waits for the publication worker, and keeps the interrupt. */
+	@Test
+	public void testInterruptedCloseStillWaitsForThePublicationWorker() throws Exception {
+		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
+			LatticePropagator propagator = new LatticePropagator(store);
+			propagator.start();
+			AtomicBoolean closeReturned = new AtomicBoolean();
+			try {
+				propagator.triggerBroadcast(CVMLong.create(776));
+				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
+					"the publication worker should enter the controlled store write");
+				Thread worker = store.heldThread();
+				Thread closer = Thread.currentThread();
+				// Lets the write finish once the close waits for it, so a close that does
+				// not wait finds the worker still running
+				Thread.ofVirtual().start(() -> {
+					while (closer.getState() != Thread.State.TIMED_WAITING && !closeReturned.get()) {
+						Thread.onSpinWait();
+					}
+					store.release();
+				});
+				closer.interrupt();
+				propagator.close();
+				boolean ended = !worker.isAlive();
+				closeReturned.set(true);
+				assertTrue(Thread.interrupted(), "close keeps the interrupt");
+				assertTrue(ended, "the worker ended before close returned");
+			} finally {
+				closeReturned.set(true);
+				Thread.interrupted();
+				store.release();
+			}
+			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
+		}
+	}
+
 	/** Close wakes an idle publication worker without interrupting it (#776). */
 	@Test
 	public void testCloseEndsIdlePublicationWorker() throws Exception {

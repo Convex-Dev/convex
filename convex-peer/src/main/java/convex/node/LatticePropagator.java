@@ -2,6 +2,7 @@ package convex.node;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -973,13 +974,10 @@ public class LatticePropagator implements Closeable {
 		}
 
 		if (propagationThread != null) {
-			try {
-				propagationThread.join(timeout);
-				if (propagationThread.isAlive()) {
-					log.warn("LatticePropagator thread did not drain within timeout, leaving it to finish");
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
+			// An interrupt does not cut the drain short: it is restored once the wait is over
+			if (!ThreadUtils.joinUninterruptibly(propagationThread,
+					Duration.ofNanos(Math.max(0L,deadline-System.nanoTime())))) {
+				log.warn("LatticePropagator thread did not drain within timeout, leaving it to finish");
 			}
 			propagationThread = null;
 		}

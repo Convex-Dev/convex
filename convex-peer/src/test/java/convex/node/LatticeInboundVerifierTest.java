@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -17,7 +18,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.MemoryStore;
 
-/** Closing the inbound verifier ends the attempts under way and starts no more. */
+/** Closing the inbound verifier ends the attempts under way and starts no more until it is opened again. */
 public class LatticeInboundVerifierTest {
 	private static final AccountKey CLAIMED=AKeyPair.createSeeded(170).getAccountKey();
 
@@ -62,7 +63,7 @@ public class LatticeInboundVerifierTest {
 	}
 
 	@Test
-	public void aClosedVerifierStartsNoAttempt() throws Exception {
+	public void aClosedVerifierStartsNoAttemptUntilOpened() throws Exception {
 		CountDownLatch release=new CountDownLatch(1);
 		AtomicInteger attempts=new AtomicInteger();
 		LatticeInboundVerifier verifier=new LatticeInboundVerifier(() -> {
@@ -79,8 +80,14 @@ public class LatticeInboundVerifierTest {
 			verifier.maybeStart(new OpenConnection(),owner,CLAIMED);
 			assertTrue(verifier.claimedKeys().isEmpty(),"no attempt is under way");
 			assertEquals(0,attempts.get());
+
+			// Opened again, as a group starting again opens it
+			verifier.open();
+			verifier.maybeStart(new OpenConnection(),owner,CLAIMED);
+			assertEquals(Set.of(CLAIMED),verifier.claimedKeys());
 		} finally {
 			release.countDown();
+			verifier.close();
 		}
 	}
 }

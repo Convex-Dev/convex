@@ -147,9 +147,14 @@ final class LatticeInboundVerifier {
 		}
 	}
 
+	/** Starts attempts again, as the propagator's endpoint does when it starts again. */
+	void open() {
+		closed = false;
+	}
+
 	/**
-	 * Cancels every pending attempt during propagator shutdown, starts no more, and
-	 * waits at most the challenge timeout for the attempts to end.
+	 * Cancels every pending attempt during propagator shutdown, starts no more until
+	 * opened again, and waits at most the challenge timeout for the attempts to end.
 	 */
 	void close() {
 		closed = true;

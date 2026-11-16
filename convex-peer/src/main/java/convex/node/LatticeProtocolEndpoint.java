@@ -2,6 +2,7 @@ package convex.node;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +45,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Cleanup;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.core.util.FutureUtils;
 import convex.lattice.cursor.Root;
@@ -141,6 +143,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	void start() {
 		if (inboundRunning) return;
 		if (inboundThread!=null) throw new IllegalStateException("Previous ingress worker is still active");
+		inboundVerifier.open();
 		inboundQueue.open();
 		inboundRunning=true;
 		acceptingInbound=true;
@@ -914,16 +917,24 @@ final class LatticeProtocolEndpoint implements Closeable {
 		acquisitions.forEach(Acquiror::close);
 		long timeout=config.getInboundShutdownTimeout();
 		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeout);
+		// An interrupt does not cut the wait short: it is restored once the wait is over
+		boolean interrupted=false;
 		try {
 			for (Acquiror acquiror:acquisitions) {
-				long remaining=deadline-System.nanoTime();
-				if (remaining<=0 || !acquiror.awaitTermination(remaining,TimeUnit.NANOSECONDS)) {
-					throw new IOException("Propagation acquisition shutdown incomplete after "+timeout+" ms");
+				while (true) {
+					try {
+						long remaining=deadline-System.nanoTime();
+						if (remaining<=0 || !acquiror.awaitTermination(remaining,TimeUnit.NANOSECONDS)) {
+							throw new IOException("Propagation acquisition shutdown incomplete after "+timeout+" ms");
+						}
+						break;
+					} catch (InterruptedException e) {
+						interrupted=true;
+					}
 				}
 			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new IOException("Interrupted while stopping propagation acquisitions",e);
+		} finally {
+			if (interrupted) Thread.currentThread().interrupt();
 		}
 	}
 
@@ -956,13 +967,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 		inboundQueue.close();
 		Thread worker=inboundThread;
 		if (worker==null) return;
-		try {
-			worker.join(config.getInboundShutdownTimeout());
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new IOException("Interrupted while draining propagation ingress",e);
+		if (!ThreadUtils.joinUninterruptibly(worker,Duration.ofMillis(config.getInboundShutdownTimeout()))) {
+			throw new IOException("Propagation ingress did not drain before timeout");
 		}
-		if (worker.isAlive()) throw new IOException("Propagation ingress did not drain before timeout");
 		inboundThread=null;
 	}
 
@@ -970,13 +977,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 		Thread maintenance=maintenanceThread;
 		if (maintenance==null) return;
 		maintenance.interrupt();
-		try {
-			maintenance.join(config.getInboundShutdownTimeout());
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new IOException("Interrupted while stopping propagation maintenance",e);
+		if (!ThreadUtils.joinUninterruptibly(maintenance,Duration.ofMillis(config.getInboundShutdownTimeout()))) {
+			throw new IOException("Propagation maintenance did not stop before timeout");
 		}
-		if (maintenance.isAlive()) throw new IOException("Propagation maintenance did not stop before timeout");
 		maintenanceThread=null;
 	}
 
