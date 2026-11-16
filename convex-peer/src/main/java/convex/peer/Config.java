@@ -238,6 +238,12 @@ public class Config {
 	/** Encoded bytes each received message is counted as, at least, for fair service. */
 	public static final long INGRESS_MINIMUM_COST = 512;
 
+	/**
+	 * Size of the queue of control messages (PING, STATUS, CHALLENGE, GOODBYE)
+	 * received on network connections and waiting for the control handler.
+	 */
+	public static final int CONTROL_QUEUE_SIZE = 10000;
+
 	/** Peer configuration key for the maximum encoded belief delta chunk size. */
 	public static final Keyword MAX_BELIEF_DELTA_MESSAGE_SIZE = Keyword.intern("max-belief-delta-message-size");
 

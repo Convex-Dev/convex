@@ -68,6 +68,8 @@ import convex.etch.EtchStore;
 import convex.net.AServer;
 import convex.net.RequestFailures;
 import convex.net.Transports;
+import convex.net.ingress.Ingress;
+import convex.net.ingress.IngressLimits;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
 
@@ -167,6 +169,17 @@ public class Server implements Closeable {
 	 * Verifies connections opened to this peer, so that the cells staked peers push are stored
 	 */
 	private final InboundVerifier verifier=new InboundVerifier(this);
+
+	/**
+	 * Answers the control messages received on network connections.
+	 */
+	private final ControlHandler controlHandler=new ControlHandler(this);
+
+	/**
+	 * Decodes and routes the messages received on network connections, off the
+	 * network threads. Created at launch.
+	 */
+	private Ingress ingress;
 
 	/**
 	 * Pre-allocated retry predicates for backpressure. These are returned by
@@ -536,6 +549,10 @@ public class Server implements Closeable {
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
 
+			// Before the listeners, which register each connection they accept with it
+			ingress=new Ingress("Peer server",IngressLimits.defaults(),AConnection::isTrusted,
+				e -> requestShutdown("JVM failure in ingress",e,false));
+			if (nio instanceof NettyServer ns) ns.setIngress(ingress,this::receiveMessage);
 			nio.setPort(port);
 			nio.launch();
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
@@ -546,6 +563,7 @@ public class Server implements Closeable {
 				if (securePort<0 || securePort>65535) throw new ConfigException("Invalid TLS port");
 				tls=NettyServer.create(this);
 				tls.setDisconnectAction(verifier::forget);
+				tls.setIngress(ingress,this::receiveMessage);
 				tls.setPort(securePort);
 				Object context=config.get(Config.TLS_CONTEXT);
 				if (context!=null && !(context instanceof SSLContext)) {
@@ -564,6 +582,7 @@ public class Server implements Closeable {
 
 			// Start threaded components
 			manager.start();
+			controlHandler.start();
 			queryHandler.start();
 			propagator.start();
 			transactionHandler.start();
@@ -594,9 +613,8 @@ public class Server implements Closeable {
 	 * messages are handled inline.
 	 *
 	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
-	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
-	 * the caller (typically {@code NettyInboundHandler}) parks the
-	 * channel and lets the predicate block on a virtual thread until space is available.
+	 * target queue is full, returns a pre-allocated retry predicate instead of an error,
+	 * which a caller that may wait tests to wait for space for a bounded time.
 	 *
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
 	 *
@@ -708,7 +726,35 @@ public class Server implements Closeable {
 	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
-		if (completeReply(m)) return null;
+		if (!prepareMessage(m)) return null;
+		return processMessage(m);
+	}
+
+	/**
+	 * Takes a message received on a network connection, on an ingress worker. As
+	 * {@link #deliverMessage(Message)}, except that control messages go to the
+	 * control handler.
+	 *
+	 * @param m Message received
+	 * @return null if placed or handled, otherwise the destination that refused it
+	 */
+	Predicate<Message> receiveMessage(Message m) {
+		if (!prepareMessage(m)) return null;
+		switch (m.getType()) {
+			case PING: case STATUS: case CHALLENGE: case GOODBYE:
+				return controlHandler.offer(m);
+			default:
+				return processMessage(m);
+		}
+	}
+
+	/**
+	 * Completes a reply, or decodes and observes a message for dispatch.
+	 *
+	 * @return true if the message is to be dispatched
+	 */
+	private boolean prepareMessage(Message m) {
+		if (completeReply(m)) return false;
 		try {
 			m.getPayload(getStore());
 		} catch (Throwable e) {
@@ -723,10 +769,10 @@ public class Server implements Closeable {
 			}
 			// After the reply. A validation failure here is in the message's own encoding
 			if (e instanceof ValidationException bad) manager.handleBadInput(m.getConnection(),bad);
-			return null;
+			return false;
 		}
 		observeMessageReceived(m);
-		return processMessage(m);
+		return true;
 	}
 
 	/**
@@ -1026,6 +1072,7 @@ public class Server implements Closeable {
 			manager.close();
 			nio.close();
 			if (tls!=null) tls.close();
+			if (ingress!=null) ingress.close();
 			verifier.close();
 			closeOwnedStore();
 			shutdownFuture.complete(Utils.getCurrentTimestamp());
@@ -1040,15 +1087,17 @@ public class Server implements Closeable {
 		// Close manager, we don't want any management actions during shutdown!
 		manager.close();
 
-		// Stop ingress before worker/store shutdown.
+		// Stop ingress before worker/store shutdown: listeners first, so nothing more is admitted
 		nio.close();
 		if (tls!=null) tls.close();
+		if (ingress!=null) ingress.close();
 		// After ingress, so that no new verification starts
 		verifier.close();
+		controlHandler.close();
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
-		
+
 		queryHandler.close();
 		transactionHandler.close();
 		executor.close();
