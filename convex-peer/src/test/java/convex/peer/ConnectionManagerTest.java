@@ -36,6 +36,7 @@ import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Order;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
@@ -593,9 +594,9 @@ public class ConnectionManagerTest {
 		}
 	}
 
-	/** False data in a polled Belief closes a verified link at once and counts as a failure. */
+	/** False data in a polled Belief closes the link at once, verified or not, and its peer waits the longest. */
 	@Test
-	public void testFalseBeliefClosesVerifiedLink() throws Exception {
+	public void testFalseBeliefClosesLinkWithLongestWait() throws Exception {
 		AKeyPair keyPair=AKeyPair.createSeeded(275);
 		Server server=createPollingServer(keyPair);
 		try {
@@ -605,17 +606,19 @@ public class ConnectionManagerTest {
 			// An Order from a staked peer, which the merge would check, with a signature that does not verify
 			SignedData<Order> forged=SignedData.create(keyPair.getAccountKey(),Ed25519Signature.ZERO,Order.create().getRef());
 			Belief polled=Belief.create(forged);
-			AccountKey key=AKeyPair.createSeeded(276).getAccountKey();
-			PollingConvex link=pollingLink(server);
-			link.markVerified(key);
-			link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData().assoc(0,polled.getHash()));
-			link.acquired=polled;
-			manager.addConnection(key,link);
+			for (boolean verified : new boolean[] {true,false}) {
+				AccountKey key=AKeyPair.createSeeded(verified ? 276 : 277).getAccountKey();
+				PollingConvex link=pollingLink(server);
+				if (verified) link.markVerified(key);
+				link.statusResult=Result.create(CVMLong.ZERO,server.getStatusData().assoc(0,polled.getHash()));
+				link.acquired=polled;
+				manager.addConnection(key,link);
 
-			manager.pollBelief(key,link);
-			assertFalse(link.isConnected());
-			assertNull(manager.getConnection(key));
-			assertFalse(manager.isDue(key),"the false data counts as a failure");
+				manager.pollBelief(key,link);
+				assertFalse(link.isConnected());
+				assertNull(manager.getConnection(key));
+				assertLongestWait(manager,clock,key);
+			}
 		} finally {
 			server.close();
 		}
@@ -690,7 +693,7 @@ public class ConnectionManagerTest {
 		}
 	}
 
-	/** An answer signed for another challenge is false input, which closes the link at once. */
+	/** An answer signed for another challenge is false input: the link closes at once and its peer waits the longest. */
 	@Test
 	public void testChallengeAnsweredForAnotherClosesLink() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(270));
@@ -719,7 +722,7 @@ public class ConnectionManagerTest {
 			assertFalse(link.isConnected(),"a replayed answer closes the link");
 			assertNull(manager.getConnection(key));
 			assertNull(link.getVerifiedPeer());
-			assertFalse(manager.isDue(key),"the replayed answer counts as a failure");
+			assertLongestWait(manager,clock,key);
 		} finally {
 			server.close();
 		}
@@ -889,12 +892,20 @@ public class ConnectionManagerTest {
 			assertFalse(manager.isDue(remoteKey));
 			assertNull(manager.tryRandomConnect(state),"a peer that answered wrongly is not redialled at once");
 
-			// So is a peer refused for its answer to the identity challenge
+			// So is a peer refused for a wrong answer to the identity challenge
 			advanceUntilDue(manager,clock,remoteKey);
-			manager.next=() -> CompletableFuture.failedFuture(new PeerRefusedException("failed identity challenge"));
+			manager.next=() -> CompletableFuture.failedFuture(new PeerRefusedException("proved no key"));
 			assertNotNull(manager.tryRandomConnect(state));
 			assertEquals(5,manager.dials);
 			assertNull(manager.tryRandomConnect(state),"a refused peer is not redialled at once");
+
+			// A peer refused for false input in its answer waits the longest
+			advanceUntilDue(manager,clock,remoteKey);
+			manager.next=() -> CompletableFuture.failedFuture(new PeerRefusedException("failed identity challenge",
+				new MisbehaviourException("Challenge response answers another challenge")));
+			assertNotNull(manager.tryRandomConnect(state));
+			assertEquals(6,manager.dials);
+			assertLongestWait(manager,clock,remoteKey);
 		} finally {
 			manager.close();
 			server.close();
@@ -927,6 +938,15 @@ public class ConnectionManagerTest {
 
 	private static void advanceUntilDue(ConnectionManager manager, AtomicLong clock, AccountKey key) {
 		while (!manager.isDue(key)) clock.addAndGet(manager.getPollDelay());
+	}
+
+	/** Checks that a peer's wait, starting at the current time, is the longest there is. */
+	private static void assertLongestWait(ConnectionManager manager, AtomicLong clock, AccountKey key) {
+		long longest=manager.getPollDelay()<<ConnectionManager.MAX_BACKOFF_DOUBLINGS;
+		clock.addAndGet(longest-1);
+		assertFalse(manager.isDue(key),"waits the longest");
+		clock.addAndGet(1);
+		assertTrue(manager.isDue(key));
 	}
 
 	private static PollingConvex pollingLink(Server server) {

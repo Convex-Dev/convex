@@ -143,20 +143,25 @@ trusted sources.
 A full queue of polled Beliefs is not a failure. Only a good poll of a verified link
 clears the count. A dial or a challenge that succeeds makes the peer due at once but keeps
 its count, so a peer that connects but never serves a poll keeps backing off. Polling an
-unverified link leaves its count alone.
+unverified link leaves its count alone, unless the reply is false input.
 
 While no link is verified, a peer that could not be reached (its dial reached no one, or it
 did not reply) is dialled whatever its wait, so a peer whose own network failed reconnects as soon
 as it returns. A peer that answered wrongly still waits.
 
+**False input.** A reply that is false rather than malformed, such as a challenge answer
+signed for another challenge or a polled Belief with a forged Order signature, closes the
+link at once, as [Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment)
+describes. It also sends the peer straight to the longest wait, from where its next failure
+closes its link again. This holds on an unverified link and for a dial refused for it: the
+sender there may not be the peer, but redialling the same address sooner would reach the
+same sender.
+
 **Closing.** A link with no reply to STATUS or to a challenge for a minute is closed; any
 reply restarts the minute. A failure that leaves a peer's wait at its cap, the ninth in a
 row, also closes its link. An unverified link is kept while no link is verified, since it
-is then all there is to poll. False input in a reply, such as a challenge answer signed for
-another challenge, closes the link at once, as
-[Failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment) describes;
-in a challenge answer or a poll of a verified link it also counts as a failure. A remote
-peer keeps its count when its link closes, so a redial waits too.
+is then all there is to poll. A remote peer keeps its count when its link closes, so a
+redial waits too.
 
 ## Generic Message API
 

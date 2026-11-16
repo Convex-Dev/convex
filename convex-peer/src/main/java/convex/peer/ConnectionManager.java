@@ -105,7 +105,7 @@ public class ConnectionManager extends AConnectionManager {
 	private record Challenge(Convex link, CompletableFuture<AccountKey> answer, long deadline) {}
 
 	/** Outcome of one poll, as it counts towards the polled peer's back-off. */
-	private enum PollOutcome { GOOD, UNREACHABLE, ANSWERED_WRONGLY, NO_FAULT }
+	private enum PollOutcome { GOOD, UNREACHABLE, ANSWERED_WRONGLY, FALSE_INPUT, NO_FAULT }
 
 	protected final Server server;
 
@@ -370,8 +370,16 @@ public class ConnectionManager extends AConnectionManager {
 			if (closed) return;
 			if (e != null) {
 				connectFailures.log(e,"Failed to connect to Peer at {}",connectTarget);
-				// A refused peer was reached and answered wrongly; any other failure reached no one
-				recordFailure(chosen,!(PeerConnectionException.unwrap(e) instanceof PeerRefusedException));
+				Throwable cause=PeerConnectionException.unwrap(e);
+				if (!(cause instanceof PeerRefusedException)) {
+					// Reached no one
+					recordFailure(chosen,true);
+				} else if ((cause.getCause() instanceof ValidationException bad) && disconnects(bad)) {
+					recordFalseInput(chosen);
+				} else {
+					// Reached, and answered wrongly
+					recordFailure(chosen,false);
+				}
 			} else if (connections.get(chosen) != linked) {
 				// Identification filed the link under the key that answered, not the one chosen
 				log.debug("Peer at {} did not identify as {}", connectTarget, chosen);
@@ -426,10 +434,13 @@ public class ConnectionManager extends AConnectionManager {
 				if (peerKey.equals(provedKey(challenge.answer()))) {
 					makeDue(peerKey);
 				} else {
-					failLink(peerKey,link,false);
-					// After the failure is counted, which a link closed for bad input still keeps
 					ValidationException bad=badAnswer(challenge.answer());
 					if (bad!=null) handleBadInput(peerKey,link,bad);
+					if ((bad!=null) && disconnects(bad)) {
+						recordFalseInput(peerKey);
+					} else {
+						failLink(peerKey,link,false);
+					}
 				}
 			} else if (now>=challenge.deadline()) {
 				challenges.remove(peerKey,challenge);
@@ -524,6 +535,15 @@ public class ConnectionManager extends AConnectionManager {
 		return b.failures();
 	}
 
+	/** Makes a remote peer that sent false input wait the longest, from where its next failure closes its link. */
+	private void recordFalseInput(AccountKey peerKey) {
+		long now=server.getTimestamp();
+		backoffs.compute(peerKey,(key,old) -> {
+			int failures=Math.max(MAX_BACKOFF_DOUBLINGS+1,(old==null) ? 1 : old.failures()+1);
+			return new Backoff(failures,now+backoff(pollDelay,failures),false);
+		});
+	}
+
 	private void makeDue(AccountKey peerKey) {
 		long now=server.getTimestamp();
 		backoffs.computeIfPresent(peerKey,(key,old) -> new Backoff(old.failures(),now,old.unreachable()));
@@ -605,18 +625,23 @@ public class ConnectionManager extends AConnectionManager {
 
 	/**
 	 * Polls one outbound peer for anti-entropy and connection health, counting the outcome
-	 * towards the peer's back-off if the link is verified.
+	 * towards the peer's back-off if the link is verified or the reply is false input.
 	 */
 	void pollBelief(AccountKey peerKey, Convex connection) throws InterruptedException {
 		boolean verified=isVerified(peerKey,connection);
 		PollOutcome outcome=poll(peerKey,connection);
+		// On any link: redialling the same address soon would reach the same answerer
+		if (outcome==PollOutcome.FALSE_INPUT) {
+			recordFalseInput(peerKey);
+			return;
+		}
 		// An unverified link only fills an idle slot: its back-off is for getting it verified
 		if (!verified) return;
 		switch (outcome) {
 			case GOOD -> backoffs.remove(peerKey);
 			case UNREACHABLE -> failLink(peerKey,connection,true);
 			case ANSWERED_WRONGLY -> failLink(peerKey,connection,false);
-			case NO_FAULT -> {}
+			case FALSE_INPUT, NO_FAULT -> {}
 		}
 	}
 
@@ -662,7 +687,7 @@ public class ConnectionManager extends AConnectionManager {
 		} catch (ValidationException e) {
 			// The polled peer's own input, and the poll's other steps throw none
 			handleBadInput(peerKey,connection,e);
-			return PollOutcome.ANSWERED_WRONGLY;
+			return disconnects(e) ? PollOutcome.FALSE_INPUT : PollOutcome.ANSWERED_WRONGLY;
 		} catch (Throwable e) {
 			Utils.checkRequestFailure(e);
 			// Failures while closing are expected
