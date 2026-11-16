@@ -67,13 +67,17 @@ public class NettyConnectionTest {
 			CompletableFuture<Long> received=CompletableFuture.supplyAsync(
 				() -> readUntilClosed(server),ThreadUtils.getVirtualExecutor());
 			NettyConnection client=NettyConnection.connect(server.getLocalSocketAddress(),m -> {});
-			client.flushOutbound().get(10,TimeUnit.SECONDS);
-			client.close();
+			try {
+				client.flushOutbound().get(10,TimeUnit.SECONDS);
+				client.close();
 
-			ExecutionException failure=assertThrows(ExecutionException.class,
-				() -> client.flushOutbound().get(10,TimeUnit.SECONDS));
-			assertInstanceOf(IOException.class,failure.getCause());
-			assertEquals(0L,received.get(10,TimeUnit.SECONDS));
+				ExecutionException failure=assertThrows(ExecutionException.class,
+					() -> client.flushOutbound().get(10,TimeUnit.SECONDS));
+				assertInstanceOf(IOException.class,failure.getCause());
+				assertEquals(0L,received.get(10,TimeUnit.SECONDS));
+			} finally {
+				client.close();
+			}
 		}
 	}
 
@@ -104,6 +108,8 @@ public class NettyConnectionTest {
 				assertTrue(client.isClosed());
 			} finally {
 				release.countDown();
+				// Closed already unless a step before the closer failed
+				client.close();
 			}
 		}
 	}

@@ -235,11 +235,11 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testPingFreshLocalClient() throws Exception {
-		ConvexLocal convex = network.getLocalClient();
-
-		CVMLong ts = convex.ping().get(5, TimeUnit.SECONDS);
-		assertNotNull(ts, "PING should return a timestamp on fresh local client");
-		assertTrue(ts.longValue() > 0);
+		try (ConvexLocal convex = network.getLocalClient()) {
+			CVMLong ts = convex.ping().get(5, TimeUnit.SECONDS);
+			assertNotNull(ts, "PING should return a timestamp on fresh local client");
+			assertTrue(ts.longValue() > 0);
+		}
 	}
 
 	// ===== Connection manager basics =====
@@ -423,8 +423,8 @@ public class ConnectionManagerTest {
 	public void testInterruptedConnectKeepsInterruptStatus() throws Exception {
 		Server server=createPollingServer();
 		// Accepts TCP but never answers the TLS handshake, so the connect cannot finish
-		try (ServerSocket silent=new ServerSocket(0,50,InetAddress.getLoopbackAddress())) {
-			ConnectionManager manager=new ConnectionManager(server);
+		try (ServerSocket silent=new ServerSocket(0,50,InetAddress.getLoopbackAddress());
+				ConnectionManager manager=new ConnectionManager(server)) {
 			URI endpoint=new URI("tls",null,"127.0.0.1",silent.getLocalPort(),null,null,null);
 
 			Thread.currentThread().interrupt();
@@ -858,9 +858,8 @@ public class ConnectionManagerTest {
 		State genesis=Init.createState(List.of(keyPair.getAccountKey(),remoteKey));
 		PeerStatus remoteStatus=genesis.getPeer(remoteKey);
 		genesis=genesis.withPeer(remoteKey,remoteStatus.withPeerData(Maps.of(Keywords.URL,Strings.create("127.0.0.1:1"))));
-		Server server=createPollingServer(keyPair,genesis);
-		DialingManager manager=new DialingManager(server);
-		try {
+		try (Server server=createPollingServer(keyPair,genesis);
+				DialingManager manager=new DialingManager(server)) {
 			AtomicLong clock=new AtomicLong(START_TIME);
 			server.setTimeSource(clock::get);
 			State state=server.getPeer().getConsensusState();
@@ -910,9 +909,6 @@ public class ConnectionManagerTest {
 			assertNotNull(manager.tryRandomConnect(state));
 			assertEquals(6,manager.dials);
 			assertLongestWait(manager,clock,remoteKey);
-		} finally {
-			manager.close();
-			server.close();
 		}
 	}
 
@@ -924,8 +920,7 @@ public class ConnectionManagerTest {
 		config.put(Keywords.KEYPAIR,keyPair);
 		config.put(Keywords.STORE,new MemoryStore());
 		Server server=Server.create(config);
-		try {
-			Convex source=Convex.connect(network.SERVER);
+		try (Convex source=Convex.connect(network.SERVER)) {
 			source.setStore(server.getStore());
 			assertNull(source.getKeyPair());
 			server.syncPeer(keyPair,source);
@@ -1025,14 +1020,14 @@ public class ConnectionManagerTest {
 
 	@Test
 	public void testClosedManagerRejectsLateConnection() throws Exception {
-		Server server=createPollingServer();
-		ConnectionManager manager=server.getConnectionManager();
-		manager.close();
-		SequencedConvex late=new SequencedConvex(-1);
+		try (Server server=createPollingServer()) {
+			ConnectionManager manager=server.getConnectionManager();
+			manager.close();
+			SequencedConvex late=new SequencedConvex(-1);
 
-		assertFalse(manager.addConnection(AKeyPair.createSeeded(217).getAccountKey(),late));
-		assertEquals(1,late.closeCount);
-		server.close();
+			assertFalse(manager.addConnection(AKeyPair.createSeeded(217).getAccountKey(),late));
+			assertEquals(1,late.closeCount);
+		}
 	}
 
 	@Test

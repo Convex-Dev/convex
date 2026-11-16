@@ -297,10 +297,10 @@ public class LatticeListenerTest {
 		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
 				AStore store=new MemoryStore();
 				NodeServer<convex.core.data.prim.AInteger> node=
-					new NodeServer<>(RelayHost.open(MaxLattice.create(),store))) {
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
+				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			FaultingGroup group=new FaultingGroup(store,logs);
 			node.addPropagator(group);
-			LatticeListener listener=new LatticeListener(NodeConfig.port(0));
 			listener.registerPropagator(group);
 			listener.setSelector(connection -> group);
 			node.launch();

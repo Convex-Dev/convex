@@ -64,116 +64,123 @@ public class ConvexLocalTest {
 
 	@Test
 	public void testConvexTransact() throws TimeoutException, InterruptedException {
-		ConvexLocal convex = network.getLocalClient();
-		Address address = convex.getAddress();
-		
-		long s=convex.getSequence();
-		
-		Result r = convex.transactSync(Invoke.create(address, s+1, Reader.read("*address*")));
-		assertNull(r.getErrorCode(), "Error:" + r.toString());
-		assertEquals(address, r.getValue());
-		
-		assertEquals(s+1,convex.getSequence());
-		
-		// Test another transaction that just returns a constant
-		assertEquals(CVMLong.ONE,convex.transact("1").join().getValue());
+		try (ConvexLocal convex = network.getLocalClient()) {
+			Address address = convex.getAddress();
+
+			long s=convex.getSequence();
+
+			Result r = convex.transactSync(Invoke.create(address, s+1, Reader.read("*address*")));
+			assertNull(r.getErrorCode(), "Error:" + r.toString());
+			assertEquals(address, r.getValue());
+
+			assertEquals(s+1,convex.getSequence());
+
+			// Test another transaction that just returns a constant
+			assertEquals(CVMLong.ONE,convex.transact("1").join().getValue());
+		}
 	}
-	
+
 	@Test
 	public void testQueryMessage() throws TimeoutException, InterruptedException, ExecutionException {
-		ConvexLocal convex = network.getLocalClient();
-		Address address = convex.getAddress();
-		
-		Message m=Message.createQuery(675678567,"*balance*",address);
-		// ABlob data=Blob.wrap(new byte[] {MessageType.QUERY.getMessageCode()}).append(m.getMessageData());
-		ABlob data=m.getMessageData();
-		Result r = convex.messageRaw(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
-		assertFalse(r.isError());
-		assertTrue(r.getValue() instanceof CVMLong);
+		try (ConvexLocal convex = network.getLocalClient()) {
+			Address address = convex.getAddress();
+
+			Message m=Message.createQuery(675678567,"*balance*",address);
+			// ABlob data=Blob.wrap(new byte[] {MessageType.QUERY.getMessageCode()}).append(m.getMessageData());
+			ABlob data=m.getMessageData();
+			Result r = convex.messageRaw(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError());
+			assertTrue(r.getValue() instanceof CVMLong);
+		}
 	}
 
 	@Test
 	public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		ConvexLocal convex = network.getLocalClient();
-		Address address = convex.getAddress();
-		Ref<ATransaction> tr = Invoke.create(address, convex.getSequence()+1, Reader.read("*address*")).getRef();
-		Result r = convex.transact(SignedData.create(convex.getAccountKey(), Ed25519Signature.ZERO, tr)).get();
-		assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
+		try (ConvexLocal convex = network.getLocalClient()) {
+			Address address = convex.getAddress();
+			Ref<ATransaction> tr = Invoke.create(address, convex.getSequence()+1, Reader.read("*address*")).getRef();
+			Result r = convex.transact(SignedData.create(convex.getAccountKey(), Ed25519Signature.ZERO, tr)).get();
+			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
+		}
 	}
-	
+
 	@Test
 	public void testBadFormat() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		ConvexLocal convex = network.getLocalClient();
-		AKeyPair keyPair = convex.getKeyPair();
-		
-		// We are going to fake a value that isn't a transaction
-		ACell trFake = Reader.read("*address*"); // a symbol, not a transaction!
-		@SuppressWarnings({ "rawtypes", "unchecked" })
-		SignedData<ATransaction> tr = (SignedData<ATransaction>)(SignedData)(keyPair.signData(trFake));
-		
-		Result r = convex.transact(tr).get();
-		assertEquals(ErrorCodes.FORMAT, r.getErrorCode());
+		try (ConvexLocal convex = network.getLocalClient()) {
+			AKeyPair keyPair = convex.getKeyPair();
+
+			// We are going to fake a value that isn't a transaction
+			ACell trFake = Reader.read("*address*"); // a symbol, not a transaction!
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			SignedData<ATransaction> tr = (SignedData<ATransaction>)(SignedData)(keyPair.signData(trFake));
+
+			Result r = convex.transact(tr).get();
+			assertEquals(ErrorCodes.FORMAT, r.getErrorCode());
+		}
 	}
-	
+
 	@Test
 	public void testBadSequence() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		ConvexLocal convex = network.getLocalClient();
-		ATransaction tr = Invoke.create(convex.getAddress(), 10, Reader.read("*address*"));
-		Result r = convex.transactSync(tr);
-		assertEquals(ErrorCodes.SEQUENCE, r.getErrorCode());
-		
-		// Sequence should recover
-		r=convex.transactSync("(+ 2 3)");
-		assertEquals(CVMLong.create(5),r.getValue());
+		try (ConvexLocal convex = network.getLocalClient()) {
+			ATransaction tr = Invoke.create(convex.getAddress(), 10, Reader.read("*address*"));
+			Result r = convex.transactSync(tr);
+			assertEquals(ErrorCodes.SEQUENCE, r.getErrorCode());
+
+			// Sequence should recover
+			r=convex.transactSync("(+ 2 3)");
+			assertEquals(CVMLong.create(5),r.getValue());
+		}
 	}
 
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		ConvexLocal convex = network.getLocalClient();
-		Address address = convex.getAddress();
-		int n = 100;
-		Future<Result>[] rs = new Future[n];
-		for (int i = 0; i < n; i++) {
-			Future<Result> f = convex.transact(Invoke.create(address, 0, Constant.of(i)));
-			rs[i] = f;
-		}
-		for (int i = 0; i < n; i++) {
-			Result r = rs[i].get(12000, TimeUnit.MILLISECONDS);
-			assertNull(r.getErrorCode(), "Error:" + r.toString());
+		try (ConvexLocal convex = network.getLocalClient()) {
+			Address address = convex.getAddress();
+			int n = 100;
+			Future<Result>[] rs = new Future[n];
+			for (int i = 0; i < n; i++) {
+				Future<Result> f = convex.transact(Invoke.create(address, 0, Constant.of(i)));
+				rs[i] = f;
+			}
+			for (int i = 0; i < n; i++) {
+				Result r = rs[i].get(12000, TimeUnit.MILLISECONDS);
+				assertNull(r.getErrorCode(), "Error:" + r.toString());
+			}
 		}
 	}
 
 	@Test
 	public void testConcurrentTransactionsOnSharedClient() throws Exception {
-		ConvexLocal convex=network.getLocalClient();
-		Address address=convex.getAddress();
-		int n=20;
-		CyclicBarrier start=new CyclicBarrier(n);
-		List<CompletableFuture<Result>> results=new ArrayList<>(n);
+		try (ConvexLocal convex=network.getLocalClient()) {
+			Address address=convex.getAddress();
+			int n=20;
+			CyclicBarrier start=new CyclicBarrier(n);
+			List<CompletableFuture<Result>> results=new ArrayList<>(n);
 
-		try (ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor()) {
-			for (int i=0;i<n;i++) {
-				final int value=i;
-				CompletableFuture<Result> result=CompletableFuture.supplyAsync(()->{
-					try {
-						start.await();
-					} catch (Exception e) {
-						throw new CompletionException(e);
-					}
-					return convex.transact(Invoke.create(address,0,Constant.of(value)));
-				},executor).thenCompose(f->f);
-				results.add(result);
+			try (ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor()) {
+				for (int i=0;i<n;i++) {
+					final int value=i;
+					CompletableFuture<Result> result=CompletableFuture.supplyAsync(()->{
+						try {
+							start.await();
+						} catch (Exception e) {
+							throw new CompletionException(e);
+						}
+						return convex.transact(Invoke.create(address,0,Constant.of(value)));
+					},executor).thenCompose(f->f);
+					results.add(result);
+				}
+
+				CompletableFuture.allOf(results.toArray(CompletableFuture[]::new))
+					.get(12000,TimeUnit.MILLISECONDS);
 			}
 
-			CompletableFuture.allOf(results.toArray(CompletableFuture[]::new))
-				.get(12000,TimeUnit.MILLISECONDS);
-		}
-
-		for (int i=0;i<n;i++) {
-			Result result=results.get(i).join();
-			assertNull(result.getErrorCode(),"Error: "+result);
-			assertEquals(CVMLong.create(i),result.getValue());
+			for (int i=0;i<n;i++) {
+				Result result=results.get(i).join();
+				assertNull(result.getErrorCode(),"Error: "+result);
+				assertEquals(CVMLong.create(i),result.getValue());
+			}
 		}
 	}
 
@@ -189,8 +196,8 @@ public class ConvexLocalTest {
 		try (MemoryStore store=new MemoryStore()) {
 			Map<Keyword,Object> config=Maps.hashMapOf(Keywords.KEYPAIR,kp,Keywords.STATE,genesis,Keywords.STORE,store,
 				Keywords.PORT,0,Keywords.AUTO_MANAGE,false,Keywords.OUTGOING_CONNECTIONS,0);
-			try (Server server=API.launchPeer(config)) {
-				ConvexLocal convex=Convex.connect(server);
+			try (Server server=API.launchPeer(config);
+					ConvexLocal convex=Convex.connect(server)) {
 				CountDownLatch busy=new CountDownLatch(1);
 				CountDownLatch release=new CountDownLatch(1);
 				// A result for a raw send matches no request, so it is observed on the thread

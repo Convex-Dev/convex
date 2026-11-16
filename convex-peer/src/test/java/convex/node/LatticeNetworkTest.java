@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -146,24 +148,23 @@ public class LatticeNetworkTest {
 
 	/**
 	 * Tears down the network after all tests complete by closing all NodeServers
-	 * and stores.
-	 *
-	 * @throws IOException If an IO error occurs during shutdown
+	 * and stores, running every close even if an earlier one fails.
 	 */
 	@AfterAll
-	public void tearDownNetwork() throws IOException {
-		for (LatticeListener transport:transports) transport.close();
-		transports.clear();
-		for (NodeServer<?> server : nodeServers) {
-			server.close();
+	public void tearDownNetwork() {
+		List<Executable> closes=new ArrayList<>();
+		// Listeners, then NodeServers, then stores; null if setup failed before creating them
+		if (transports!=null) for (LatticeListener transport:transports) closes.add(transport::close);
+		if (nodeServers!=null) for (NodeServer<?> server:nodeServers) closes.add(server::close);
+		if (stores!=null) for (AStore store:stores) closes.add(store::close);
+		try {
+			assertAll("Close the network",closes);
+		} finally {
+			if (transports!=null) transports.clear();
+			if (nodeServers!=null) nodeServers.clear();
+			if (propagators!=null) propagators.clear();
+			if (stores!=null) stores.clear();
 		}
-		nodeServers.clear();
-		propagators.clear();
-
-		for (AStore store : stores) {
-			store.close();
-		}
-		stores.clear();
 	}
 
 	/**

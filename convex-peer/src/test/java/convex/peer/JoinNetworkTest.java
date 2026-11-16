@@ -1,5 +1,6 @@
 package convex.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -177,10 +178,13 @@ public class JoinNetworkTest {
 			assertNotEquals(advertised.getConsensusState().getHash(),
 					joined.getConsensusState().getHash());
 		} finally {
-			if (destination!=null) destination.close();
-			if (source!=null) source.close();
-			destinationStore.close();
-			sourceStore.close();
+			Server destinationPeer=destination;
+			Server sourcePeer=source;
+			assertAll("Close the peers and their stores",
+				() -> { if (destinationPeer!=null) destinationPeer.close(); },
+				() -> { if (sourcePeer!=null) sourcePeer.close(); },
+				destinationStore::close,
+				sourceStore::close);
 		}
 	}
 

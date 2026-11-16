@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +28,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.slf4j.event.Level;
 
 import convex.core.ErrorCodes;
@@ -100,18 +103,22 @@ public class NodeServerTest {
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		for (LatticeListener transport:transports.values()) transport.close();
+	public void tearDown() {
+		List<Executable> cleanup=new ArrayList<>();
+		// Listeners before their nodes, nodes before the store they use
+		for (LatticeListener transport:transports.values()) cleanup.add(transport::close);
+		NodeServer<?> maxNode=maxNodeServer;
+		NodeServer<?> setNode=setNodeServer;
+		AStore testStore=store;
+		if (maxNode != null) cleanup.add(maxNode::close);
+		if (setNode != null) cleanup.add(setNode::close);
+		if (testStore != null) cleanup.add(testStore::close);
+		// Cleared first: the instance is shared by the class's tests, and the next must not close these again
 		transports.clear();
-		if (maxNodeServer != null) {
-			maxNodeServer.close();
-		}
-		if (setNodeServer != null) {
-			setNodeServer.close();
-		}
-		if (store != null) {
-			store.close();
-		}
+		maxNodeServer=null;
+		setNodeServer=null;
+		store=null;
+		assertAll("Close this test's listeners, nodes and store",cleanup);
 	}
 
 	/** A relay node: the host's live application admits the whole lattice, the node replicates it. */
@@ -858,34 +865,31 @@ public class NodeServerTest {
 
 		// Create Convex connections to the server (using loopback addresses for testing)
 		InetSocketAddress serverAddress = address(maxNodeServer);
-		ConvexRemote peer1 = ConvexRemote.connect(serverAddress);
-		ConvexRemote peer2 = ConvexRemote.connect(serverAddress);
+		try (ConvexRemote peer1 = ConvexRemote.connect(serverAddress);
+				ConvexRemote peer2 = ConvexRemote.connect(serverAddress)) {
 
-		// Initially no peers
-		Set<Convex> peers = propagator.getPeers();
-		assertTrue(peers.isEmpty());
+			// Initially no peers
+			Set<Convex> peers = propagator.getPeers();
+			assertTrue(peers.isEmpty());
 
-		// Add peers with identity keys
-		AccountKey key1 = AKeyPair.generate().getAccountKey();
-		AccountKey key2 = AKeyPair.generate().getAccountKey();
-		propagator.addPeer(key1, peer1).get(5,TimeUnit.SECONDS);
-		propagator.addPeer(key2, peer2).get(5,TimeUnit.SECONDS);
+			// Add peers with identity keys
+			AccountKey key1 = AKeyPair.generate().getAccountKey();
+			AccountKey key2 = AKeyPair.generate().getAccountKey();
+			propagator.addPeer(key1, peer1).get(5,TimeUnit.SECONDS);
+			propagator.addPeer(key2, peer2).get(5,TimeUnit.SECONDS);
 
-		peers = propagator.getPeers();
-		assertEquals(2, peers.size());
-		assertTrue(peers.contains(peer1));
-		assertTrue(peers.contains(peer2));
+			peers = propagator.getPeers();
+			assertEquals(2, peers.size());
+			assertTrue(peers.contains(peer1));
+			assertTrue(peers.contains(peer2));
 
-		// Remove a peer by identity
-		propagator.removePeer(key1);
-		peers = propagator.getPeers();
-		assertEquals(1, peers.size());
-		assertTrue(peers.contains(peer2));
-		assertFalse(peers.contains(peer1));
-
-		// Clean up
-		peer1.close();
-		peer2.close();
+			// Remove a peer by identity
+			propagator.removePeer(key1);
+			peers = propagator.getPeers();
+			assertEquals(1, peers.size());
+			assertTrue(peers.contains(peer2));
+			assertFalse(peers.contains(peer1));
+		}
 	}
 
 	/**
@@ -989,13 +993,14 @@ public class NodeServerTest {
 		assertNotNull(serverAddress, "Server should have a host address after launch");
 		
 		// Connect with ConvexRemote
-		ConvexRemote convex = ConvexRemote.connect(serverAddress);
-		assertNotNull(convex, "ConvexRemote connection should be created");
-		assertTrue(convex.isConnected(), "ConvexRemote should be connected");
-		
-		// Clean up
-		convex.close();
-		assertFalse(convex.isConnected(), "ConvexRemote should be disconnected after close");
+		try (ConvexRemote convex = ConvexRemote.connect(serverAddress)) {
+			assertNotNull(convex, "ConvexRemote connection should be created");
+			assertTrue(convex.isConnected(), "ConvexRemote should be connected");
+
+			// Clean up
+			convex.close();
+			assertFalse(convex.isConnected(), "ConvexRemote should be disconnected after close");
+		}
 	}
 	
 	/**
@@ -1178,9 +1183,9 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testApplicationTakingNothingLeavesRootUnchanged() throws Exception {
-		try (AStore ingressStore=new MemoryStore()) {
+		try (AStore ingressStore=new MemoryStore();
+				LatticeHost<ASet<ACell>> host=LatticeHost.create(Sets.empty(),ingressStore)) {
 			ASet<ACell> value=Sets.of(Blobs.createRandom(400));
-			LatticeHost<ASet<ACell>> host=LatticeHost.create(Sets.empty(),ingressStore);
 			var indifferent=new ALatticeApplication<ASet<ACell>>(host.cursor().fork(),host::persist) {
 				@Override public ASet<ACell> merge(ASet<ACell> incoming) { return cursor().get(); }
 			};
@@ -1301,8 +1306,7 @@ public class NodeServerTest {
 				assertNull(values.get(1),
 					"the manager must not search a different propagator store");
 			} finally {
-				manager.close();
-				peer.close();
+				assertAll("Close the manager and its peer",manager::close,peer::close);
 			}
 		}
 	}
@@ -1430,7 +1434,12 @@ public class NodeServerTest {
 				assertServed(value, peer.awaitResult(81));
 			} finally {
 				servingStore.release.countDown();
-				if (closer == null) manager.close();
+				if (closer == null) {
+					manager.close();
+				} else {
+					// After the release, which its close waits for; before the store closes
+					closer.join();
+				}
 			}
 		}
 	}
@@ -1526,8 +1535,7 @@ public class NodeServerTest {
 						"the withheld branch should not appear before its response arrives");
 				} finally {
 					sourceStore.release.countDown();
-					sourceManager.close();
-					source.close();
+					assertAll("Close the source's manager and route",sourceManager::close,source::close);
 				}
 			}
 		}
@@ -1597,12 +1605,16 @@ public class NodeServerTest {
 			receiver.close();
 		} finally {
 			ingressStore.release();
-			if (receiver != null) receiver.close();
-			if (sourceManager != null) sourceManager.close();
-			if (source != null) source.close();
-			sourceStore.close();
-			ingressStore.close();
-			primaryStore.close();
+			NodeServer<ASet<ACell>> openedReceiver=receiver;
+			LatticeConnectionManager openedManager=sourceManager;
+			ConvexRemote openedSource=source;
+			assertAll("Close the receiver, the source and the stores",
+				() -> { if (openedReceiver != null) openedReceiver.close(); },
+				() -> { if (openedManager != null) openedManager.close(); },
+				() -> { if (openedSource != null) openedSource.close(); },
+				sourceStore::close,
+				ingressStore::close,
+				primaryStore::close);
 		}
 	}
 
@@ -1652,10 +1664,13 @@ public class NodeServerTest {
 			assertFalse(ingressStore.heldThread().isAlive(), "the ingress worker should finish its message");
 		} finally {
 			ingressStore.release();
-			if (receiver != null) receiver.close();
-			if (source != null) source.close();
-			ingressStore.close();
-			primaryStore.close();
+			NodeServer<ASet<ACell>> openedReceiver=receiver;
+			ConvexRemote openedSource=source;
+			assertAll("Close the receiver, the source and the stores",
+				() -> { if (openedReceiver != null) openedReceiver.close(); },
+				() -> { if (openedSource != null) openedSource.close(); },
+				ingressStore::close,
+				primaryStore::close);
 		}
 	}
 
@@ -1903,8 +1918,7 @@ public class NodeServerTest {
 			assertTrue(node.isRunning(), "the same NodeServer should be launchable after cleanup");
 		} finally {
 			testStore.failOnRootWrite = -1;
-			node.close();
-			testStore.close();
+			assertAll("Close the node and its store",node::close,testStore::close);
 		}
 	}
 
@@ -2063,8 +2077,10 @@ public class NodeServerTest {
 			LatticePropagator bobGroup = new LatticePropagator(bobStore, LatticePropagatorConfig.create());
 			aliceGroup.setTransportSigner(ChallengeSigner.create(aliceKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT));
 			bobGroup.setTransportSigner(ChallengeSigner.create(bobKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT));
-			try (var alice = new NodeServer<>(RelayHost.open(lattice, aliceStore), NodeConfig.port(-1));
-					var bob = new NodeServer<>(RelayHost.open(lattice, bobStore), NodeConfig.localNetwork());
+			try (var aliceHost = RelayHost.open(lattice, aliceStore);
+					var bobHost = RelayHost.open(lattice, bobStore);
+					var alice = new NodeServer<>(aliceHost, NodeConfig.port(-1));
+					var bob = new NodeServer<>(bobHost, NodeConfig.localNetwork());
 					var listener = new LatticeListener(NodeConfig.localNetwork())) {
 				alice.addPropagator(aliceGroup);
 				bob.addPropagator(bobGroup);
@@ -2271,8 +2287,10 @@ public class NodeServerTest {
 			endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 2
 			assertTrue(peer.isClosed(),"the failure must not have reset the count");
 		} finally {
-			if (maxNodeServer != null) maxNodeServer.close();
-			failingStore.close();
+			NodeServer<AInteger> node=maxNodeServer;
+			assertAll("Close the node and its store",
+				() -> { if (node != null) node.close(); },
+				failingStore::close);
 		}
 	}
 
@@ -2474,9 +2492,9 @@ public class NodeServerTest {
 		AStore testStore = new MemoryStore();
 
 		NodeServer<AInteger> node = new TestNode<>(lattice, testStore);
-		allowSingleGroupInbound(node);
 
 		try {
+			allowSingleGroupInbound(node);
 			node.launch();
 
 			LatticePropagator propagator = propagator(node);
@@ -2521,8 +2539,7 @@ public class NodeServerTest {
 				"Propagator should be notified after incoming LATTICE_VALUE — " +
 				"if null, incoming merges are not relayed (gossip is broken)");
 		} finally {
-			node.close();
-			testStore.close();
+			assertAll("Close the node and its store",node::close,testStore::close);
 		}
 	}
 
@@ -2765,8 +2782,9 @@ public class NodeServerTest {
 					assertNotNull(target.getStore().refForHash(branch.getHash()),"branch present in target store");
 				}
 			} finally {
-				cm.removePeer(sourceKey.getAccountKey());
-				peer.close();
+				assertAll("Remove and close the peer",
+					() -> cm.removePeer(sourceKey.getAccountKey()),
+					peer::close);
 			}
 		}
 	}
@@ -3020,8 +3038,7 @@ public class NodeServerTest {
 			assertTrue(node.isRunning(), "durability recovery policy belongs to the operator");
 		} finally {
 			testStore.failRootWrites = false;
-			node.close();
-			testStore.close();
+			assertAll("Close the node and its store",node::close,testStore::close);
 		}
 	}
 
@@ -3062,8 +3079,7 @@ public class NodeServerTest {
 			assertEquals(CVMLong.create(42), propagator.getLastAnnouncedValue(),
 				"Propagator's announced value should match synced value");
 		} finally {
-			node.close();
-			testStore.close();
+			assertAll("Close the node and its store",node::close,testStore::close);
 		}
 	}
 
@@ -3143,53 +3159,54 @@ public class NodeServerTest {
 			assertEquals(8 * 1024 * 1024, verified.getMaxInboundMessageLength(),
 				"a connection verified for its manager slot should receive the trusted tier");
 		} finally {
-			cm.removePeer(serverKey.getAccountKey());
-			verified.close();
+			assertAll("Remove and close the peer",
+				() -> cm.removePeer(serverKey.getAccountKey()),
+				verified::close);
 		}
 	}
 
 	/** A bootstrap connection remains capability-free until its challenge resolves. */
 	@Test
 	public void testPeerChallengeLimboAndPromotion() throws Exception {
-		LatticeConnectionManager cm = new LatticeConnectionManager(store);
-		cm.setKeyPair(AKeyPair.generate());
-		AccountKey peerKey = AKeyPair.generate().getAccountKey();
-		ControlledVerificationConvex peer = new ControlledVerificationConvex();
+		try (LatticeConnectionManager cm = new LatticeConnectionManager(store)) {
+			cm.setKeyPair(AKeyPair.generate());
+			AccountKey peerKey = AKeyPair.generate().getAccountKey();
+			ControlledVerificationConvex peer = new ControlledVerificationConvex();
 
-		CompletableFuture<Convex> admission = cm.addPeer(peerKey, peer);
-		assertTrue(cm.isVerificationPending(peerKey));
-		assertEquals(1, cm.getPendingConnectionCount());
-		assertFalse(cm.isConnected(peerKey));
-		assertFalse(cm.getPeers().contains(peer));
-		assertNull(peer.getStore(), "limbo must not grant reverse store access");
+			CompletableFuture<Convex> admission = cm.addPeer(peerKey, peer);
+			assertTrue(cm.isVerificationPending(peerKey));
+			assertEquals(1, cm.getPendingConnectionCount());
+			assertFalse(cm.isConnected(peerKey));
+			assertFalse(cm.getPeers().contains(peer));
+			assertNull(peer.getStore(), "limbo must not grant reverse store access");
 
-		peer.completeVerification(peerKey);
-		assertSame(peer, admission.get(5, TimeUnit.SECONDS));
-		assertFalse(cm.isVerificationPending(peerKey));
-		assertEquals(0, cm.getPendingConnectionCount());
-		assertSame(peer, cm.getConnection(peerKey));
-		assertSame(store, peer.getStore(), "promotion should grant the configured store capability");
-		cm.close();
+			peer.completeVerification(peerKey);
+			assertSame(peer, admission.get(5, TimeUnit.SECONDS));
+			assertFalse(cm.isVerificationPending(peerKey));
+			assertEquals(0, cm.getPendingConnectionCount());
+			assertSame(peer, cm.getConnection(peerKey));
+			assertSame(store, peer.getStore(), "promotion should grant the configured store capability");
+		}
 	}
 
 	/** A failed bootstrap challenge closes the socket without admitting it. */
 	@Test
 	public void testFailedPeerChallengeNeverEntersActiveSet() throws Exception {
-		LatticeConnectionManager cm = new LatticeConnectionManager(store);
-		cm.setKeyPair(AKeyPair.generate());
-		AccountKey peerKey = AKeyPair.generate().getAccountKey();
-		ControlledVerificationConvex peer = new ControlledVerificationConvex();
+		try (LatticeConnectionManager cm = new LatticeConnectionManager(store)) {
+			cm.setKeyPair(AKeyPair.generate());
+			AccountKey peerKey = AKeyPair.generate().getAccountKey();
+			ControlledVerificationConvex peer = new ControlledVerificationConvex();
 
-		CompletableFuture<Convex> admission = cm.addPeer(peerKey, peer);
-		peer.failVerification();
-		assertFalse(cm.isVerificationPending(peerKey));
-		assertTrue(admission.isCompletedExceptionally());
-		assertThrows(ExecutionException.class, () -> admission.get(5, TimeUnit.SECONDS));
-		assertFalse(cm.isConnected(peerKey));
-		assertFalse(cm.getPeers().contains(peer));
-		assertNull(peer.getStore());
-		assertFalse(peer.isConnected());
-		cm.close();
+			CompletableFuture<Convex> admission = cm.addPeer(peerKey, peer);
+			peer.failVerification();
+			assertFalse(cm.isVerificationPending(peerKey));
+			assertTrue(admission.isCompletedExceptionally());
+			assertThrows(ExecutionException.class, () -> admission.get(5, TimeUnit.SECONDS));
+			assertFalse(cm.isConnected(peerKey));
+			assertFalse(cm.getPeers().contains(peer));
+			assertNull(peer.getStore());
+			assertFalse(peer.isConnected());
+		}
 	}
 
 	/**
@@ -3198,29 +3215,29 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testInboundRouteUpgradeRequiresAuthenticatedIdentity() throws Exception {
-		LatticeConnectionManager cm = new LatticeConnectionManager(store);
-		AccountKey peerKey = AKeyPair.generate().getAccountKey();
-		RecordingConnection inbound = new RecordingConnection();
+		try (LatticeConnectionManager cm = new LatticeConnectionManager(store)) {
+			AccountKey peerKey = AKeyPair.generate().getAccountKey();
+			RecordingConnection inbound = new RecordingConnection();
 
-		assertThrows(SecurityException.class, () -> cm.upgradeInboundConnection(inbound),
-			"operator-visible inbound access must not imply authenticated route trust");
-		assertFalse(cm.hasUpgradedInboundConnection(peerKey));
+			assertThrows(SecurityException.class, () -> cm.upgradeInboundConnection(inbound),
+				"operator-visible inbound access must not imply authenticated route trust");
+			assertFalse(cm.hasUpgradedInboundConnection(peerKey));
 
-		inbound.setTrustedKey(peerKey);
-		CompletableFuture<AConnection> upgraded = cm.whenInboundConnectionUpgraded(peerKey);
-		assertSame(inbound, cm.upgradeInboundConnection(inbound).get(5, TimeUnit.SECONDS));
-		assertSame(inbound, upgraded.get(5, TimeUnit.SECONDS));
-		assertTrue(cm.hasUpgradedInboundConnection(peerKey));
-		assertFalse(cm.isConnected(peerKey),
-			"the upgraded inbound route must remain distinct from outbound Convex clients");
-		assertEquals(1, cm.getPropagationRouteCount());
+			inbound.setTrustedKey(peerKey);
+			CompletableFuture<AConnection> upgraded = cm.whenInboundConnectionUpgraded(peerKey);
+			assertSame(inbound, cm.upgradeInboundConnection(inbound).get(5, TimeUnit.SECONDS));
+			assertSame(inbound, upgraded.get(5, TimeUnit.SECONDS));
+			assertTrue(cm.hasUpgradedInboundConnection(peerKey));
+			assertFalse(cm.isConnected(peerKey),
+				"the upgraded inbound route must remain distinct from outbound Convex clients");
+			assertEquals(1, cm.getPropagationRouteCount());
 
-		cm.broadcast(Message.createPing(1));
-		assertEquals(1, inbound.sent.get());
-		cm.removeUpgradedInboundConnection(inbound);
-		assertFalse(cm.hasUpgradedInboundConnection(peerKey));
-		assertEquals(0, cm.getPropagationRouteCount());
-		cm.close();
+			cm.broadcast(Message.createPing(1));
+			assertEquals(1, inbound.sent.get());
+			cm.removeUpgradedInboundConnection(inbound);
+			assertFalse(cm.hasUpgradedInboundConnection(peerKey));
+			assertEquals(0, cm.getPropagationRouteCount());
+		}
 	}
 
 	/**
@@ -3337,24 +3354,25 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = address(maxNodeServer);
-		ConvexRemote peer = ConvexRemote.connect(addr);
+		try (ConvexRemote peer = ConvexRemote.connect(addr)) {
 
-		LatticeConnectionManager cm = propagator(maxNodeServer).getConnectionManager();
-		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+			LatticeConnectionManager cm = propagator(maxNodeServer).getConnectionManager();
+			AccountKey peerKey = AKeyPair.generate().getAccountKey();
 
-		cm.addPeer(peerKey, peer);
-		assertTrue(cm.isConnected(peerKey), "Should be connected initially");
+			cm.addPeer(peerKey, peer);
+			assertTrue(cm.isConnected(peerKey), "Should be connected initially");
 
-		// Kill the connection
-		peer.close();
+			// Kill the connection
+			peer.close();
 
-		// isConnected should detect the dead connection and prune it
-		assertFalse(cm.isConnected(peerKey), "Should detect dead connection");
-		assertEquals(0, cm.getConnectionCount(), "Dead connection should be pruned");
+			// isConnected should detect the dead connection and prune it
+			assertFalse(cm.isConnected(peerKey), "Should detect dead connection");
+			assertEquals(0, cm.getConnectionCount(), "Dead connection should be pruned");
 
-		// Desired peer should still exist (for reconnection)
-		assertTrue(cm.getDesiredPeers().containsKey(peerKey),
-			"Desired peer should survive connection death");
+			// Desired peer should still exist (for reconnection)
+			assertTrue(cm.getDesiredPeers().containsKey(peerKey),
+				"Desired peer should survive connection death");
+		}
 	}
 
 	/**

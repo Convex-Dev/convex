@@ -314,8 +314,7 @@ public class PeerRequestFailureTest {
 		try (logs) {
 			FaultingStore store=new FaultingStore();
 			Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
-			try {
-				Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+			try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
 				int i=0;
 				// The handler warns only of the first running out of memory: here, this test's own
 				for (Throwable failure: withOwn(FAILURES,outOfMemory)) {
@@ -346,8 +345,7 @@ public class PeerRequestFailureTest {
 	public void aBlockThatCannotBeProducedFailsItsTransactions() throws Exception {
 		FaultingStore store=new FaultingStore();
 		Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+		try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
 			int i=0;
 			for (Throwable failure: FAILURES) {
 				SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 1 "+(i++)+")"));
@@ -432,10 +430,9 @@ public class PeerRequestFailureTest {
 	public void aBlockThatCannotBeProposedFailsItsTransactions() throws Exception {
 		FailingKeyPair kp=new FailingKeyPair(LOCAL,v -> v instanceof Order);
 		Server peer=launchHaltedPeer(kp);
-		try {
+		try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
 			LinkedBlockingQueue<SignedData<ATransaction>> queued=new LinkedBlockingQueue<>();
 			peer.getTransactionHandler().setRequestObserver(queued::add);
-			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
 			// Not started: this test thread runs it
 			BeliefPropagator proposer=new BeliefPropagator(peer);
 			proposer.belief=peer.getBelief();
@@ -469,10 +466,9 @@ public class PeerRequestFailureTest {
 	@Test
 	public void aFailingBeliefObserverCostsTheUpdateNothing() throws Exception {
 		Server peer=launchHaltedPeer(LOCAL);
-		try {
+		try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
 			LinkedBlockingQueue<SignedData<ATransaction>> queued=new LinkedBlockingQueue<>();
 			peer.getTransactionHandler().setRequestObserver(queued::add);
-			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
 			// Not started: this test thread runs it
 			BeliefPropagator proposer=new BeliefPropagator(peer);
 			proposer.belief=peer.getBelief();
@@ -496,8 +492,7 @@ public class PeerRequestFailureTest {
 	@Test
 	public void aFailingResponseObserverCostsNothingElse() throws Exception {
 		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
-		try {
-			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+		try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
 			long seq=1;
 			for (Throwable failure: FAILURES) {
 				peer.getTransactionHandler().setResponseObserver((sd,r) -> {
@@ -748,8 +743,12 @@ public class PeerRequestFailureTest {
 						throw error;
 					}
 				};
-				peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),failing);
-				assertEquals(1,polls.get(),error.toString());
+				try {
+					peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),failing);
+					assertEquals(1,polls.get(),error.toString());
+				} finally {
+					failing.close();
+				}
 			}
 		} finally {
 			peer.close();

@@ -76,12 +76,14 @@ public class CVMExecutorFailureTest {
 				Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
 				try {
 					store.failure.set(failure);
-					// Executing it advances the state, which is then persisted
-					Convex.connect(peer,ORIGIN,LOCAL).transact(transaction("(+ 1 2)"));
-					// Preemptive: without the shutdown, the wait would never return
-					assertTimeoutPreemptively(Duration.ofSeconds(InvalidPeerDataTest.WAIT),() -> peer.waitForShutdown(),failure.toString());
-					assertFalse(peer.isRunning(),failure.toString());
-					assertTrue(store.writesAfterFailure.get()>0,failure+": the final checkpoint is written");
+					try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
+						// Executing it advances the state, which is then persisted
+						client.transact(transaction("(+ 1 2)"));
+						// Preemptive: without the shutdown, the wait would never return
+						assertTimeoutPreemptively(Duration.ofSeconds(InvalidPeerDataTest.WAIT),() -> peer.waitForShutdown(),failure.toString());
+						assertFalse(peer.isRunning(),failure.toString());
+						assertTrue(store.writesAfterFailure.get()>0,failure+": the final checkpoint is written");
+					}
 				} finally {
 					peer.close();
 				}
@@ -100,12 +102,14 @@ public class CVMExecutorFailureTest {
 			Server peer=InvalidPeerDataTest.launchPeer(store,LOCAL);
 			try {
 				store.failure.set(failure);
-				Result r=Convex.connect(peer,ORIGIN,LOCAL).transact(transaction("(+ 1 2)")).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
-				assertEquals(CVMLong.create(3),r.getValue(),r.toString());
-				assertTrue(store.failed,"the root write failed once");
-				// Before the result is reported, so already done
-				assertTrue(store.writesAfterFailure.get()>0,"the advanced state is persisted on the retry");
-				assertTrue(peer.isRunning());
+				try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
+					Result r=client.transact(transaction("(+ 1 2)")).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+					assertEquals(CVMLong.create(3),r.getValue(),r.toString());
+					assertTrue(store.failed,"the root write failed once");
+					// Before the result is reported, so already done
+					assertTrue(store.writesAfterFailure.get()>0,"the advanced state is persisted on the retry");
+					assertTrue(peer.isRunning());
+				}
 			} finally {
 				peer.close();
 			}
@@ -125,10 +129,12 @@ public class CVMExecutorFailureTest {
 			AtomicInteger updates=new AtomicInteger();
 			peer.addStateUpdateObserver(p -> updates.incrementAndGet());
 			int registered=updates.get();
-			Result r=Convex.connect(peer,ORIGIN,LOCAL).transact(transaction("(+ 1 2)")).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
-			assertEquals(CVMLong.create(3),r.getValue(),r.toString());
-			assertTrue(updates.get()>registered,"the other observer is called on the update");
-			assertTrue(peer.isRunning());
+			try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
+				Result r=client.transact(transaction("(+ 1 2)")).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+				assertEquals(CVMLong.create(3),r.getValue(),r.toString());
+				assertTrue(updates.get()>registered,"the other observer is called on the update");
+				assertTrue(peer.isRunning());
+			}
 		} finally {
 			peer.close();
 		}

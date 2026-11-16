@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.time.Duration;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -21,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -155,22 +159,30 @@ public class NodeServerPersistenceTest {
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
+	public void tearDown() {
 		// Test hooks must not affect the final snapshot written during close().
-		sharedPrimaryStore.setRootWriteHook(null);
-		sharedBackupStore.setRootWriteHook(null);
-		sharedPrimaryStore.setFlushHook(null);
-		sharedBackupStore.setFlushHook(null);
-		sharedPrimaryStore.setFlushCompleteHook(null);
-		sharedBackupStore.setFlushCompleteHook(null);
-		for (LatticeListener transport:transports.values()) transport.close();
-		transports.clear();
-		if (primary != null) primary.close();
-		if (backup != null) backup.close();
-		if (primaryStore != null && primaryStore != sharedPrimaryStore) primaryStore.close();
-		if (backupStore != null && backupStore != sharedBackupStore) backupStore.close();
-		sharedPrimaryStore.close();
-		sharedBackupStore.close();
+		for (HookedEtchStore store:new HookedEtchStore[] {sharedPrimaryStore,sharedBackupStore}) {
+			if (store == null) continue;
+			store.setRootWriteHook(null);
+			store.setFlushHook(null);
+			store.setFlushCompleteHook(null);
+		}
+		List<Executable> closes=new ArrayList<>();
+		for (LatticeListener transport:transports.values()) closes.add(transport::close);
+		closes.add(() -> { if (primary != null) primary.close(); });
+		closes.add(() -> { if (backup != null) backup.close(); });
+		closes.add(() -> { if (primaryStore != null && primaryStore != sharedPrimaryStore) primaryStore.close(); });
+		closes.add(() -> { if (backupStore != null && backupStore != sharedBackupStore) backupStore.close(); });
+		closes.add(() -> { if (sharedPrimaryStore != null) sharedPrimaryStore.close(); });
+		closes.add(() -> { if (sharedBackupStore != null) sharedBackupStore.close(); });
+		try {
+			assertAll("Close the listeners, nodes and stores",closes);
+		} finally {
+			// One instance serves every test, so the next test must not close these again
+			transports.clear();
+			primary=null;
+			backup=null;
+		}
 	}
 
 	/**
@@ -206,8 +218,11 @@ public class NodeServerPersistenceTest {
 	private void connectPrimaryToBackup() throws Exception {
 		InetSocketAddress backupAddr = address(backup);
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+		// Before connecting, so a failed check leaves no connection open
+		LatticePropagator group=propagationGroup(primary);
+		// The group owns the connection once added, and closes it with the node
 		Convex conn = ConvexRemote.connect(backupAddr);
-		propagationGroup(primary).addPeer(peerKey, conn);
+		group.addPeer(peerKey, conn);
 	}
 
 	/**
@@ -232,14 +247,16 @@ public class NodeServerPersistenceTest {
 	private void pullBackupFromPrimary() throws Exception {
 		InetSocketAddress primaryAddr = address(primary);
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
-		Convex conn = ConvexRemote.connect(primaryAddr);
+		// Before connecting, so a failed check leaves no connection open
 		LatticePropagator group=propagationGroup(backup);
+		Convex conn = ConvexRemote.connect(primaryAddr);
 		try {
 			group.addPeer(peerKey, conn);
 			assertTrue(backup.pull(group), "Pull should complete");
 		} finally {
-			group.removePeer(peerKey);
-			conn.close();
+			assertAll("Remove and close the pull connection",
+				() -> group.removePeer(peerKey),
+				conn::close);
 		}
 	}
 
@@ -617,14 +634,19 @@ public class NodeServerPersistenceTest {
 			}
 		}, "raced-identity-sync");
 		syncThread.start();
+		try {
+			assertTrue(persistenceEntered.await(5, TimeUnit.SECONDS),
+				"sync should reach persistence before the concurrent write");
+			writeDataValue(primary, 999);
+			allowPersistence.countDown();
+			syncThread.join(5_000);
 
-		assertTrue(persistenceEntered.await(5, TimeUnit.SECONDS),
-			"sync should reach persistence before the concurrent write");
-		writeDataValue(primary, 999);
-		allowPersistence.countDown();
-		syncThread.join(5_000);
-
-		assertFalse(syncThread.isAlive(), "raced sync should complete promptly");
+			assertFalse(syncThread.isAlive(), "raced sync should complete promptly");
+		} finally {
+			// Released first, so the sync ends however the steps above ended; its hook waits at most 5 s
+			allowPersistence.countDown();
+			syncThread.join();
+		}
 		assertNull(failure.get(), "raced sync should not fail");
 		assertEquals(CVMLong.create(999), readDataValue(primary, 999),
 			"concurrent write must survive the raced sync");
@@ -872,8 +894,11 @@ public class NodeServerPersistenceTest {
 			});
 			b.start();
 			ready.countDown();
-			primary.getHost().sync();
-			b.join();
+			try {
+				primary.getHost().sync();
+			} finally {
+				b.join();
+			}
 
 			// B's write must survive the CAS-or-merge fallback inside sync()
 			assertEquals(bValue, primary.getCursor().get(bKey),
@@ -947,9 +972,10 @@ public class NodeServerPersistenceTest {
 			assertEquals(1,maxInFlight.get(),"second pipeline must wait outside setRootData");
 		} finally {
 			releaseFirst.countDown();
+			// After the release, which both wait behind; joining an unstarted t2 returns at once
+			t1.join();
+			t2.join();
 		}
-		t1.join();
-		t2.join();
 
 		assertNull(failure.get(),"authoritative persistence must not throw");
 		assertEquals(1, maxInFlight.get(),

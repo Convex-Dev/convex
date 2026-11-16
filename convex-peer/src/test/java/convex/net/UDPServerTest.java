@@ -11,17 +11,18 @@ public class UDPServerTest {
 
 	@Test
 	public void closeEndsTheReceiverAndTheSocket() throws Exception {
-		UDPServer server=new UDPServer();
-		server.launch("127.0.0.1",0);
-		Thread receiver=server.thread;
-		assertTrue(receiver.isAlive());
+		try (UDPServer server=new UDPServer()) {
+			server.launch("127.0.0.1",0);
+			Thread receiver=server.thread;
+			assertTrue(receiver.isAlive());
 
-		server.close();
-		assertFalse(receiver.isAlive(),"close returns once the receiving thread has ended");
-		assertTrue(server.socket.isClosed());
+			server.close();
+			assertFalse(receiver.isAlive(),"close returns once the receiving thread has ended");
+			assertTrue(server.socket.isClosed());
 
-		server.close();
-		assertThrows(IllegalStateException.class,() -> server.launch("127.0.0.1",0),"a closed server does not launch again");
+			server.close();
+			assertThrows(IllegalStateException.class,() -> server.launch("127.0.0.1",0),"a closed server does not launch again");
+		}
 	}
 
 	@Test

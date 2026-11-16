@@ -60,8 +60,8 @@ class LatticeNodeTest {
 
 	/** Close is final: a closed node cannot be launched and opens no listener. */
 	@Test void aClosedNodeStaysClosed() throws Exception {
-		try (var store=new MemoryStore()) {
-			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0));
+		try (var store=new MemoryStore();
+				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0))) {
 			var group=node.createPropagator();
 			node.close();
 			assertThrows(IllegalStateException.class,node::launch);
@@ -80,8 +80,9 @@ class LatticeNodeTest {
 	 */
 	@Test void closeNeverWaitsForASelectorThatReadsTheNode() throws Exception {
 		try (var store=new MemoryStore();
-				var others=Executors.newVirtualThreadPerTaskExecutor()) {
-			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch();
+				var others=Executors.newVirtualThreadPerTaskExecutor();
+				// Closed before the executor, whose close waits for its task: closing the node frees the selector
+				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch()) {
 			// A node with a key keeps an unreachable peer, retrying, until it closes
 			var key=AKeyPair.createSeeded(714);
 			node.setIdentity(DID.forKey(key.getAccountKey()),key);

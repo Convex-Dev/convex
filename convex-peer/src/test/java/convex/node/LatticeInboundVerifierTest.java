@@ -59,6 +59,8 @@ public class LatticeInboundVerifierTest {
 			assertTrue(waited,"the attempt ended before close returned");
 		} finally {
 			closeReturned.set(true);
+			// After the attempt is let go, so a test that failed before its close waits for it to end
+			verifier.close();
 		}
 	}
 

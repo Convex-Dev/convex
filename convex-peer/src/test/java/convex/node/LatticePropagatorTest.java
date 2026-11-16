@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -139,30 +140,26 @@ public class LatticePropagatorTest {
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		if (transport1!=null) transport1.close();
-		if (transport2!=null) transport2.close();
-		if (server1 != null) {
-			server1.close();
+	public void tearDown() {
+		try {
+			assertAll("Close the network",
+				() -> { if (transport1!=null) transport1.close(); },
+				() -> { if (transport2!=null) transport2.close(); },
+				() -> { if (server1!=null) server1.close(); },
+				() -> { if (server2!=null) server2.close(); },
+				() -> { if (store1!=null) store1.close(); },
+				() -> { if (store2!=null) store2.close(); });
+		} finally {
+			// One instance serves every test, so a test without the network must not close this one again
+			transport1=null;
+			transport2=null;
+			server1=null;
+			server2=null;
+			propagator1=null;
+			propagator2=null;
+			store1=null;
+			store2=null;
 		}
-		if (server2 != null) {
-			server2.close();
-		}
-		if (store1 != null) {
-			store1.close();
-		}
-		if (store2 != null) {
-			store2.close();
-		}
-		// One instance serves every test, so a test without the network must not close this one again
-		transport1=null;
-		transport2=null;
-		server1=null;
-		server2=null;
-		propagator1=null;
-		propagator2=null;
-		store1=null;
-		store2=null;
 	}
 
 	/**
@@ -192,18 +189,22 @@ public class LatticePropagatorTest {
 
 		LatticePropagator group=new LatticePropagator(new MemoryStore());
 		group.start();
-		// Starting again warns of the redundant call
-		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
-			group.start();
+		try {
+			// Starting again warns of the redundant call
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				group.start();
+			}
+			assertTrue(group.isRunning());
+			assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
+			assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
+			group.close();
+			group.close();
+			assertFalse(group.isRunning());
+			assertEquals(LatticePropagator.State.STOPPED,group.getStatus().state());
+			assertEquals(0L,group.getStatus().failureCount(),"closing again is no failure");
+		} finally {
+			group.close();
 		}
-		assertTrue(group.isRunning());
-		assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
-		assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
-		group.close();
-		group.close();
-		assertFalse(group.isRunning());
-		assertEquals(LatticePropagator.State.STOPPED,group.getStatus().state());
-		assertEquals(0L,group.getStatus().failureCount(),"closing again is no failure");
 	}
 
 	@Test
@@ -680,25 +681,28 @@ public class LatticePropagatorTest {
 	public void testTriggerAndCloseDrainsAfterLoopExit() throws Exception {
 		LatticePropagator propagator = new LatticePropagator(new MemoryStore());
 		propagator.start();
+		try {
+			// Force the propagation loop to terminate while triggerAndClose still
+			// sees a propagator to shut down (running false, thread field non-null)
+			Field runningField = LatticePropagator.class.getDeclaredField("running");
+			runningField.setAccessible(true);
+			runningField.setBoolean(propagator, false);
+			Field threadField = LatticePropagator.class.getDeclaredField("propagationThread");
+			threadField.setAccessible(true);
+			Thread worker = (Thread) threadField.get(propagator);
+			worker.interrupt(); // wake from poll; loop drains (empty queue) and exits
+			worker.join(10_000);
+			assertFalse(worker.isAlive(), "Propagation loop should have exited");
 
-		// Force the propagation loop to terminate while triggerAndClose still
-		// sees a propagator to shut down (running false, thread field non-null)
-		Field runningField = LatticePropagator.class.getDeclaredField("running");
-		runningField.setAccessible(true);
-		runningField.setBoolean(propagator, false);
-		Field threadField = LatticePropagator.class.getDeclaredField("propagationThread");
-		threadField.setAccessible(true);
-		Thread worker = (Thread) threadField.get(propagator);
-		worker.interrupt(); // wake from poll; loop drains (empty queue) and exits
-		worker.join(10_000);
-		assertFalse(worker.isAlive(), "Propagation loop should have exited");
-
-		// The final value is offered to a queue no thread will ever read;
-		// only the closing thread's drain can process it
-		ACell finalValue = CVMLong.create(424242);
-		propagator.triggerAndClose(finalValue);
-		assertEquals(finalValue, propagator.getLastAnnouncedValue(),
-			"Final value must be announced even when the loop exited before the offer");
+			// The final value is offered to a queue no thread will ever read;
+			// only the closing thread's drain can process it
+			ACell finalValue = CVMLong.create(424242);
+			propagator.triggerAndClose(finalValue);
+			assertEquals(finalValue, propagator.getLastAnnouncedValue(),
+				"Final value must be announced even when the loop exited before the offer");
+		} finally {
+			propagator.close();
+		}
 	}
 
 	/**
@@ -723,6 +727,8 @@ public class LatticePropagatorTest {
 				assertEquals(LatticePropagator.State.STOPPED, propagator.getStatus().state());
 			} finally {
 				store.release();
+				// After the release, so a close the test did not reach finds the worker free
+				propagator.close();
 			}
 			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
 			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
@@ -753,6 +759,8 @@ public class LatticePropagatorTest {
 			} finally {
 				Thread.interrupted();
 				store.release();
+				// After the release, so a close the test did not reach finds the worker free
+				propagator.close();
 			}
 			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
 			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
@@ -766,13 +774,17 @@ public class LatticePropagatorTest {
 			store.release();
 			LatticePropagator propagator = new LatticePropagator(store);
 			propagator.start();
-			propagator.triggerBroadcast(CVMLong.create(776));
-			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
-			Thread worker = store.heldThread();
+			try {
+				propagator.triggerBroadcast(CVMLong.create(776));
+				assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+				Thread worker = store.heldThread();
 
-			propagator.close();
-			assertFalse(worker.isAlive(), "close must end an idle worker within the drain timeout");
-			assertFalse(store.wasInterrupted());
+				propagator.close();
+				assertFalse(worker.isAlive(), "close must end an idle worker within the drain timeout");
+				assertFalse(store.wasInterrupted());
+			} finally {
+				propagator.close();
+			}
 		}
 	}
 

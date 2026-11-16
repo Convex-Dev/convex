@@ -67,8 +67,8 @@ class InboundQueueBackpressureTest {
 		try (MemoryStore store=new MemoryStore()) {
 			Map<Keyword,Object> config=Maps.hashMapOf(Keywords.KEYPAIR,kp,Keywords.STATE,genesis,Keywords.STORE,store,
 				Keywords.PORT,0,Keywords.AUTO_MANAGE,false,Keywords.OUTGOING_CONNECTIONS,0);
-			try (Server server=API.launchPeer(config)) {
-				ConvexLocal convex=Convex.connect(server);
+			try (Server server=API.launchPeer(config);
+					ConvexLocal convex=Convex.connect(server)) {
 				CompletableFuture<Outcome> outcome=new CompletableFuture<>();
 				// A result for a raw send matches no request, so it is observed on the thread
 				// delivering it: the query handler's

@@ -737,12 +737,17 @@ public class LatticeConnectionManagerTest {
 		manager.setPeerTargets(0,0); // the next pass would retire this route
 
 		CompletableFuture<Void> closing=CompletableFuture.runAsync(() -> manager.close(60_000));
-		peer.flushRequested.get(5,TimeUnit.SECONDS);
-		manager.maintainConnections();
-		assertTrue(peer.isConnected(),"no route is retired while close waits for its messages");
-		peer.written.complete(null);
-		closing.get(5,TimeUnit.SECONDS);
-		assertFalse(peer.isConnected());
+		try {
+			peer.flushRequested.get(5,TimeUnit.SECONDS);
+			manager.maintainConnections();
+			assertTrue(peer.isConnected(),"no route is retired while close waits for its messages");
+			peer.written.complete(null);
+			closing.get(5,TimeUnit.SECONDS);
+			assertFalse(peer.isConnected());
+		} finally {
+			// Lets a close still waiting for the write end now, not at its 60 second timeout
+			peer.written.complete(null);
+		}
 	}
 
 	/** A route that never finishes writing is closed at the timeout. */

@@ -143,9 +143,8 @@ public class NettyServerTest {
 			server.launch();
 			InetSocketAddress addr = server.getHostAddress();
 
-			Convex c1 = Convex.connect(addr);
-			Convex c2 = Convex.connect(addr);
-			try {
+			try (Convex c1 = Convex.connect(addr);
+					Convex c2 = Convex.connect(addr)) {
 				assertFalse(c1.query(":one").join().isError());
 				assertFalse(c2.query(":two").join().isError());
 				assertEquals(2, server.getClientConnectionCount());
@@ -158,9 +157,6 @@ public class NettyServerTest {
 					assertEquals(-1, s.getInputStream().read(),
 						"Connection beyond the limit should be closed by the server");
 				}
-			} finally {
-				c1.close();
-				c2.close();
 			}
 		}
 	}
@@ -224,15 +220,20 @@ public class NettyServerTest {
 		NettyInboundHandler handler = new NettyInboundHandler(msg -> null, null);
 		EmbeddedChannel ch = new EmbeddedChannel(handler);
 		ServerOutboundQueue outbound = new ServerOutboundQueue(1 << 20, 1 << 20);
-		NettyServerConnection conn = new NettyServerConnection(ch, handler, outbound);
-		handler.setConnection(conn);
+		try {
+			NettyServerConnection conn = new NettyServerConnection(ch, handler, outbound);
+			handler.setConnection(conn);
 
-		CompletableFuture<AConnection> disconnected = new CompletableFuture<>();
-		handler.setDisconnectAction(disconnected::complete);
+			CompletableFuture<AConnection> disconnected = new CompletableFuture<>();
+			handler.setDisconnectAction(disconnected::complete);
 
-		ch.close();
+			ch.close();
 
-		assertTrue(disconnected.isDone(), "channelInactive should fire the disconnect action");
-		assertEquals(conn, disconnected.getNow(null));
+			assertTrue(disconnected.isDone(), "channelInactive should fire the disconnect action");
+			assertEquals(conn, disconnected.getNow(null));
+		} finally {
+			// Stops the queue's writer thread
+			outbound.close();
+		}
 	}
 }

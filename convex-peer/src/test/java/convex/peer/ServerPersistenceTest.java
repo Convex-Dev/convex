@@ -1,5 +1,6 @@
 package convex.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -55,8 +56,10 @@ public class ServerPersistenceTest {
 			server=null;
 			assertEquals(1,store.flushCount);
 		} finally {
-			if (server!=null) server.close();
-			store.close();
+			Server launched=server;
+			assertAll("Close the peer and its store",
+				() -> { if (launched!=null) launched.close(); },
+				store::close);
 		}
 
 		try (EtchStore reopened=EtchStore.create(file,etchConfig)) {

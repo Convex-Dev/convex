@@ -105,8 +105,7 @@ public class MisbehaviourTest {
 	@Test
 	public void aBadTransactionSignatureKeepsALocalConnection() throws Exception {
 		Server peer=InvalidPeerDataTest.launchPeer(LOCAL);
-		try {
-			Convex client=Convex.connect(peer,ORIGIN,LOCAL);
+		try (Convex client=Convex.connect(peer,ORIGIN,LOCAL)) {
 			Result bad=client.transact(badlySigned("(+ 1 2)")).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
 			assertEquals(ErrorCodes.SIGNATURE,bad.getErrorCode(),bad.toString());
 			Result good=client.transact(LOCAL.signData(Invoke.create(ORIGIN,1,"(+ 2 3)"))).get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
@@ -158,8 +157,13 @@ public class MisbehaviourTest {
 					super.close();
 				}
 			};
-			peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),polledPeer);
-			assertTrue(closed.get());
+			try {
+				peer.getConnectionManager().pollBelief(REMOTE_A.getAccountKey(),polledPeer);
+				assertTrue(closed.get());
+			} finally {
+				// Already closed by the poll, unless it failed to close it
+				polledPeer.close();
+			}
 		} finally {
 			peer.close();
 		}
@@ -350,10 +354,15 @@ public class MisbehaviourTest {
 		try {
 			// Not started: this test thread runs it
 			BeliefPropagator propagator=new BeliefPropagator(peer);
-			assertFalse(propagator.mergeBeliefMessage(new HashMap<>(),m));
-			CompletableFuture<?> fetch=propagator.getMissingDataFetch();
-			assertNotNull(fetch,"the missing data is fetched");
-			fetch.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			try {
+				assertFalse(propagator.mergeBeliefMessage(new HashMap<>(),m));
+				CompletableFuture<?> fetch=propagator.getMissingDataFetch();
+				assertNotNull(fetch,"the missing data is fetched");
+				fetch.get(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS);
+			} finally {
+				// Before the peer closes: the propagator's fetch writes to the peer's store
+				propagator.close();
+			}
 		} finally {
 			peer.close();
 		}

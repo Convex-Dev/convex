@@ -520,8 +520,7 @@ public class InvalidPeerDataTest {
 
 	private void checkAcquireNotPersisted(AStore store) throws Exception {
 		Server peer=launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer);
+		try (Convex client=Convex.connect(peer)) {
 			Blob part=Blob.createRandom(new Random(1234),200);
 			Cells.persist(part,store);
 
@@ -567,8 +566,7 @@ public class InvalidPeerDataTest {
 
 	private void aTransactionWithADeeplyNestedResult(AStore store) throws Exception {
 		Server peer=launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+		try (Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL)) {
 			String buildDeep="(loop [v 1 i 0] (if (< i "+DEEP+") (recur [v] (inc i)) v))";
 			Result deep=client.transact(buildDeep).get(WAIT,TimeUnit.SECONDS);
 			assertNull(deep.getErrorCode(),"the transaction succeeds");
@@ -598,8 +596,7 @@ public class InvalidPeerDataTest {
 
 	private void aDeeplyNestedTransactionIsExecuted(AStore store) throws Exception {
 		Server peer=launchPeer(store,LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+		try (Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL)) {
 			ACell deep=nested(DEEP,new ArrayList<>());
 			SignedData<ATransaction> tx=LOCAL.signData(Invoke.create(Init.GENESIS_ADDRESS,1,deep));
 			Result failed=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
@@ -898,8 +895,7 @@ public class InvalidPeerDataTest {
 	@Test
 	public void aTransactionWithInvalidStructureIsRejected() throws Exception {
 		Server peer=launchPeer(LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+		try (Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL)) {
 			SignedData<ATransaction> tx=LOCAL.signData(
 				Invoke.create(Init.GENESIS_ADDRESS,1,NodeServerTest.invalidVectorTree()));
 			Result rejected=client.transact(tx).get(WAIT,TimeUnit.SECONDS);
@@ -958,8 +954,7 @@ public class InvalidPeerDataTest {
 	@Test
 	public void aDeeplyNestedQueryIsAnswered() throws Exception {
 		Server peer=launchPeer(LOCAL);
-		try {
-			Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL);
+		try (Convex client=Convex.connect(peer,Init.GENESIS_ADDRESS,LOCAL)) {
 			ACell deep=nested(DEEP,new ArrayList<>());
 			assertNotNull(client.query(deep).get(WAIT,TimeUnit.SECONDS));
 			assertEquals(CVMLong.create(3),client.query("(+ 1 2)").get(WAIT,TimeUnit.SECONDS).getValue());
@@ -1028,9 +1023,13 @@ public class InvalidPeerDataTest {
 				for (Error error: errors) {
 					CompletableFuture<Void> secondLoop=new CompletableFuture<>();
 					AThreadedComponent component=throwingOnce(peer,error,secondLoop);
-					component.start();
-					secondLoop.get(WAIT,TimeUnit.SECONDS);
-					component.close();
+					try {
+						component.start();
+						secondLoop.get(WAIT,TimeUnit.SECONDS);
+					} finally {
+						// The peer does not know of this component, so closing the peer would not stop it
+						component.close();
+					}
 				}
 				assertTrue(peer.isRunning());
 			} finally {

@@ -345,9 +345,8 @@ public class MissingBeliefDataTest {
 	 */
 	@Test
 	public void anOutboundPeerConnectionServesDataRequests() throws Exception {
-		Server receiver=launchPeer(LOCAL);
-		Server sender=launchPeer(REMOTE_A);
-		try {
+		try (Server receiver=launchPeer(LOCAL);
+				Server sender=launchPeer(REMOTE_A)) {
 			Blob held=Blobs.createRandom(300);
 			Cells.persist(held,sender.getStore());
 
@@ -364,9 +363,6 @@ public class MissingBeliefDataTest {
 			Result result=reply.toResult();
 			assertFalse(result.isError(),result.toString());
 			assertEquals(held,((AVector<?>)result.getValue()).get(0));
-		} finally {
-			sender.close();
-			receiver.close();
 		}
 	}
 }

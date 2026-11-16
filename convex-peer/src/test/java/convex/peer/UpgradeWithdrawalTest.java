@@ -205,40 +205,40 @@ public class UpgradeWithdrawalTest {
 		// The peer stops before the scope closes
 		try (alerts; AutoCloseable stopping = () -> stop(s)) {
 			launchIsolated(s);
-			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
+			try (Convex convex = Convex.connect(s, GENESIS, PEER_KP)) {
+				// Early detection: the peer already knows an unsupported upgrade is
+				// scheduled, well before the activation and before it withdraws.
+				Migrations.UpgradeWarning warn = s.getUpgradeWarning();
+				assertEquals(unsupported, warn.version);
+				assertEquals(activation, warn.activation);
 
-			// Early detection: the peer already knows an unsupported upgrade is
-			// scheduled, well before the activation and before it withdraws.
-			Migrations.UpgradeWarning warn = s.getUpgradeWarning();
-			assertEquals(unsupported, warn.version);
-			assertEquals(activation, warn.activation);
+				// The peer's first block registers its hostname at the start instant
+				s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
 
-			// The peer's first block registers its hostname at the start instant
-			s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
+				// Normal operation before the boundary: a transaction confirms, version unchanged
+				Result r=transactAt(s, convex, clock, t0 + 2000, "(def a 1)");
+				assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
+				assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
+				assertFalse(s.isConsensusHalted());
 
-			// Normal operation before the boundary: a transaction confirms, version unchanged
-			Result r=transactAt(s, convex, clock, t0 + 2000, "(def a 1)");
-			assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
-			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
-			assertFalse(s.isConsensusHalted());
+				// Advance the clock past the activation. The next block is timestamped at
+				// or beyond the activation, so applying it fires the (missing) upgrade
+				// first — deterministically, from the controlled timestamp.
+				clock.set(activation + 1);
+				convex.transact("(def b 2)"); // fire-and-forget: this block never commits
 
-			// Advance the clock past the activation. The next block is timestamped at
-			// or beyond the activation, so applying it fires the (missing) upgrade
-			// first — deterministically, from the controlled timestamp.
-			clock.set(activation + 1);
-			convex.transact("(def b 2)"); // fire-and-forget: this block never commits
+				// Wait on the real halt signal (guaranteed to occur)
+				UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
+				assertEquals(unsupported, halt.getVersion());
+				assertTrue(s.isConsensusHalted());
 
-			// Wait on the real halt signal (guaranteed to occur)
-			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
-			assertEquals(unsupported, halt.getVersion());
-			assertTrue(s.isConsensusHalted());
+				// The peer stayed at the supported version and never applied the boundary
+				assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
 
-			// The peer stayed at the supported version and never applied the boundary
-			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
-
-			// Still alive for queries against the frozen state; b was never defined
-			assertFalse(convex.querySync("a").isError());
-			assertTrue(convex.querySync("b").isError());
+				// Still alive for queries against the frozen state; b was never defined
+				assertFalse(convex.querySync("a").isError());
+				assertTrue(convex.querySync("b").isError());
+			}
 		}
 		assertHaltLogged(alerts);
 	}
@@ -272,27 +272,28 @@ public class UpgradeWithdrawalTest {
 			long stake0 = s.getPeer().getConsensusState().getPeer(myKey).getPeerStake();
 			assertTrue(stake0 > 0);
 
-			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
-			// The peer's first block registers its hostname at the start instant
-			s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
+			try (Convex convex = Convex.connect(s, GENESIS, PEER_KP)) {
+				// The peer's first block registers its hostname at the start instant
+				s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
 
-			// Confirm a transaction deep in the withdrawal window (past any randomised instant,
-			// before the boundary). The peer decides whether to withdraw before filling the
-			// block, so any withdrawal would be in the same block as this transaction.
-			Result r=transactAt(s, convex, clock, activation - 60*1000, "(def a 1)");
-			assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
+				// Confirm a transaction deep in the withdrawal window (past any randomised instant,
+				// before the boundary). The peer decides whether to withdraw before filling the
+				// block, so any withdrawal would be in the same block as this transaction.
+				Result r=transactAt(s, convex, clock, activation - 60*1000, "(def a 1)");
+				assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
 
-			// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
-			// zero the stake; peer rewards may only increase it), and still operating.
-			assertTrue(s.getPeer().getConsensusState().getPeer(myKey).getPeerStake() >= stake0,
-					"last viable peer must not have withdrawn its stake");
-			assertFalse(s.isConsensusHalted());
+				// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
+				// zero the stake; peer rewards may only increase it), and still operating.
+				assertTrue(s.getPeer().getConsensusState().getPeer(myKey).getPeerStake() >= stake0,
+						"last viable peer must not have withdrawn its stake");
+				assertFalse(s.isConsensusHalted());
 
-			// It still freezes at the boundary
-			clock.set(activation + 1);
-			convex.transact("(def b 2)");
-			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
-			assertEquals(unsupported, halt.getVersion());
+				// It still freezes at the boundary
+				clock.set(activation + 1);
+				convex.transact("(def b 2)");
+				UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
+				assertEquals(unsupported, halt.getVersion());
+			}
 		}
 		assertHaltLogged(alerts);
 	}
@@ -300,9 +301,8 @@ public class UpgradeWithdrawalTest {
 	@Test
 	public void testHaltedPeerFreezesButServesQueries() throws Exception {
 		Server s = launchIsolatedPeer();
-		try {
-			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
-
+		// The client closes before the finally closes the peer
+		try (Convex convex = Convex.connect(s, GENESIS, PEER_KP)) {
 			// Consensus works before the halt
 			Result r = convex.transactSync("(def a 1)");
 			assertFalse(r.isError(), () -> "Setup transaction failed: " + r);

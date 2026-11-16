@@ -141,8 +141,18 @@ public class ServerCloseTest {
 
 	static Server launchWithFailingGoodbye(TrackingStore store, FailingGoodbye connection) throws Exception {
 		Server peer=createOwning(store,Map.of());
-		peer.launch();
-		assertTrue(peer.getConnectionManager().addConnection(REMOTE.getAccountKey(),connection));
+		try {
+			peer.launch();
+			assertTrue(peer.getConnectionManager().addConnection(REMOTE.getAccountKey(),connection));
+		} catch (Throwable e) {
+			// The caller gets no peer to close
+			try {
+				peer.close();
+			} catch (Throwable closeFailure) {
+				e.addSuppressed(closeFailure);
+			}
+			throw e;
+		}
 		store.armed=true;
 		return peer;
 	}
@@ -249,13 +259,13 @@ public class ServerCloseTest {
 	public void waitingForDeliveriesReturnsOnceTheyHaveFinished() throws Exception {
 		AKeyPair kp=InvalidPeerDataTest.LOCAL;
 		Server peer=InvalidPeerDataTest.launchPeer(kp);
+		AtomicBoolean waitReturned=new AtomicBoolean();
 		try {
 			SignedData<ATransaction> tx=kp.signData(Invoke.create(Init.GENESIS_ADDRESS,1,"(+ 1 2)"));
 			Block block=Block.of(InvalidPeerDataTest.blockTime(peer),tx);
 			BlockResult br=BlockResult.create(peer.getPeer().getConsensusState(),new Result[] {Result.value(CVMLong.create(3))});
 			Thread waiter=Thread.currentThread();
 			AtomicBoolean waiting=new AtomicBoolean();
-			AtomicBoolean waitReturned=new AtomicBoolean();
 			CompletableFuture<Result> delivered=new CompletableFuture<>();
 			AConnection client=new AConnection() {
 				@Override public boolean sendMessage(Message msg) { return trySendMessage(msg); }
@@ -284,6 +294,8 @@ public class ServerCloseTest {
 			assertTrue(finished,"the delivery finished before the wait returned");
 			assertEquals(CVMLong.create(3),delivered.get().getValue());
 		} finally {
+			// Releases a delivery still held if the test failed, so its thread ends
+			waitReturned.set(true);
 			peer.close();
 		}
 	}

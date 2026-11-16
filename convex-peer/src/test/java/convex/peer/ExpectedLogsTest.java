@@ -87,12 +87,17 @@ public class ExpectedLogsTest {
 			log.warn("Logged after close began");
 		});
 		other.start();
-		assertTrue(armed.await(5,TimeUnit.SECONDS));
-		CompletableFuture<Void> closing=CompletableFuture.runAsync(logs::close);
-		release.countDown();
-		closing.get(5,TimeUnit.SECONDS);
-		assertEquals(1,logs.records().size());
-		other.join();
+		try {
+			assertTrue(armed.await(5,TimeUnit.SECONDS));
+			CompletableFuture<Void> closing=CompletableFuture.runAsync(logs::close);
+			release.countDown();
+			closing.get(5,TimeUnit.SECONDS);
+			assertEquals(1,logs.records().size());
+		} finally {
+			// Releases the thread if the test failed before it did, so the join returns
+			release.countDown();
+			other.join();
+		}
 	}
 
 	@Test

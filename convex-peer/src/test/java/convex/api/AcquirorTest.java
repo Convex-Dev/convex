@@ -151,16 +151,21 @@ public class AcquirorTest {
 		try (BlockingWriteStore store = new BlockingWriteStore("Acquiror");
 				Acquiror acquiror = Acquiror.create(expected.getHash(), store, hashes ->
 					CompletableFuture.completedFuture(Result.create(null, Vectors.of(expected))))) {
-			CompletableFuture<ACell> acquired = acquiror.getFuture();
-			assertTrue(store.entered.await(5, TimeUnit.SECONDS),
-				"the worker should enter the controlled store write");
+			try {
+				CompletableFuture<ACell> acquired = acquiror.getFuture();
+				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
+					"the worker should enter the controlled store write");
 
-			acquiror.close();
-			store.release();
+				acquiror.close();
+				store.release();
 
-			assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
-			assertTrue(acquired.isCancelled());
-			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
+				assertTrue(acquiror.awaitTermination(5, TimeUnit.SECONDS));
+				assertTrue(acquired.isCancelled());
+				assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
+			} finally {
+				// Closing the acquiror does not wait for its worker, which stays held in the write until released
+				store.release();
+			}
 		}
 	}
 

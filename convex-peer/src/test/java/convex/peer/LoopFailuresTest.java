@@ -1,5 +1,6 @@
 package convex.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -89,8 +90,7 @@ public class LoopFailuresTest {
 				assertTrue(component.rounds.await(InvalidPeerDataTest.WAIT,TimeUnit.SECONDS),"the loop comes round after every failure");
 				assertTrue(peer.isRunning());
 			} finally {
-				component.close();
-				peer.close();
+				stop(component,peer);
 			}
 		}
 		logs.assertLogged(Level.ERROR,OWN_WORK.get(0));
@@ -111,11 +111,20 @@ public class LoopFailuresTest {
 				assertTimeoutPreemptively(Duration.ofSeconds(InvalidPeerDataTest.WAIT),() -> peer.waitForShutdown());
 				assertFalse(peer.isRunning());
 			} finally {
-				component.close();
-				peer.close();
+				stop(component,peer);
 			}
 		}
 		logs.assertLogged(Level.ERROR,failure);
+	}
+
+	/** Stops a component and waits for its thread, then closes its peer, each even if the other fails. */
+	private static void stop(FailingComponent component, Server peer) {
+		assertAll("Stop the component and close the peer",
+			() -> {
+				component.close();
+				component.awaitStopped();
+			},
+			peer::close);
 	}
 
 	/** The connection manager's loop carries on after a failure of its own upkeep. */
