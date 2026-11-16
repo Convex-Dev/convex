@@ -1359,7 +1359,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
-	 * Query tool should handle extremely long input.
+	 * Query tool evaluates a long form in full: a sum of 1001 terms.
 	 */
 	@Test
 	public void testQueryExtremelyLongInput() throws IOException, InterruptedException {
@@ -1370,23 +1370,19 @@ public class McpTest extends ARESTTest {
 		sb.append(")");
 		AMap<AString, ACell> args = Maps.of("source", sb.toString());
 		AMap<AString, ACell> responseMap = makeToolCall("query", args);
-		// Should either succeed or fail gracefully
-		ACell result = responseMap.get(McpProtocol.FIELD_RESULT);
-		ACell error = responseMap.get(McpProtocol.FIELD_ERROR);
-		assertTrue(result != null || error != null, "Long input should return result or error");
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertEquals(CVMLong.create(1001), RT.getIn(structured, "value"));
 	}
 
 	/**
-	 * Query tool should handle null bytes in input.
+	 * Query tool rejects a null byte in the source as a structured parse error.
 	 */
 	@Test
 	public void testQueryNullBytes() throws IOException, InterruptedException {
 		AMap<AString, ACell> args = Maps.of("source", "test\u0000value");
 		AMap<AString, ACell> responseMap = makeToolCall("query", args);
-		// Should handle gracefully - either succeed or return structured error
-		ACell result = responseMap.get(McpProtocol.FIELD_RESULT);
-		ACell error = responseMap.get(McpProtocol.FIELD_ERROR);
-		assertTrue(result != null || error != null, "Null bytes should be handled gracefully");
+		AMap<AString, ACell> structured = expectError(responseMap);
+		assertNotNull(RT.getIn(structured, "message"), "Null byte should be reported as a parse error");
 	}
 
 	/**
