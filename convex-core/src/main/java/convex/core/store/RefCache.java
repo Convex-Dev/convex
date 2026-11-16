@@ -17,7 +17,8 @@ import convex.core.data.RefSoft;
  *
  * <p>Admission checks happen on insertion, never on the hit path. Release/acquire
  * array access publishes newly constructed refs to concurrent readers. Collisions
- * and racing replacements may evict entries: this is a cache, not storage.</p>
+ * and racing replacements may evict entries: this is a cache, not storage. A
+ * replacement for the same hash never lowers its cached status.</p>
  */
 public final class RefCache {
 
@@ -74,7 +75,9 @@ public final class RefCache {
 	}
 	
 	/**
-	 * Stores a Ref in the cache
+	 * Stores a Ref in the cache. Never lowers the status cached for the same hash: a
+	 * live entry with a higher status is kept, and a cleared one passes its status to
+	 * a soft ref that replaces it.
 	 * @param ref Ref to store
 	 * @throws IllegalArgumentException if the ref is foreign or a direct ref
 	 * carries an unprovable storage claim
@@ -86,7 +89,17 @@ public final class RefCache {
 			throw new IllegalArgumentException("Stored cache refs must be bound to their store");
 		}
 		int ix=calcIndex(ref.getHash());
-		ENTRIES.setRelease(cache, ix, ref);
+		while (true) {
+			Ref<?> current=(Ref<?>) ENTRIES.getAcquire(cache, ix);
+			Ref<?> entry=ref;
+			if ((current!=null)&&(current.getStatus()>ref.getStatus())&&current.getHash().equals(ref.getHash())) {
+				// The store's flags only rise, so the higher status is the later evidence,
+				// whichever insertion arrives last
+				if (!(current instanceof RefSoft<?> soft)||soft.hasReference()) return;
+				if (ref instanceof RefSoft) entry=ref.withMinimumStatus(current.getStatus());
+			}
+			if (ENTRIES.compareAndSet(cache, ix, current, entry)) return;
+		}
 	}
 
 	private int calcIndex(Hash h) {

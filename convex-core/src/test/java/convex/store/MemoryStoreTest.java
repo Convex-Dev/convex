@@ -1,6 +1,7 @@
 package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -179,6 +180,56 @@ public class MemoryStoreTest {
 		Ref<?> persistedRef = ms.refForHash(setHash);
 		assertNotNull(persistedRef);
 		assertTrue(persistedRef.getStatus() >= Ref.PERSISTED);
+	}
+
+	/**
+	 * A STORED write that finishes after a PERSISTED write of the same value began
+	 * must not lower the status the store records for it. The novelty handler runs
+	 * inside the STORED write, after its first child and before its top cell is
+	 * recorded, so the PERSISTED write it makes stands in for one racing on
+	 * another thread.
+	 */
+	@Test
+	public void testRacingLowerWriteKeepsStatus() throws IOException {
+		MemoryStore ms = new MemoryStore();
+		Random r = new Random(5791);
+		AVector<ACell> value = Vectors.empty();
+		for (int i = 0; i < 10; i++) {
+			value = value.conj(Blob.createRandom(r, 200));
+		}
+		assertFalse(value.isEmbedded());
+		Hash hash = value.getHash();
+		final AVector<ACell> top = value;
+
+		boolean[] raced = {false};
+		Consumer<Ref<ACell>> handler = ref -> {
+			if (raced[0]) return;
+			raced[0] = true;
+			Ref<ACell> persisted = ms.storeTopRef(top.getRef(), Ref.PERSISTED, null);
+			assertEquals(Ref.PERSISTED, persisted.getStatus());
+		};
+		Ref<AVector<ACell>> stored = ms.storeTopRef(value.getRef(), Ref.STORED, handler);
+		assertTrue(raced[0]);
+
+		assertEquals(Ref.PERSISTED, ms.refForHash(hash).getStatus());
+		// The write's result reports what the store records, as Etch.write does
+		assertEquals(Ref.PERSISTED, stored.getStatus());
+	}
+
+	/**
+	 * A write records only the status it achieved in this store, not one the
+	 * incoming Ref carries from elsewhere.
+	 */
+	@Test
+	public void testWriteIgnoresIncomingStatus() {
+		MemoryStore ms = new MemoryStore();
+		Blob value = Blob.createRandom(new Random(7713), 300);
+		assertFalse(value.isEmbedded());
+		Ref<ACell> claimed = Ref.get((ACell) value).withMinimumStatus(Ref.ANNOUNCED);
+
+		Ref<ACell> stored = ms.storeTopRef(claimed, Ref.STORED, null);
+		assertEquals(Ref.STORED, stored.getStatus());
+		assertEquals(Ref.STORED, ms.refForHash(value.getHash()).getStatus());
 	}
 
 	@Test

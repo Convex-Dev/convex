@@ -392,7 +392,7 @@ public class Etch {
 	 *
 	 * @param key   A key value (typically the Hash)
 	 * @param value Value data to associate with the key
-	 * @return Ref after writing to store
+	 * @return Ref carrying the flags the store records for the key after the write
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized <T extends ACell> Ref<T> write(AArrayBlob key, Ref<T> value) throws IOException {
@@ -1023,11 +1023,11 @@ public class Etch {
 
 	/**
 	 * Updates a Ref in place at the specified position. Assumes data not changed.
-	 * 
+	 *
 	 * @param position Slot value containing position in storage file
-	 * @param ref
-	 * @return
-	 * @throws IOException
+	 * @param ref Ref whose flags are merged into the entry's
+	 * @return Ref carrying the flags the entry records after the merge
+	 * @throws IOException In case of IO error
 	 */
 	private <T extends ACell> Ref<T> updateInPlace(long position, Ref<T> ref) throws IOException {
 		// ensure we have a raw position
@@ -1043,8 +1043,9 @@ public class Etch {
 
 		long currentSize = Utils.readLong(label, Byte.BYTES, Long.BYTES);
 
+		// Nothing to write, but the caller's flags may claim less than the entry records
 		if (currentFlags == newFlags)
-			return ref;
+			return (ref.getFlags() == newFlags) ? ref : ref.withFlags(newFlags);
 
 		// We have a status change, need to increase status of store
 		label[0] = (byte) newFlags;

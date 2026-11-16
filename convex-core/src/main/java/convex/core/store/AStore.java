@@ -86,13 +86,15 @@ public abstract class AStore implements Closeable, Persister {
 
 	
 	/**
-	 * Gets the stored Ref for a given hash value, or null if not found in the store.
-	 * 
-	 * If the result is non-null, the Ref will have a status equal to STORED at minimum.
-	 * Calls to Ref.getValue() should therefore never throw MissingDataException.
-	 * 
-	 * @param hash A hash value to look up in the persisted store
-	 * @return The stored Ref, or null if the hash value is not persisted
+	 * Gets the Ref for a given hash value, or null if the store holds no entry for it
+	 * and has no decoded copy of it cached.
+	 *
+	 * A Ref for an entry the store holds has status STORED at minimum. With no such
+	 * entry, a store may return a cell it has decoded but not stored, at status UNKNOWN.
+	 * Calls to Ref.getValue() on the result never throw MissingDataException.
+	 *
+	 * @param hash A hash value to look up in the store
+	 * @return The Ref, or null if the store neither holds nor caches the value
 	 */
 	public abstract <T extends ACell> Ref<T> refForHash(Hash hash);
 
