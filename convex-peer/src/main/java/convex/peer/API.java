@@ -25,6 +25,7 @@ import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 
 
 /**
@@ -147,7 +148,6 @@ public class API {
 		if (count==0) throw new IllegalArgumentException("At least one peer key pair is required");
 
 		List<Server> serverList = new ArrayList<Server>();
-		boolean launched=false;
 
 		Map<Keyword, Object> config = new HashMap<>();
 
@@ -202,12 +202,17 @@ public class API {
 				throw new LaunchException("Error setting up peer connections",e);
 			}
 
-			launched=true;
 			return serverList;
-		} finally {
-			if (!launched) {
-				for (int i=serverList.size()-1; i>=0; i--) serverList.get(i).close();
+		} catch (Throwable e) {
+			// Every launched peer is closed; the launch failure stays primary
+			Cleanup cleanup=new Cleanup();
+			for (int i=serverList.size()-1; i>=0; i--) cleanup.run(serverList.get(i)::close);
+			try {
+				cleanup.finish();
+			} catch (Throwable closeFailure) {
+				e.addSuppressed(closeFailure);
 			}
+			throw e;
 		}
 	}
 

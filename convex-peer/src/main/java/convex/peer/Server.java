@@ -62,6 +62,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
@@ -480,13 +481,15 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Launch the Peer Server, including all main server threads
-	 * @throws InterruptedException 
+	 * Launch the Peer Server, including all main server threads. A launch that fails
+	 * closes this Server.
+	 * @throws LaunchException if the launch fails, or this Server has been closed
+	 * @throws InterruptedException if interrupted while launching
 	 */
 	public synchronized void launch() throws LaunchException, InterruptedException {
+		if (closed) throw new LaunchException("Server has been closed");
 		if (isRunning) return; // in case of double launch
 		isRunning=true;
-		boolean launched=false;
 		try {
 			// Establish Peer state
 			Peer peer = establishPeer();
@@ -547,14 +550,24 @@ public class Server implements Closeable {
 
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
-			launched=true;
 		} catch (ConfigException e) {
-			throw new LaunchException("Launch failed due to config problem: "+e,e);
+			throw closeAfterFailedLaunch(new LaunchException("Launch failed due to config problem: "+e,e));
 		} catch (IOException e) {
-			throw new LaunchException("Launch failed due to IO Error: "+e,e);
-		} finally {
-			if (!launched) close(false);
+			throw closeAfterFailedLaunch(new LaunchException("Launch failed due to IO Error: "+e,e));
+		} catch (Throwable e) {
+			closeAfterFailedLaunch(e);
+			throw e;
 		}
+	}
+
+	/** Closes this Server after a failed launch, keeping the launch failure primary. */
+	private <T extends Throwable> T closeAfterFailedLaunch(T failure) {
+		try {
+			close(false);
+		} catch (Throwable e) {
+			failure.addSuppressed(e);
+		}
+		return failure;
 	}
 
 	private void goLive() {
@@ -945,8 +958,11 @@ public class Server implements Closeable {
 	/**
 	 * Future to complete with timestamp at time of shutdown
 	 */
-	private CompletableFuture<Long> shutdownFuture=new CompletableFuture<Long>(); 
-	
+	private CompletableFuture<Long> shutdownFuture=new CompletableFuture<Long>();
+
+	/** Set by the first close, under this Server's lock, which launch also holds */
+	private boolean closed;
+
 	@Override
 	public void close() {
 		close(true);
@@ -975,62 +991,64 @@ public class Server implements Closeable {
 		});
 	}
 
-	/** Performs normal shutdown, optionally writing a final peer checkpoint. */
+	/**
+	 * Performs normal shutdown, optionally writing a final peer checkpoint. Every step
+	 * runs whatever an earlier one threw; the first failure is thrown at the end.
+	 */
 	private synchronized void close(boolean persist) {
-		removeShutdownHook();
-		if (!isRunning) {
-			isLive=false;
-			manager.close();
-			nio.close();
-			if (tls!=null) tls.close();
-			closeOwnedStore();
-			shutdownFuture.complete(Utils.getCurrentTimestamp());
-			return;
-		}
+		if (closed) return;
+		closed=true;
+		// Only a launched Server has state to checkpoint
+		boolean launched=isRunning;
 		Peer startingPeer=getPeer();
 		AccountKey peerKey=(startingPeer==null)?null:startingPeer.getPeerKey();
 		log.debug("Peer shutdown starting for {}",peerKey);
 		isLive=false;
 		isRunning = false;
 
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(this::removeShutdownHook);
+
 		// Close manager, we don't want any management actions during shutdown!
-		manager.close();
+		cleanup.run(manager::close);
 
 		// Stop ingress before worker/store shutdown.
-		nio.close();
-		if (tls!=null) tls.close();
+		cleanup.run(nio::close);
+		if (tls!=null) cleanup.run(tls::close);
 
 		// Shut down propagator, no point sending any more Beliefs
-		propagator.close();
-		
-		queryHandler.close();
-		transactionHandler.close();
-		executor.close();
+		cleanup.run(propagator::close);
+		cleanup.run(queryHandler::close);
+		cleanup.run(transactionHandler::close);
+		cleanup.run(executor::close);
 
+		cleanup.run(() -> stopComponentsAndCheckpoint(persist&&launched));
+		cleanup.run(this::closeOwnedStore);
+		log.info("Peer shutdown complete for {}",peerKey);
+		// Last: a caller waiting for shutdown may then rely on everything above
+		shutdownFuture.complete(Utils.getCurrentTimestamp());
+		cleanup.finish();
+	}
+
+	/** Waits for the closed components to stop, then writes the final checkpoint if asked. */
+	private void stopComponentsAndCheckpoint(boolean persist) {
 		boolean writersStopped=awaitComponentsStopped(
 			queryHandler,propagator,transactionHandler,executor);
-		
-		Peer peer=getPeer();
-		// persist peer state if necessary
-		if (persist && (peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))
-				&&writersStopped) {
-			try {
-				executor.persistPeerData();
-				// Normal state publication remains buffered. An orderly shutdown is
-				// the durability boundary for the Peer-owned root.
-				store.flush();
-			} catch (IOException e) {
-				log.error("Unable to complete final Peer checkpoint in "+store
-						+"; the store may require operator recovery",e);
-			}
-		} else if (persist && (peer!=null)&&!Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
+		if (!persist || (getPeer()==null) || Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) return;
+		if (!writersStopped) {
 			log.error("Peer writers did not stop cleanly; skipping the final checkpoint for "
 					+store+" and leaving recovery to the operator");
+			return;
 		}
-
-		closeOwnedStore();
-		log.info("Peer shutdown complete for {}",peerKey);
-		shutdownFuture.complete(Utils.getCurrentTimestamp());
+		try {
+			executor.persistPeerData();
+			// Normal state publication remains buffered. An orderly shutdown is
+			// the durability boundary for the Peer-owned root.
+			store.flush();
+		} catch (IOException e) {
+			log.error("Unable to complete final Peer checkpoint in "+store
+					+"; the store may require operator recovery",e);
+		}
 	}
 
 	private void removeShutdownHook() {
