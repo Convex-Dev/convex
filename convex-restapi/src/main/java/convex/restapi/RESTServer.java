@@ -46,6 +46,7 @@ import convex.restapi.auth.OAuthService;
 import convex.restapi.auth.VenueIdentity;
 import convex.restapi.handler.GracefulStop;
 import convex.restapi.handler.HttpMethodFilter;
+import convex.restapi.handler.RequestBody;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpServer;
 import convex.restapi.web.AuthPage;
@@ -85,8 +86,8 @@ public class RESTServer implements Closeable {
 	protected final AdminAuthorizer adminAuthorizer;
 	/** Configured maximum size of a structured REST request body (bytes). */
 	protected final long maxRequestBytes;
-	/** Bytes of an oversized body to drain before rejecting; see {@link #drainRejectedBody}. */
-	protected final long oversizeDrainBytes;
+	/** Most bytes of a request body read before responding: the ceiling plus {@link #DRAIN_SLACK_BYTES}. */
+	protected final long drainBytes;
 	/** Global admission control bounding concurrent short-lived requests. */
 	protected final Semaphore requestPermits;
 	protected Javalin javalin;
@@ -97,7 +98,7 @@ public class RESTServer implements Closeable {
 	protected static final Integer DEFAULT_PORT=8080;
 	/** Default hard ceiling for structured REST request bodies (see {@code rest.maxRequestBytes}). */
 	public static final long MAX_REQUEST_BODY_BYTES=RESTConfig.DEFAULT_MAX_REQUEST_BYTES;
-	/** Extra bytes drained beyond the body ceiling before a rejection is answered. */
+	/** Bytes read beyond the body ceiling before responding, so a body just over it still gets its 413. */
 	static final long DRAIN_SLACK_BYTES=65536L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
@@ -147,7 +148,7 @@ public class RESTServer implements Closeable {
 		this.convex = ConvexLocal.create(server);
 		this.publicQueryService = new PublicQueryService(server, restConfig);
 		this.maxRequestBytes = restConfig.getMaxRequestBytes();
-		this.oversizeDrainBytes = maxRequestBytes + DRAIN_SLACK_BYTES;
+		this.drainBytes = maxRequestBytes + DRAIN_SLACK_BYTES;
 		long maxRequests = restConfig.getMaxConcurrentRequests();
 		this.requestPermits = new Semaphore((int) Math.min(Integer.MAX_VALUE, Math.max(1L, maxRequests)));
 		String baseUrl=restConfig.getBaseUrl();
@@ -457,41 +458,6 @@ public class RESTServer implements Closeable {
 	}
 
 	/**
-	 * Reads and discards a bounded prefix of a request body we are about to reject, so the
-	 * connection can be closed gracefully and the 413 survives.
-	 *
-	 * <p>Closing a connection that still holds unread body data resets it rather than
-	 * closing gracefully, and a reset makes the client's TCP stack discard its receive
-	 * buffer — including the 413 already written. Draining first lets the close be graceful
-	 * so the status actually arrives. Bounded (body ceiling plus {@link #DRAIN_SLACK_BYTES})
-	 * so a rejected request never costs more to read than a legal one.</p>
-	 *
-	 * <p>Does nothing when the client offered {@code Expect: 100-continue}: it is waiting
-	 * for permission and has sent no body, so there is nothing to drain — and touching the
-	 * stream would make Jetty invite it to send the very body being rejected.</p>
-	 *
-	 * @param ctx Request context for the rejected request
-	 * @param oversizeDrainBytes Maximum bytes to read and discard
-	 */
-	private static void drainRejectedBody(io.javalin.http.Context ctx, long oversizeDrainBytes) {
-		String expect=ctx.header("Expect");
-		if ((expect!=null)&&expect.toLowerCase().contains("100-continue")) return;
-		try {
-			java.io.InputStream in=ctx.req().getInputStream();
-			byte[] buffer=new byte[8192];
-			long remaining=oversizeDrainBytes;
-			while (remaining>0) {
-				int n=in.read(buffer,0,(int)Math.min(buffer.length,remaining));
-				if (n<0) break;
-				remaining-=n;
-			}
-		} catch (java.io.IOException e) {
-			// Client vanished mid-drain. Answering it is best-efforts by nature, and the
-			// 413 below still runs; nothing here should mask the rejection.
-		}
-	}
-
-	/**
 	 * Whether a request is a long-lived stream excluded from the global admission cap.
 	 * The query-watch and log-watch SSE endpoints hold their connection open, and the MCP
 	 * SSE stream (the GET on {@code /mcp}) keeps its own connection cap (#659); short-lived
@@ -521,15 +487,24 @@ public class RESTServer implements Closeable {
 			ctx.attribute(REQUEST_PERMIT_ATTR, Boolean.TRUE);
 		});
 		routes.after(ctx -> {
-			if (ctx.attribute(REQUEST_PERMIT_ATTR)!=null) requestPermits.release();
+			if (ctx.attribute(REQUEST_PERMIT_ATTR)==null) return;
+			try {
+				// Before the response is written: Jetty resets a connection whose body is
+				// still arriving, and the reset makes the client discard the response.
+				// Within the permit, as reading is part of answering; a shed request is not
+				// read. Bounded, so no request costs more to read than a legal one.
+				RequestBody.discardRest(ctx, drainBytes);
+			} finally {
+				requestPermits.release();
+			}
 		});
 
-		// Reject a known oversized body before a handler starts parsing it. Requests
-		// without Content-Length are still bounded while read by RequestBody.
+		// Reject a known oversized body before a handler starts parsing it; the after
+		// handler reads it within its bound, so the 413 arrives. Requests without
+		// Content-Length are still bounded while read by RequestBody.
 		routes.before(ctx -> {
 			long contentLength=ctx.req().getContentLengthLong();
 			if (contentLength>maxRequestBytes) {
-				drainRejectedBody(ctx, oversizeDrainBytes);
 				throw new ContentTooLargeResponse("Request body exceeds maximum size of "
 						+maxRequestBytes+" bytes");
 			}

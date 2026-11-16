@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep the consensus data verified peers send each other, so they no longer fetch it again. ([CPoS scheduling](convex-peer/docs/PROPAGATION.md#cpos-scheduling))
 - Correct Convex DB's SQL results, binary data and prepared statements across transactions, and report errors with SQLSTATE codes. ([#836](https://github.com/Convex-Dev/convex/issues/836))
 - Keep lattice edits that retry after a conflict, and stop long-running lattice applications holding saved data in memory. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
+- Deliver REST error responses, such as 401 and 404, to clients still sending a request body, rather than dropping the connection.
 
 ## [0.8.19] - 2026-11-07
 
