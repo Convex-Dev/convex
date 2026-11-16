@@ -540,8 +540,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			try {
 				ACell payload=m.getPayload(getStore());
 				// Before merging, which keeps only what it takes: the sender counts every
-				// cell as announced and leaves it out of the updates that follow
-				stageUpdate(payload);
+				// cell as announced and leaves it out of the updates that follow. Only from
+				// a verified link, as for DATA
+				AConnection connection=m.getConnection();
+				if ((connection!=null)&&connection.isTrusted()) stageUpdate(payload);
 				return mergeBeliefValue(orders,payload,m);
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());
@@ -708,9 +710,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Fetches what an update lacks from the connection it arrived on: whoever sent a
 	 * delta holds everything it refers to (CAD015). At most one fetch is outstanding.
 	 * A miss while one is under way is ignored, because the same Orders usually arrive
-	 * soon from other peers. The update's own cells were kept when it was received, so
-	 * normally only what it left out is requested. Once that has arrived the update is
-	 * queued again to merge.
+	 * soon from other peers. The update's own cells are stored first, if they were not
+	 * kept when it was received, so only what it left out is requested. Once that has
+	 * arrived the update is queued again to merge.
 	 * A fetch that fails, or takes longer than the poll delay, is dropped.
 	 *
 	 * <p>The request goes only to the sender, so a sender that never answers delays
@@ -724,7 +726,8 @@ public class BeliefPropagator extends AThreadedComponent {
 		if (!fetching.compareAndSet(false,true)) return;
 		try {
 			AStore store=getStore();
-			ACell update=m.getPayload(store);
+			// Kept on receipt only from a verified link; storing again is then a lookup
+			ACell update=Cells.store(m.getPayload(store),store);
 			long timeout=server.getConnectionManager().getPollDelay();
 			Acquiror acquiror=Acquiror.fromMessages(update.getHash(),store,hashes ->
 				connection.request(Message.createDataRequest(null,hashes),timeout));

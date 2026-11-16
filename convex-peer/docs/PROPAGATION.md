@@ -107,19 +107,20 @@ decision, not the data layer's.
 
 A delta leaves out every cell its sender has announced before, to anyone: the
 record of what has been announced is per store, not per receiver. A receiver
-therefore keeps every cell an update carries as it takes the update off its
-queue, before merging and whatever the merge takes from it. A merge takes only
-the Orders it uses, yet the sender's later updates leave out all the rest too:
-an Order older than one the receiver holds, the receiver's own Order as the
-sender saw it, and the Belief's own cells, which an unchanged Belief repeated as
-a keepalive refers to. Keeping them is staging, as for DATA; a failure to keep
-them is logged and the merge goes ahead.
+therefore keeps every cell an update from a verified link carries as it takes
+the update off its queue, before merging and whatever the merge takes from it. A
+merge takes only the Orders it uses, yet the sender's later updates leave out all
+the rest too: an Order older than one the receiver holds, the receiver's own
+Order as the sender saw it, and the Belief's own cells, which an unchanged
+Belief repeated as a keepalive refers to. Keeping them is staging, as for DATA
+([PEER_PRIORITY.md](PEER_PRIORITY.md)); a failure to keep them is logged and the
+merge goes ahead.
 
 A receiver can still lack cells an update refers to. It may not have been
 connected when they were first sent (a peer broadcasts as soon as it starts,
 while its connections are still opening), a queue may have refused the update
-that carried them, or the update's DATA may have come on a link the receiver had
-not yet verified, and been ignored ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
+that carried them, or the update or its DATA may have come on a link the
+receiver had not yet verified, and not been kept.
 
 Such an update ends in a request rather than a timer. `BeliefPropagator` fetches
 what the update lacks from the connection it arrived on, and queues the update

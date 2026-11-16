@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -44,8 +45,9 @@ import convex.core.store.MemoryStore;
 import convex.net.Transports;
 
 /**
- * A peer stores DATA only from connections it has verified as a staked peer's own
- * outbound link to it, and verifies a connection when it sends a Belief or DATA.
+ * A peer stores the cells pushed to it, as DATA or in a Belief, only from connections it
+ * has verified as a staked peer's own outbound link to it, and verifies a connection
+ * when it sends a Belief or DATA.
  */
 public class InboundVerificationTest {
 	static final AKeyPair LOCAL=AKeyPair.createSeeded(150);
@@ -119,25 +121,40 @@ public class InboundVerificationTest {
 		}
 	}
 
-	/** DATA from a trusted key that no longer has the minimum stake is not stored. */
+	/**
+	 * A Belief from an unverified connection has only what the merge takes stored; one
+	 * from a trusted connection has every cell it carries stored.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
 	@Test
-	public void dataFromAKeyWithoutStakeIsNotStored() throws Exception {
+	public void beliefCellsAreKeptOnlyFromTrustedConnections() throws Exception {
 		Server peer=launch(LOCAL);
 		try {
-			Blob value=Blobs.createRandom(400);
-			Message sent=data(value);
-			CompletableFuture<Message> staged=new CompletableFuture<>();
-			peer.getBeliefPropagator().setDataStageObserver(staged::complete);
+			LinkedBlockingQueue<SignedData<Order>> merged=new LinkedBlockingQueue<>();
+			peer.getBeliefPropagator().setOrderUpdateObserver(merged::add);
+			long ts=InvalidPeerDataTest.blockTime(peer);
 
-			LocalConnection unstaked=connect(peer,m -> true);
-			unstaked.getPaired().setTrustedKey(UNSTAKED.getAccountKey());
-			unstaked.sendMessage(sent);
+			// Beside a good Order, so that its merge shows the whole Belief was handled
+			SignedData<?> notKept=UNSTAKED.signData(Blobs.createRandom(1000));
+			SignedData<Order> goodB=InvalidPeerDataTest.order(REMOTE_B,1,InvalidPeerDataTest.block(REMOTE_B,ts));
+			connect(peer,m -> true).sendMessage(belief(Belief.create(goodB,(SignedData)notKept)));
+			assertEquals(goodB,merged.poll(WAIT,TimeUnit.SECONDS));
+			assertNull(peer.getStore().refForHash(notKept.getValue().getHash()));
 
-			staged.get(WAIT,TimeUnit.SECONDS);
-			assertNull(peer.getStore().refForHash(value.getHash()));
+			SignedData<?> kept=UNSTAKED.signData(Blobs.createRandom(1000));
+			SignedData<Order> goodA=InvalidPeerDataTest.order(REMOTE_A,1,InvalidPeerDataTest.block(REMOTE_A,ts));
+			LocalConnection trusted=connect(peer,m -> true);
+			trusted.getPaired().setTrustedKey(REMOTE_A.getAccountKey());
+			trusted.sendMessage(belief(Belief.create(goodA,(SignedData)kept)));
+			assertEquals(goodA,merged.poll(WAIT,TimeUnit.SECONDS));
+			assertNotNull(peer.getStore().refForHash(kept.getValue().getHash()));
 		} finally {
 			peer.close();
 		}
+	}
+
+	static Message belief(Belief b) {
+		return MissingBeliefDataTest.wire(Message.createBelief(b));
 	}
 
 	/**

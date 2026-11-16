@@ -929,8 +929,8 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * An update whose cells run out of memory as the peer keeps them on receipt is merged
-	 * all the same: keeping them only spares later fetches.
+	 * An update from a trusted connection whose cells run out of memory as the peer keeps
+	 * them on receipt is merged all the same: keeping them only spares later fetches.
 	 */
 	@Test
 	public void anUpdateThatRunsOutOfMemoryAsItIsKeptIsStillMerged() throws Exception {
@@ -944,7 +944,7 @@ public class InvalidPeerDataTest {
 				SignedData<Order> good=order(REMOTE_B,1,block(REMOTE_B,blockTime(peer)));
 				Belief belief=Belief.create(good);
 				store.failOnce(belief.getHash(),error);
-				connect(peer).sendMessage(wire(Message.createBelief(belief)));
+				connectAs(peer,REMOTE_A).sendMessage(wire(Message.createBelief(belief)));
 
 				Belief merged=updates.poll(WAIT,TimeUnit.SECONDS);
 				assertNotNull(merged,"the good Order is merged");

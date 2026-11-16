@@ -24,7 +24,7 @@ import convex.core.message.Message;
 
 /**
  * Establishes which connections opened to this peer come from staked peers, so that
- * the DATA they send is stored. Owned by {@link Server}.
+ * the cells they push, as DATA or in a Belief, are stored. Owned by {@link Server}.
  *
  * <p>An untrusted connection is challenged when it sends a Belief or DATA. It becomes
  * trusted when its far end gives the bound answer

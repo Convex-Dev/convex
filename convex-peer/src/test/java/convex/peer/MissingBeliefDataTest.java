@@ -47,8 +47,8 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 
 /**
- * A peer keeps every cell a Belief or Order update carries, so later updates that leave
- * them out as already announced need no fetch. One that still cannot be decoded,
+ * A peer keeps every cell a Belief or Order update from a trusted link carries, so later
+ * updates that leave them out as already announced need no fetch. One that still cannot be decoded,
  * because the sender left out cells it announced before, is completed by a fetch from
  * the sender rather than waiting for the peer's next poll.
  */
@@ -180,8 +180,8 @@ public class MissingBeliefDataTest {
 
 	/**
 	 * A peer that already holds a newer Order from A, relayed by another peer, does not
-	 * merge A's own update for an older one, but keeps it: A counts that Order as
-	 * announced and leaves it out of the Belief it sends next.
+	 * merge A's own update, from A's trusted link, for an older one, but keeps it: A
+	 * counts that Order as announced and leaves it out of the Belief it sends next.
 	 */
 	@Test
 	public void anOrderNotMergedIsKeptForTheUpdatesThatReferToIt() throws Exception {
@@ -204,6 +204,8 @@ public class MissingBeliefDataTest {
 			propagator.setOrderUpdateObserver(merged::add);
 			LocalConnection relayEnd=connect(peer,SILENT);
 			LocalConnection senderEnd=connect(peer,SILENT);
+			// Trusted as A's own link, so that what it sends is kept
+			senderEnd.getPaired().setTrustedKey(REMOTE_A.getAccountKey());
 			for (Message m: relayed) relayEnd.sendMessage(wire(m));
 			for (Message m: own) senderEnd.sendMessage(wire(m));
 			for (Message m: belief) senderEnd.sendMessage(wire(m));

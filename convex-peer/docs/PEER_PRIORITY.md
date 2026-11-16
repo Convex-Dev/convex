@@ -41,9 +41,10 @@ consensus:
 2. **Cheap rejection.** `BeliefPropagator` drops an Order from a key that is not a staked
    peer before checking its signature or storing it, and an Order no newer than the one
    it holds before checking its signature. A bad signature ends processing of the message
-   carrying it. The exception is an update with data missing that this peer fetches: its
-   cells, and whatever the fetch brings, are stored before any Order in it is judged, as
-   pushed DATA is. With one fetch at a time, that is one update at a time.
+   carrying it. An update's cells are stored before any Order in it is judged in two
+   cases: it came on a trusted connection ([Inbound Connections](#inbound-connections)),
+   or it has data missing that this peer fetches, when its cells and whatever the fetch
+   brings are stored. With one fetch at a time, the second is one update at a time.
 3. **A bounded queue.** Pushed Beliefs from every connection, and DATA from trusted
    connections, share one ordered queue, bounded by count and bytes. When it is full,
    further pushes are dropped; the connection is never paused for them.
@@ -57,8 +58,8 @@ rate at worst.
 
 | Message | Handling |
 |---------|----------|
-| BELIEF | Joins the propagation queue, whoever sent it. From an untrusted connection, it also starts verification of that connection |
-| DATA | From a trusted connection, joins the propagation queue, and its cells are stored if the connection's key still has the minimum effective stake; they count only once a valid Belief refers to them. From any other connection, ignored, and starts verification |
+| BELIEF | Joins the propagation queue, whoever sent it, and its Orders are judged on their own. The cells it carries are stored on receipt only from a trusted connection. From an untrusted connection, it also starts verification of that connection |
+| DATA | From a trusted connection, joins the propagation queue, and its cells are stored; they count only once a valid Belief refers to them. From any other connection, ignored, and starts verification |
 | CHALLENGE | Answered with this peer's key, so whoever opened the connection can verify it |
 | RESULT | Completes this peer's request on that connection, a challenge or a fetch of missing data; any other is ignored (CAD015) |
 
@@ -76,8 +77,10 @@ other peers answer such requests from its store.
    answering connection was opened to reach. Only a peer's own outbound link gives this
    form ([Outbound Connections](#outbound-connections-challengeresponse)); a server's
    answer has three elements and is not accepted.
-3. On success, the connection's trusted key is set. DATA from it is then stored, and it
-   gets the trusted treatment for replies ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
+3. On success, the connection's trusted key is set. DATA from it, and the cells its
+   Beliefs carry, are then stored, and it gets the trusted treatment for replies
+   ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)). Stake is checked here, once:
+   whatever the connection sends later is judged, as from anyone, when it is merged.
 
 On a network thread the verifier only checks whether to start: whether the connection is
 trusted, has an attempt in flight, or is backing off. Signing, sending, waiting up to 5 s

@@ -27,7 +27,6 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
-import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
@@ -165,7 +164,7 @@ public class Server implements Closeable {
 	protected final QueryHandler queryHandler=new QueryHandler(this);
 
 	/**
-	 * Verifies connections opened to this peer, so that DATA from staked peers is stored
+	 * Verifies connections opened to this peer, so that the cells staked peers push are stored
 	 */
 	private final InboundVerifier verifier=new InboundVerifier(this);
 
@@ -667,14 +666,9 @@ public class Server implements Closeable {
 
 	/**
 	 * Stores the cells of a DATA message from a trusted connection, on the Belief
-	 * propagator thread. Ignores it if the connection's key no longer has the minimum
-	 * stake.
+	 * propagator thread.
 	 */
 	void stageData(Message message) throws IOException, BadFormatException {
-		AConnection connection=message.getConnection();
-		AccountKey sender=(connection==null)?null:connection.getTrustedKey();
-		// Here, not on the I/O thread: the State lookup may load cells from the store
-		if (sender==null || !BeliefMerge.isValidPeer(getState(),sender)) return;
 		AVector<?> payload=RT.ensureVector(message.getPayload());
 		// Bounded by the inbound message length only: novelty has no cell-count limit
 		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
@@ -900,8 +894,9 @@ public class Server implements Closeable {
 	/**
 	 * Process an incoming message that represents a Belief. Whoever sent it, each
 	 * Order it carries is judged on its own (signature, stake and age), so it joins the
-	 * ordered propagation queue behind any DATA from the same connection. A Belief from
-	 * an untrusted connection also starts verification of that connection.
+	 * ordered propagation queue behind any DATA from the same connection. The cells it
+	 * carries are kept only if the connection is trusted. A Belief from an untrusted
+	 * connection also starts verification of that connection.
 	 * @param m Belief message to process
 	 * @return true if queued, false if the queue is full and the Belief was dropped
 	 */
