@@ -284,6 +284,38 @@ public class MapsTest {
 		result.validate();
 	}
 
+	/**
+	 * mergeDifferences of a leaf with a tree, at the root or as children below it, calls the
+	 * function only for keys whose values differ, and gives the receiver itself when the result
+	 * equals it
+	 */
+	@Test
+	public void testLeafMergeDifferencesWithTree() {
+		AHashMap<CVMLong,CVMLong> leaf=Maps.empty(), small=Maps.empty(), big=Maps.empty();
+		for (long i=0; i<300; i++) {
+			CVMLong k=CVMLong.create(i);
+			if (i<5) leaf=leaf.assoc(k,k);
+			if (i<40) small=small.assoc(k,k);
+			big=big.assoc(k,k);
+		}
+		assertTrue(leaf instanceof MapLeaf);
+		// The small tree's children are leaves, the big tree's are trees
+		assertTrue(small instanceof MapTree);
+		assertTrue(big instanceof MapTree);
+
+		java.util.List<CVMLong> calledOnBoth=new java.util.ArrayList<>();
+		MergeFunction<CVMLong> firstOnly=new MergeFunction<>() {
+			@Override public CVMLong merge(CVMLong a, CVMLong b) {
+				if ((a!=null)&&(b!=null)) calledOnBoth.add(a);
+				return (b==null)?a:null;
+			}
+		};
+		// Every shared key has the same value, so only the receiver's keys remain
+		assertSame(leaf,leaf.mergeDifferences(big,firstOnly));
+		assertSame(small,small.mergeDifferences(big,firstOnly));
+		assertTrue(calledOnBoth.isEmpty());
+	}
+
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
 		ATransaction trans=Transfer.create(InitTest.HERO,0, InitTest.HERO, 58);
