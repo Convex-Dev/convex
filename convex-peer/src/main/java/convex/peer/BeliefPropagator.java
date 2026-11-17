@@ -730,6 +730,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		AConnection connection=m.getConnection();
 		if ((connection==null)||!connection.supportsMessage()) return;
 		if (!fetching.compareAndSet(false,true)) return;
+		CompletableFuture<Object> fetch=new CompletableFuture<>();
 		try {
 			AStore store=getStore();
 			// Kept on receipt only from a verified link; storing again is then a lookup
@@ -740,7 +741,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			fetchAcquiror=acquiror;
 			// A close that ran before the line above found no fetch to stop
 			if (closed) acquiror.close();
-			missingDataFetch=acquiror.<ACell>getFuture()
+			// Before the acquisition starts, as its thread sends the request: whoever sees
+			// the request then finds this fetch
+			missingDataFetch=fetch;
+			acquiror.<ACell>getFuture()
 				.orTimeout(timeout,TimeUnit.MILLISECONDS)
 				.handle((value,error) -> {
 					acquiror.close();
@@ -753,11 +757,15 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (error instanceof ValidationException bad) server.getConnectionManager().handleBadInput(connection,bad);
 					}
 					return null;
+				})
+				.whenComplete((done,error) -> {
+					if (error==null) fetch.complete(done); else fetch.completeExceptionally(error);
 				});
 		} catch (Throwable e) {
 			// Any failure starting this update's fetch drops it, and must clear the flag
 			// or no later fetch could start. First, so that holds even for a JVM failure
 			fetching.set(false);
+			fetch.complete(null);
 			Utils.checkRequestFailure(e);
 			fetchFailures.log(e,"Unable to fetch missing update data");
 		}
