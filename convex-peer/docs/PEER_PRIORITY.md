@@ -111,7 +111,7 @@ Lattice nodes verify connections opened to them in their own way; see
 
 | Component | Role |
 |-----------|------|
-| `AConnection.isTrusted()` / `setTrustedKey()` | Set by `ConvexRemote.setVerifiedPeer()`, on a link this peer opened |
+| `AConnection.isTrusted()` / `setTrustedKey()` | Set by `AConvexConnected.setVerifiedPeer()`, on a link this peer opened |
 | `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |

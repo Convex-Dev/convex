@@ -444,7 +444,6 @@ The implementation replaces, rather than wraps:
 
 - `Server.deliverMessage`;
 - the initial routing responsibility of `Server.processMessage`;
-- the blocking `Server.receiveAction` retry wrapper;
 - the accepted-Netty delivery function;
 - the outbound `NettyConnection` consumer wrapper;
 - decode inside outbound result-future continuations.
@@ -477,8 +476,7 @@ High and low water marks are distinct to avoid rapidly toggling `autoRead`.
   capable of returning per-channel backpressure.
 - Give accepted Peer-server and outbound client connections explicit route
   profiles.
-- Replace `Server.deliverMessage`, `Server.receiveAction` and the duplicated
-  initial routing path.
+- Replace `Server.deliverMessage` and the duplicated initial routing path.
 - Add a bounded control handler.
 - Add non-blocking capacity signals to the transaction, query and control
   destinations.
