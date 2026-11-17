@@ -361,9 +361,9 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 	
 	@Override
-	protected AHashSet<T>  mergeWith(AHashSet<T>  b, int setOp, int shift) {
-		if (b instanceof SetLeaf) return mergeWith((SetLeaf<T>) b, setOp,shift);
-		if (b instanceof SetTree) return b.mergeWith(this, reverseOp(setOp),shift);
+	protected AHashSet<T>  mergeWith(AHashSet<T>  b, int setOp, int prefix) {
+		if (b instanceof SetLeaf) return mergeWith((SetLeaf<T>) b, setOp, prefix);
+		if (b instanceof SetTree) return b.mergeWith(this, reverseOp(setOp), prefix);
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
