@@ -218,6 +218,30 @@ public class SetsTest {
 
 		assertThrows(Throwable.class,()->a.intersectAll(null));
 	}
+
+	/**
+	 * Removals that leave more than a leaf's elements, all under one hash prefix, give the
+	 * set of those elements: a tree has at least two children (CAD003)
+	 */
+	@Test
+	public void testRemovalsLeavingOneHashPrefix() {
+		// Prefix of one digit collapses the root; of two digits, the level below it too
+		for (int digits=1; digits<=2; digits++) {
+			ASet<CVMLong> kept=Sets.empty();
+			ASet<CVMLong> removed=Sets.empty();
+			ASet<CVMLong> all=Sets.empty();
+			for (long i=0; kept.count()<=SetLeaf.MAX_ELEMENTS+3; i++) {
+				CVMLong k=CVMLong.create(i);
+				Hash h=k.getHash();
+				boolean keep=(h.getHexDigit(0)==0)&&((digits==1)||(h.getHexDigit(1)==0));
+				if (keep) kept=kept.conj(k); else removed=removed.conj(k);
+				all=all.conj(k);
+			}
+			ASet<CVMLong> r=all.excludeAll(removed);
+			assertEquals(kept,r);
+			ObjectsTest.doAnyValueTests(r);
+		}
+	}
 	
 	@Test
 	public void testBigSlice() {

@@ -236,6 +236,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 				sel = sel & ~(1 << i); // remove from selection
 			}
 		}
+		// A tree has at least two children: a lone child holds every element, so it is the set
+		if (Integer.bitCount(newMask & 0xFFFF) == 1) {
+			return children[Integer.numberOfTrailingZeros(sel)].getValue();
+		}
 		if (mask != newMask) {
 			return new SetTree<V>(Refs.filterSmallArray(children, sel), shift, newMask, count);
 		}

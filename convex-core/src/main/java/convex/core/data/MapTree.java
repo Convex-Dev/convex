@@ -235,6 +235,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 				sel = sel & ~(1 << i); // remove from selection
 			}
 		}
+		// A tree has at least two children: a lone child holds every entry, so it is the map
+		if (Integer.bitCount(newMask & 0xFFFF) == 1) {
+			return children[Integer.numberOfTrailingZeros(sel)].getValue();
+		}
 		if (mask != newMask) {
 			return new MapTree<K, V>(Refs.filterSmallArray(children, sel), shift, newMask, count);
 		}

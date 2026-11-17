@@ -26,6 +26,7 @@ import convex.core.exceptions.ValidationException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.util.Bits;
+import convex.core.util.MergeFunction;
 import convex.test.Samples;
 
 /**
@@ -185,6 +186,37 @@ public class MapsTest {
 		// should merge back to original map. Useful also for testing empty children
 		// merges.
 		assertEquals(m, m1.mergeDifferences(m2, (a, b) -> (a == null) ? b : a));
+	}
+
+	/**
+	 * Removals that leave more than a leaf's entries, all under one hash prefix, give the
+	 * map of those entries: a tree has at least two children (CAD003)
+	 */
+	@Test
+	public void testRemovalsLeavingOneHashPrefix() {
+		// Prefix of one digit collapses the root; of two digits, the level below it too
+		for (int digits=1; digits<=2; digits++) {
+			AHashMap<CVMLong, CVMLong> kept = Maps.empty();
+			AHashMap<CVMLong, CVMLong> m = Maps.empty();
+			AHashMap<CVMLong, CVMLong> changed = Maps.empty(); // every key, another value
+			for (long i=0; kept.count()<=MapLeaf.MAX_ENTRIES+3; i++) {
+				CVMLong k = CVMLong.create(i);
+				Hash h = k.getHash();
+				boolean keep = (h.getHexDigit(0)==0) && ((digits==1)||(h.getHexDigit(1)==0));
+				if (keep) kept = kept.assoc(k, CVMLong.ONE);
+				m = m.assoc(k, keep ? CVMLong.ONE : CVMLong.ZERO);
+				changed = changed.assoc(k, CVMLong.create(2));
+			}
+			MergeFunction<CVMLong> keepOnes = (a, b) -> ((a!=null)&&(a.longValue()==1)) ? a : null;
+			for (AHashMap<CVMLong, CVMLong> r : java.util.List.of(
+					m.filterValues(v -> v.longValue()==1),
+					m.mapEntries(e -> (e.getValue().longValue()==1) ? e : null),
+					m.mergeDifferences(changed, keepOnes),
+					m.mergeWith(changed, keepOnes))) {
+				assertEquals(kept, r);
+				ObjectsTest.doAnyValueTests(r);
+			}
+		}
 	}
 
 	@Test
