@@ -43,8 +43,9 @@ Ordinary filesystem fixtures can use a static `@TempDir` for one directory per
 class with automatic cleanup; parallel tests must use distinct child paths.
 
 The everyday run covers representative Etch lifecycle configurations and a
-complete rebuild. Exhaustive lifecycle and physical-rebuild format matrices run
-in CI and release builds. To include them locally:
+complete rebuild. Exhaustive lifecycle and physical-rebuild format matrices, and
+the randomised hash map and set merge checks (`HashMergeFuzzTest`), run in CI
+and release builds. To include them locally:
 
 ```bash
 ./mvnw -B test -pl convex-core -am -Dconvex.test.extended=true
