@@ -543,7 +543,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				// cell as announced and leaves it out of the updates that follow. Only from
 				// a verified link, as for DATA
 				AConnection connection=m.getConnection();
-				if ((connection!=null)&&connection.isTrusted()) stageUpdate(payload);
+				if ((connection!=null)&&connection.isVerified()) stageUpdate(payload);
 				return mergeBeliefValue(orders,payload,m);
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());

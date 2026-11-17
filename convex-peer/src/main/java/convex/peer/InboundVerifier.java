@@ -26,8 +26,8 @@ import convex.core.message.Message;
  * Establishes which connections opened to this peer come from staked peers, so that
  * the cells they push, as DATA or in a Belief, are stored. Owned by {@link Server}.
  *
- * <p>An untrusted connection is challenged when it sends a Belief or DATA. It becomes
- * trusted when its far end gives the bound answer
+ * <p>An unverified connection is challenged when it sends a Belief or DATA. It becomes
+ * verified ({@link AConnection#setVerifiedKey}) when its far end gives the bound answer
  * ({@link Message#answerBoundChallenge}) naming this peer as the peer it dialled,
  * signed by a key with at least the minimum stake. A failed attempt delays the next
  * one for that connection, doubling with each failure.</p>
@@ -67,13 +67,13 @@ class InboundVerifier {
 	}
 
 	/**
-	 * Starts an attempt to verify a connection, unless it is trusted, cannot be sent
+	 * Starts an attempt to verify a connection, unless it is verified, cannot be sent
 	 * messages, has an attempt in flight, or is still backing off after a failure.
 	 *
 	 * @param conn Connection that sent a Belief or DATA, or null
 	 */
 	void maybeStart(AConnection conn) {
-		if (conn == null || conn.isTrusted() || closed) return;
+		if (conn == null || conn.isVerified() || closed) return;
 		Entry entry = entries.get(conn);
 		if (entry != null && !mayStart(entry, server.getTimestamp())) return;
 		if (!conn.supportsMessage() || conn.isClosed()) return;
@@ -103,7 +103,7 @@ class InboundVerifier {
 	}
 
 	private void verify(AConnection conn, Attempt attempt) {
-		boolean trusted = false;
+		boolean verified = false;
 		try {
 			removeClosed();
 			Peer peer = server.getPeer();
@@ -128,8 +128,8 @@ class InboundVerifier {
 				log.debug("Inbound connection key {} is not a staked peer", remoteKey);
 				return;
 			}
-			conn.setTrustedKey(remoteKey);
-			trusted = true;
+			conn.setVerifiedKey(remoteKey);
+			verified = true;
 			log.info("Verified inbound peer {} from {}", remoteKey, conn.getRemoteAddress());
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -138,9 +138,9 @@ class InboundVerifier {
 		} finally {
 			try {
 				attempt.reply().cancel(false);
-				finish(conn, attempt, trusted);
+				finish(conn, attempt, verified);
 				BiConsumer<AConnection, Boolean> observer = outcomeObserver;
-				if (observer != null) observer.accept(conn, trusted);
+				if (observer != null) observer.accept(conn, verified);
 			} finally {
 				// Always, or close() would wait for this attempt forever
 				attempt.stopped().complete(null);
@@ -148,12 +148,12 @@ class InboundVerifier {
 		}
 	}
 
-	/** Records an attempt's outcome: forgets a trusted or closed connection, else backs it off. */
-	private void finish(AConnection conn, Attempt attempt, boolean trusted) {
+	/** Records an attempt's outcome: forgets a verified or closed connection, else backs it off. */
+	private void finish(AConnection conn, Attempt attempt, boolean verified) {
 		synchronized (this) {
 			Entry entry = entries.get(conn);
 			if (entry == null || entry.attempt() != attempt) return;
-			if (trusted || closed || conn.isClosed()) {
+			if (verified || closed || conn.isClosed()) {
 				entries.remove(conn);
 			} else {
 				int failures = entry.failures() + 1;

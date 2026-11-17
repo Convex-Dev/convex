@@ -462,9 +462,18 @@ public class MessageTest {
 	@Test public void testConnectionTrust() {
 		LocalConnection conn = LocalConnection.create(m -> true);
 		assertFalse(conn.isTrusted());
+		assertFalse(conn.isVerified());
 
 		conn.setTrustedKey(KP.getAccountKey());
 		assertTrue(conn.isTrusted());
+		assertFalse(conn.isVerified(), "trusting the far end does not verify an opener");
+
+		LocalConnection opened = LocalConnection.create(m -> true);
+		opened.setVerifiedKey(KP.getAccountKey());
+		assertTrue(opened.isVerified());
+		assertEquals(KP.getAccountKey(), opened.getVerifiedKey());
+		assertFalse(opened.isTrusted(), "a verified opener is not trusted");
+		assertNull(opened.getTrustedKey());
 	}
 
 	@Test public void testChallengeWithID() {

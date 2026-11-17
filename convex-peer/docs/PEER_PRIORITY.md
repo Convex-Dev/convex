@@ -13,14 +13,20 @@ each other's Orders, so knowing which connection a Belief arrived on would vouch
 nothing it contains.
 
 DATA is different: it is cells pushed ahead of a Belief, stored before anything refers to
-them. A consensus peer stores DATA only from a connection it trusts: one whose far end has
-proved it is a staked peer's own link to this peer
+them. A consensus peer stores DATA only from a verified connection: one opened to it whose
+far end has proved it is a staked peer's own link to this peer
 ([Verifying an Inbound Connection](#verifying-an-inbound-connection)). DATA from any other
 connection is ignored, and an update it preceded completes through the missing-data fetch
 ([PROPAGATION.md](PROPAGATION.md)).
 
+Trust and verification are separate. A peer trusts only connections it opened, to peers
+that proved their key ([Outbound Connections](#outbound-connections-challengeresponse)), as
+[CAD015](https://docs.convex.world/docs/cad/peercomms) asks: `AConnection.isTrusted`. A
+connection opened to it is at most verified, `AConnection.isVerified`, which grants what
+this document and [BACKPRESSURE.md](BACKPRESSURE.md) describe.
+
 Besides results, a peer sends on a connection opened to it only a challenge, when the
-connection is untrusted and sends a Belief or DATA, and a request for data missing from an
+connection is unverified and sends a Belief or DATA, and a request for data missing from an
 update that arrived on it. What a fetch brings back is content-addressed and judged like
 any other data.
 
@@ -42,10 +48,10 @@ consensus:
    peer before checking its signature or storing it, and an Order no newer than the one
    it holds before checking its signature. A bad signature ends processing of the message
    carrying it. An update's cells are stored before any Order in it is judged in two
-   cases: it came on a trusted connection ([Inbound Connections](#inbound-connections)),
+   cases: it came on a verified connection ([Inbound Connections](#inbound-connections)),
    or it has data missing that this peer fetches, when its cells and whatever the fetch
    brings are stored. With one fetch at a time, the second is one update at a time.
-3. **A bounded queue.** Pushed Beliefs from every connection, and DATA from trusted
+3. **A bounded queue.** Pushed Beliefs from every connection, and DATA from verified
    connections, share one ordered queue, bounded by count and bytes. When it is full,
    further pushes are dropped; the connection is never paused for them.
 
@@ -58,8 +64,8 @@ rate at worst.
 
 | Message | Handling |
 |---------|----------|
-| BELIEF | Joins the propagation queue, whoever sent it, and its Orders are judged on their own. The cells it carries are stored on receipt only from a trusted connection. From an untrusted connection, it also starts verification of that connection |
-| DATA | From a trusted connection, joins the propagation queue, and its cells are stored; they count only once a valid Belief refers to them. From any other connection, ignored, and starts verification |
+| BELIEF | Joins the propagation queue, whoever sent it, and its Orders are judged on their own. The cells it carries are stored on receipt only from a verified connection. From an unverified connection, it also starts verification of that connection |
+| DATA | From a verified connection, joins the propagation queue, and its cells are stored; they count only once a valid Belief refers to them. From any other connection, ignored, and starts verification |
 | CHALLENGE | Answered with this peer's key, so whoever opened the connection can verify it |
 | RESULT | Completes this peer's request on that connection, a challenge or a fetch of missing data; any other is ignored (CAD015) |
 
@@ -69,7 +75,7 @@ other peers answer such requests from its store.
 
 ### Verifying an Inbound Connection
 
-`InboundVerifier` challenges an untrusted connection when it sends a Belief or DATA:
+`InboundVerifier` challenges an unverified connection when it sends a Belief or DATA:
 
 1. It sends a CHALLENGE `[token, nil, networkID]`, signed by this peer.
 2. The far end must give the bound answer `[token, thisPeer, networkID, thisPeer]`, signed
@@ -77,21 +83,23 @@ other peers answer such requests from its store.
    answering connection was opened to reach. Only a peer's own outbound link gives this
    form ([Outbound Connections](#outbound-connections-challengeresponse)); a server's
    answer has three elements and is not accepted.
-3. On success, the connection's trusted key is set. DATA from it, and the cells its
-   Beliefs carry, are then stored, and it gets the trusted treatment for replies
+3. On success, the connection's verified key is set; its trusted key stays unset. DATA
+   from it, and the cells its Beliefs carry, are then stored, and it is served as a peer
+   link: in the priority lane of the peer's ingress
+   ([BACKPRESSURE.md](BACKPRESSURE.md#lanes)) and first for replies
    ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)). Stake is checked here, once:
    whatever the connection sends later is judged, as from anyone, when it is merged.
 
 On a network thread the verifier only checks whether to start: whether the connection is
-trusted, has an attempt in flight, or is backing off. Signing, sending, waiting up to 5 s
+verified, has an attempt in flight, or is backing off. Signing, sending, waiting up to 5 s
 for the answer and checking it run on a virtual thread.
 
 A failed attempt delays the next one for that connection, with the same waits as polling
 ([Polling and Back-off](#polling-and-back-off)). The verifier forgets a connection when it is
-trusted or closes. Closes are reported by the network listeners, and swept up when an
+verified or closes. Closes are reported by the network listeners, and swept up when an
 attempt starts for transports that do not report them.
 
-The first update a peer sends on a new link may arrive before the link is trusted. Its
+The first update a peer sends on a new link may arrive before the link is verified. Its
 DATA is then ignored, and that update completes through the fetch.
 
 Lattice nodes verify connections opened to them in their own way; see
@@ -103,7 +111,7 @@ Lattice nodes verify connections opened to them in their own way; see
 
 | Component | Role |
 |-----------|------|
-| `AConnection.isTrusted()` / `setTrustedKey()` | Set by `ConvexRemote.setVerifiedPeer()` |
+| `AConnection.isTrusted()` / `setTrustedKey()` | Set by `ConvexRemote.setVerifiedPeer()`, on a link this peer opened |
 | `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |

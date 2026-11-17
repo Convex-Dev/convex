@@ -47,7 +47,9 @@ server-initiated protocol exchange (e.g. challenge/response).
 
 Additional state and lifecycle:
 - `isTrusted()` / `getTrustedKey()` / `setTrustedKey(AccountKey)` — this end's
-  verified trust in the remote participant
+  trust in the remote participant, which has proved its key
+- `isVerified()` / `getVerifiedKey()` / `setVerifiedKey(AccountKey)` — the key the
+  remote participant, which opened the connection, has proved to this end
 - `getRemoteAddress()` — remote socket address if applicable
 - `isClosed()` / `close()` — lifecycle
 - `getReceivedCount()` — statistics
@@ -85,21 +87,27 @@ time via the `acceptsMessages` flag on each end of a `LocalConnection` pair.
 ### 2.4 Trust
 
 Trust is **per-end**. Each end of a connection independently tracks whether it
-has verified the remote participant's identity:
+has verified the remote participant's identity, in one of two keys:
 
-- `endA.setTrustedKey(keyB)` — A has verified B
-- `endB.setTrustedKey(keyA)` — B has verified A
+- `endA.setTrustedKey(keyB)` — A has verified B and trusts it as B
+- `endB.setVerifiedKey(keyA)` — B has verified A, which opened the connection to B
 - These are independent
 
-Trust is established by the [challenge/response verification protocol](PEER_PRIORITY.md)
+A consensus peer trusts only connections it opened
+([CAD015](https://docs.convex.world/docs/cad/peercomms)), and at most verifies a
+connection opened to it. A lattice node also trusts a connection opened to it once it
+admits it as a route ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md)).
+
+Both are established by the [challenge/response verification protocol](PEER_PRIORITY.md)
 (Ed25519 signatures over random tokens). The verification protocol is universal
 — any participant with an Ed25519 keypair can verify any other, regardless of
 application.
 
-What trust **means** is application-specific policy, separate from the
-connection layer:
-- Consensus peer: prioritise beliefs, exempt from backpressure
-- Lattice node: accept merge data from verified sources
+What trust and verification **mean** is application-specific policy, separate from
+the connection layer:
+- Consensus peer: polls the peers it trusts first; keeps DATA from, and serves first,
+  a connection it has verified as a staked peer's own link
+- Lattice node: accept merge data from trusted sources
 - AI agent: authorise privileged operations
 - Generic: "I have cryptographically verified who you are"
 
@@ -135,6 +143,7 @@ connection is indistinguishable from a network connection.
         │  paired: endB ────────────────── paired: endA    │
         │  acceptsMsgs    │              │  acceptsMsgs    │
         │  trustedKey     │              │  trustedKey     │
+        │  verifiedKey    │              │  verifiedKey    │
         └─────────────────┘              └─────────────────┘
 
 A calls endA.sendMessage(msg):
@@ -457,16 +466,17 @@ an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
 ```java
 AConnection conn = msg.getConnection();
 if (conn != null && conn.isTrusted()) {
-    // verified sender — e.g. a lattice node accepts its merge data
+    // trusted sender — e.g. a lattice node accepts its merge data
 } else {
-    // unverified sender
+    // untrusted sender
 }
 ```
 
-Messages on return-only connections are always untrusted (`supportsMessage()`
+Messages on return-only connections are never trusted or verified (`supportsMessage()`
 returns false so verification cannot be initiated). Persistent bidirectional
 connections can accumulate trust via verification. A consensus peer judges a Belief by
-its signed Orders, whoever sent it, but stores DATA only from a trusted connection.
+its signed Orders, whoever sent it, but stores DATA only from a verified connection
+(`conn.isVerified()`).
 
 ### 5.4 Verification
 
@@ -481,7 +491,8 @@ A lattice node verifies an inbound connection that claims a key it wants to trus
 6. Subsequent messages on this connection are trusted
 
 A consensus peer verifies a connection opened to it in the same way, with an answer
-that only a staked peer's own outbound link can give (`InboundVerifier`); see
+that only a staked peer's own outbound link can give (`InboundVerifier`), and sets
+`conn.setVerifiedKey(remoteKey)`: the connection is verified, not trusted; see
 [PEER_PRIORITY.md](PEER_PRIORITY.md#verifying-an-inbound-connection).
 
 Application-specific policy (e.g. "is this key a registered peer in consensus
@@ -493,7 +504,7 @@ identity means.
 
 | Actor | Connection type | Mode | Trust | Verification |
 |---|---|---|---|---|
-| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client initiated; a lattice node's server may also verify |
+| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client initiated; the consensus peer or lattice node it opened the connection to may also verify it |
 | In-memory peer/agent (`ConvexLocal` + keypair) | Local pair (persistent) | bidirectional | yes | client initiated |
 | Shared REST gateway (`ConvexLocal`, no keypair) | Local pair (persistent) | return-only | no | not possible |
 | HTTP endpoint (`ChainAPI`) | Via shared `ConvexLocal` | return-only | no | not possible |

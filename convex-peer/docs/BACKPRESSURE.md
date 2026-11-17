@@ -63,10 +63,10 @@ routed in the order they arrived, by one worker at a time.
 
 ### Lanes
 
-Connections are served in two lanes. A trusted connection (`AConnection.isTrusted`)
-is in the priority lane: on a peer, one verified as a staked peer's own link
-([PEER_PRIORITY.md](PEER_PRIORITY.md)); among the connections a process opens, one
-whose peer has proved its key. Every other connection is ordinary.
+Connections are served in two lanes. On a peer, a connection verified as a staked
+peer's own link (`AConnection.isVerified`, [PEER_PRIORITY.md](PEER_PRIORITY.md)) is in
+the priority lane; among the connections a process opens, one whose peer has proved
+its key (`AConnection.isTrusted`). Every other connection is ordinary.
 
 The lanes alternate while both have work. Within a lane connections take turns by
 encoded bytes, a turn allowing `Config.INGRESS_PRIORITY_QUANTUM` (64 KB) in the
@@ -130,12 +130,11 @@ So a client that sends faster than it reads is slowed by TCP, like one whose req
 fill a queue, rather than losing results. Pausing always holds a framed message, so
 that Netty's decoder does not ask the socket for more input while reads are off.
 
-A verified connection is never paused for its replies: it has a far larger allowance
-(`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own, served first. A
-lattice node verifies the connections it admits; a consensus peer verifies a
-connection that proves it is a staked peer's own link
-([PEER_PRIORITY.md](PEER_PRIORITY.md)). Every other connection is treated as a
-client here. A client reply that finds the shared queue full is refused: the writer
+A peer link is never paused for its replies: it has a far larger allowance
+(`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own, served first. A peer
+link is a connection a consensus peer has verified as a staked peer's own link
+([PEER_PRIORITY.md](PEER_PRIORITY.md)), or one a lattice node trusts, having admitted
+it as a route. Every other connection is treated as a client here. A client reply that finds the shared queue full is refused: the writer
 only hands messages to Netty, so that takes a server too short of CPU for the writer
 to keep up.
 

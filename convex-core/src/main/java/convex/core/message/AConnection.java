@@ -22,14 +22,23 @@ import convex.core.exceptions.BadFormatException;
  * reference to the {@code AConnection} it arrived on, enabling the server to:
  * <ul>
  *   <li>Route result messages back to the originator via {@link #returnMessage(Message)}</li>
- *   <li>Check trust status via {@link #isTrusted()} for Belief admission and backpressure</li>
+ *   <li>Check whether the sender is trusted ({@link #isTrusted()}) or verified
+ *       ({@link #isVerified()}), for what it stores and how it is served</li>
  *   <li>Close misbehaving connections via {@link #close()}</li>
  * </ul>
  *
  * <h2>Trust Model</h2>
- * <p>Connections start untrusted. A connection becomes trusted after the remote
- * peer successfully responds to a challenge/response verification, at which point
- * {@link #setTrustedKey(AccountKey)} is called with the verified key.</p>
+ * <p>Each end of a connection keeps two keys, both absent at first, and each set only
+ * after the far end has proved it holds that key by answering a challenge.</p>
+ * <ul>
+ *   <li>The trusted key ({@link #setTrustedKey(AccountKey)}): this end trusts the far
+ *       end as that participant. A consensus peer trusts only peers it connected to; a
+ *       lattice node also trusts a connection opened to it that it admits as a route.</li>
+ *   <li>The verified key ({@link #setVerifiedKey(AccountKey)}): the far end opened the
+ *       connection, and has proved to this end that it is that participant. A consensus
+ *       peer sets it on a connection that proves it is a staked peer's own link.</li>
+ * </ul>
+ * <p>The two are independent: what each grants is the application's policy.</p>
  *
  * <h2>Implementations</h2>
  * <ul>
@@ -43,6 +52,8 @@ public abstract class AConnection {
 
 	/** Published across network, verification and dispatcher threads. */
 	private volatile AccountKey trustedKey=null;
+	/** Published across network, verification and dispatcher threads. */
+	private volatile AccountKey verifiedKey=null;
 	private final AtomicLong requestCounter=new AtomicLong();
 	/** Allocated on first request, never replaced during this connection's lifetime. */
 	private volatile ConcurrentHashMap<ACell,RequestFuture> awaiting;
@@ -223,7 +234,7 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Checks if this connection has been verified as a trusted peer.
+	 * Checks if this end trusts the far end, which has proved its key.
 	 * @return true if trusted, false otherwise
 	 */
 	public boolean isTrusted() {
@@ -245,6 +256,32 @@ public abstract class AConnection {
 	 */
 	public void setTrustedKey(AccountKey key) {
 		this.trustedKey=key;
+	}
+
+	/**
+	 * Checks if the far end, which opened this connection, has proved its key to this end.
+	 * @return true if verified, false otherwise
+	 */
+	public boolean isVerified() {
+		return verifiedKey!=null;
+	}
+
+	/**
+	 * Gets the key the far end, which opened this connection, has proved to this end, or
+	 * null if none.
+	 * @return AccountKey of the verified far end, or null
+	 */
+	public AccountKey getVerifiedKey() {
+		return verifiedKey;
+	}
+
+	/**
+	 * Sets the key the far end, which opened this connection, has proved to this end.
+	 * Only call this after the far end has answered a challenge that proves the key.
+	 * @param key Verified AccountKey of the far end, or null to clear it
+	 */
+	public void setVerifiedKey(AccountKey key) {
+		this.verifiedKey=key;
 	}
 
 	/**
@@ -381,7 +418,10 @@ public abstract class AConnection {
 	public String toString() {
 		InetSocketAddress addr=getRemoteAddress();
 		String addrStr=(addr!=null) ? addr.toString() : "local";
-		String trust=isTrusted() ? " trusted="+trustedKey : " untrusted";
+		AccountKey trusted=trustedKey;
+		AccountKey verified=verifiedKey;
+		String trust=(trusted!=null) ? " trusted="+trusted : (verified!=null) ? "" : " untrusted";
+		if (verified!=null) trust+=" verified="+verified;
 		return getClass().getSimpleName()+"["+addrStr+trust+"]";
 	}
 }

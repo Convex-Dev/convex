@@ -55,7 +55,7 @@ decodes the result. This also leaves full decode work on the Netty event loop.
 
 An outbound socket is not trusted merely because the local Peer opened it.
 `Convex.verifyPeer` establishes trust through challenge/response and then sets
-the verified key on the underlying `AConnection`.
+the trusted key on the underlying `AConnection`.
 
 ### Existing destinations
 
@@ -114,9 +114,9 @@ them has accepted the message.
 5. **Trust is verified.** Only a connection whose remote Peer has proved its key
    receives the verified-Peer service class: on an accepted connection, a staked
    Peer's own link verified as [PEER_PRIORITY.md](../../convex-peer/docs/PEER_PRIORITY.md#verifying-an-inbound-connection)
-   describes; on an outbound connection, a Peer verified by `Convex.verifyPeer`.
-   Each ingress is given the rule for its own connections; the ingress itself
-   holds no trust policy. This is the priority
+   describes (`AConnection.isVerified`); on an outbound connection, a Peer verified
+   by `Convex.verifyPeer` (`AConnection.isTrusted`). Each ingress is given the rule
+   for its own connections; the ingress itself holds no trust policy. This is the priority
    [CAD015](https://docs.convex.world/docs/cad/peercomms) asks for messages from
    trusted sources.
 6. **Priority is non-starving.** Verified traffic has more service and reserved

@@ -536,8 +536,9 @@ public class Server implements Closeable {
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
 
-			// Before the listeners, which register each connection they accept with it
-			ingress=new Ingress("Peer server",IngressLimits.defaults(),AConnection::isTrusted,
+			// Before the listeners, which register each connection they accept with it.
+			// Every connection here was opened to this peer: a verified one is a staked peer's own link
+			ingress=new Ingress("Peer server",IngressLimits.defaults(),AConnection::isVerified,
 				e -> requestShutdown("JVM failure in ingress",e,false));
 			if (nio instanceof NettyServer ns) {
 				ns.setIngress(ingress,this::receiveMessage);
@@ -680,14 +681,14 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Offers DATA from a trusted connection to the propagation queue, so it retains wire
+	 * Offers DATA from a verified connection to the propagation queue, so it retains wire
 	 * order off the I/O thread. DATA from any other connection is ignored, and starts
 	 * verification of that connection: an update it preceded completes through the
 	 * missing-data fetch.
 	 */
 	private boolean processData(Message message) {
 		AConnection connection=message.getConnection();
-		if (connection==null || !connection.isTrusted()) {
+		if (connection==null || !connection.isVerified()) {
 			verifier.maybeStart(connection);
 			return false;
 		}
@@ -700,7 +701,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Stores the cells of a DATA message from a trusted connection, on the Belief
+	 * Stores the cells of a DATA message from a verified connection, on the Belief
 	 * propagator thread.
 	 */
 	void stageData(Message message) throws IOException, BadFormatException {
@@ -957,7 +958,7 @@ public class Server implements Closeable {
 	 * Process an incoming message that represents a Belief. Whoever sent it, each
 	 * Order it carries is judged on its own (signature, stake and age), so it joins the
 	 * ordered propagation queue behind any DATA from the same connection. The cells it
-	 * carries are kept only if the connection is trusted. A Belief from an untrusted
+	 * carries are kept only if the connection is verified. A Belief from an unverified
 	 * connection also starts verification of that connection.
 	 * @param m Belief message to process
 	 * @return true if queued, false if the queue is full and the Belief was dropped

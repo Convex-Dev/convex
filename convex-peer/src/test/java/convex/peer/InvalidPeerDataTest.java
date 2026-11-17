@@ -148,10 +148,10 @@ public class InvalidPeerDataTest {
 		return MissingBeliefDataTest.connect(peer,m -> true);
 	}
 
-	/** A connection the peer trusts as a staked peer's, as verification leaves it: DATA from it is stored. */
+	/** A connection the peer has verified as a staked peer's own link, as verification leaves it: DATA from it is stored. */
 	static LocalConnection connectAs(Server peer, AKeyPair kp) {
 		LocalConnection senderEnd=connect(peer);
-		senderEnd.getPaired().setTrustedKey(kp.getAccountKey());
+		senderEnd.getPaired().setVerifiedKey(kp.getAccountKey());
 		return senderEnd;
 	}
 
@@ -344,7 +344,7 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * Deeply nested DATA from a trusted connection is stored, and a good Order sent after
+	 * Deeply nested DATA from a verified connection is stored, and a good Order sent after
 	 * it is merged.
 	 */
 	@Test
@@ -516,7 +516,7 @@ public class InvalidPeerDataTest {
 	/**
 	 * A local client, as the REST API uses, acquires a value the peer has persisted,
 	 * and is refused at once, with nothing written, a value the peer has only stored,
-	 * as DATA from a trusted connection leaves it.
+	 * as DATA from a verified connection leaves it.
 	 */
 	@Test
 	public void acquiringAValueNotPersisted() throws Exception {
@@ -770,7 +770,7 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * DATA from a trusted connection that runs out of memory as it is staged is dropped,
+	 * DATA from a verified connection that runs out of memory as it is staged is dropped,
 	 * and a good Order sent after it is merged.
 	 */
 	@Test
@@ -802,7 +802,7 @@ public class InvalidPeerDataTest {
 	}
 
 	/**
-	 * An update from a trusted connection whose cells run out of memory as the peer keeps
+	 * An update from a verified connection whose cells run out of memory as the peer keeps
 	 * them on receipt is merged all the same: keeping them only spares later fetches.
 	 */
 	@Test

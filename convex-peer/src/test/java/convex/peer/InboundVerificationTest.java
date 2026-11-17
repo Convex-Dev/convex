@@ -88,33 +88,33 @@ public class InboundVerificationTest {
 	}
 
 	/** Completes with the first outcome the peer's verifier records. */
-	static CompletableFuture<AConnection> nextOutcome(Server peer, boolean trusted) {
+	static CompletableFuture<AConnection> nextOutcome(Server peer, boolean verified) {
 		CompletableFuture<AConnection> outcome=new CompletableFuture<>();
 		peer.getInboundVerifier().setOutcomeObserver((conn,ok) -> {
-			if (ok==trusted) outcome.complete(conn);
+			if (ok==verified) outcome.complete(conn);
 			else outcome.completeExceptionally(new AssertionError("verification "+(ok?"succeeded":"failed")));
 		});
 		return outcome;
 	}
 
-	/** DATA from an unverified connection is ignored; from a trusted one it is stored. */
+	/** DATA from an unverified connection is ignored; from a verified one it is stored. */
 	@Test
-	public void onlyTrustedDataIsStored() throws Exception {
+	public void onlyVerifiedDataIsStored() throws Exception {
 		Server peer=launch(LOCAL);
 		try {
 			Blob ignored=Blobs.createRandom(400);
 			Blob stored=Blobs.createRandom(400);
-			Message trustedData=data(stored);
+			Message verifiedData=data(stored);
 			CompletableFuture<Message> staged=new CompletableFuture<>();
 			peer.getBeliefPropagator().setDataStageObserver(m -> {
-				if (trustedData.getMessageData().equals(m.getMessageData())) staged.complete(m);
+				if (verifiedData.getMessageData().equals(m.getMessageData())) staged.complete(m);
 			});
 
 			// Delivered on this thread: ignored, or queued, before sendMessage returns
 			connect(peer,m -> true).sendMessage(data(ignored));
-			LocalConnection trusted=connect(peer,m -> true);
-			trusted.getPaired().setTrustedKey(REMOTE_A.getAccountKey());
-			trusted.sendMessage(trustedData);
+			LocalConnection verified=connect(peer,m -> true);
+			verified.getPaired().setVerifiedKey(REMOTE_A.getAccountKey());
+			verified.sendMessage(verifiedData);
 
 			staged.get(WAIT,TimeUnit.SECONDS);
 			assertNotNull(peer.getStore().refForHash(stored.getHash()));
@@ -126,11 +126,11 @@ public class InboundVerificationTest {
 
 	/**
 	 * A Belief from an unverified connection has only what the merge takes stored; one
-	 * from a trusted connection has every cell it carries stored.
+	 * from a verified connection has every cell it carries stored.
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	@Test
-	public void beliefCellsAreKeptOnlyFromTrustedConnections() throws Exception {
+	public void beliefCellsAreKeptOnlyFromVerifiedConnections() throws Exception {
 		Server peer=launch(LOCAL);
 		try {
 			LinkedBlockingQueue<SignedData<Order>> merged=new LinkedBlockingQueue<>();
@@ -146,9 +146,9 @@ public class InboundVerificationTest {
 
 			SignedData<?> kept=UNSTAKED.signData(Blobs.createRandom(1000));
 			SignedData<Order> goodA=InvalidPeerDataTest.order(REMOTE_A,1,InvalidPeerDataTest.block(REMOTE_A,ts));
-			LocalConnection trusted=connect(peer,m -> true);
-			trusted.getPaired().setTrustedKey(REMOTE_A.getAccountKey());
-			trusted.sendMessage(belief(Belief.create(goodA,(SignedData)kept)));
+			LocalConnection verified=connect(peer,m -> true);
+			verified.getPaired().setVerifiedKey(REMOTE_A.getAccountKey());
+			verified.sendMessage(belief(Belief.create(goodA,(SignedData)kept)));
 			assertEquals(goodA,merged.poll(WAIT,TimeUnit.SECONDS));
 			assertNotNull(peer.getStore().refForHash(kept.getValue().getHash()));
 		} finally {
@@ -162,16 +162,16 @@ public class InboundVerificationTest {
 
 	/**
 	 * A peer's link to its launch source, which proves the source's key only after it is
-	 * filed, is trusted by the source once proved, even after a first challenge failed:
+	 * filed, is verified by the source once proved, even after a first challenge failed:
 	 * over the network, and in process when the source is a Server.
 	 */
 	@Test
-	public void aLaunchSourceLinkIsTrustedOnceProved() throws Exception {
-		checkLaunchSourceLinkTrusted(false);
-		checkLaunchSourceLinkTrusted(true);
+	public void aLaunchSourceLinkIsVerifiedOnceProved() throws Exception {
+		checkLaunchSourceLinkVerified(false);
+		checkLaunchSourceLinkVerified(true);
 	}
 
-	private void checkLaunchSourceLinkTrusted(boolean inProcess) throws Exception {
+	private void checkLaunchSourceLinkVerified(boolean inProcess) throws Exception {
 		Server source=launch(LOCAL);
 		AtomicLong offset=new AtomicLong();
 		source.setTimeSource(() -> Utils.getCurrentTimestamp()+offset.get());
@@ -200,9 +200,9 @@ public class InboundVerificationTest {
 
 			// Once the wait after the failure has passed, the source challenges again
 			offset.addAndGet(source.getConnectionManager().getPollDelay());
-			CompletableFuture<AConnection> trusted=nextOutcome(source,true);
+			CompletableFuture<AConnection> verified=nextOutcome(source,true);
 			assertTrue(link.trySend(belief));
-			assertEquals(REMOTE_A.getAccountKey(),trusted.get(WAIT,TimeUnit.SECONDS).getTrustedKey());
+			assertEquals(REMOTE_A.getAccountKey(),verified.get(WAIT,TimeUnit.SECONDS).getVerifiedKey());
 		} finally {
 			if (link!=null) link.close();
 			joiner.close();
@@ -211,21 +211,21 @@ public class InboundVerificationTest {
 	}
 
 	/**
-	 * A staked peer that opened a connection to this peer is trusted once it sends a
+	 * A staked peer that opened a connection to this peer is verified once it sends a
 	 * Belief, whether it dialled with this peer's key chosen or, as on a local network,
 	 * without one.
 	 */
 	@Test
-	public void aStakedPeerThatDialledIsTrusted() throws Exception {
-		checkDialledPeerTrusted(true);
-		checkDialledPeerTrusted(false);
+	public void aStakedPeerThatDialledIsVerified() throws Exception {
+		checkDialledPeerVerified(true);
+		checkDialledPeerVerified(false);
 	}
 
-	private void checkDialledPeerTrusted(boolean keyChosen) throws Exception {
+	private void checkDialledPeerVerified(boolean keyChosen) throws Exception {
 		Server receiver=launch(LOCAL);
 		Server sender=launch(REMOTE_A);
 		try {
-			CompletableFuture<AConnection> trusted=nextOutcome(receiver,true);
+			CompletableFuture<AConnection> verified=nextOutcome(receiver,true);
 			AccountKey chosen=keyChosen?LOCAL.getAccountKey():null;
 			sender.getConnectionManager()
 				.connectToPeer(Transports.endpoint(receiver.getHostAddress()),chosen)
@@ -233,10 +233,11 @@ public class InboundVerificationTest {
 
 			sender.getConnectionManager().broadcast(Message.createBelief(sender.getBelief()));
 
-			AConnection link=trusted.get(WAIT,TimeUnit.SECONDS);
-			assertEquals(REMOTE_A.getAccountKey(),link.getTrustedKey());
+			AConnection link=verified.get(WAIT,TimeUnit.SECONDS);
+			assertEquals(REMOTE_A.getAccountKey(),link.getVerifiedKey());
+			assertNull(link.getTrustedKey(),"a link opened to this peer is verified, not trusted");
 
-			// DATA on the trusted link is now stored
+			// DATA on the verified link is now stored
 			Blob value=Blobs.createRandom(400);
 			Message sentData=Message.createDataMessage(List.of(value),(int)CPoSConstants.MAX_MESSAGE_LENGTH);
 			CompletableFuture<Message> staged=new CompletableFuture<>();
@@ -272,15 +273,15 @@ public class InboundVerificationTest {
 	}
 
 	/** Has a client with the given key, which has verified the peer, send it a Belief. */
-	private AccountKey verifyClient(Server peer, AKeyPair kp, AccountKey dialled, boolean expectTrusted) throws Exception {
+	private AccountKey verifyClient(Server peer, AKeyPair kp, AccountKey dialled, boolean expectVerified) throws Exception {
 		ConvexLocal client=Convex.connect(peer,null,kp);
 		try {
 			assertEquals(LOCAL.getAccountKey(),
 				client.verifyPeer(LOCAL.getAccountKey(),peer.getPeer().getNetworkID()).get(WAIT,TimeUnit.SECONDS));
 			client.setDialledPeer(dialled);
-			CompletableFuture<AConnection> outcome=nextOutcome(peer,expectTrusted);
+			CompletableFuture<AConnection> outcome=nextOutcome(peer,expectVerified);
 			client.message(Message.createBelief(peer.getBelief()));
-			return outcome.get(WAIT,TimeUnit.SECONDS).getTrustedKey();
+			return outcome.get(WAIT,TimeUnit.SECONDS).getVerifiedKey();
 		} finally {
 			client.close();
 		}
@@ -311,7 +312,7 @@ public class InboundVerificationTest {
 
 			assertFalse(plain.get(WAIT,TimeUnit.SECONDS).isError(),"a valid plain answer was given");
 			AConnection link=refused.get(WAIT,TimeUnit.SECONDS);
-			assertFalse(link.isTrusted());
+			assertFalse(link.isVerified());
 		} finally {
 			signer.close();
 			other.close();
@@ -400,7 +401,7 @@ public class InboundVerificationTest {
 		}
 	}
 
-	/** A Belief from an unverified connection is merged as before: only DATA waits on trust. */
+	/** A Belief from an unverified connection is merged as before: only DATA waits on verification. */
 	@Test
 	public void beliefsAreTakenWhileVerifying() throws Exception {
 		Server peer=launch(LOCAL);

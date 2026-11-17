@@ -203,7 +203,7 @@ public class PeerIngressTest {
 			verified.setDialledPeer(peerKey);
 			CompletableFuture<AConnection> outcome = InboundVerificationTest.nextOutcome(server, true);
 			verified.message(Message.createBelief(server.getBelief()));
-			assertTrue(outcome.get(WAIT, TimeUnit.SECONDS).isTrusted());
+			assertTrue(outcome.get(WAIT, TimeUnit.SECONDS).isVerified());
 
 			// Runs where the payload was decoded: holding it holds that worker
 			server.setMessageReceiveObserver(m -> {
