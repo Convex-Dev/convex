@@ -427,6 +427,24 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	/**
+	 * Filters this MapLeaf to the entries whose key hashes do, or do not, start with the same
+	 * hex digits as a given hash
+	 *
+	 * @param h Hash to compare with
+	 * @param n Number of leading hex digits to compare
+	 * @param same True for the entries that match h, false for the others
+	 * @return Filtered MapLeaf
+	 */
+	MapLeaf<K, V> filterPrefix(Hash h, int n, boolean same) {
+		int sel = 0;
+		int c = size();
+		for (int i = 0; i < c; i++) {
+			if ((entries[i].getKeyHash().commonHexPrefixLength(h, n) >= n) == same) sel = sel | (1 << i);
+		}
+		return filterEntries(sel);
+	}
+
+	/**
 	 * Filters entries using the given bit mask
 	 * 
 	 * @param selection
@@ -461,7 +479,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
 		if (b instanceof MapLeaf) return mergeWith((MapLeaf<K, V>) b, func, shift);
-		if (b instanceof MapTree) return ((MapTree<K, V>) b).mergeWith(this, func.reverse());
+		if (b instanceof MapTree) return b.mergeWith(this, func.reverse(), shift);
 		throw new Panic("Unhandled map type: " + b.getClass());
 	}
 
@@ -515,7 +533,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
 		if (b instanceof MapLeaf) return mergeDifferences((MapLeaf<K, V>) b, func,shift);
-		if (b instanceof MapTree) return b.mergeWith(this, func.reverse());
+		if (b instanceof MapTree) return b.mergeWith(this, func.reverse(), shift);
 		throw new Panic("Unhandled map type: " + b.getClass());
 	}
 

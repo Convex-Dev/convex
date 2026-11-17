@@ -79,7 +79,16 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		}
 	}
 
-	protected abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift);
+	/**
+	 * Merges as {@link #mergeDifferences(AMap, MergeFunction)} does, given a number of leading
+	 * hex digits that every key hash of both maps is known to share.
+	 *
+	 * @param b Other map to merge with
+	 * @param func Merge function, returning a new value for each key
+	 * @param prefix Number of leading hex digits shared by every key hash of both maps
+	 * @return A merged map, or this map if no changes occurred
+	 */
+	protected abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int prefix);
 
 	/**
 	 * Merge this map with another map, using the given function for each key that
@@ -104,7 +113,16 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 */
 	public abstract AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func);
 
-	protected abstract AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift);
+	/**
+	 * Merges as {@link #mergeWith(AHashMap, MergeFunction)} does, given a number of leading hex
+	 * digits that every key hash of both maps is known to share.
+	 *
+	 * @param b Other map to merge with
+	 * @param func Merge function, returning a new value for each key
+	 * @param prefix Number of leading hex digits shared by every key hash of both maps
+	 * @return A merged map, or this map if no changes occurred
+	 */
+	protected abstract AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int prefix);
 
 	@Override
 	public AHashMap<K, V> filterValues(Predicate<V> pred) {

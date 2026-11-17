@@ -242,6 +242,49 @@ public class SetsTest {
 			ObjectsTest.doAnyValueTests(r);
 		}
 	}
+
+	/**
+	 * Union, intersection and difference of hash sets whose trees branch at different hex digits
+	 * or under different prefixes, at the root or below it, give the set built by conj (CAD003)
+	 */
+	@Test
+	public void testMergesAcrossTreeShapes() throws InvalidDataException {
+		for (java.util.List<CVMLong> xs: TreeShapes.SHAPES) {
+			for (java.util.List<CVMLong> ys: TreeShapes.SHAPES) {
+				ASet<CVMLong> x=conjAll(xs), y=conjAll(ys);
+
+				java.util.Set<CVMLong> union=new java.util.LinkedHashSet<>(xs);
+				union.addAll(ys);
+				assertMergeResult(conjAll(union),x.includeAll(y));
+
+				java.util.Set<CVMLong> intersection=new java.util.LinkedHashSet<>(xs);
+				intersection.retainAll(ys);
+				assertMergeResult(conjAll(intersection),x.intersectAll(y));
+
+				java.util.Set<CVMLong> difference=new java.util.LinkedHashSet<>(xs);
+				difference.removeAll(ys);
+				assertMergeResult(conjAll(difference),x.excludeAll(y));
+			}
+		}
+
+		// An unchanged result is the receiver: a subset under one child, and a set sharing no prefix
+		java.util.List<java.util.List<CVMLong>> shapes=TreeShapes.SHAPES;
+		ASet<CVMLong> holding=conjAll(shapes.get(8));
+		assertSame(holding,holding.includeAll(conjAll(shapes.get(1))));
+		ASet<CVMLong> under0=conjAll(shapes.get(1));
+		assertSame(under0,under0.excludeAll(conjAll(shapes.get(2))));
+	}
+
+	private static ASet<CVMLong> conjAll(java.util.Collection<CVMLong> keys) {
+		ASet<CVMLong> s=Sets.empty();
+		for (CVMLong k: keys) s=s.conj(k);
+		return s;
+	}
+
+	private static void assertMergeResult(ASet<CVMLong> expected, ASet<CVMLong> result) throws InvalidDataException {
+		assertEquals(expected,result);
+		result.validate();
+	}
 	
 	@Test
 	public void testBigSlice() {

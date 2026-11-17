@@ -316,6 +316,24 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
+	 * Filters this SetLeaf to the elements whose hashes do, or do not, start with the same hex
+	 * digits as a given hash
+	 *
+	 * @param h Hash to compare with
+	 * @param n Number of leading hex digits to compare
+	 * @param same True for the elements that match h, false for the others
+	 * @return Filtered SetLeaf
+	 */
+	SetLeaf<T> filterPrefix(Hash h, int n, boolean same) {
+		int sel = 0;
+		int c = size();
+		for (int i = 0; i < c; i++) {
+			if ((elements[i].getHash().commonHexPrefixLength(h, n) >= n) == same) sel = sel | (1 << i);
+		}
+		return filterEntries(sel);
+	}
+
+	/**
 	 * Filters entries using the given bit mask
 	 * 
 	 * @param selection

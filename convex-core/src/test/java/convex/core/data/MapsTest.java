@@ -219,6 +219,71 @@ public class MapsTest {
 		}
 	}
 
+	/**
+	 * Merging hash maps whose trees branch at different hex digits or under different prefixes,
+	 * at the root or below it, gives the map built by assoc (CAD003)
+	 */
+	@Test
+	public void testMergesAcrossTreeShapes() throws InvalidDataException {
+		java.util.List<java.util.List<CVMLong>> shapes=TreeShapes.SHAPES;
+		MergeFunction<CVMLong> preferFirst=(a,b)->(a!=null)?a:b;
+		MergeFunction<CVMLong> both=(a,b)->((a!=null)&&(b!=null))?a:null;
+		MergeFunction<CVMLong> sum=(a,b)->(a==null)?b:((b==null)?a:CVMLong.create(a.longValue()+b.longValue()));
+		for (int i=0; i<shapes.size(); i++) {
+			for (int j=0; j<shapes.size(); j++) {
+				// Shapes of the same parity give a shared key the same value
+				java.util.Map<CVMLong,CVMLong> xs=shapeValues(shapes.get(i),i), ys=shapeValues(shapes.get(j),j);
+				AHashMap<CVMLong,CVMLong> x=assocAll(xs), y=assocAll(ys);
+				for (MergeFunction<CVMLong> f: java.util.List.of(preferFirst,both,sum)) {
+					assertMergeResult(expectedMerge(xs,ys,f,false),x.mergeWith(y,f));
+				}
+				for (MergeFunction<CVMLong> f: java.util.List.of(preferFirst,both)) {
+					assertMergeResult(expectedMerge(xs,ys,f,true),x.mergeDifferences(y,f));
+				}
+			}
+		}
+
+		// An unchanged result is the receiver: a submap under one child, and a map sharing no prefix
+		AHashMap<CVMLong,CVMLong> holding=assocAll(shapeValues(shapes.get(8),8));
+		AHashMap<CVMLong,CVMLong> sub=assocAll(shapeValues(shapes.get(1),1));
+		assertSame(holding,holding.mergeWith(sub,preferFirst));
+		assertSame(holding,holding.mergeDifferences(sub,preferFirst));
+		MergeFunction<CVMLong> firstOnly=(a,b)->(b==null)?a:null;
+		AHashMap<CVMLong,CVMLong> other=assocAll(shapeValues(shapes.get(2),2));
+		assertSame(sub,sub.mergeWith(other,firstOnly));
+		assertSame(sub,sub.mergeDifferences(other,firstOnly));
+	}
+
+	private static java.util.Map<CVMLong,CVMLong> shapeValues(java.util.List<CVMLong> keys, int shape) {
+		java.util.Map<CVMLong,CVMLong> m=new java.util.LinkedHashMap<>();
+		for (CVMLong k: keys) m.put(k,CVMLong.create(k.longValue()+(shape%2)));
+		return m;
+	}
+
+	private static AHashMap<CVMLong,CVMLong> assocAll(java.util.Map<CVMLong,CVMLong> m) {
+		AHashMap<CVMLong,CVMLong> result=Maps.empty();
+		for (java.util.Map.Entry<CVMLong,CVMLong> e: m.entrySet()) result=result.assoc(e.getKey(),e.getValue());
+		return result;
+	}
+
+	/** The merge by its contract: the function for each key, or with differences only, each key whose values differ */
+	private static AHashMap<CVMLong,CVMLong> expectedMerge(java.util.Map<CVMLong,CVMLong> xs, java.util.Map<CVMLong,CVMLong> ys, MergeFunction<CVMLong> f, boolean differences) {
+		java.util.Set<CVMLong> keys=new java.util.LinkedHashSet<>(xs.keySet());
+		keys.addAll(ys.keySet());
+		java.util.Map<CVMLong,CVMLong> merged=new java.util.LinkedHashMap<>();
+		for (CVMLong k: keys) {
+			CVMLong a=xs.get(k), b=ys.get(k);
+			CVMLong v=(differences&&java.util.Objects.equals(a,b))?a:f.merge(a,b);
+			if (v!=null) merged.put(k,v);
+		}
+		return assocAll(merged);
+	}
+
+	private static void assertMergeResult(AHashMap<CVMLong,CVMLong> expected, AHashMap<CVMLong,CVMLong> result) throws InvalidDataException {
+		assertEquals(expected,result);
+		result.validate();
+	}
+
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
 		ATransaction trans=Transfer.create(InitTest.HERO,0, InitTest.HERO, 58);

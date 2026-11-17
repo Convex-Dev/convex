@@ -555,18 +555,104 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func) {
-		return mergeWith(b, func, this.shift);
+		return mergeWith(b, func, 0);
 	}
 
 	@Override
-	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
+	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int prefix) {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
-			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
-			return mergeWith(bt, func, shift);
+			// Usual case first: both branch at the digit after the known prefix, so share it
+			if ((shift == bt.shift) && (shift == prefix)) return mergeWith(bt, func, shift);
+			return mergeTrees(bt, func, false);
 		}
-		if ((b instanceof MapLeaf)) return mergeWith((MapLeaf<K, V>) b, func, shift);
+		if ((b instanceof MapLeaf)) {
+			MapLeaf<K, V> bl = (MapLeaf<K, V>) b;
+			// Usual case first: every key of b is known to share this tree's prefix
+			if ((shift == prefix) || bl.isEmpty()) return mergeWith(bl, func, shift);
+			Hash h = getFirstHash();
+			AHashMap<K, V> result = mergeWith(bl.filterPrefix(h, shift, true), func, shift);
+			// Keys under another prefix lie outside this tree, like those under an absent digit
+			return assocAlone(result, bl.filterPrefix(h, shift, false), func);
+		}
 		throw new Panic("Unrecognised map type: " + b.getClass());
+	}
+
+	/**
+	 * Merges with a tree whose shift or prefix differs from this one's, or which is not known
+	 * to share it, as mergeWith or, with differences, as mergeDifferences
+	 */
+	private AHashMap<K, V> mergeTrees(MapTree<K, V> b, MergeFunction<V> func, boolean differences) {
+		int bshift = b.shift;
+		int least = Math.min(shift, bshift);
+		int common = getFirstHash().commonHexPrefixLength(b.getFirstHash(), least);
+		if (common < least) {
+			// No key in common: each is merged with nothing, then joined at the digit where they part
+			AHashMap<K, V> empty = Maps.empty();
+			AHashMap<K, V> ra = differences ? mergeDifferences(empty, func, shift) : mergeWith(empty, func, shift);
+			AHashMap<K, V> rb = differences ? empty.mergeDifferences(b, func, bshift) : empty.mergeWith(b, func, bshift);
+			return join(common, ra, rb);
+		}
+		if (shift == bshift) return differences ? mergeDifferences(b, func, shift) : mergeWith(b, func, shift);
+		// One lies under a single digit of the other
+		if (shift < bshift) return mergeUnder(this, b.getFirstHash().getHexDigit(shift), b, true, func, differences);
+		return mergeUnder(b, getFirstHash().getHexDigit(bshift), this, false, func, differences);
+	}
+
+	/**
+	 * Merges tree t with map x, all of whose keys lie under digit d of t: x with the child of t
+	 * at d, and each other child of t with nothing.
+	 *
+	 * @param tFirst True if t is the receiver of the merge, false if x is
+	 * @param differences True to merge as mergeDifferences, false as mergeWith
+	 */
+	@SuppressWarnings("unchecked")
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> mergeUnder(MapTree<K, V> t, int d, AHashMap<K, V> x, boolean tFirst, MergeFunction<V> func, boolean differences) {
+		int s = t.shift;
+		AHashMap<K, V> empty = Maps.empty();
+		Ref<AHashMap<K, V>>[] newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[FANOUT];
+		boolean changed = false;
+		for (int digit = 0; digit < FANOUT; digit++) {
+			Ref<AHashMap<K, V>> tref = t.childForDigit(digit);
+			AHashMap<K, V> tc = tref.getValue();
+			AHashMap<K, V> xc = (digit == d) ? x : empty;
+			if (tc.isEmpty() && xc.isEmpty()) continue;
+			AHashMap<K, V> first = tFirst ? tc : xc;
+			AHashMap<K, V> second = tFirst ? xc : tc;
+			AHashMap<K, V> rc = differences ? first.mergeDifferences(second, func, s + 1) : first.mergeWith(second, func, s + 1);
+			if (rc != tc) changed = true;
+			newChildren[digit] = (rc == tc) ? tref : rc.getRef();
+		}
+		if (tFirst && !changed) return t;
+		// A lone child left is the result itself, so a receiver x left unchanged is returned as x
+		return createFull(newChildren, s);
+	}
+
+	/**
+	 * Joins two maps whose keys share their first c hex digits and part at the next
+	 */
+	@SuppressWarnings("unchecked")
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> join(int c, AHashMap<K, V> a, AHashMap<K, V> b) {
+		if (b.isEmpty()) return a;
+		if (a.isEmpty()) return b;
+		Ref<AHashMap<K, V>>[] children = (Ref<AHashMap<K, V>>[]) new Ref<?>[FANOUT];
+		children[a.getFirstHash().getHexDigit(c)] = a.getRef();
+		children[b.getFirstHash().getHexDigit(c)] = b.getRef();
+		return createFull(children, c);
+	}
+
+	/**
+	 * Adds the entries of a leaf whose keys the result lacks, with the values the function gives
+	 * each alone
+	 */
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> assocAlone(AHashMap<K, V> result, MapLeaf<K, V> b, MergeFunction<V> func) {
+		int n = b.size();
+		for (int i = 0; i < n; i++) {
+			MapEntry<K, V> e = b.entryAt(i);
+			V value = func.merge(e.getKey(), null, e.getValue());
+			if (value != null) result = result.assocEntry(e.withValue(value));
+		}
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -640,15 +726,21 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 	
 	@Override
-	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func,int shift) {
+	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int prefix) {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
-			// this is OK, top levels should both have shift 0 and be aligned down the tree.
-			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
-			return mergeDifferences(bt, func,shift);
+			// Usual case first: both branch at the digit after the known prefix, so share it
+			if ((shift == bt.shift) && (shift == prefix)) return mergeDifferences(bt, func, shift);
+			return mergeTrees(bt, func, true);
 		} else {
 			// must be ListMap
-			return mergeDifferences((MapLeaf<K, V>) b, func,shift);
+			MapLeaf<K, V> bl = (MapLeaf<K, V>) b;
+			// Usual case first: every key of b is known to share this tree's prefix
+			if ((shift == prefix) || bl.isEmpty()) return mergeDifferences(bl, func, shift);
+			Hash h = getFirstHash();
+			AHashMap<K, V> result = mergeDifferences(bl.filterPrefix(h, shift, true), func, shift);
+			// Keys under another prefix lie outside this tree, like those under an absent digit
+			return assocAlone(result, bl.filterPrefix(h, shift, false), func);
 		}
 	}
 

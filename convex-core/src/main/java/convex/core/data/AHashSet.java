@@ -18,7 +18,16 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 
 	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp);
 
-	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int shift);
+	/**
+	 * Merges as {@link #mergeWith(AHashSet, int)} does, given a number of leading hex digits
+	 * that every element hash of both sets is known to share.
+	 *
+	 * @param b Other set
+	 * @param setOp Set operation
+	 * @param prefix Number of leading hex digits shared by every element hash of both sets
+	 * @return Merged set
+	 */
+	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int prefix);
 
 	@SuppressWarnings("unchecked")
 	public AHashSet<T> includeAll(ASet<? extends T> elements) {

@@ -472,18 +472,97 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public AHashSet<T> mergeWith(AHashSet<T> b, int setOp) {
-		return mergeWith(b, setOp, this.shift);
+		return mergeWith(b, setOp, 0);
 	}
 
 	@Override
-	protected AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int shift) {
+	protected AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int prefix) {
 		if ((b instanceof SetTree)) {
 			SetTree<T> bt = (SetTree<T>) b;
-			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
-			return mergeWith(bt, setOp, shift);
+			// Usual case first: both branch at the digit after the known prefix, so share it
+			if ((shift == bt.shift) && (shift == prefix)) return mergeWith(bt, setOp, shift);
+			return mergeTrees(bt, setOp);
 		}
-		if ((b instanceof SetLeaf)) return mergeWith((SetLeaf<T>) b, setOp, shift);
+		if ((b instanceof SetLeaf)) {
+			SetLeaf<T> bl = (SetLeaf<T>) b;
+			// Usual case first: every element of b is known to share this tree's prefix
+			if ((shift == prefix) || bl.isEmpty()) return mergeWith(bl, setOp, shift);
+			Hash h = getFirstHash();
+			AHashSet<T> result = mergeWith(bl.filterPrefix(h, shift, true), setOp, shift);
+			// Elements under another prefix lie outside this tree, like those under an absent digit
+			return includeAlone(result, bl.filterPrefix(h, shift, false), setOp);
+		}
 		throw new Panic("Unrecognised map type: " + b.getClass());
+	}
+
+	/**
+	 * Merges with a tree whose shift or prefix differs from this one's, or which is not known
+	 * to share it
+	 */
+	private AHashSet<T> mergeTrees(SetTree<T> b, int setOp) {
+		int bshift = b.shift;
+		int least = Math.min(shift, bshift);
+		int common = getFirstHash().commonHexPrefixLength(b.getFirstHash(), least);
+		if (common < least) {
+			// No element in common: each is merged with nothing, then joined at the digit where they part
+			AHashSet<T> empty = Sets.empty();
+			return join(common, mergeWith(empty, setOp, shift), empty.mergeWith(b, setOp, bshift));
+		}
+		if (shift == bshift) return mergeWith(b, setOp, shift);
+		// One lies under a single digit of the other
+		if (shift < bshift) return mergeUnder(this, b.getFirstHash().getHexDigit(shift), b, true, setOp);
+		return mergeUnder(b, getFirstHash().getHexDigit(bshift), this, false, setOp);
+	}
+
+	/**
+	 * Merges tree t with set x, all of whose elements lie under digit d of t: x with the child of
+	 * t at d, and each other child of t with nothing.
+	 *
+	 * @param tFirst True if t is the receiver of the merge, false if x is
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> AHashSet<T> mergeUnder(SetTree<T> t, int d, AHashSet<T> x, boolean tFirst, int setOp) {
+		int s = t.shift;
+		AHashSet<T> empty = Sets.empty();
+		Ref<AHashSet<T>>[] newChildren = (Ref<AHashSet<T>>[]) new Ref<?>[16];
+		boolean changed = false;
+		for (int digit = 0; digit < 16; digit++) {
+			Ref<AHashSet<T>> tref = t.childForDigit(digit);
+			AHashSet<T> tc = tref.getValue();
+			AHashSet<T> xc = (digit == d) ? x : empty;
+			if (tc.isEmpty() && xc.isEmpty()) continue;
+			AHashSet<T> rc = tFirst ? tc.mergeWith(xc, setOp, s + 1) : xc.mergeWith(tc, setOp, s + 1);
+			if (rc != tc) changed = true;
+			newChildren[digit] = (rc == tc) ? tref : rc.getRef();
+		}
+		if (tFirst && !changed) return t;
+		// A lone child left is the result itself, so a receiver x left unchanged is returned as x
+		return createFull(newChildren, s);
+	}
+
+	/**
+	 * Joins two sets whose elements share their first c hex digits and part at the next
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> AHashSet<T> join(int c, AHashSet<T> a, AHashSet<T> b) {
+		if (b.isEmpty()) return a;
+		if (a.isEmpty()) return b;
+		Ref<AHashSet<T>>[] children = (Ref<AHashSet<T>>[]) new Ref<?>[16];
+		children[a.getFirstHash().getHexDigit(c)] = a.getRef();
+		children[b.getFirstHash().getHexDigit(c)] = b.getRef();
+		return createFull(children, c);
+	}
+
+	/**
+	 * Includes the elements of a leaf that the result lacks, as the set operation gives each alone
+	 */
+	private AHashSet<T> includeAlone(AHashSet<T> result, SetLeaf<T> b, int setOp) {
+		int n = b.size();
+		for (int i = 0; i < n; i++) {
+			Ref<T> newE = applyOp(setOp, null, b.getRef(i));
+			if (newE != null) result = result.includeRef(newE);
+		}
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")
