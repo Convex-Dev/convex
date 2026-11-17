@@ -142,40 +142,13 @@ public class EtchUtils {
 				file, marker.exists() ? "present" : "absent", targets);
 
 		// ---- 1: identify the CURRENT store file ----
-		// The single marker (rewritten by every completeGC) names it; no marker
-		// means the base file itself is current
-		File current = null;
-		boolean markerMalformed = false;
-		String markerDiscardReason = null;
-		if (marker.exists()) {
-			String name = readMarkerName(marker);
-			if (name == null) {
-				markerMalformed = true;
-			} else {
-				File named = new File(file.getParentFile(), name).getCanonicalFile();
-				if (named.equals(file)) {
-					markerDiscardReason = "names the already-adopted base file";
-				} else if (!named.exists()) {
-					if (file.exists()) {
-						markerDiscardReason = "names missing target "+name
-								+" while the adopted base file is present";
-					} else {
-						throw new IOException("Etch GC recovery cannot proceed for " + file + ": marker "
-								+ marker.getName() + " names " + name + " as the current store file, but"
-								+ " neither that file nor " + file.getName() + " exists. Files have been"
-								+ " lost outside Convex's control (disk failure? manual deletion?)."
-								+ " Restore " + name + " or " + file.getName() + " from a backup, or delete"
-								+ " the marker to start a fresh empty store.");
-					}
-				} else if (!containsCanonical(targets,named)) {
-					throw new IOException("Etch GC recovery marker "+marker
-							+" names a file outside the GC target set for "+file+": "+name);
-				} else {
-					current = named;
-					debug("Etch GC recovery: completed cutover found - current store file is {}",
-							current.getName());
-				}
-			}
+		MarkerState markerState = readMarkerState(file, marker, targets);
+		File current = markerState.current();
+		boolean markerMalformed = markerState.malformed();
+		String markerDiscardReason = markerState.discardReason();
+		if (current != null) {
+			debug("Etch GC recovery: completed cutover found - current store file is {}",
+					current.getName());
 		}
 		// Where rolled-back data belongs: the live store file
 		File live = (current != null) ? current : file;
@@ -296,6 +269,62 @@ public class EtchUtils {
 		return file;
 	}
 
+	/**
+	 * Returns the file that currently holds the store whose logical file is
+	 * {@code file}, without changing anything on disk: the file named by a
+	 * completed GC cutover still awaiting adoption, otherwise {@code file}.
+	 *
+	 * @param file Etch store file as the caller names it
+	 * @return canonical file holding the store's current data
+	 * @throws IOException if the completion marker cannot be read, names a file
+	 *         outside the store's GC target set, or names a missing file while
+	 *         {@code file} is also missing
+	 */
+	public static File currentStoreFile(File file) throws IOException {
+		file = file.getCanonicalFile();
+		File marker = markerFile(file);
+		if (!marker.exists()) return file;
+		File current = readMarkerState(file, marker, gcTargets(file)).current();
+		return (current != null) ? current : file;
+	}
+
+	/**
+	 * Interpretation of a GC completion marker: the marker-named current file,
+	 * or null when the base file itself is current, with the reason a present
+	 * marker does not name a current file.
+	 */
+	private record MarkerState(File current, boolean malformed, String discardReason) {}
+
+	private static MarkerState readMarkerState(File file, File marker, List<File> targets)
+			throws IOException {
+		// The single marker (rewritten by every completeGC) names the current
+		// file; no marker means the base file itself is current
+		if (!marker.exists()) return new MarkerState(null, false, null);
+		String name = readMarkerName(marker);
+		if (name == null) return new MarkerState(null, true, null);
+		File named = new File(file.getParentFile(), name).getCanonicalFile();
+		if (named.equals(file)) {
+			return new MarkerState(null, false, "names the already-adopted base file");
+		}
+		if (!named.exists()) {
+			if (file.exists()) {
+				return new MarkerState(null, false, "names missing target "+name
+						+" while the adopted base file is present");
+			}
+			throw new IOException("Etch GC recovery cannot proceed for " + file + ": marker "
+					+ marker.getName() + " names " + name + " as the current store file, but"
+					+ " neither that file nor " + file.getName() + " exists. Files have been"
+					+ " lost outside Convex's control (disk failure? manual deletion?)."
+					+ " Restore " + name + " or " + file.getName() + " from a backup, or delete"
+					+ " the marker to start a fresh empty store.");
+		}
+		if (!containsCanonical(targets,named)) {
+			throw new IOException("Etch GC recovery marker "+marker
+					+" names a file outside the GC target set for "+file+": "+name);
+		}
+		return new MarkerState(named, false, null);
+	}
+
 	private static boolean containsCanonical(List<File> files, File candidate) throws IOException {
 		for (File file:files) {
 			if (file.getCanonicalFile().equals(candidate)) return true;
@@ -319,13 +348,14 @@ public class EtchUtils {
 		}
 		for (File candidate:files) {
 			if (candidate.length()==0L) continue;
-			try (RandomAccessFile data=new RandomAccessFile(candidate,"r");
-					AFileMapper mapper=EtchFileMapperFactory.createExisting(data.getChannel(),config,
-							candidate.getName(),true)) {
-				byte[] masterKey=AEtchHeader.resolveKey(mapper,candidate.getName(),config);
+			// Positional reads, not a mapper: a MappedByteBuffer mapping outlives
+			// close, and on Windows would stop recovery deleting or renaming the file
+			try (RandomAccessFile data=new RandomAccessFile(candidate,"r")) {
+				EtchHeaderSource source=EtchHeaderSource.of(data.getChannel());
+				byte[] masterKey=AEtchHeader.resolveKey(source,candidate.getName(),config);
 				AEtchHeader header=null;
 				try {
-					header=AEtchHeader.open(mapper,candidate.getName(),masterKey);
+					header=AEtchHeader.open(source,candidate.getName(),masterKey);
 					masterKey=null; // borrowed caller-owned array is not retained
 					Etch.resolveExistingConfig(header,config);
 					versions.add(header.version());

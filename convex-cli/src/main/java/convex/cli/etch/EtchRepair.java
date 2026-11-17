@@ -31,13 +31,14 @@ public class EtchRepair extends AEtchCommand {
 
 	@Override
 	public void execute() {
-		File source=etchMixin.getEtchFile();
 		File destination=FileUtils.getFile(destFilename);
 		try {
+			File source=etchMixin.getCurrentEtchFile();
 			EtchRebuilder.Result result=EtchRebuilder.rebuildConfigured(
 					source,sourceConfig(),destination,
 					sourcePolicy->destinationConfig(sourcePolicy,true));
 			println("Etch repair status:      "+result.status());
+			println("Source file:             "+source.getCanonicalPath());
 			println("Selected source root:    "+result.sourceRoot());
 			println("Indexed records accepted: "+Text.toFriendlyNumber(result.indexedRecordsAccepted()));
 			println("Scanned records accepted: "+Text.toFriendlyNumber(result.scannedRecordsAccepted()));

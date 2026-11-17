@@ -23,7 +23,7 @@ public class EtchValidate extends AEtchCommand {
 
 	@Override
 	public void execute() {
-		File file=etchMixin.getEtchFile();
+		File file=etchMixin.getCurrentEtchFile();
 		int detailLimit=100;
 		if (maxFailures!=null) {
 			if ((maxFailures<0)||(maxFailures>Integer.MAX_VALUE)) {
@@ -42,6 +42,7 @@ public class EtchValidate extends AEtchCommand {
 
 			cli().println("Etch strict validation completed with "
 					+report.failureCount()+" error(s)");
+			cli().println("Store file:               "+file.getCanonicalPath());
 			cli().println("Index blocks:             "+Text.toFriendlyNumber(report.indexBlocks()));
 			cli().println("Index pointers:           "+Text.toFriendlyNumber(report.indexPointers()));
 			cli().println("Cells:                    "+Text.toFriendlyNumber(report.records()));

@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import org.junit.jupiter.api.Test;
 
@@ -166,5 +167,76 @@ public class EtchGCRecoveryTest {
 			assertTrue(store.isGCInProgress());
 			store.cancelGC();
 		}
+	}
+
+	@Test
+	public void testRecoveryAdoptsFilesItHasNotMapped() throws IOException {
+		// Stores are written under other names and copied into place, so nothing
+		// in this process has mapped the files recovery deletes and renames
+		File base=base();
+		File target=new File(base.getPath()+"~");
+		File tombstone=new File(base.getPath()+".gc-defunct");
+		File marker=EtchUtils.markerFile(base);
+		target.deleteOnExit();
+		tombstone.deleteOnExit();
+		marker.deleteOnExit();
+		File superseded=base();
+		File collected=base();
+		AVector<ACell> collectedRoot=EtchGCLifecycleTest.tree(9000);
+		try (EtchStore store=EtchStore.create(superseded)) {
+			store.setRootData(EtchGCLifecycleTest.tree(9100));
+		}
+		try (EtchStore store=EtchStore.create(collected)) {
+			store.setRootData(collectedRoot);
+		}
+		Files.copy(superseded.toPath(),base.toPath(),StandardCopyOption.REPLACE_EXISTING);
+		Files.copy(collected.toPath(),target.toPath());
+		Files.writeString(tombstone.toPath(),"");
+		EtchUtils.writeMarker(base,target);
+
+		// The backend whose mappings outlive close
+		EtchConfig config=EtchConfig.create(EtchConstants.CURRENT_VERSION,
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,EtchConstants.DEFAULT_BUILD_CHAINS);
+		assertEquals(base.getCanonicalFile(),EtchUtils.recover(base,config));
+		assertFalse(target.exists());
+		assertFalse(tombstone.exists());
+		assertFalse(marker.exists());
+		try (EtchStore store=EtchStore.create(base,config)) {
+			assertEquals(collectedRoot.getHash(),store.getRootHash());
+		}
+	}
+
+	@Test
+	public void testCurrentStoreFileFollowsPendingAdoption() throws IOException {
+		File base=base();
+		File canonical=base.getCanonicalFile();
+		assertEquals(canonical,EtchUtils.currentStoreFile(base));
+
+		File target=new File(base.getPath()+"~");
+		target.deleteOnExit();
+		try (EtchStore store=EtchStore.create(target)) {
+			store.setRootData(EtchGCLifecycleTest.tree(8900));
+		}
+		File marker=EtchUtils.markerFile(base);
+		marker.deleteOnExit();
+		EtchUtils.writeMarker(base,target);
+
+		// Completed cutover, superseded base not yet deleted: resolution only reads
+		assertEquals(target.getCanonicalFile(),EtchUtils.currentStoreFile(base));
+		assertTrue(base.exists());
+		assertTrue(marker.exists());
+
+		// Superseded base deleted, collected file not yet renamed
+		assertTrue(base.delete());
+		assertEquals(target.getCanonicalFile(),EtchUtils.currentStoreFile(base));
+		assertTrue(marker.exists());
+
+		// A malformed marker leaves the base file current, as recovery treats it
+		Files.writeString(marker.toPath(),"");
+		assertEquals(canonical,EtchUtils.currentStoreFile(base));
+
+		// A marker naming a lost file, with the base file also missing, is refused
+		Files.writeString(marker.toPath(),base.getName()+"~7\n");
+		assertThrows(IOException.class,()->EtchUtils.currentStoreFile(base));
 	}
 }

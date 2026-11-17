@@ -10,6 +10,7 @@ import convex.core.data.AccountKey;
 import convex.core.util.FileUtils;
 import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
+import convex.etch.EtchUtils;
 import convex.peer.API;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.Option;
@@ -98,6 +99,20 @@ public class EtchMixin extends AMixin {
 			throw new CLIError("No Etch store file specified. Include --etch or set CONVEX_ETCH_FILE.");
 		}
 		return FileUtils.getFile(etchStoreFilename);
+	}
+
+	/**
+	 * Returns the file currently holding the configured Etch store, following
+	 * a completed GC cutover still awaiting adoption, without opening the
+	 * store or changing any file.
+	 */
+	public File getCurrentEtchFile() {
+		File file=getEtchFile();
+		try {
+			return EtchUtils.currentStoreFile(file);
+		} catch (IOException e) {
+			throw new CLIError("Unable to locate the current file of Etch store "+file+": "+e.getMessage(),e);
+		}
 	}
 
 	public List<AccountKey> getPeerList() {

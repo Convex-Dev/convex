@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Validate data that peers and lattice nodes receive more strictly before using it.
 - Keep Etch stores safe to reopen after a crash or hard kill, with nothing to repair when idle. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
 - Validate and repair Etch stores holding large values without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
+- Finish an Etch GC on Windows when the store is next opened, and have `etch validate` and `etch repair` read the collected file while it waits. ([File lifecycle](convex-core/docs/ETCH_GC.md#file-lifecycle-and-recovery))
 - Pass lattice data a node pulls from one peer on to its other peers.
 - Keep the consensus data verified peers send each other, so they no longer fetch it again. ([CPoS scheduling](convex-peer/docs/PROPAGATION.md#cpos-scheduling))
 - Correct Convex DB's SQL results, binary data and prepared statements across transactions, and report errors with SQLSTATE codes. ([#836](https://github.com/Convex-Dev/convex/issues/836))

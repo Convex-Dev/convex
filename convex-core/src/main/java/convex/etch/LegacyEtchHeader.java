@@ -28,11 +28,11 @@ final class LegacyEtchHeader extends AEtchHeader {
 		return new LegacyEtchHeader(version,0L,Hash.UNSET_HASH);
 	}
 
-	static LegacyEtchHeader open(AFileMapper mapper, String fileName) throws IOException {
+	static LegacyEtchHeader open(EtchHeaderSource source, String fileName) throws IOException {
 		int headerLength=Math.toIntExact(ROOT_HASH_OFFSET+Hash.LENGTH);
-		if (mapper.length()<headerLength) throw new IOException("Truncated Etch header: "+fileName);
+		if (source.length()<headerLength) throw new IOException("Truncated Etch header: "+fileName);
 		byte[] header=new byte[headerLength];
-		mapper.read(0L,header,0,header.length,null);
+		source.read(0L,header,0,header.length);
 		return decode(header,fileName);
 	}
 
