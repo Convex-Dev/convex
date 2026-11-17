@@ -12,15 +12,10 @@ import javax.swing.JSpinner;
 import javax.swing.JTabbedPane;
 import javax.swing.SpinnerNumberModel;
 import java.awt.Component;
-import java.io.File;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
-import convex.core.data.ACell;
-import convex.core.data.AMap;
-import convex.core.data.Keyword;
-import convex.core.store.NullStore;
 import convex.core.util.FileUtils;
 import convex.gui.components.FilePicker;
 import convex.gui.components.HostCombo;
@@ -30,7 +25,6 @@ import convex.gui.keys.KeyAccess;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
-import convex.peer.Server;
 import net.miginfocom.swing.MigLayout;
 
 public class PeerLaunchDialog {
@@ -91,17 +85,12 @@ public class PeerLaunchDialog {
 		FilePicker filePicker=new FilePicker(FileUtils.getFile("~/.convex/etch.db").getAbsolutePath());
 		joinPanel.add(filePicker);
 		joinPanel.add(Toolkit.makeHelp("Select Etch database file for peer operation."));
-		
-		// Loaded per options
-		JPanel loadPanel=new JPanel();
-		FilePicker backupPicker=new FilePicker(null);
-		loadPanel.add(backupPicker);
-		
+
+		// No Restore Backup tab until a peer can start from a backup file: issue #851
 		JTabbedPane tabs=new JTabbedPane();
 		tabs.add(testNetPanel,"Local Testnet");
 		tabs.add(joinPanel,"Join Network");
-		tabs.add(loadPanel,"Restore Backup");
-		
+
 		int result = JOptionPane.showConfirmDialog(parent, tabs, 
 	               "Peer Launch Details", 
 	               JOptionPane.OK_CANCEL_OPTION, 
@@ -137,12 +126,6 @@ public class PeerLaunchDialog {
 		    			return null;
 		    		}
 		    		return PeerGUI.launchPeerGUI(sa,kp);
-		    	} else if (selected==loadPanel) {
-		    		File f=backupPicker.getFile();
-		    		AKeyPair kp=null; // TODO;
-		    		AMap<Keyword,ACell> peerData=FileUtils.loadCAD3(f.toPath(), NullStore.INSTANCE);
-		    		Server server=Server.fromPeerData(kp,peerData);
-		    		return PeerGUI.launchPeerGUI(server);
 		    	}
 	    	} catch (InterruptedException e) {
 	    		Thread.currentThread().interrupt();
