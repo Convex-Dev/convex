@@ -157,6 +157,7 @@ public class Blob extends AArrayBlob {
 			return true;
 		if (a instanceof AArrayBlob)
 			return equals((AArrayBlob) a);
+		if (a == null) return false; // after the fast path, which null never takes
 		long n = count();
 		if (a.count() != n)
 			return false;

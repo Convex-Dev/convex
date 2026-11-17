@@ -61,6 +61,8 @@ public abstract class ADerivedBlob extends ABlob {
 
 	@Override
 	public boolean equals(ABlob o) {
+		if (o == this) return true;
+		if (o == null) return false;
 		return o.equals(getCanonical());
 	}
 

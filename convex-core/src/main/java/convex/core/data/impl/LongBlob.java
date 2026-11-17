@@ -66,6 +66,7 @@ public final class LongBlob extends ALongBlob {
 	@Override
 	public boolean equals(ABlob a) {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
+		if (a == null) return false; // after the fast path, which null never takes
 		return ((a.count()==LENGTH)&& (a.longValue()== value));
 	}
 	
