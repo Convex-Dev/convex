@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Poll the peers a peer has verified first, one poll at a time and sooner after one that went well, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
 - Speed up decoding of messages that carry several cells, such as consensus updates. ([Canonical decoding](convex-core/docs/ENCODER_DESIGN.md#canonical-decoding))
 - Decode incoming messages off the network threads, so a busy connection no longer delays others, and keep part of a peer's capacity for verified peers. ([Server-side backpressure](convex-peer/docs/BACKPRESSURE.md))
+- Refuse SQL column types Convex DB cannot yet store, such as `DATE` and `UUID`, when a table is created, rather than keeping the column untyped. ([SQL column types](convex-db/docs/SQL-TYPES.md))
 
 ### Fixed
 

@@ -182,6 +182,8 @@ PgServer server = PgServer.builder()
 server.start();
 ```
 
+The server listens on every network interface. Without a password, any client that can reach the port can read and write the database it serves, so set a password, add TLS on networks you do not trust, or keep the port behind a firewall.
+
 ### TLS
 
 Give the server an `SSLContext` holding its certificate and private key, and clients that request TLS are upgraded before they send their startup message or password:
@@ -203,6 +205,8 @@ Once TLS is offered, a client that does not request it is refused with SQLSTATE 
 ```bash
 java -cp convex-db.jar convex.db.psql.PgServer -p 5432 -d mydb
 ```
+
+The command-line server is for local trials: it has no password or TLS option, and it serves a new in-memory database, whose data is lost when the server stops.
 
 ### Connecting with Clients
 
