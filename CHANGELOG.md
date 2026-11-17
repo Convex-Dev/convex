@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgrade all peers of a network together: this release changes how some transactions execute.
 - Rework lattice cursors and transactions: transactions run on any component and in separate regions at once, and writes compare by value and reach only places that exist; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Disconnect a connection that sends false data, such as a bad signature, and keep one that sends malformed data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
 - Report failures to clients as clear errors rather than stack traces, empty results or no reply, and keep routine failures out of operator warning logs.
