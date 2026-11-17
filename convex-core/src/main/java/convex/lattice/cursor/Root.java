@@ -170,7 +170,8 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 		for (;;) {
 			Object current=state.get();
 			if (current instanceof Claimed claimed) {
-				if (claimed.claim.isOwnedByCaller()) throw new IllegalStateException("This thread already holds this root's claim");
+				// The holder takes it again; closing this one leaves the claim to the one it took first
+				if (claimed.claim.isOwnedByCaller()) return () -> {};
 				claimed.claim.awaitRelease();
 			} else {
 				ActiveClaim claim=new ActiveClaim(state);

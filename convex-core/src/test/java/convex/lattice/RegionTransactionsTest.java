@@ -400,6 +400,62 @@ class RegionTransactionsTest {
 		assertEquals(Sets.of(6),at(root,MORE),"a region the container left alone commits its exclusive transaction");
 	}
 
+	/**
+	 * A change spanning a staged region and the rest of its container, published as one:
+	 * the copy's claim first, then the container's, the order in which a sync takes them.
+	 */
+	@Test void aCopyClaimedFirstSyncsIntoAnExclusiveContainerTransaction() throws InterruptedException {
+		var host=new Root<>(Index.<Keyword,ACell>of(FORKED,Sets.empty(),LIVE,Sets.empty()));
+		var before=host.get();
+		var app=new App(host.fork());
+		Members copy=app.forked();
+		Thread[] publisher=new Thread[1];
+		copy.exclusive().execute(held -> {
+			publisher[0]=Thread.ofPlatform().start(app::sync);
+			awaitParked(publisher[0]);
+			assertTrue(publisher[0].isAlive(),"the application's sync waits for the copy's claim, holding nothing");
+			app.exclusive().execute(view -> {
+				view.live().add(1);
+				copy.execute(m -> m.add(2));
+				copy.sync();
+				assertEquals(Sets.of(2),app.value().get(FORKED),"the copy's sync lands in the claimed state at once");
+				assertEquals(Sets.empty(),app.value().get(LIVE),"ahead of the draft");
+			});
+			assertSame(before,host.get(),"the host sees neither until the application publishes");
+		});
+		publisher[0].join();
+		assertEquals(Sets.of(2),at(host,FORKED),"one publication carries both");
+		assertEquals(Sets.of(1),at(host,LIVE));
+	}
+
+	@Test void aCopysSyncStaysIfTheContainerTransactionThenFails() {
+		var root=new Root<>(Index.<Keyword,ACell>of(FORKED,Sets.empty(),LIVE,Sets.empty()));
+		var app=new App(root);
+		Members copy=app.forked();
+		assertThrows(IllegalStateException.class,() -> copy.exclusive().execute(held -> app.exclusive().execute(view -> {
+			view.live().add(1);
+			copy.add(2);
+			copy.sync();
+			throw new IllegalStateException();
+		})));
+		assertEquals(Sets.of(2),at(root,FORKED),"the sync is not undone");
+		assertEquals(Sets.empty(),at(root,LIVE),"the draft is");
+	}
+
+	@Test void aCopySyncedInItsOwnExclusiveTransactionPublishesWhatItHadCommitted() {
+		var root=liveRoot();
+		var app=new App(root);
+		var copy=(Members)app.more().fork();
+		copy.add(1);
+		copy.exclusive().execute(draft -> {
+			draft.add(3);
+			copy.sync();
+			assertEquals(Sets.of(1),at(root,MORE),"not the draft");
+		});
+		assertEquals(Sets.of(1,3),copy.value(),"the draft commits into the copy");
+		assertEquals(Sets.of(1),at(root,MORE));
+	}
+
 	@Test void aContainerTransactionSeesWhatARegionCommitted() {
 		var root=liveRoot();
 		var app=new App(root);

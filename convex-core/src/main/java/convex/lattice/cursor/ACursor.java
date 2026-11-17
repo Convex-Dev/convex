@@ -60,10 +60,10 @@ public abstract class ACursor<V extends ACell> {
 	 * cursors pass it down through their existing source links, so a boundary needs
 	 * to know nothing about paths or views. This is the only boundary-owned capability
 	 * a cursor exposes, and it supports {@link Transactions} and atomic fork
-	 * publication.
+	 * publication. A thread already holding that claim takes it again without
+	 * waiting, and the claim stays held until the outermost one is closed.
 	 *
 	 * @return The claim, to be closed by the calling thread
-	 * @throws IllegalStateException if the calling thread already holds that claim
 	 */
 	protected Claim claim() {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" has no root to claim");

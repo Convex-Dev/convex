@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bind Swing views to lattice components, updating them automatically. ([Lattice views](convex-gui/docs/LATTICE_VIEWS.md))
 - Give Java, JDBC and PostgreSQL clients read-only access to Convex DB databases. ([#803](https://github.com/Convex-Dev/convex/issues/803))
 - Let embedders handle incoming connections and component failures themselves. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers))
+- Commit a change to a staged lattice copy together with other changes in its container. ([Forks and transactions](convex-core/docs/LATTICE_APPLICATIONS.md#forks-and-transactions))
 
 ### Changed
 

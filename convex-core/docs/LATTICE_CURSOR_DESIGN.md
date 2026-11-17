@@ -376,7 +376,8 @@ A claim locks a transactional boundary, wherever in a cursor tree it is taken:
 the nearest `BoundaryCursor` beneath the claiming cursor, or else the root, which is
 the outermost boundary. Derived views pass the claim down through their source
 links, so a boundary needs to know nothing about paths or views. A boundary holds at
-most one claim, and it covers everything under the boundary: while it is held, a
+most one claim, owned by one thread, which may take it again; it stays held until
+the outermost is closed. It covers everything under the boundary: while it is held, a
 write through the boundary from another thread that would change its value waits
 for the release and recalculates, and a write that leaves the value equal carries
 on. Persisting leaves the value equal, so it proceeds during a claim and the root
@@ -398,6 +399,15 @@ the commit fails rather than overwrite the write. A component's transactions pas
 its `reconcile`, so a conflict there fails the commit.
 Each write through a boundary holds the read side of its read-write lock, and its
 claim holds the write side.
+
+Claims are taken in one order: a fork's claim before the claim over its destination,
+and a boundary's before those enclosing it. A fork's sync holds the fork's claim while
+it writes the destination, which waits for any claim held there, and a region's
+claimed commit holds the region's boundary while it writes the container's root. Work
+that holds a claim and then writes through another fork or boundary, as a callback
+syncing a fork or writing through a captured region does, must already hold that
+one's claim, taken first; otherwise it can deadlock with a thread taking them in this
+order.
 
 Typed domain
 transactions use `rebind` to retain component policy; a component opts in by

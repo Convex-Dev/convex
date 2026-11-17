@@ -275,10 +275,18 @@ class RootClaimTest {
 		assertEquals(Maps.empty(),root.get(),"The claim was free to take again");
 	}
 
-	@Test void aThreadCannotTakeARootsClaimTwice() {
+	@Test void aThreadHoldingARootsClaimTakesItAgainAndKeepsIt() throws InterruptedException {
 		var root=tree();
-		Transactions.executeExclusively(root,draft -> assertThrows(IllegalStateException.class,
-			() -> Transactions.executeExclusively(root,inner -> {})));
+		Thread[] writer=new Thread[1];
+		Transactions.executeExclusively(root,draft -> {
+			Transactions.executeExclusively(root,inner -> inner.set(inner.get().assoc(B,Maps.of(X,CVMLong.ONE))));
+			assertEquals(CVMLong.ONE,root.get(B,X),"the inner transaction commits at once");
+			writer[0]=Thread.ofPlatform().start(() -> root.set(Maps.empty()));
+			awaitParked(writer[0]);
+			assertTrue(writer[0].isAlive(),"closing the inner claim left the claim held");
+		});
+		writer[0].join();
+		assertEquals(Maps.empty(),root.get(),"released with the outermost claim");
 	}
 
 	@Test void aWriteThroughACapturedLiveCursorDuringTheCallbackIsRefusedAtCommit() {

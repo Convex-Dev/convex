@@ -23,6 +23,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Claim;
 import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
@@ -150,14 +151,21 @@ class TransactionBehaviourTest {
 		/** Queues another writer's commit, computed from the current value and the value the attempt proposes. */
 		void competeWith(BinaryOperator<AHashMap<Keyword,ACell>> write) { competing.add(write); }
 
-		/** Whether the calling thread holds this root's claim, the one case a second claim is refused. */
-		boolean claimedByCaller() {
-			try {
-				Transactions.executeExclusively(this,draft -> {});
-				return false;
-			} catch (IllegalStateException e) {
-				return true;
-			}
+		/** Thread holding this root's claim, or null. */
+		private volatile Thread holder;
+
+		/** Whether the calling thread holds this root's claim. */
+		boolean claimedByCaller() { return holder==Thread.currentThread(); }
+
+		@Override protected Claim claim() {
+			Claim claim=super.claim();
+			Thread previous=holder;
+			holder=Thread.currentThread();
+			return () -> {
+				// Cleared before the release, while this thread still holds the claim
+				holder=previous;
+				claim.close();
+			};
 		}
 
 		@Override protected boolean install(AHashMap<Keyword,ACell> held,AHashMap<Keyword,ACell> value) {

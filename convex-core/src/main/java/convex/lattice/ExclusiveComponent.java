@@ -37,11 +37,19 @@ import convex.lattice.cursor.Transactions;
  * through the boundary is reconciled with the callback's run by the source component's
  * {@link ALatticeComponent#reconcile(ACell,ACell,ACell)}, as {@link TransactionalComponent}
  * describes, or makes the transaction fail if it cannot reconcile changes on both sides. For a
- * staged component the root is that component's working copy, so the fork's sync
- * waits for a running transaction.
+ * staged component the root is that component's working copy, so a sync of the fork
+ * from another thread waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
- * separate sync. Callbacks must not wait for another operation on the same state,
- * sync it, or write through a captured live component.</p>
+ * separate sync, and a sync from the callback publishes what the fork held before the
+ * transaction.</p>
+ *
+ * <p>Callbacks must not wait for another thread's operation on the same state. A write
+ * a callback makes outside its draft, through a captured component or by a fork's sync,
+ * lands at once and stays if the callback or the commit fails; one that changes the
+ * value under the claim is reconciled at commit, as above. Such a write waits for any
+ * claim it passes that another thread holds, so the callback's thread must hold each
+ * such claim, taken before this one: a fork's claim before its destination's, a
+ * region's before its container's. A thread may take a claim it already holds.</p>
  *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks

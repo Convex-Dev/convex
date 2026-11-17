@@ -55,15 +55,15 @@ public final class BoundaryCursor<V extends ACell> extends AForkableCursor<V> {
 
 	/**
 	 * Takes this boundary's claim, waiting for any earlier claim and for writes
-	 * through it to finish.
+	 * through it to finish. The thread holding it takes it again at once.
 	 *
-	 * @throws IllegalStateException if the calling thread already holds this claim,
-	 *         or is writing through this boundary
+	 * @throws IllegalStateException if the calling thread is writing through this
+	 *         boundary without holding its claim
 	 */
 	@Override
 	protected Claim claim() {
-		if (lock.isWriteLockedByCurrentThread()) throw new IllegalStateException("This thread already holds this boundary's claim");
-		if (lock.getReadHoldCount()>0) throw new IllegalStateException("A write through this boundary cannot claim it");
+		// A read hold cannot be raised to the write lock; the holder's own writes can
+		if (!lock.isWriteLockedByCurrentThread() && lock.getReadHoldCount()>0) throw new IllegalStateException("A write through this boundary cannot claim it");
 		ReentrantReadWriteLock.WriteLock claim=lock.writeLock();
 		claim.lock();
 		return claim::unlock;

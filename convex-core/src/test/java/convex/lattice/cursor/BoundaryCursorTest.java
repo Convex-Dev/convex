@@ -195,13 +195,39 @@ class BoundaryCursorTest {
 		assertEquals(CVMLong.ONE,a.get());
 	}
 
-	@Test void aBoundaryCannotBeClaimedTwiceByOneThread() {
-		var a=boundary(tree(),A);
+	@Test void aThreadHoldingABoundarysClaimTakesItAgainAndKeepsIt() throws InterruptedException {
+		var root=tree();
+		var a=boundary(root,A);
+		Thread[] writer=new Thread[1];
 		Transactions.executeExclusively(a,draft -> {
-			assertThrows(IllegalStateException.class,() -> Transactions.executeExclusively(a,d -> d.set(CVMLong.TWO)));
-			draft.set(CVMLong.ONE);
+			Transactions.executeExclusively(a,inner -> inner.set(CVMLong.TWO));
+			assertEquals(CVMLong.TWO,root.get(A),"the inner transaction commits at once");
+			writer[0]=Thread.ofPlatform().start(() -> a.set(CVMLong.create(5)));
+			awaitParked(writer[0]);
+			assertTrue(writer[0].isAlive(),"closing the inner claim left the claim held");
 		});
-		assertEquals(CVMLong.ONE,a.get());
+		writer[0].join();
+		assertEquals(CVMLong.create(5),root.get(A),"released with the outermost claim");
+	}
+
+	@Test void aNestedTransactionUnderTheSameClaimIsReconciledByTheOuterCommit() {
+		var root=tree();
+		var a=boundary(root,A);
+		assertThrows(IllegalStateException.class,() -> Transactions.executeExclusively(a,draft -> {
+			Transactions.executeExclusively(a,inner -> inner.set(CVMLong.TWO));
+			draft.set(CVMLong.ONE);
+		}),"with no merge, the outer commit refuses a change under its claim");
+		assertEquals(CVMLong.TWO,root.get(A),"the inner commit stands");
+	}
+
+	@Test void aWriteThroughTheBoundaryCannotClaimItWithoutHoldingTheClaim() {
+		var root=tree();
+		var a=boundary(root,A);
+		a.updateAndGet(v -> {
+			assertThrows(IllegalStateException.class,() -> Transactions.executeExclusively(a,d -> {}));
+			return CVMLong.ONE;
+		});
+		assertEquals(CVMLong.ONE,root.get(A));
 	}
 
 	@Test void persistingGoesThroughDuringAClaim() {
