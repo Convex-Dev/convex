@@ -1,6 +1,6 @@
 # Etch v3: Header, Durability and Encryption
 
-Etch v3 is the current on-disk format for Etch, the append-only content-addressed
+Etch v3 is the latest on-disk format for Etch, the append-only content-addressed
 store behind every Convex peer and lattice node. It keeps the v2 data-record and
 index-block layout specified in [CAD047](https://docs.convex.world/docs/cad/etch)
 and changes only what sits around it: a duplicated, self-checking header that
