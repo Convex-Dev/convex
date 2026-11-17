@@ -12,12 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bind Swing views to lattice components, updating them automatically. ([Lattice views](convex-gui/docs/LATTICE_VIEWS.md))
 - Give Java, JDBC and PostgreSQL clients read-only access to Convex DB databases. ([#803](https://github.com/Convex-Dev/convex/issues/803))
 - Let embedders handle incoming connections and component failures themselves. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers))
-- Commit a change to a staged lattice copy together with other changes in its container. ([Forks and transactions](convex-core/docs/LATTICE_APPLICATIONS.md#forks-and-transactions))
 
 ### Changed
 
 - Upgrade all peers of a network together: this release changes how some transactions execute.
-- Rework lattice cursors and transactions, so transactions run on any component and across regions at once; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
+- Rework lattice cursors and transactions, so transactions run on any component and in separate regions at once; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
 - Keep peers responsive under load, decoding messages faster and reserving capacity for verified peers. ([Server-side backpressure](convex-peer/docs/BACKPRESSURE.md))
 - Poll verified peers first, and back off from peers that fail. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
 - Check data from peers and lattice nodes more strictly, and drop connections that send false data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
