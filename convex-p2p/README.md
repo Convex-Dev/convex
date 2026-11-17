@@ -307,7 +307,7 @@ me.node().cursor()                    // independent node-record component
 
 P2PUser draft = me.fork();            // identity edits, isolated
 draft.cursor().set(...);
-draft.sync();                         // merged back under LWW
+draft.sync();                         // merged back; refused if the record changed too
 node.getApplication().sync();         // publish the complete root
 ```
 

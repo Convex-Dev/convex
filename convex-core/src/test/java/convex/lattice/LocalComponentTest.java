@@ -139,24 +139,30 @@ class LocalComponentTest {
 		assertEquals(beta.cursor().get(),signed.getValue().get(BETA));
 	}
 
-	@Test void newerRecordWinsWhicheverCopySyncsFirst() {
+	/**
+	 * Of two copies of one service that both changed, whichever syncs second fails,
+	 * newer or not, and changes nothing. A copy that changed nothing takes what the
+	 * other published.
+	 */
+	@Test void secondOfTwoChangedCopiesFailsToSync() {
 		for (boolean newerFirst:new boolean[] {true,false}) {
 			var host=LatticeHost.create();
 			var signatures=new AtomicInteger();
 			var older=new Notes(host.cursor(),ALPHA,signatures,new AtomicLong(1));
 			var newer=new Notes(host.cursor(),ALPHA,signatures,new AtomicLong(2));
+			var idle=new Notes(host.cursor(),ALPHA,signatures,new AtomicLong(3));
 			older.put(A,1);
 			newer.put(A,2);
-			if (newerFirst) {
-				newer.sync();
-				older.sync();
-			} else {
-				older.sync();
-				newer.sync();
-			}
-			assertEquals(newer.cursor().get(),slot(host.cursor().get()).getValue().get(ALPHA));
-			older.sync();
-			assertEquals(newer.cursor().get(),older.cursor().get());
+			var first=newerFirst?newer:older;
+			var second=newerFirst?older:newer;
+			first.sync();
+			var published=slot(host.cursor().get());
+			assertThrows(MergeConflictException.class,second::sync);
+			assertSame(published,slot(host.cursor().get()),"a refused sync changes nothing");
+			assertEquals(1,signatures.get(),"a refused sync signs nothing");
+			assertEquals(CVMLong.create(newerFirst?1:2),second.cursor().get().get(A),"the refused copy keeps its edits");
+			idle.sync();
+			assertEquals(first.cursor().get(),idle.cursor().get(),"a copy that changed nothing takes the published record");
 		}
 	}
 

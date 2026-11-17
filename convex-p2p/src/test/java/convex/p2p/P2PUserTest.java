@@ -27,6 +27,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.store.MemoryStore;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.node.NodeConfig;
 
@@ -237,12 +238,11 @@ public class P2PUserTest {
 	}
 
 	/**
-	 * A stale forked edit loses to a newer parent value. This is the :id region's LWW
-	 * wiring showing through P2PUser.fork() — the fork/sync mechanism itself is core's
-	 * ({@code SignedCursorTest.testForkSyncAboveSigningBoundary}).
+	 * A forked edit cannot sync over an identity that changed while the fork was open:
+	 * the sync fails and changes nothing, and the fork keeps its edit.
 	 */
 	@Test
-	public void testForkSyncMergesByTimestamp() {
+	public void testForkSyncRefusesAnIdentityThatChangedToo() {
 		P2PUser me = node.p2p(KEY);
 		me.cursor().set(P2PLattice.createIdentity(Strings.create("base"), null, null, 1000L));
 		me.sync();
@@ -255,11 +255,13 @@ public class P2PUserTest {
 		me2.cursor().set(P2PLattice.createIdentity(Strings.create("newer"), null, null, 3000L));
 		me2.sync();
 
-		draft.sync();
+		assertThrows(MergeConflictException.class, draft::sync);
 
 		assertEquals(Strings.create("newer"),
 			node.p2p(KEY).getIdentity().get(P2PLattice.ID_NAME),
-			"Older forked edit must not overwrite a newer parent value");
+			"A refused sync changes nothing");
+		assertEquals(Strings.create("stale"), draft.getIdentity().get(P2PLattice.ID_NAME),
+			"The fork keeps its edit");
 	}
 
 	// ===== Scoping =====

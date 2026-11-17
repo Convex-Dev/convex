@@ -23,8 +23,10 @@ import convex.lattice.cursor.AForkableCursor;
  * <p>The component works on a private copy of its record. Edits through
  * {@link #cursor()} stamp {@code :timestamp} from the supplied clock but neither sign
  * nor reach the owner's slot. {@link #sync()} writes the record into the slot with a
- * single signature; a sync with nothing changed writes and signs nothing. When to
- * sync is the application's policy, so any number of edits can share one signature.</p>
+ * single signature; a sync with nothing changed writes and signs nothing. If both the
+ * copy and the slot's record have changed since the copy last synced, the sync fails
+ * with a {@link MergeConflictException} and changes nothing. When to sync is the
+ * application's policy, so any number of edits can share one signature.</p>
  *
  * <p>Several services share an owner's slot, each under its own keyword, and each
  * sync re-signs the slot. Records merge whole, the newer {@code :timestamp} winning
@@ -87,11 +89,5 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	public AHashMap<Keyword,ACell> mergeAt(ACell incoming,ACell... path) {
 		if (path.length!=0 || !(incoming instanceof AHashMap<?,?> map)) return cursor().getOrDefault(null);
 		return merge((AHashMap<Keyword,ACell>)map);
-	}
-
-	/** When the slot's record also changed, the newer record wins. */
-	@Override
-	protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
-		return record.getLattice().merge(own,other);
 	}
 }

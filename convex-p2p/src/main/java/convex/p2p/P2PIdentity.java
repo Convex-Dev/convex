@@ -7,6 +7,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -41,7 +42,11 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 		setIdentity(P2PLattice.createIdentity(name,nodes,null,timestamp));
 	}
 
-	/** Creates an isolated working component at the same logical path, merging on sync with the identity value lattice. */
+	/**
+	 * Creates an isolated working component at the same logical path. Its sync fails
+	 * with a {@link MergeConflictException}, changing nothing, if the record here has
+	 * changed too.
+	 */
 	public P2PIdentity fork() {
 		return rebind(storage.fork());
 	}
@@ -49,11 +54,5 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 	@Override
 	public P2PIdentity rebind(AForkableCursor<ACell> cursor) {
 		return new P2PIdentity(cursor,owner);
-	}
-
-	/** Reconciles this component's draft using its domain merge rule. */
-	@Override
-	protected ACell reconcile(ACell own,ACell other) {
-		return P2PLattice.ID_LATTICE.getValueLattice().merge(own,other);
 	}
 }
