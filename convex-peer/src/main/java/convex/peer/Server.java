@@ -610,7 +610,7 @@ public class Server implements Closeable {
 	 * Dispatches a decoded inbound message to the appropriate handler.
 	 *
 	 * <p>Client requests are offered to bounded queues and may request connection
-	 * backpressure when full. BELIEF propagation, and DATA from a trusted connection,
+	 * backpressure when full. BELIEF propagation, and DATA from a verified connection,
 	 * is offered once to its dedicated queue and dropped if full. Lightweight control
 	 * messages are handled inline.
 	 *

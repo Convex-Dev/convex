@@ -99,7 +99,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		Config.BELIEF_QUEUE_SIZE);
 
 	/**
-	 * Ordered BELIEF messages received from any connection, and DATA from trusted
+	 * Ordered BELIEF messages received from any connection, and DATA from verified
 	 * ones. DATA must remain ahead of the root that references it until both reach
 	 * this thread.
 	 */
