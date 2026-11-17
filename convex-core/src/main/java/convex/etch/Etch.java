@@ -211,18 +211,25 @@ public class Etch {
 	/** Test-only construction around a deterministic mapper. */
 	Etch(AFileMapper mapper, String fileName, EtchFileCipher dataCipher,
 			EtchFileCipher indexCipher) {
+		this(mapper,fileName,dataCipher,indexCipher,null,null);
+	}
+
+	/** Test-only construction exercising the real mutation/checkpoint path. */
+	Etch(AFileMapper mapper, String fileName, EtchFileCipher dataCipher,
+			EtchFileCipher indexCipher, AEtchHeader header, EtchConfig config) {
 		this.file = null;
 		this.fileName = fileName;
 		this.data = null;
-		this.config = null;
-		this.header = null;
-		this.version = 0;
-		this.indexStart = 0L;
+		this.config = config;
+		this.header = header;
+		this.version = (header==null)?0:header.version();
+		this.indexStart = (header==null)?0L:header.indexStart();
 		this.mapper = mapper;
 		this.dataCipher = dataCipher;
 		this.indexCipher = indexCipher;
 		this.buildChains = false;
 		this.shutdownHook = null;
+		this.requiresOpenTransition = header instanceof EtchV3Header;
 	}
 
 	/**
