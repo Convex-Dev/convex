@@ -33,7 +33,8 @@ public final class RequestBody {
 	}
 
 	/**
-	 * Reads a request body whole.
+	 * Reads a request body whole. A body an earlier handler has already read through the
+	 * context, as {@link Context#body()} does, is taken from the context's copy of it.
 	 *
 	 * @param ctx Request context
 	 * @param maxBytes Most bytes the body may have
@@ -42,6 +43,13 @@ public final class RequestBody {
 	 * @throws BadRequestResponse if the body cannot be read
 	 */
 	public static byte[] readBytes(Context ctx, long maxBytes) {
+		// Javalin's body() and bodyAsBytes() spend the stream and keep a copy, which only
+		// bodyAsBytes() returns from then on
+		if (contentBytesRead(ctx)>0) {
+			byte[] read=ctx.bodyAsBytes();
+			if (read.length>maxBytes) throw tooLarge(maxBytes);
+			return read;
+		}
 		InputStream in=ctx.bodyInputStream();
 		ByteArrayOutputStream out=new ByteArrayOutputStream();
 		byte[] chunk=new byte[CHUNK_SIZE];
@@ -50,15 +58,22 @@ public final class RequestBody {
 			int n;
 			while ((n=in.read(chunk))>=0) {
 				total+=n;
-				if (total>maxBytes) {
-					throw new ContentTooLargeResponse("Request body exceeds maximum size of "+maxBytes+" bytes");
-				}
+				if (total>maxBytes) throw tooLarge(maxBytes);
 				out.write(chunk,0,n);
 			}
 		} catch (IOException e) {
 			throw new BadRequestResponse("Unable to read request body");
 		}
 		return out.toByteArray();
+	}
+
+	private static ContentTooLargeResponse tooLarge(long maxBytes) {
+		return new ContentTooLargeResponse("Request body exceeds maximum size of "+maxBytes+" bytes");
+	}
+
+	/** Bytes of the request body read from the connection so far, by any reader. */
+	private static long contentBytesRead(Context ctx) {
+		return Request.getContentBytesRead(ServletContextRequest.getServletContextRequest(ctx.req()));
 	}
 
 	/**
@@ -88,8 +103,7 @@ public final class RequestBody {
 		String expect=ctx.header("Expect");
 		if ((expect!=null)&&expect.toLowerCase(Locale.ROOT).contains("100-continue")) return;
 
-		long alreadyRead=Request.getContentBytesRead(ServletContextRequest.getServletContextRequest(ctx.req()));
-		long remaining=maxBytes-Math.max(0,alreadyRead);
+		long remaining=maxBytes-Math.max(0,contentBytesRead(ctx));
 		try {
 			InputStream in=ctx.req().getInputStream();
 			byte[] chunk=new byte[CHUNK_SIZE];
