@@ -30,23 +30,23 @@ import convex.lattice.cursor.Transactions;
  * <p>The claim is that of the nearest transactional boundary beneath the source's
  * bound storage ({@link convex.lattice.cursor.ACursor#claim}): a
  * {@link convex.lattice.cursor.BoundaryCursor}, or else the root, which is the
- * outermost boundary. It covers everything under that boundary: writes through it
- * wait, including incoming merges, and exclusive transactions under the same
- * boundary run one after another whatever they touch, while those under separate
+ * outermost boundary. It covers everything under that boundary: writes through it from
+ * other threads wait, including incoming merges, and exclusive transactions under the
+ * same boundary run one after another whatever they touch, while those under separate
  * boundaries run at the same time. A write reaching the value without passing
- * through the boundary is reconciled with the callback's run by the source component's
+ * through the boundary, or made by the claiming thread outside the draft, is
+ * reconciled with the callback's run by the source component's
  * {@link ALatticeComponent#reconcile(ACell,ACell,ACell)}, as {@link TransactionalComponent}
  * describes, or makes the transaction fail if it cannot reconcile changes on both sides. For a
  * staged component the root is that component's working copy, so a sync of the fork
  * from another thread waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
- * separate sync, and a sync from the callback publishes what the fork held before the
- * transaction.</p>
+ * separate sync, and a sync from the callback publishes the fork's working value,
+ * without this transaction's draft.</p>
  *
  * <p>Callbacks must not wait for another thread's operation on the same state. A write
  * a callback makes outside its draft, through a captured component or by a fork's sync,
- * lands at once and stays if the callback or the commit fails; one that changes the
- * value under the claim is reconciled at commit, as above. Such a write waits for any
+ * lands at once and stays if the callback or the commit fails. Such a write waits for any
  * claim it passes that another thread holds, so the callback's thread must hold each
  * such claim, taken before this one: a fork's claim before its destination's, a
  * region's before its container's. A thread may take a claim it already holds.</p>
@@ -62,7 +62,7 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	/** Binds the source's domain operations to each draft. */
 	private final Function<? super AForkableCursor<V>,? extends C> binder;
 
-	/** Reconciles a change under the claim that did not pass through it, or null to fail instead. */
+	/** Reconciles a change under the claim made outside the draft, or null to fail instead. */
 	private final ThreeWayMerge<V> merge;
 
 	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> binder,ThreeWayMerge<V> merge) {

@@ -46,9 +46,10 @@ import convex.lattice.MergeConflictException;
  * expensive to repeat or with side effects: its callback runs once.</p>
  *
  * <p>Under a {@link BoundaryCursor}, a write that does not pass through the boundary
- * can still change the value while it is claimed. The transaction then commits by the
- * same merge, and fails if that merge refuses the change. Without a merge, it fails
- * rather than overwrite the change.</p>
+ * can still change the value while it is claimed, and so can the claiming thread, as
+ * an exclusive callback may. The transaction then commits by the same merge, and
+ * fails if that merge refuses the change. Without a merge, it fails rather than
+ * overwrite the change.</p>
  */
 public final class Transactions {
 
@@ -123,9 +124,9 @@ public final class Transactions {
 
 	/**
 	 * Runs one isolated callback, once, under the claim beneath this cursor (see
-	 * {@link ACursor#claim}), and returns its result. Writes through that boundary
-	 * wait until it commits, and so do other claims on it. A change under the claim
-	 * that did not pass through it makes the transaction fail.
+	 * {@link ACursor#claim}), and returns its result. Writes through that boundary from
+	 * other threads wait until it commits, and so do their claims on it. A change under
+	 * the claim made outside the draft makes the transaction fail.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
@@ -140,7 +141,7 @@ public final class Transactions {
 
 	/**
 	 * Runs one isolated callback, once, as {@link #transactExclusively(AForkableCursor,Function)},
-	 * merging a change under the claim that did not pass through it with the callback's run.
+	 * merging a change under the claim made outside the draft with the callback's run.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type

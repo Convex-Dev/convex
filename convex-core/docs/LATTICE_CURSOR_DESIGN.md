@@ -392,7 +392,8 @@ transactions under separate boundaries, such as the regions of one container, ru
 at the same time. A claim beneath a boundary, on the root or an enclosing boundary,
 stops writes through it too, since they pass through. A write that reaches a
 boundary's storage without passing through it, while the boundary is claimed, such
-as a whole-container commit over one of its regions, is reconciled as a fork's sync
+as a whole-container commit over one of its regions, or a write the claiming thread
+makes outside its draft, is reconciled as a fork's sync
 is: given a three-way merge, the claimed commit merges its run's value, as `own`,
 with that write, as `other`, from the value the run started with. Without a merge
 the commit fails rather than overwrite the write. A component's transactions pass

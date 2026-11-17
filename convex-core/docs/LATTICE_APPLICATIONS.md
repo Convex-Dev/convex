@@ -421,14 +421,16 @@ root, which is a staged component's working copy or the live host. Writes throug
 that boundary wait, so keep such callbacks short.
 
 A change to a staged copy can commit together with other changes at its destination.
-Take the copy's claim first, through its `exclusive()` form, then run an exclusive
-transaction on the component holding the destination. In that callback, change the
+Take the copy's claim first, through its `exclusive()` form, then the claim of each
+region the destination lies in, innermost first, then run an exclusive transaction
+on the component holding the destination. In that callback, change the
 draft, transact on the copy itself rather than through the draft of its exclusive
 form, and sync it. The sync lands at once and the commit reconciles it with the
 draft. It is not undone if the callback then fails, so make it the last step. If
 that component is bound to a private copy of the host root, the host sees nothing
 until that component publishes, and its publication carries both changes. Claims
-taken the other way round can deadlock with another thread syncing the copy; see
+taken in another order, or a region claim left out, can deadlock with another
+thread syncing the copy or transacting on that region; see
 [claims](LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
 
 Even a single local edit must atomically transform the latest enclosing value.
