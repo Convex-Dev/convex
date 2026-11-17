@@ -36,7 +36,7 @@ of how it got there is in the branch's git log. See
 - Cursors carry no lattice, context, merge rule or container-construction policy.
   Components supply read/write functions and explicit signing and stamping functions.
 - Roots hold only current atomic state. A fork is a working copy with a baseline;
-  `sync(merge)` publishes it with the merge its owning component supplies, and on any
+  `reconcile(merge)` publishes it with the merge its owning component supplies, and on any
   other cursor publishes nothing. `LatticeHost.sync()` publishes host storage under
   its own lock.
 - Transactions retain their attempt input; component publication retains its own
@@ -162,16 +162,15 @@ write unless its shape is structural.
 
 A fork is a private working copy of a destination cursor together with the
 destination value it was last reconciled against. `AForkableCursor.fork()` creates
-one and `sync(merge)` publishes it. On sync the fork adopts whichever side changed
-alone, calls the supplied merge only when both the copy and the destination moved
-since the baseline, and installs the result by compare-and-set, retrying while the
-destination moves. The fork holds no lattice, no merge rule and no context. Every
-forkable cursor accepts `sync(merge)`; on a cursor that is not a fork it returns the
-current value and publishes nothing, so a live view and a staged component share one
-sync.
+one and `reconcile(merge)` publishes it. The fork gives the supplied three-way merge
+the baseline, its working value and the destination's value, and installs the result
+in one atomic destination update, retrying while the destination moves. The fork
+holds no lattice, no merge rule and no context. Every forkable cursor accepts
+`reconcile(merge)`; on a cursor that is not a fork it returns the current value and
+publishes nothing, so a live view and a staged component share one sync.
 
 The merge is the component's. `ALatticeComponent.sync()` hands its own
-`mergePublication(own, other)` to its storage, closed over whatever policy that
+`reconcile(base, own, other)` to its storage, closed over whatever policy that
 component holds: its lattice, signer, clock or authoriser. A component fork,
 `rebind(storage.fork())`, is a new component of the same class over a forked cursor,
 so a fork reconciles with the policy of the component that owns it, resolved when it
@@ -592,7 +591,7 @@ plus a merge function, and every component's level has one; how that rule is
 implemented is left to the application or implementer.
 
 `ALatticeComponent` no longer accepts or exposes
-`ALattice`. It supplies storage, child routing and a `mergePublication(own, other)`
+`ALattice`. It supplies storage, child routing and a `reconcile(own, other)`
 hook. Unsupported descendant paths are rejected by `mergeAtPath` unless a
 component defines their handling. A staged component can reconcile directly over
 immutable values without constructing a lattice definition.
@@ -641,7 +640,7 @@ follow the same rule: one holding a private copy of the root is built over
 a host.
 
 `sync()` publishes the bound storage with the component's own reconciliation,
-`storage.sync(this::mergePublication)`. On a fork that reconciles and publishes into
+`storage.reconcile` given its `reconcile(base, own, other)`. On a fork that reconciles and publishes into
 the fork's destination; on any other cursor it returns the current value and
 publishes nothing, so a live view has no publication work. Sync never publishes a
 caller-owned fork through a view, nor signs, stamps or creates default state. Nested
@@ -698,7 +697,7 @@ construction. Wrappers sharing a fork share publication; ordinary cursor views n
 publish enclosing state (entries 5 and 26).
 
 A cursor fork holds only its destination, working state and baseline. The merge
-function is supplied to each `sync(merge)`; atomic reconciliation, failure handling
+function is supplied to each `reconcile(merge)`; atomic reconciliation, failure handling
 and working-state coordination are as entry 27 describes. `AForkableCursor` remains
 distinct from the read-only view hierarchy. The lattice adapter's constructors bind;
 callers explicitly choose a fork when staging is intended.
@@ -818,12 +817,11 @@ transactions in separate regions run at the same time, while the container's cla
 lies beneath every boundary and stops all region writes. A region's claim holds only
 against writes through its boundary: a transaction on the container that changes the
 same region meanwhile is another lattice value arriving, so the region's claimed
-commit merges it with its own run by the region's publication merge, as a forked
-region does when it syncs, with the run's value as `own` and the change as `other`,
-so the merge's own tie rule decides between local work and the change.
-A region with no publication merge fails rather than overwrite the change. That
-applies to exclusive transactions and to ordinary ones that took the claim after two
-conflicts.
+commit merges it with its own run by the region's `reconcile`, as a forked region
+does when it syncs, with the run's value as `own` and the change as `other`. A
+region whose `reconcile` refuses the change, as the default does for a change on both
+sides, fails rather than overwrite it. That applies to exclusive transactions and to
+ordinary ones that took the claim after a conflict.
 Applications sharing one root make independent updates in any case, which their
 lattice merges reconcile. Making the container fork its regions itself was tried and
 rejected: a region with its own signing view must reconcile above that view, which a
