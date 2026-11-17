@@ -745,7 +745,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public boolean containsAll(ASet<?> b) {
 		if (b instanceof SetTree) {
-			return containsAll((SetTree<?>)b);
+			return containsAll((SetTree<?>)b, 0);
 		}
 		// must be a SetLeaf
 		long n=b.count;
@@ -755,21 +755,45 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		}
 		return true;
 	}
-	
-	protected boolean containsAll(SetTree<?> other) {
+
+	/**
+	 * Tests whether this tree holds every element of another, given a number of leading hex
+	 * digits that every element hash of both is known to share
+	 */
+	protected boolean containsAll(SetTree<?> other, int prefix) {
+		// Usual case first: both branch at the digit after the known prefix, so share it
+		if ((shift != other.shift) || (shift != prefix)) {
+			int least = Math.min(shift, other.shift);
+			// Trees that part before either branches have no element in common
+			if (getFirstHash().commonHexPrefixLength(other.getFirstHash(), least) < least) return false;
+			// A tree branching at an earlier digit has elements under digits this one lacks
+			if (other.shift < shift) return false;
+			// A tree branching at a later digit lies under one digit of this one
+			if (other.shift > shift) return childContainsAll(childForDigit(other.getFirstHash().getHexDigit(shift)).getValue(), other, shift + 1);
+		}
+
 		// fist check this mask contains all of target mask
 		if ((this.mask|other.mask)!=this.mask) return false;
-		
+
 		for (int i=0; i<16; i++) {
 			Ref<AHashSet<T>> child=this.childForDigit(i);
 			if (child==null) continue;
-			
+
 			Ref<?> mchild = other.childForDigit(i);
 			if (mchild==null) continue;
-			
-			if (!(child.getValue().containsAll((ASet<?>) mchild.getValue()))) return false; 
+
+			if (!childContainsAll(child.getValue(), (AHashSet<?>) mchild.getValue(), shift + 1)) return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Tests whether a child set holds every element of another set, given a number of leading
+	 * hex digits that every element hash of both is known to share
+	 */
+	private static boolean childContainsAll(AHashSet<?> child, AHashSet<?> b, int prefix) {
+		if ((child instanceof SetTree<?> ct) && (b instanceof SetTree<?> bt)) return ct.containsAll(bt, prefix);
+		return child.containsAll(b);
 	}
 
 	@Override

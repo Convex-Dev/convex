@@ -314,6 +314,26 @@ public class MapsTest {
 		assertSame(leaf,leaf.mergeDifferences(big,firstOnly));
 		assertSame(small,small.mergeDifferences(big,firstOnly));
 		assertTrue(calledOnBoth.isEmpty());
+
+		// mergeWith too gives the receiver itself when the result equals it
+		MergeFunction<CVMLong> both=(a,b)->((a!=null)&&(b!=null))?a:null;
+		assertSame(leaf,leaf.mergeWith(big,both));
+		assertSame(small,small.mergeWith(big,both));
+	}
+
+	/**
+	 * Key subset tests between hash maps whose trees branch at different hex digits or under
+	 * different prefixes, at the root or below it, answer by the keys
+	 */
+	@Test
+	public void testContainsAllKeysAcrossTreeShapes() {
+		java.util.List<java.util.List<CVMLong>> shapes=TreeShapes.SHAPES;
+		for (int i=0; i<shapes.size(); i++) {
+			for (int j=0; j<shapes.size(); j++) {
+				AHashMap<CVMLong,CVMLong> x=assocAll(shapeValues(shapes.get(i),i)), y=assocAll(shapeValues(shapes.get(j),j));
+				assertEquals(shapes.get(i).containsAll(shapes.get(j)),x.containsAllKeys(y));
+			}
+		}
 	}
 
 	@Test

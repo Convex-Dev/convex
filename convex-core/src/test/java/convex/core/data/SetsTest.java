@@ -275,6 +275,45 @@ public class SetsTest {
 		assertSame(under0,under0.excludeAll(conjAll(shapes.get(2))));
 	}
 
+	/**
+	 * Subset tests between hash sets whose trees branch at different hex digits or under
+	 * different prefixes, at the root or below it, answer by the elements
+	 */
+	@Test
+	public void testSubsetsAcrossTreeShapes() {
+		for (java.util.List<CVMLong> xs: TreeShapes.SHAPES) {
+			for (java.util.List<CVMLong> ys: TreeShapes.SHAPES) {
+				ASet<CVMLong> x=conjAll(xs), y=conjAll(ys);
+				boolean expected=xs.containsAll(ys);
+				assertEquals(expected,x.containsAll(y));
+				assertEquals(expected,y.isSubset(x));
+			}
+		}
+	}
+
+	/**
+	 * A leaf merged with a tree, at the root or as children below it, gives the receiver itself
+	 * when the result equals it
+	 */
+	@Test
+	public void testLeafMergeWithTreeIdentity() {
+		ASet<CVMLong> leaf=Sets.empty(), small=Sets.empty(), big=Sets.empty(), other=Sets.empty();
+		for (long i=0; i<300; i++) {
+			CVMLong k=CVMLong.create(i);
+			if (i<5) leaf=leaf.conj(k);
+			if (i<40) small=small.conj(k);
+			big=big.conj(k);
+			other=other.conj(CVMLong.create(i+1000));
+		}
+		assertTrue(leaf instanceof SetLeaf);
+		// The small tree's children are leaves, the big tree's are trees
+		assertTrue(small instanceof SetTree);
+		assertSame(leaf,leaf.intersectAll(big));
+		assertSame(leaf,leaf.excludeAll(other));
+		assertSame(small,small.intersectAll(big));
+		assertSame(small,small.excludeAll(other));
+	}
+
 	private static ASet<CVMLong> conjAll(java.util.Collection<CVMLong> keys) {
 		ASet<CVMLong> s=Sets.empty();
 		for (CVMLong k: keys) s=s.conj(k);

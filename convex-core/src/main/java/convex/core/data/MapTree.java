@@ -962,7 +962,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public boolean containsAllKeys(AHashMap<K, V> map) {
 		if (map instanceof MapTree) {
-			return containsAllKeys((MapTree<K,V>)map);
+			return containsAllKeys((MapTree<K,V>)map, 0);
 		}
 		// must be a MapLeaf
 		long n=map.count;
@@ -973,20 +973,44 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 	
-	protected boolean containsAllKeys(MapTree<K, V> map) {
+	/**
+	 * Tests whether this tree holds every key of another, given a number of leading hex digits
+	 * that every key hash of both is known to share
+	 */
+	protected boolean containsAllKeys(MapTree<K, V> map, int prefix) {
+		// Usual case first: both branch at the digit after the known prefix, so share it
+		if ((shift != map.shift) || (shift != prefix)) {
+			int least = Math.min(shift, map.shift);
+			// Trees that part before either branches have no key in common
+			if (getFirstHash().commonHexPrefixLength(map.getFirstHash(), least) < least) return false;
+			// A tree branching at an earlier digit has keys under digits this one lacks
+			if (map.shift < shift) return false;
+			// A tree branching at a later digit lies under one digit of this one
+			if (map.shift > shift) return childContainsAllKeys(childForDigit(map.getFirstHash().getHexDigit(shift)).getValue(), map, shift + 1);
+		}
+
 		// fist check this mask contains all of target mask
 		if ((this.mask|map.mask)!=this.mask) return false;
-		
+
 		for (int i=0; i<FANOUT; i++) {
 			Ref<AHashMap<K,V>> child=this.childForDigit(i);
 			if (child==null) continue;
-			
+
 			Ref<AHashMap<K,V>> mchild=map.childForDigit(i);
 			if (mchild==null) continue;
-			
-			if (!(child.getValue().containsAllKeys(mchild.getValue()))) return false; 
+
+			if (!childContainsAllKeys(child.getValue(), mchild.getValue(), shift + 1)) return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Tests whether a child map holds every key of another map, given a number of leading hex
+	 * digits that every key hash of both is known to share
+	 */
+	private static <K extends ACell, V extends ACell> boolean childContainsAllKeys(AHashMap<K, V> child, AHashMap<K, V> map, int prefix) {
+		if ((child instanceof MapTree<K, V> ct) && (map instanceof MapTree<K, V> mt)) return ct.containsAllKeys(mt, prefix);
+		return child.containsAllKeys(map);
 	}
 
 	@Override

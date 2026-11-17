@@ -363,7 +363,11 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override
 	protected AHashSet<T>  mergeWith(AHashSet<T>  b, int setOp, int prefix) {
 		if (b instanceof SetLeaf) return mergeWith((SetLeaf<T>) b, setOp, prefix);
-		if (b instanceof SetTree) return b.mergeWith(this, reverseOp(setOp), prefix);
+		if (b instanceof SetTree) {
+			AHashSet<T> result = b.mergeWith(this, reverseOp(setOp), prefix);
+			// The tree returns itself when unchanged, so an unchanged leaf is found by equality
+			return equals(result) ? this : result;
+		}
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
