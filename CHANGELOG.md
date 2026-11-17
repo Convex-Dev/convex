@@ -5,39 +5,37 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.20-SNAPSHOT] - Unreleased
+## [0.8.20] - 2026-11-17
 
 ### Added
 
 - Bind Swing views to lattice components, updating them automatically. ([Lattice views](convex-gui/docs/LATTICE_VIEWS.md))
-- Open Convex DB databases read-only, live in Java or through JDBC and PostgreSQL. ([#803](https://github.com/Convex-Dev/convex/issues/803))
+- Open live, read-only Convex DB databases from Java, JDBC or PostgreSQL clients. ([#803](https://github.com/Convex-Dev/convex/issues/803))
 - Let embedders handle incoming connections and component failures themselves. ([Incoming handlers](convex-peer/docs/LATTICE_NETWORKING.md#incoming-connection-handlers))
 
 ### Changed
 
 - Upgrade all peers of a network together: this release changes how some transactions execute.
-- Rework lattice cursors and transactions: transactions run on any component and in separate regions at once, and writes compare by value and reach only places that exist; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
-- Disconnect a connection that sends false data, such as a bad signature, and keep one that sends malformed data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
-- Report failures to clients as clear errors rather than stack traces, empty results or no reply, and keep routine failures out of operator warning logs.
-- Limit the length of lattice paths a node accepts, 1,024 keys by default. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
-- Poll the peers a peer has verified first, one poll at a time and sooner after one that went well, and back off from peers that fail to connect, verify or answer polls. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
-- Speed up decoding of messages that carry several cells, such as consensus updates. ([Canonical decoding](convex-core/docs/ENCODER_DESIGN.md#canonical-decoding))
-- Decode incoming messages off the network threads, so a busy connection no longer delays others, and keep part of a peer's capacity for verified peers. ([Server-side backpressure](convex-peer/docs/BACKPRESSURE.md))
-- Refuse SQL column types Convex DB cannot yet store, such as `DATE` and `UUID`, when a table is created, rather than keeping the column untyped. ([SQL column types](convex-db/docs/SQL-TYPES.md))
+- Rework lattice cursors and transactions, so transactions run on any component and across regions at once; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
+- Keep peers responsive under load, decoding messages faster and reserving capacity for verified peers. ([Server-side backpressure](convex-peer/docs/BACKPRESSURE.md))
+- Poll verified peers first, and back off from peers that fail. ([Polling and Back-off](convex-peer/docs/PEER_PRIORITY.md#polling-and-back-off))
+- Check data from peers and lattice nodes more strictly, and disconnect peers that send false data. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
+- Limit the length of lattice paths a node accepts. ([Memory budgets](convex-peer/docs/PROPAGATION.md#memory-budgets))
+- Report failures to clients as clear errors, and keep routine failures out of operator logs.
+- Refuse SQL column types Convex DB cannot yet store, such as `DATE`, when a table is created. ([SQL column types](convex-db/docs/SQL-TYPES.md))
 
 ### Fixed
 
-- Keep peers running when a request or one of their own tasks fails, even by running out of memory; a peer stops only when it cannot advance consensus. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
-- Validate data that peers and lattice nodes receive more strictly before using it.
-- Keep Etch stores safe to reopen after a crash or hard kill, with nothing to repair when idle. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
-- Validate and repair Etch stores holding large values without false problem reports. ([#843](https://github.com/Convex-Dev/convex/issues/843))
-- Finish an Etch GC on Windows when the store is next opened, and have `etch validate` and `etch repair` read the collected file while it waits. ([File lifecycle](convex-core/docs/ETCH_GC.md#file-lifecycle-and-recovery))
+- Keep peers running when a request or internal task fails. ([Failure containment](convex-core/docs/CONSENSUS.md#failure-containment))
+- Make hash map and set operations correct for all contents.
+- Keep Etch stores safe to reopen after a crash or hard kill. ([Durability contract](convex-core/docs/ETCHv3.md#durability-contract))
+- Validate, repair and garbage-collect Etch stores reliably, including large values and on Windows. ([#843](https://github.com/Convex-Dev/convex/issues/843))
 - Pass lattice data a node pulls from one peer on to its other peers.
-- Keep the consensus data verified peers send each other, so they no longer fetch it again. ([CPoS scheduling](convex-peer/docs/PROPAGATION.md#cpos-scheduling))
-- Correct Convex DB's SQL results, binary data and prepared statements across transactions, and report errors with SQLSTATE codes. ([#836](https://github.com/Convex-Dev/convex/issues/836))
-- Keep lattice edits that retry after a conflict, and stop long-running lattice applications holding saved data in memory. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
-- Shut peers, lattice nodes, clients and the desktop apps down completely: closing one stops the threads, requests and connections it started, and finishes even when a step fails. ([What each close stops](convex-peer/docs/SHUTDOWN.md#what-each-close-stops))
-- Deliver REST error responses, such as 401 and 404, to clients still sending a request body, rather than dropping the connection.
+- Stop peers fetching consensus data they have already received. ([CPoS scheduling](convex-peer/docs/PROPAGATION.md#cpos-scheduling))
+- Improve Convex DB's SQL correctness, and report errors with standard SQLSTATE codes. ([#836](https://github.com/Convex-Dev/convex/issues/836))
+- Keep lattice edits that retry after a conflict, and free saved data from memory in long-running lattice applications. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
+- Shut down peers, lattice nodes, clients and the desktop apps completely. ([What each close stops](convex-peer/docs/SHUTDOWN.md#what-each-close-stops))
+- Deliver REST error responses to clients still sending a request body.
 
 ## [0.8.19] - 2026-11-07
 
