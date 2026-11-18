@@ -12,18 +12,17 @@ component-owned working state and batched signing.
 
 ```text
 ACursor<V>                                get / atomic update / persist / path
-└── AForkableCursor<V>                    typed paths; fork(); sync(merge)
-    ├── Root<V>                           atomic value holder
-    │   └── TransactionalRootCursor<V>    opt-in coordinated writes
-    ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
+└── AForkableCursor<V>                    typed paths; fork(); reconcile(merge)
+    ├── Root<V>                           atomic value holder; the outermost boundary
+    ├── ForkedCursor<V>                   working copy; reconciles with a plug-in three-way merge
     ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
+    ├── BoundaryCursor<V>                 writes pass through; claims stop here
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
         ├── PathCursor<V>                 navigation through existing containers
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
-        └── AUpdateCursor<V,S>            cached preparation per atomic operation
-            ├── StampedCursor<V>          explicit clock and stamp function
-            ├── SignedCursor<V>           explicit signing function
-            └── DefaultCursor<V>          explicit default for absent storage
+        ├── StampedCursor<V>              explicit clock and stamp function
+        ├── SignedCursor<V>               explicit signing function
+        └── DefaultCursor<V>              explicit default for absent storage
 AView<T>                                  read-only cursor views
 Transactions                              optimistic and exclusive subtree transactions
 ```
@@ -34,13 +33,13 @@ ordinary Java functions supplied by their owning components.
 
 The base contract stays minimal: get, atomic update and path at one location.
 Subclasses and compositions add behaviour; the base gains no capability hooks that
-every subclass and view would have to forward. A service owned by the root gets at
-most one hook, resolved through existing source links: `exclusiveLock()`, for
-transactions and fork publication, is the only one. Storage, durability and
-publication attach at the host, and a module that needs a store mid-write, such as
-DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
-hook: it is one concrete method over `updateAndGet` with a store-agnostic
-`Persister`, which views inherit and only `ForkedCursor` overrides.
+every subclass and view would have to forward. A service owned by a transactional
+boundary gets at most one hook, resolved through existing source links: `claim()`,
+for transactions and fork publication, is the only one. Storage, durability and
+publication attach at the host, and a module that saves content mid-write, such as
+DLFS writing blob checkpoints, takes a `Persister` as an explicit parameter. `persist` is not a
+hook: it is one method with a store-agnostic `Persister`, which views inherit and
+only the cursors that hold a value, `Root` and `ForkedCursor`, override.
 
 ## Atomic operations and paths
 
@@ -66,19 +65,32 @@ reads throw `MissingValueException`; optional reads return their fallback, and
 presence checks return false.
 
 `path(keys...)` creates a view without reading or changing state. Writes
-use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
-intermediate containers must already exist. An absent final value can be replaced,
-but writing through an absent container throws `PathWriteException`, and so does a
-write to a container that cannot hold its key, such as a vector given a key that is
-not an index within it. The exception carries the keys from the one that does not
-fit, and its depth. `assoc` and `assocIn` follow the same rule. A plain path write
-through a signed envelope is refused with `IllegalArgumentException`.
+use `PathCursor.assocExisting` to rebuild existing ancestors atomically. A plain
+path write through a signed envelope is refused with `IllegalArgumentException`.
 
-Atomic updates keep their creation semantics: a missing final entry is supplied
-as null, and a changed result can insert it into an existing map. Unchanged writes
-preserve absence. Forks and transactions can likewise start from a missing location
-as nil without creating destination state. None of these operations creates a
-missing intermediate container implicitly.
+A write lands only where the cursor's place exists. For a path that is where its
+`exists()` is true: a path whose entry or any container above it is missing throws
+`PathWriteException`, and so does a write to a container that cannot hold its key,
+such as a vector given a key that is not an index within it. The exception carries
+the keys from the one that does not fit, and its depth. A read-only view throws
+`ReadOnlyCursorException`. Both refuse every write, whatever the values: a write
+that would change nothing and a compare-and-set that would not match are refused
+like any other. A transaction is refused as well: at its first read where its
+place does not exist, and at commit on a read-only view. The refusal of a write is
+decided on the value the write would land on and leaves it untouched, so a fork
+whose place has been deleted is refused at sync and keeps its edits. Views over a
+path, such as a default, a signed view or a stamp, write through it and are
+refused with it.
+
+An entry is created by writing the container that holds it: `assoc` and `assocIn`
+on the container's cursor, or an update function there. This is the standard, and
+what applications should do by default. A component may instead supply a view
+that creates its place lazily when written, and takes responsibility for doing so
+correctly: atomically with a changed write, and never on a read or a write that
+changes nothing. The entry views of map and index components and lattice paths
+below do this, and are the examples to follow. A value the cursor will not
+accept, such as one no signer is authorised for, is refused only when it would be
+written.
 
 Transformations propagate source absence without applying their read function.
 A projection over present storage returns the value its supplied function defines,
@@ -90,11 +102,6 @@ absence. Its reads and unchanged writes still create no state.
 When migrating callers, retain required reads where absence is a defect. Use
 `getOrDefault(null)` only where missing state is expected, or `exists()` when only
 presence matters. CVM collection lookups and `RT.getIn` retain their existing rules.
-
-Root CAS uses reference identity. Path, projection and signing views compare the
-view by value equality, then make one CAS attempt against the observed underlying
-value. A concurrent source change can therefore make their CAS fail even when it
-changed an unrelated field. Atomic update operations retry as needed.
 
 Multi-key paths use one `PathCursor`. External key conversion remains a lattice or
 component concern; cursors accept canonical CVM keys.
@@ -108,27 +115,100 @@ fork of the view is ordinary writable storage, but its sync publishes through th
 view and is refused. Syncing the view itself is refused as well: it can publish
 nothing, so a component bound to it fails instead of appearing to publish its
 source. Paths and views over it keep the ordinary sync, which only reads. A
-transaction that changes nothing commits, since it writes nothing. `AView` subclasses refuse writes with the same exception, an
+transaction is a write, so one that changes nothing is refused as well. `AView` subclasses refuse writes with the same exception, an
 `UnsupportedOperationException`.
+
+## Values and the cells that hold them
+
+A value is what CAD3 equality sees. The same value can be held as different Java
+objects: cells built by an edit reach their children through strong references,
+and the equal cells a store returns reach theirs through soft ones. Which is held
+decides only memory use, and cursors keep the two apart with four rules.
+
+1. **Every operation decides by value.** Compare-and-set, an unchanged write, a
+   conflict, a claim and a fork's test of which side changed all compare values, on
+   a root, a fork and a view alike. No result depends on which object holds a
+   value.
+2. **A write of an equal value keeps the cells held.** It changes nothing, signs
+   and stamps nothing, and cannot displace persisted cells with a copy built
+   elsewhere.
+3. **Only a holder switches cells for equal ones.** A `Root` holds a value, and a
+   fork holds two, its working value and its baseline; a view holds none. `persist`
+   is the switch, and a fork also adopts its destination's cells at sync. Neither is
+   a write, so rule 2 does not stop them and a claim does not delay them.
+4. **A changed write is built on the cells held when it lands, where the cursor
+   has the function to run.** An update function, at a root or through any view,
+   runs again if the cells were switched beneath it, so what it leaves untouched
+   stays persisted. Compare-and-set and a transaction commit bring a finished
+   value for the cursor's own place, which goes in as given; through a view, the
+   source around that place is still built on the cells held.
+
+`Root.install` is the one place a changed write lands and the cursors' only test of
+object identity; whatever fails there looks again by value. Component code that
+edits through update functions needs no such test. The exception is work prepared
+outside an update function because it does I/O, as DLFS prepares and checkpoints
+file content: it is built on the cells it read, so it goes in only over those very
+cells and is prepared again otherwise. That test decides whether work is redone,
+never what the result is.
+
+Compare-and-set is the atomic update "if the value equals the expected one then
+the new value, otherwise unchanged" on every cursor, and its result says whether
+the value matched. It therefore fails only when the cursor's own value differs:
+a change elsewhere in a view's source makes the update run again, as it does for
+any update function. The contract is about values alone, so a cursor that signs,
+stamps or merges holds what that makes of the new value.
+
+Rule 2 costs one comparison per write: the same object is recognised at once, and
+otherwise the comparison hashes the branch cells on the changed path, which are
+kept and needed again when the value is saved ([Equality](EQUALITY.md)).
+
+A finished value built before a persist landed puts the cells it was built on
+back, so they stay in memory until the holder is next persisted. Prefer an update
+function for an edit to a large value. A merge result is such a value: merges
+decide values only, and the holder's next persist finds whatever it shares with the
+saved value already stored.
 
 ## Persistence
 
-`persist(persister)` replaces the value a cursor holds with the equal value a
-`Persister` returns, such as `LatticeHost::persist`, in one atomic update. On an
-Etch store the stored cells are then soft references and need not stay in memory.
-The cursor holds no store. An edit landing meanwhile repeats the update on the
-edited value; persisting again only finds the cells already stored. A fork persists
-its working value, then its reconciled baseline outside its lock, replacing the
-baseline only if no sync has moved it meanwhile. Views hold no value of their own:
-they treat the equal value as unchanged, so the cells are stored and their source
-is left to its owner. A read-only view refuses to persist, as it refuses any write.
+Persisting a value builds new cells and leaves the ones it was given as they are.
+On an Etch store the new cells reach their children through soft references, so
+stored data can leave memory; the original cells keep strong references to theirs.
+The two values are equal, so only memory use tells them apart. Stored data is
+released only once whoever holds the value has switched to the new cells: a holder
+left on the original keeps the whole tree in memory, however much of it is stored.
+
+A `Persister` persists any value, not only a cursor's: every store is one, and a
+builder such as `BlobOutputStream` takes one to save content as it is written.
+`persist(persister)` makes that switch for a cursor, replacing the cells it holds
+with the equal ones a `Persister` returns, such as `LatticeHost::persist`, in one
+atomic step. The cursor holds no store. An edit landing meanwhile repeats the
+persist on the edited value; persisting again only finds the cells already stored.
+After three attempts the cursor keeps the value as it stands, so writes that never
+pause cannot hold a persist up, and a later persist switches what is then held. A
+fork persists its working value, then its reconciled baseline without taking a claim,
+replacing the baseline only if no sync has moved it meanwhile. Views hold no value of
+their own: to them the persisted value is a write of an equal value, so the cells are
+stored and their source is left to its owner. A read-only view refuses to persist, as
+it refuses any write.
+
+Saving a value switches nobody else. A fork is separate storage, so a host sync that
+saves its destination leaves the fork on the cells it already held. A long-lived fork
+keeps what is written to it in memory until it is persisted, which a component given
+a persistence function does at each sync, or until it syncs with no edits since its
+last sync and so adopts the saved value. The host root switches as part of its own
+sync, even when a write
+[lands during the save](../../convex-peer/docs/PERSISTENCE.md#ordering).
 
 ## Component-supplied construction
 
+A plain path writes only where its entry exists. A component that wants its place
+created by its first write supplies a view that does so, and these are the ways to
+do it properly.
+
 For ordinary collections, use `MapComponent.path(key)` or `IndexComponent.path(key)`.
 An entry reads as a path does: a missing key is absent and a stored nil is present.
-They reject incompatible stored containers and create a correctly typed container
-only on a changed write. Their pure `createContainer()` hook can supply initial
+They reject incompatible stored containers, and on a changed write insert their key,
+creating a correctly typed container first if there is none. Their pure `createContainer()` hook can supply initial
 contents or refuse creation. Reads and no-op edits leave missing storage absent.
 
 For custom representations, a component can use
@@ -156,12 +236,13 @@ back leaves the source unchanged by value equality. Construction and the child e
 commit in the same atomic source update. Exceptions commit nothing. Obtaining a view
 or reading it has no state-changing effects.
 
-`cursor.withDefault(emptyContainer).path(key)` supplies a known container type
-without any merge definition. The optional adapter helper
+`cursor.withDefault(emptyContainer)` supplies a known container type for reads
+and for update functions, without any merge definition; a plain path below it
+still writes only to an entry that exists. The optional adapter helper
 `LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
 lattice key, using an explicit lattice. It reads as any path does, so a missing
-key is absent. Its writes use `LatticeOps.assocIn` to construct an absent
-container from the lattice's zero at that level.
+key is absent. Its writes use `LatticeComponent.assocIn` to insert its key, constructing an
+absent container from the lattice's zero at that level.
 Unknown missing container types fail; keys never determine container types.
 JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
 Owner envelopes still require an explicit signing boundary.
@@ -175,13 +256,24 @@ root.updateAndGet(values -> values.include(item));
 
 ## Forks, transactions and publication
 
+A transaction commits into the cursor on which it was started. A live path
+installs the change in its enclosing storage; a fork installs it in its own
+working root. Sync is the separate reconciliation of that fork with its
+publication destination. Neither step implies publication beyond its destination.
+
 `fork()` creates an isolated working copy, a `ForkedCursor`, retaining its
-destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
-that publication: an unchanged copy adopts the destination, an unchanged destination
-accepts the working value, and divergent changes invoke the supplied function.
-The fork retains no merge callback. Ordinary roots, paths and transformed views
-implement `sync(merge)` as a read-only no-op without invoking that function or
-publishing any enclosing fork; a read-only view refuses it.
+destination and reconciliation baseline. Each `reconcile(merge)` supplies the policy
+for that publication as a `ThreeWayMerge`, which receives the value both sides last
+agreed on, the working value and the destination's value.
+
+A three-way merge is total: it is given every case, and a side that changed nothing
+contributes nothing. It decides the value only, whatever the value's structure.
+Where the result is known by reference, the update that applies the merge skips it: a destination still
+holding the base takes `own`, which was built from it, and an unchanged `own` takes
+the destination's value. These checks cost nothing, so a sync or commit that meets
+no concurrent change does no merge work. The fork retains no merge callback. Ordinary roots, paths
+and transformed views implement both as a read-only no-op without invoking that
+function or publishing any enclosing fork; a read-only view refuses them.
 
 The destination has the same value type as the fork. Signing and stamping compose
 through cursor views, and where an authoring view sits relative to the fork decides
@@ -197,9 +289,9 @@ A fork that takes part in timestamp-ordered merges sits outside its stamp. Insid
 it, the fork's working value keeps the timestamp it was forked from, so incoming
 merges and reconciliation at sync select older records over its edits.
 
-Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
-write lock while the destination's atomic update reconciles and commits by CAS.
-Fork reads take no lock: a read during sync sees the working value from before it,
+Each fork uses an independent `Root`. Sync holds the claim on all of it while the
+destination's atomic update reconciles and commits by CAS.
+Fork reads never wait: a read during sync sees the working value from before it,
 and a read after sync returns sees the published value. A successful commit installs the reconciled working
 value and advances the baseline without further user code or merging. Failed
 reconciliation or preparation commits nothing; competing destination writes remain
@@ -208,11 +300,18 @@ or wait for operations on it. This is a callback contract, without thread owners
 or re-entrancy guards.
 
 A component with an independent publication boundary owns such a fork and supplies
-its own reconciliation rule; `ALatticeComponent.mergePublication(own, other)` is
-that component's merge, called only when both sides changed. No `ALattice` is
+its own reconciliation rule. `ALatticeComponent.reconcile(base, own, other)` is
+that component's three-way merge. By default a side that changed nothing takes the
+other's value, and `reconcile(own, other)`, the component's rule for a real conflict,
+is called only when both sides changed. No `ALattice` is
 required. `LatticeComponent` adapts a lattice for components that choose to use one. An application overrides it
 to take regions that its own components publish from the destination; each such
 component publishes through its own fork of the host.
+A lattice join takes `own` first, since tie rules such as `LWWLattice`'s prefer that
+side. A component can override the three-value form instead, to use the value both
+sides last agreed on throughout. Changes in different places combine only where the
+component's value is independent place by place, as a CRDT's is or a container's
+top-level regions are; anywhere else, a change on both sides is a conflict.
 For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use
 `Transactions`.
 
@@ -222,11 +321,16 @@ The component which supplied the destination owns the next publication step, and
 the host's own `sync()` persists and replicates. Lightweight components have no
 independent publication work. No cursor starts a worker or timer.
 
-Component constructors bind their supplied working cursor directly. The protected
-`rebind(cursor)` hook recreates the same domain operations, configuration and child
-views over new storage, without creating another fork. A component's `fork()`
-rebinds to a fork of its bound storage. Concrete subclasses can refine the return
-type without adding self-type parameters to the component hierarchy.
+Component constructors bind their supplied working cursor directly. `rebind(cursor)`
+makes the same component over new storage, without creating another fork: a
+component's `fork()` rebinds to a fork of its bound storage, and a transaction
+rebinds to each attempt's draft. Only the cursor's value commits or publishes. The
+component decides what happens to everything else it holds: a reference for what is
+only read or safe to reuse, its own copy for what it changes, and child components
+made on the new cursor when they are needed. Region containers keep their factories
+and make children on demand, so a rebound container's children are on its own
+cursor. Concrete subclasses can refine the return type without adding self-type
+parameters to the component hierarchy.
 
 The base component retains one bound `storage` cursor. Its overridable `cursor()`
 exposes the editing view, which may stamp local changes. Sync always uses bound
@@ -234,25 +338,91 @@ storage, so an editing-view override cannot hide the publication boundary. Wrapp
 bound to the same fork share publication; a path or transformed view over that fork
 has no publication of its own. Sync returns the bound value, which may be nil even
 when the editing view supplies a default. Reads and ordinary view sync never author
-state. Applications may add preparation and managed-child publication explicitly.
+state. A component that manages children in forks of their own syncs them first,
+through `syncChildren()`; applications may also add preparation.
 
-`Transactions` runs a synchronous callback against a private draft and commits by
-CAS, preserving each operation under contention. `transact` returns the result of
-the run that committed; `execute` returns nothing. `TransactionalRootCursor` opts into a shared write lock for
-exclusive execution, where the callback runs once under the lock, and for contention
-fallback. Derived views forward that lock through their existing source links. Typed domain
-transactions use `TransactionalComponent.withCursor` to retain component policy;
-components can delegate that public adapter to their protected `rebind` hook.
+`Transactions` runs a synchronous callback against a private draft. Execution
+produces a transaction value and a return value. Commit applies any required
+reconciliation and authoring, then atomically installs the resulting state.
+`transact` returns the callback result from the execution whose transaction value
+was used for the successful commit; `execute` returns nothing. The additional
+transformations do not recompute the return value. Component merge policy
+determines which changes survive reconciliation. The transaction value need not
+be separately visible in storage before these transformations.
+
+A transaction starts with a required read of its cursor, so a place that does not
+exist throws `MissingValueException` before the callback runs, also through an
+entry view that an ordinary write would create. An ordinary write creates the
+place first. A default view is present wherever it is read, so a transaction
+through one starts from the default and its commit is a write like any other.
+
+Optimistic execution is the fast path for transactions that do not collide. Commit
+is a three-way merge on the transaction's own value: the value the run started
+from, the run's value and the value as held. A change elsewhere under the root never
+reruns the callback, and its finished result is applied to the new root. A
+component's transaction commits by the component's own merge, so a concurrent change
+the component can reconcile, such as one to a different region, commits with the
+run. Transactions record no reads: what the merge accepts is valid by the
+component's rules. By default a component's merge treats a change on both sides as
+a conflict. A transaction on a plain cursor, given no merge, commits strictly: only
+if its own value is unchanged, which it is if it was only persisted during the run,
+and a run that changed nothing commits whatever changed meanwhile, as of the value
+it read. On a conflict, the
+transaction takes the claim of its nearest boundary and finishes under it. Claims
+on the same boundary run one at a time, and a callback runs at most twice. An exclusive transaction starts with that claim and runs
+once, for work too expensive to repeat or with side effects.
+
+A claim locks a transactional boundary, wherever in a cursor tree it is taken:
+the nearest `BoundaryCursor` beneath the claiming cursor, or else the root, which is
+the outermost boundary. Derived views pass the claim down through their source
+links, so a boundary needs to know nothing about paths or views. A boundary holds at
+most one claim, owned by one thread, which may take it again; it stays held until
+the outermost is closed. It covers everything under the boundary: while it is held, a
+write through the boundary from another thread that would change its value waits
+for the release and recalculates, and a write that leaves the value equal carries
+on. Persisting leaves the value equal, so it proceeds during a claim and the root
+then holds the persisted cells; an exclusive transaction that changes nothing writes
+nothing over them.
+Reads never wait. Without a claim, each read or compare-and-set of the root
+adds one type check, and nothing is recorded per transaction.
+
+A `BoundaryCursor` wraps any cursor, and writes pass straight through it. Claims
+from cursors over it stop there instead of reaching the root, so exclusive
+transactions under separate boundaries, such as the regions of one container, run
+at the same time. A claim beneath a boundary, on the root or an enclosing boundary,
+stops writes through it too, since they pass through. A write that reaches a
+boundary's storage without passing through it, while the boundary is claimed, such
+as a whole-container commit over one of its regions, or a write the claiming thread
+makes outside its draft, is reconciled as a fork's sync
+is: given a three-way merge, the claimed commit merges its run's value, as `own`,
+with that write, as `other`, from the value the run started with. Without a merge
+the commit fails rather than overwrite the write. A component's transactions pass
+its `reconcile`, so a conflict there fails the commit.
+Each write through a boundary holds the read side of its read-write lock, and its
+claim holds the write side.
+
+Claims are taken in one order: a fork's claim before the claim over its destination,
+and a boundary's before those enclosing it. A fork's sync holds the fork's claim while
+it writes the destination, which waits for any claim held there, and a region's
+claimed commit holds the region's boundary while it writes the container's root. Work
+that holds a claim and then writes through another fork or boundary, as a callback
+syncing a fork or writing through a captured region does, must already hold that
+one's claim, taken first; otherwise it can deadlock with a thread taking them in this
+order.
+
+Typed domain
+transactions use `rebind` to retain component policy; a component opts in by
+declaring `TransactionalComponent` and refining `rebind` to return its own type.
 `TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
 storage as a fork is: a read-only view of it, whose transactions rebind the domain
-component to a draft and commit to that storage under its root's lock.
+component to a draft and commit to that storage under its nearest boundary's claim.
 The transaction targets bound `storage()`, while the rebound view rebuilds the
 component's editing views over the draft. An authoring view within bound storage
-applies once at commit: a signing view signs the committed value, and a stamp there
-gives it the commit's time. A stamp the component builds over its storage applies
+applies at each commit attempt: a signing view signs the committed value, and a stamp
+there gives it the commit's time. A stamp the component builds over its storage applies
 within the draft instead, with the time of the edit, and commit does not apply it
 again. Unsigned staged components defer signing to publication.
-Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
+Each attempt uses a fresh `Root` for its draft, supporting
 concurrent edits and nested transactions through the existing cursor machinery.
 The callback must finish its work before returning. Only the captured immutable
 value is committed; later edits to a retained draft or its forks remain private.
@@ -282,15 +452,17 @@ stamping. Read functions must accept the values that policy can produce.
 A transform behaves as any cursor does for its consumers. It is absent where it
 finds no value, including wherever its source is absent; a view that should hold a
 value when nothing is stored is built over `withDefault`. A transform creates no
-storage by default: a navigating view refuses a missing container with
+place by default: a navigating view refuses a missing entry or container with
 `PathWriteException`. A transform whose definition knows how to build its storage
 builds it in its write: a default from its default, an authoring view its envelope
-or record, a component's projection what its write function supplies.
+or record, a component's projection what its write function supplies. Each still
+writes through its source, so it lands only where the source's place exists or
+is created by the source.
 
 `ProjectionCursor` rebuilds from the current source on retries, preserving siblings.
-`AUpdateCursor` adds caching for prepared replacements. Prepared signatures are reused while retries request the
-same value; a genuinely different payload must be signed again. `StampedCursor`
-resolves its clock once per changed operation, reusing that timestamp across retries.
+Signed and stamped views also rebuild on each attempt: a retried write signs again,
+and `StampedCursor` reads its clock again, so a write that loses a race is stamped
+no earlier than the write it lost to.
 Writes through descendant views pass through the same authoring boundary atomically.
 
 `SignedCursor` unwraps `SignedData` on reads and uses the bound function on writes.
@@ -307,11 +479,10 @@ for unsigned working state that is signed only when published, and
 ## Code and specifications
 
 - `convex.lattice.cursor`: atomic storage, paths, function-based views, drafts and wrappers.
-- `convex.lattice.LatticeOps`: strict path updates and explicit component construction helpers.
 - `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `LatticeHost`: structure,
   merge policy and publication lifecycle.
 - `convex.lattice.LatticeContext`: optional policy for lattice adapters; domain
   components bind their own signing and clock functions.
-- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): earlier cursor model.
+- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): the cursor rules this implements.
 - [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice): lattice specification.
 - [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth): authorisation.

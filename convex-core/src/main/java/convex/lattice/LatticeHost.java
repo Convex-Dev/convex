@@ -15,9 +15,10 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
+import convex.core.store.Persister;
+import convex.core.util.Cleanup;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 
 /**
  * Generic host for lattice application components, with optional persistence.
@@ -68,6 +69,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	private volatile AutoSync autoSync;
 	private volatile AutoFlush autoFlush;
 	private boolean closed;
+	/** Set under syncLock when close begins, so no automatic worker starts after close collects them */
+	private boolean closing;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
 	/**
@@ -110,17 +113,10 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * @throws IllegalStateException if the store already holds a root
 	 */
 	public static <V extends ACell> LatticeHost<V> create(V initialValue, AStore store) {
-		return create(initialValue,store,Cursors::root);
-	}
-
-	/** Creates a fresh host with explicit cursor coordination. */
-	public static <V extends ACell> LatticeHost<V> create(V initialValue,AStore store,
-			Function<V,? extends Root<V>> rootFactory) {
-		Objects.requireNonNull(rootFactory);
 		if (store!=null && retainedRoot(store)!=null) {
 			throw new IllegalStateException("Store already holds a root: open it, or replace it explicitly");
 		}
-		return new LatticeHost<>(rootFactory.apply(initialValue),store);
+		return new LatticeHost<>(Cursors.root(initialValue),store);
 	}
 
 	/**
@@ -133,14 +129,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * @return Host over the initial value
 	 */
 	public static <V extends ACell> LatticeHost<V> replace(V initialValue, AStore store) {
-		return replace(initialValue,store,Cursors::root);
-	}
-
-	/** Replaces the retained root using explicit cursor coordination. */
-	public static <V extends ACell> LatticeHost<V> replace(V initialValue,AStore store,
-			Function<V,? extends Root<V>> rootFactory) {
 		Objects.requireNonNull(initialValue,"Replacement root must not be null");
-		Root<V> root=Objects.requireNonNull(rootFactory.apply(initialValue));
 		if (store!=null) {
 			try {
 				store.setRootData(initialValue);
@@ -148,7 +137,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 				throw new StoreException("Lattice host could not replace the retained root",e);
 			}
 		}
-		return new LatticeHost<>(root,store);
+		return new LatticeHost<>(Cursors.root(initialValue),store);
 	}
 
 	private static <T extends ACell> T retainedRoot(AStore store) {
@@ -170,15 +159,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * The caller owns the store lifecycle. A null store uses the supplied initial value.
 	 */
 	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store) throws IOException {
-		return open(initialValue,store,Cursors::root);
-	}
-
-	/** Opens a host with explicit cursor coordination, e.g. {@code Cursors::transactionalRoot}. */
-	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store,
-			Function<V,? extends Root<V>> rootFactory) throws IOException {
-		Objects.requireNonNull(rootFactory);
 		V retained=(store==null)?null:store.getRootData();
-		return new LatticeHost<>(rootFactory.apply(retained==null?initialValue:retained),store);
+		return new LatticeHost<>(Cursors.root(retained==null?initialValue:retained),store);
 	}
 
 	/** Returns the host store, or null for in-memory operation. The caller owns its lifecycle. */
@@ -221,10 +203,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 		if (store!=null && store==this.store) {
 			throw new IllegalArgumentException("A fork must not share its origin's store");
 		}
-		V value=cursor().get();
-		Root<V> copy=cursor().supportsExclusiveTransactions()
-			?new TransactionalRootCursor<>(value):Cursors.root(value);
-		return new LatticeHost<>(copy,store,this);
+		return new LatticeHost<>(Cursors.root(cursor().get()),store,this);
 	}
 
 	/**
@@ -291,8 +270,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 
 	/**
 	 * Persists the current root value without changing the cursor or publishing.
-	 * Unlike a component's working state, the root keeps its references until
-	 * {@link #sync()} installs the retained snapshot.
+	 * Unlike a component's working state, the root stays on its current cells until
+	 * {@link #sync()} switches it to persisted ones.
 	 *
 	 * @return Persisted current root value
 	 * @throws IOException If persistence fails
@@ -348,11 +327,31 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 			ensureOpen();
 			V snapshot=cursor().get();
 			V published=publish.apply(storeRoot(snapshot));
-			// Persisted references may replace the snapshot; concurrent edits stay pending.
-			cursor().compareAndSet(snapshot,published);
+			switchRoot(snapshot,published);
 			return published;
 		} finally {
 			syncLock.unlock();
+		}
+	}
+
+	/**
+	 * Switches the root to persisted cells, or it stays strong (see Persister): the
+	 * published ones while it still holds the very snapshot that was published. A
+	 * write landing during the save stays unpublished until the next sync, so the root
+	 * it is in takes nothing from the publisher, whose cells may belong to another
+	 * store, and persists as it stands instead.
+	 */
+	private void switchRoot(V snapshot,V published) {
+		try {
+			cursor().persist(new Persister() {
+				@SuppressWarnings("unchecked")
+				@Override
+				public <T extends ACell> T persist(T held) throws IOException {
+					return (held==snapshot)?(T)published:LatticeHost.this.persist(held);
+				}
+			});
+		} catch (IOException e) {
+			throw new StoreException("Lattice host sync failed: persistence error",e);
 		}
 	}
 
@@ -471,7 +470,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	private AutoSync startAutoSync(Duration interval, Runnable applicationSync) {
 		syncLock.lock();
 		try {
-			ensureOpen();
+			ensureNotClosing();
 			if (autoSync!=null) throw new IllegalStateException("Host already has an automatic sync");
 			autoSync=new AutoSync(this,interval,applicationSync);
 			return autoSync;
@@ -491,7 +490,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	public AutoFlush autoFlush(Duration interval) {
 		syncLock.lock();
 		try {
-			ensureOpen();
+			ensureNotClosing();
 			if (autoFlush!=null) throw new IllegalStateException("Host already has an automatic flusher");
 			autoFlush=new AutoFlush(this,interval);
 			return autoFlush;
@@ -521,7 +520,12 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * {@link #flush()}, {@link #autoSync(Duration, Runnable)}, {@link #autoFlush(Duration)}
 	 * and {@link #attachPublisher(Function)} throw {@link IllegalStateException}. Reads
 	 * still work. Incoming merges may still change the in-memory value but cannot be
-	 * retained, so a node still running fails its syncs. Closing again does nothing.</p>
+	 * retained, so a node still running fails its syncs. Closing again does nothing.
+	 * Automatic workers cannot be started once close has begun, even if it fails.</p>
+	 *
+	 * <p>Every step runs whatever an earlier one threw: a failure no service can carry
+	 * on from in the last application sync, such as running out of memory, is thrown
+	 * once the flushing has stopped and the save has run.</p>
 	 *
 	 * @throws IOException if the final checkpoint fails; the host stays open and a
 	 *         later close retries, without the automatic workers, which have stopped
@@ -530,14 +534,28 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 */
 	@Override
 	public void close() throws IOException {
-		// Outside syncLock: the workers' steps take it, and stopping waits for them
-		AutoSync syncer=autoSync;
-		AutoFlush flusher=autoFlush;
-		if ((syncer!=null && syncer.isWorker()) || (flusher!=null && flusher.isWorker())) {
-			throw new IllegalStateException("Close the host from its owner, not an automatic worker's failure callback");
+		AutoSync syncer;
+		AutoFlush flusher;
+		syncLock.lock();
+		try {
+			syncer=autoSync;
+			flusher=autoFlush;
+			if ((syncer!=null && syncer.isWorker()) || (flusher!=null && flusher.isWorker())) {
+				throw new IllegalStateException("Close the host from its owner, not an automatic worker's failure callback");
+			}
+			closing=true;
+		} finally {
+			syncLock.unlock();
 		}
-		if (syncer!=null) syncer.closeForHost();
-		if (flusher!=null) flusher.closeForHost();
+		// Outside syncLock: the workers' steps take it, and stopping waits for them
+		Cleanup cleanup=new Cleanup();
+		if (syncer!=null) cleanup.run(syncer::closeForHost);
+		if (flusher!=null) cleanup.run(flusher::closeForHost);
+		cleanup.run(this::finalCheckpoint);
+		cleanup.finish(IOException.class);
+	}
+
+	private void finalCheckpoint() throws IOException {
 		syncLock.lock();
 		try {
 			if (closed) return;
@@ -550,6 +568,11 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 
 	private void ensureOpen() {
 		if (closed) throw new IllegalStateException("Lattice host is closed");
+	}
+
+	private void ensureNotClosing() {
+		ensureOpen();
+		if (closing) throw new IllegalStateException("Lattice host is closing");
 	}
 
 	void releaseAutoSync(AutoSync resource) {

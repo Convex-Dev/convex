@@ -35,6 +35,16 @@ public class SpecialTest extends ACVMTest {
 		super(BaseTest.UPGRADED);
 	}
 
+	/** Every code in range creates its Special, and codes either side of the range create none */
+	@Test
+	public void testCreateRange() {
+		for (int code=Special.BASE; code<Special.BASE+Special.NUM_SPECIALS; code++) {
+			assertNotNull(Special.create(code));
+		}
+		assertNull(Special.create(Special.BASE-1));
+		assertNull(Special.create(Special.BASE+Special.NUM_SPECIALS));
+	}
+
 	@Test
 	public void testSpecialAddress() {
 		// Hero should be *address* initial context

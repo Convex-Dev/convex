@@ -29,10 +29,10 @@ public class EtchMaintenanceReaderTest {
 		for (short version:new short[] { EtchConstants.VERSION_1,EtchConstants.VERSION_2 }) {
 			File file=tempFile("etch-maintenance-v"+version);
 			AString value=Strings.create("legacy maintenance v"+version);
-			EtchStore store=new EtchStore(Etch.create(file,EtchConfig.create(version)));
-			store.setRootData(value);
-			store.flush();
-			store.close();
+			try (EtchStore store=new EtchStore(Etch.create(file,EtchConfig.create(version)))) {
+				store.setRootData(value);
+				store.flush();
+			}
 
 			try (EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file)) {
 				assertEquals(version,reader.getVersion());
@@ -56,10 +56,10 @@ public class EtchMaintenanceReaderTest {
 	public void testDirtyV3OpenIsExplicitReadOnlyAndWriterExcluding() throws Exception {
 		File file=tempFile("etch-maintenance-dirty");
 		AString value=Strings.create("dirty maintenance root");
-		EtchStore store=new EtchStore(Etch.create(file,EtchConfig.create(EtchConstants.VERSION_3)));
-		store.setRootData(value);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,EtchConfig.create(EtchConstants.VERSION_3)))) {
+			store.setRootData(value);
+			store.flush();
+		}
 		byte[] cleanBytes=Files.readAllBytes(file.toPath());
 		try (EtchMaintenanceReader clean=EtchMaintenanceReader.openUnsafe(file)) {
 			assertTrue(clean.isCleanClosed());
@@ -88,10 +88,10 @@ public class EtchMaintenanceReaderTest {
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
 				true,EtchConfig.CipherMode.AES_256_CTR,true,null,hint->SECRET.clone());
 		AString value=Strings.create("encrypted maintenance root "+"0123456789abcdef".repeat(4));
-		EtchStore store=new EtchStore(Etch.create(file,config));
-		store.setRootData(value);
-		store.flush();
-		store.close();
+		try (EtchStore store=new EtchStore(Etch.create(file,config))) {
+			store.setRootData(value);
+			store.flush();
+		}
 		markV3Open(file,SECRET);
 
 		byte[] wrongSecret=SECRET.clone();
@@ -131,20 +131,24 @@ public class EtchMaintenanceReaderTest {
 		}
 
 		EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file);
-		long physicalEnd=reader.getPhysicalFileEnd();
-		assertEquals(oldPhysical+1L,physicalEnd);
-		assertTrue(reader.getLogicalFileEnd()<physicalEnd);
-		byte[] tail=new byte[1];
-		reader.readRaw(physicalEnd-1L,tail,0,1);
-		assertEquals(0x5a,tail[0]&0xff);
-		assertThrows(IOException.class,()->reader.readRaw(physicalEnd,tail,0,1));
-		assertThrows(IOException.class,()->reader.readRaw(-1L,tail,0,1));
-		assertThrows(IOException.class,()->reader.readRaw(Long.MAX_VALUE,tail,0,1));
-		assertThrows(IOException.class,()->reader.readData(reader.getBodyStart()-1L,tail,0,1));
-		long firstAlignedPastLogical=(reader.getLogicalFileEnd()+7L)&~7L;
-		assertThrows(IOException.class,()->reader.readIndexSlot(firstAlignedPastLogical));
-		reader.close();
-		assertThrows(IOException.class,()->reader.readRaw(0L,tail,0,1));
+		try {
+			long physicalEnd=reader.getPhysicalFileEnd();
+			assertEquals(oldPhysical+1L,physicalEnd);
+			assertTrue(reader.getLogicalFileEnd()<physicalEnd);
+			byte[] tail=new byte[1];
+			reader.readRaw(physicalEnd-1L,tail,0,1);
+			assertEquals(0x5a,tail[0]&0xff);
+			assertThrows(IOException.class,()->reader.readRaw(physicalEnd,tail,0,1));
+			assertThrows(IOException.class,()->reader.readRaw(-1L,tail,0,1));
+			assertThrows(IOException.class,()->reader.readRaw(Long.MAX_VALUE,tail,0,1));
+			assertThrows(IOException.class,()->reader.readData(reader.getBodyStart()-1L,tail,0,1));
+			long firstAlignedPastLogical=(reader.getLogicalFileEnd()+7L)&~7L;
+			assertThrows(IOException.class,()->reader.readIndexSlot(firstAlignedPastLogical));
+			reader.close();
+			assertThrows(IOException.class,()->reader.readRaw(0L,tail,0,1));
+		} finally {
+			reader.close();
+		}
 	}
 
 	@Test

@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileTime;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -26,8 +27,8 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -50,8 +51,8 @@ public class DLFSLocal extends DLFileSystem {
 
 	// Cursor for filesystem root node. This may be a path into a bigger lattice
 	AForkableCursor<AVector<ACell>> rootCursor;
-	// Store for incremental blob checkpoints during streamed writes, or null for heap-only
-	private final AStore store;
+	// Persists file content as it is written, or null to keep it in memory
+	private final Persister persister;
 	private final DLFSLocation location;
 	private volatile Supplier<CVMLong> clock;
 
@@ -72,7 +73,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	/**
 	 * Creates a DLFSLocal backed by a lattice cursor (which may be a path into a larger lattice).
-	 * File data remains heap-backed; use {@link #create(DLFSProvider, String, AForkableCursor, AStore)}
+	 * File data remains heap-backed; use {@link #create(DLFSProvider, String, AForkableCursor, Persister)}
 	 * for incremental blob persistence.
 	 *
 	 * @param dlfsProvider Provider for this filesystem
@@ -84,26 +85,26 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	/**
-	 * Creates a cursor-backed view which checkpoints blob branches into the supplied
-	 * store when non-null. Intended for adapters which may also operate detached.
+	 * Creates a cursor-backed view which checkpoints blob branches through the
+	 * supplied persister when non-null. Intended for adapters which may also operate detached.
 	 */
 	protected DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
-			AForkableCursor<AVector<ACell>> cursor, AStore store) {
-		this(dlfsProvider,uriPath,cursor,store,DLFSLocation.at(cursor));
+			AForkableCursor<AVector<ACell>> cursor, Persister persister) {
+		this(dlfsProvider,uriPath,cursor,persister,DLFSLocation.at(cursor));
 	}
 
 	/** Binds a NIO view to the working location known by its domain component. */
 	protected DLFSLocal(DLFSProvider dlfsProvider,String uriPath,
-			AForkableCursor<AVector<ACell>> cursor,AStore store,DLFSLocation location) {
-		this(dlfsProvider,uriPath,cursor,store,location,Utils::getCurrentTimestampCell);
+			AForkableCursor<AVector<ACell>> cursor,Persister persister,DLFSLocation location) {
+		this(dlfsProvider,uriPath,cursor,persister,location,Utils::getCurrentTimestampCell);
 	}
 
-	/** Binds a NIO view to its component's location, store and mutation clock. */
+	/** Binds a NIO view to its component's location, persister and mutation clock. */
 	protected DLFSLocal(DLFSProvider dlfsProvider,String uriPath,
-			AForkableCursor<AVector<ACell>> cursor,AStore store,DLFSLocation location,Supplier<CVMLong> clock) {
+			AForkableCursor<AVector<ACell>> cursor,Persister persister,DLFSLocation location,Supplier<CVMLong> clock) {
 		super(dlfsProvider,uriPath);
 		this.rootCursor=cursor;
-		this.store=store;
+		this.persister=persister;
 		this.location=java.util.Objects.requireNonNull(location);
 		this.clock=java.util.Objects.requireNonNull(clock);
 	}
@@ -112,26 +113,26 @@ public class DLFSLocal extends DLFileSystem {
 		return other instanceof DLFSLocal local && location.equals(local.location);
 	}
 
-	/** Creates a view with an explicit component location and optional blob store. */
+	/** Creates a view with an explicit component location and optional blob persister. */
 	public static DLFSLocal create(DLFSProvider provider,String uriPath,
-			AForkableCursor<AVector<ACell>> cursor,AStore store,DLFSLocation location) {
-		return new DLFSLocal(provider,uriPath,cursor,store,location);
+			AForkableCursor<AVector<ACell>> cursor,Persister persister,DLFSLocation location) {
+		return new DLFSLocal(provider,uriPath,cursor,persister,location);
 	}
 
 	/**
-	 * Creates a cursor-backed view with incremental blob persistence in the
-	 * supplied store. The caller retains ownership of the store.
+	 * Creates a cursor-backed view with incremental blob persistence through the
+	 * supplied persister. The caller keeps its store open while the view is in use.
 	 *
 	 * @param dlfsProvider DLFS provider
 	 * @param uriPath URI path (may be null)
 	 * @param cursor Cursor pointing to the DLFS tree
-	 * @param store Store used for streamed blob persistence
+	 * @param persister Persister used for streamed blob persistence
 	 * @return Store-backed filesystem view
 	 */
 	public static DLFSLocal create(DLFSProvider dlfsProvider, String uriPath,
-			AForkableCursor<AVector<ACell>> cursor, AStore store) {
-		if (store==null) throw new IllegalArgumentException("DLFS persistence store must not be null");
-		return new DLFSLocal(dlfsProvider,uriPath,cursor,store);
+			AForkableCursor<AVector<ACell>> cursor, Persister persister) {
+		if (persister==null) throw new IllegalArgumentException("DLFS persister must not be null");
+		return new DLFSLocal(dlfsProvider,uriPath,cursor,persister);
 	}
 
 	public static DLFSLocal create(DLFSProvider provider) {
@@ -191,40 +192,63 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	/**
-	 * Checkpoints immutable blob branches into this filesystem's store, if any. Part
+	 * Checkpoints immutable blob branches through this filesystem's persister, if any. Part
 	 * of the channel write protocol; subclasses may override it to apply their own
 	 * persistence policy.
 	 */
 	protected ABlob checkpointBlob(ABlob data) throws IOException {
-		return (store==null)?data:Cells.persist(data,store);
+		return (persister==null)?data:persister.persist(data);
 	}
 
 	/**
 	 * Atomically transforms the latest file data across all views of this drive.
-	 * Checkpointing runs before installation, outside cursor retry callbacks. A
-	 * changed root with unchanged file data reuses the prepared blob; only a change
-	 * to this file's data requires recomputation and another checkpoint.
+	 * The new content is prepared, and checkpointed, outside the cursor's update, and
+	 * installed by an update function, so the drive around it is built on the cells
+	 * the cursor holds. A changed root with unchanged file data redoes only the
+	 * install; a change to this file's data prepares the content again. A transform
+	 * that leaves the content equal changes nothing.
 	 */
 	AVector<ACell> updateFileData(DLPath path, UnaryOperator<ABlob> transform,
 			CVMLong operationTime, boolean checkpoint) throws IOException {
 		checkOpen();
-		ABlob preparedFrom=null;
-		ABlob prepared=null;
 		while (true) {
-			AVector<ACell> root=rootCursor.get();
-			AVector<ACell> node=DLFSNode.resolveValidPath(root,path);
+			AVector<ACell> node=DLFSNode.resolveValidPath(rootCursor.get(),path);
 			ABlob data=(node==null)?null:DLFSNode.getData(node);
 			if (data==null) throw new NoSuchFileException(path.toString());
-			if (data!=preparedFrom) {
-				prepared=transform.apply(data);
-				if (prepared==data) return node;
-				if (checkpoint) prepared=checkpointBlob(prepared);
-				preparedFrom=data;
-			}
-			AVector<ACell> updated=DLFSNode.withContentTime(node.assoc(DLFSNode.POS_DATA,prepared),operationTime);
-			AVector<ACell> next=DLFSNode.updateNode(root,path,updated,operationTime);
-			if (rootCursor.compareAndSet(root,next)) return updated;
+			ABlob prepared=transform.apply(data);
+			if (Utils.equals(prepared,data)) return node;
+			if (checkpoint) prepared=checkpointBlob(prepared);
+			AVector<ACell> updated=installFileData(path,data,prepared,operationTime);
+			if (updated!=null) return updated;
 		}
+	}
+
+	/**
+	 * Installs content prepared from a file's data, if the drive still holds the very
+	 * cells it was prepared from. The prepared content shares those cells, so it goes
+	 * in only over them: equal data in other cells means the cursor was switched to
+	 * persisted ones, and content built on the old ones would put them back in memory.
+	 *
+	 * @return The file's new node, or null if its data is no longer those cells
+	 */
+	private AVector<ACell> installFileData(DLPath path,ABlob from,ABlob prepared,CVMLong operationTime) throws IOException {
+		// Set by every run of the update function, so it reflects the run that landed
+		AtomicReference<AVector<ACell>> installed=new AtomicReference<>();
+		try {
+			rootCursor.updateAndGet(root -> {
+				AVector<ACell> node=resolveValidUnchecked(root,path);
+				if (node==null || DLFSNode.getData(node)!=from) {
+					installed.set(null);
+					return root;
+				}
+				AVector<ACell> updated=DLFSNode.withContentTime(node.assoc(DLFSNode.POS_DATA,prepared),operationTime);
+				installed.set(updated);
+				return DLFSNode.updateNode(root,path,updated,operationTime);
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+		return installed.get();
 	}
 
 	@Override
@@ -238,33 +262,35 @@ public class DLFSLocal extends DLFileSystem {
 		// Save before the update, so a retry under contention redoes only the install
 		ABlob data=checkpointBlob(content);
 		CVMLong operationTime=currentTimestamp();
+		// Set by every run of the update function, so it reflects the run that landed
+		AtomicReference<AVector<ACell>> replaced=new AtomicReference<>();
 		try {
-			while (true) {
-				AVector<ACell> root=rootCursor.get();
+			rootCursor.updateAndGet(root -> {
 				requireDirectory(root,parent);
 				AVector<ACell> existing=resolveValidUnchecked(root,target);
-				if (!condition.test(existing)) throw new ConditionFailedException(target.toString());
+				if (!condition.test(existing)) throw new UncheckedIOException(new ConditionFailedException(target.toString()));
 				AVector<ACell> base;
 				if (existing==null) {
 					base=DLFSNode.createEmptyFile(operationTime);
 				} else if (DLFSNode.isRegularFile(existing)) {
 					base=existing;
 				} else {
-					throw new FileSystemException(target.toString(),null,"Is a directory");
+					throw new UncheckedIOException(new FileSystemException(target.toString(),null,"Is a directory"));
 				}
+				replaced.set(existing);
 				// Editing the existing entry keeps its metadata and unknown trailing fields
 				AVector<ACell> updated=DLFSNode.withContentTime(base.assoc(DLFSNode.POS_DATA,data),operationTime);
-				AVector<ACell> next=DLFSNode.updateNode(root,target,updated,operationTime);
-				if (rootCursor.compareAndSet(root,next)) return existing;
-			}
+				return DLFSNode.updateNode(root,target,updated,operationTime);
+			});
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
 		}
+		return replaced.get();
 	}
 
 	@Override
-	protected AStore getContentStore() {
-		return store;
+	protected Persister getContentPersister() {
+		return persister;
 	}
 
 	@Override
@@ -441,10 +467,13 @@ public class DLFSLocal extends DLFileSystem {
 		if (DLFSNode.isDirectory(copied) && !recursive) {
 			copied=DLFSNode.withoutChildren(copied);
 		}
-		// Bind foreign branches to the destination store before publication. Heap-only
-		// destinations need direct refs so closing the source store cannot lose data.
-		if (store!=destination.store) {
-			copied=Cells.persist(copied,(destination.store==null)?new MemoryStore():destination.store);
+		// Bind the copy to the destination's store before publication; cells already
+		// there are found, not written again. A heap-only destination needs direct refs,
+		// so closing the source's store cannot lose data.
+		if (destination.persister!=null) {
+			copied=destination.persister.persist(copied);
+		} else if (persister!=null) {
+			copied=new MemoryStore().persist(copied);
 		}
 		AVector<ACell> prepared=copied;
 		try {
@@ -537,12 +566,12 @@ public class DLFSLocal extends DLFileSystem {
 		rootCursor.updateAndGet(own -> DLFSLattice.INSTANCE.merge(own,other));
 	}
 
-	/** Creates a forked view sharing this filesystem's store, if any. */
+	/** Creates a forked view sharing this filesystem's persister, if any. */
 	@Override
 	public DLFSLocal fork() {
 		checkOpen();
 		var working=rootCursor.fork();
-		return new WorkingFileSystem(provider(),uriPath,working,store,clock);
+		return new WorkingFileSystem(provider(),uriPath,working,persister,clock);
 	}
 
 	/** NIO view owning an independent publication boundary. */
@@ -550,14 +579,19 @@ public class DLFSLocal extends DLFileSystem {
 		private final ForkedCursor<AVector<ACell>> working;
 
 		WorkingFileSystem(DLFSProvider provider,String uriPath,
-				ForkedCursor<AVector<ACell>> working,AStore store,Supplier<CVMLong> clock) {
-			super(provider,uriPath,working,store,DLFSLocation.at(working),clock);
+				ForkedCursor<AVector<ACell>> working,Persister persister,Supplier<CVMLong> clock) {
+			super(provider,uriPath,working,persister,DLFSLocation.at(working),clock);
 			this.working=working;
 		}
 
+		/** Publishes by the drive lattice's join where both sides changed. */
 		@Override public void sync() {
 			checkOpen();
-			working.sync(DLFSLattice.INSTANCE::merge);
+			working.reconcile((base,own,other) -> {
+				if (Utils.equals(own,base)) return other;
+				if (Utils.equals(other,base)) return own;
+				return DLFSLattice.INSTANCE.merge(own,other);
+			});
 		}
 	}
 
@@ -567,13 +601,13 @@ public class DLFSLocal extends DLFileSystem {
 		// A live view is already updated. Only independent working views publish.
 	}
 
-	/** Creates an independent snapshot of the current state, checkpointing into the same store, if any. */
+	/** Creates an independent snapshot of the current state, checkpointing through the same persister, if any. */
 	@Override
 	public DLFSLocal clone() {
 		checkOpen();
 		AVector<ACell> root=rootCursor.get();
 		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root);
-		return new DLFSLocal(provider(),uriPath,cursor,store,DLFSLocation.at(cursor),clock);
+		return new DLFSLocal(provider(),uriPath,cursor,persister,DLFSLocation.at(cursor),clock);
 	}
 
 	private static void requireAbsent(AVector<ACell> parent, AString name, DLPath path) throws IOException {

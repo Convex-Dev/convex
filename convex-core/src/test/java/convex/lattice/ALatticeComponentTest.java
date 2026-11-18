@@ -26,10 +26,11 @@ import convex.core.data.RefDirect;
 import convex.core.data.RefSoft;
 import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
-import convex.etch.EtchStore;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Persister;
+import convex.test.Persisters;
+import convex.test.Samples;
 
 public class ALatticeComponentTest {
 
@@ -40,7 +41,7 @@ public class ALatticeComponentTest {
 			super(cursor);
 		}
 
-		TestComponent(AForkableCursor<ASet<ACell>> cursor,Persister<ASet<ACell>> persister) {
+		TestComponent(AForkableCursor<ASet<ACell>> cursor,Persister persister) {
 			super(cursor,persister);
 		}
 
@@ -48,10 +49,10 @@ public class ALatticeComponentTest {
 			return rebind(storage.fork());
 		}
 
-		@Override protected TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
+		@Override public TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
 
 		@Override
-		protected ASet<ACell> mergePublication(ASet<ACell> own,ASet<ACell> other) {
+		protected ASet<ACell> reconcile(ASet<ACell> own,ASet<ACell> other) {
 			return own.includeAll(other);
 		}
 
@@ -153,10 +154,9 @@ public class ALatticeComponentTest {
 		var b=Blob.fromHex("bb");
 		var component=new AtomicReference<TestComponent>();
 		var edited=new AtomicBoolean();
-		component.set(new TestComponent(host.cursor().fork(),value -> {
+		component.set(new TestComponent(host.cursor().fork(),Persisters.after(value -> {
 			if (edited.compareAndSet(false,true)) component.get().add(b);
-			return host.persist(value);
-		}));
+		},host::persist)));
 		component.get().add(a);
 		var persisted=component.get().persist();
 		assertEquals(Sets.of(a,b),persisted);
@@ -166,14 +166,12 @@ public class ALatticeComponentTest {
 	/** With an Etch store, persisted working state refers to its stored cells softly, so memory can release them. */
 	@Test
 	public void persistedWorkingStateRefersToStoredCellsSoftly() throws Exception {
-		try (EtchStore store=EtchStore.createTemp()) {
-			var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),store);
-			var component=new TestComponent(host.cursor().fork(),host::persist);
-			component.add(Blobs.createRandom(new Random(4321),1000));
-			assertInstanceOf(RefDirect.class,component.storage().get().getRef(0));
-			component.persist();
-			assertInstanceOf(RefSoft.class,component.storage().get().getRef(0));
-		}
+		var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),Samples.TEST_STORE);
+		var component=new TestComponent(host.cursor().fork(),host::persist);
+		component.add(Blobs.createRandom(new Random(4321),1000));
+		assertInstanceOf(RefDirect.class,component.storage().get().getRef(0));
+		component.persist();
+		assertInstanceOf(RefSoft.class,component.storage().get().getRef(0));
 	}
 
 	/** Only a component given a function persists itself; others are persisted with their parent. */
@@ -198,10 +196,8 @@ public class ALatticeComponentTest {
 		var unrelated=Keyword.intern("unrelated");
 		var marker=Blob.fromHex("abcd");
 		var host=LatticeHost.create(Index.<Keyword,ACell>none().assoc(unrelated,marker),null);
-		var live=new TestComponent(host.cursor().<ASet<ACell>>path(key).withDefault(Sets.empty()));
-		var draft=live.fork();
 		var regions=new Regions(host.cursor());
-		regions.add(key,draft);
+		regions.create(key,(AForkableCursor<ASet<ACell>> region) -> new TestComponent(region.withDefault(Sets.empty())).fork());
 		regions.mergeAt(Sets.of(marker),key);
 		assertNull(host.cursor().get().get(key));
 		regions.mergeAt(Sets.of(marker),unrelated);

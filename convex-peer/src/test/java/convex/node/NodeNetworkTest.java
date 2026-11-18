@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,12 +12,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
@@ -30,6 +35,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -46,6 +52,7 @@ import convex.lattice.Lattice;
  * All servers share a common Lattice instance.
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class NodeNetworkTest {
 
 	/**
@@ -143,26 +150,24 @@ public class NodeNetworkTest {
 	}
 
 	/**
-	 * Shuts down all NodeServers in the network after all tests complete.
-	 * 
-	 * @throws IOException If an IO error occurs during shutdown
+	 * Shuts down all NodeServers in the network after all tests complete,
+	 * running every close even if an earlier one fails.
 	 */
 	@AfterAll
-	public void tearDownNetwork() throws IOException {
-		for (LatticeListener transport:transports) transport.close();
-		transports.clear();
-		// Close all NodeServers
-		for (NodeServer<?> server : nodeServers) {
-			server.close();
+	public void tearDownNetwork() {
+		List<Executable> closes=new ArrayList<>();
+		// Listeners, then NodeServers, then stores; null if setup failed before creating them
+		if (transports!=null) for (LatticeListener transport:transports) closes.add(transport::close);
+		if (nodeServers!=null) for (NodeServer<?> server:nodeServers) closes.add(server::close);
+		if (stores!=null) for (AStore store:stores) closes.add(store::close);
+		try {
+			assertAll("Close the network",closes);
+		} finally {
+			if (transports!=null) transports.clear();
+			if (nodeServers!=null) nodeServers.clear();
+			if (propagators!=null) propagators.clear();
+			if (stores!=null) stores.clear();
 		}
-		nodeServers.clear();
-		propagators.clear();
-		
-		// Close all stores
-		for (AStore store : stores) {
-			store.close();
-		}
-		stores.clear();
 	}
 
 	/**
@@ -212,13 +217,15 @@ public class NodeNetworkTest {
 		// Update the :data path with the updated Index
 		server0.getCursor().assoc(dataKeyword, updatedDataIndex);
 
-		// Sync so the propagator has the value for LATTICE_QUERY responses.
-		// Synchronous commit: announce completes on this thread before return.
-		server0.getHost().sync();
-
 		// Create the query path [:data valueHash] for reuse
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);
-		
+		Predicate<ACell> holdsTestValue = root -> testValue.equals(RT.getIn(root, dataKeyword, valueHash));
+
+		// Sync publishes the value; the propagator's worker then announces it, and
+		// LATTICE_QUERY answers from what has been announced.
+		server0.getHost().sync();
+		propagators.get(0).whenAnnounced(holdsTestValue).get(10, TimeUnit.SECONDS);
+
 		// Verify server 0 has the value at [:data valueHash] by sending a LATTICE_QUERY via ConvexRemote
 		InetSocketAddress server0Address = transports.get(0).getHostAddress();
 		assertNotNull(server0Address, "Server 0 should have a host address");
@@ -251,7 +258,8 @@ public class NodeNetworkTest {
 		
 		// Call sync on the last server to sync with server 0
 		assertTrue(lastServer.pull(propagators.get(NETWORK_SIZE - 1)), "Pull should succeed");
-		
+		propagators.get(NETWORK_SIZE - 1).whenAnnounced(holdsTestValue).get(10, TimeUnit.SECONDS);
+
 		// Verify the last server has the new data value at [:data valueHash] path via LATTICE_QUERY
 		InetSocketAddress lastServerAddress = transports.get(NETWORK_SIZE-1).getHostAddress();
 		assertNotNull(lastServerAddress, "Last server should have a host address");

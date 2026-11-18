@@ -57,7 +57,7 @@ class NettyServerConnection extends AConnection {
 
 	@Override
 	public boolean trySendMessage(Message msg) {
-		if (NettyConnection.encodedLength(msg) < 0) return false; // too large for a frame: logged, not sent
+		if (NettyConnection.encodedLength(msg) < 0) return false; // too large for a frame: refused
 		try {
 			return sendMessage(msg);
 		} catch (ClosedChannelException e) {

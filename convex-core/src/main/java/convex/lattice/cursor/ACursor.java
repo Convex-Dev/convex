@@ -1,19 +1,19 @@
 package convex.lattice.cursor;
 
 import java.io.IOException;
-import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
-import convex.lattice.LatticeOps;
+import convex.core.store.Persister;
+import convex.core.util.Utils;
 
 /**
  * Atomic read/write access to one immutable CVM value.
- * Paths update existing nested containers atomically through their base cursor.
- * Components construct missing containers. Cursors carry no lattice policy,
+ * Paths write existing entries atomically through their base cursor.
+ * Components create missing entries and containers. Cursors carry no lattice policy,
  * signing context, clock or store; components own those concerns.
  *
  * @param <V> Value type
@@ -53,26 +53,20 @@ public abstract class ACursor<V extends ACell> {
 	// ===== Exclusive transactions =====
 
 	/**
-	 * Returns the lock which serialises writes to this cursor's shared state, or null
-	 * when that state lives in an ordinary optimistic root. Derived cursors resolve
-	 * this through their existing links; {@link TransactionalRootCursor} supplies its
-	 * write lock. This is the only root-owned capability a cursor exposes, and it
-	 * supports {@link Transactions} and atomic fork publication.
+	 * Takes the {@link Claim} of the nearest transactional boundary beneath this
+	 * cursor, waiting for any earlier claim on it: a {@link BoundaryCursor} this
+	 * cursor is built over, or else the root holding its state, which is the
+	 * outermost boundary. The claim covers everything under that boundary. Derived
+	 * cursors pass it down through their existing source links, so a boundary needs
+	 * to know nothing about paths or views. This is the only boundary-owned capability
+	 * a cursor exposes, and it supports {@link Transactions} and atomic fork
+	 * publication. A thread already holding that claim takes it again without
+	 * waiting, and the claim stays held until the outermost one is closed.
 	 *
-	 * @return Shared write lock, or null when exclusive transactions are unsupported
+	 * @return The claim, to be closed by the calling thread
 	 */
-	protected Lock exclusiveLock() {
-		return null;
-	}
-
-	/**
-	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
-	 * roots support optimistic transactions only.
-	 *
-	 * @return true if {@link Transactions#transactExclusively} is available
-	 */
-	public final boolean supportsExclusiveTransactions() {
-		return exclusiveLock() != null;
+	protected Claim claim() {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" has no root to claim");
 	}
 
 	// ===== Reads =====
@@ -134,7 +128,7 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
-		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, key));
+		getAndUpdate(bv -> (V) PathCursor.assocExisting(bv, value, key));
 	}
 
 	/**
@@ -149,7 +143,7 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {
-		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, keys));
+		getAndUpdate(bv -> (V) PathCursor.assocExisting(bv, value, keys));
 	}
 
 	/**
@@ -161,18 +155,18 @@ public abstract class ACursor<V extends ACell> {
 	public abstract V getAndSet(V newValue);
 
 	/**
-	 * Atomically sets the value if it currently equals the expected value.
+	 * Atomically writes {@code newValue} if the current value equals {@code expected}, by value.
 	 *
-	 * <p>This is the fundamental Compare-And-Set (CAS) operation. It succeeds only if
-	 * the current value is identical (==) to the expected value. This enables optimistic
-	 * concurrency: read a value, compute a new value, and attempt to write it back,
-	 * failing if another thread modified it in between.</p>
-	 *
-	 * @param expected The value expected to be present
-	 * @param newValue The new value to set if expectation holds
-	 * @return true if update succeeded, false if current value wasn't expected
+	 * @param expected Value expected
+	 * @param newValue Value to write
+	 * @return true if the value equalled {@code expected}; false if it differed, leaving it unchanged
+	 * @throws ReadOnlyCursorException If this cursor is read-only
+	 * @throws convex.lattice.PathWriteException If this cursor has nowhere to write
 	 */
-	public abstract boolean compareAndSet(V expected, V newValue);
+	public boolean compareAndSet(V expected, V newValue) {
+		V before=getAndUpdate(current -> Utils.equals(current,expected)?newValue:current);
+		return Utils.equals(before,expected);
+	}
 
 	/**
 	 * Sets the cursor to the new value.
@@ -257,28 +251,35 @@ public abstract class ACursor<V extends ACell> {
 
 	// ===== Persistence =====
 
+	/** Persisting is worth repeating for an edit that lands, but must not chase writes that never pause. */
+	static final int PERSIST_ATTEMPTS=3;
+
 	/**
 	 * Replaces the value this cursor holds with the equal value the persister returns,
 	 * in one atomic update, so the cells it has stored need not stay in memory. An
 	 * edit landing meanwhile makes the update repeat on the edited value, which is
-	 * harmless: cells already stored are found, not written again. The cursor knows no
-	 * store. A view holds no value of its own and treats the equal value as unchanged,
-	 * so the cells are stored but its source keeps what it holds.
+	 * harmless: cells already stored are found, not written again. After three attempts
+	 * the cursor keeps the value as it stands, so writes that never pause cannot hold
+	 * this up, and a later persist switches what is then held. The cursor knows no
+	 * store. Only a cursor that holds a value switches: a {@link Root} and a fork do.
+	 * A view holds no value of its own and, as with any write of an equal value, leaves
+	 * its source as it is, so the cells are stored but the source keeps what it holds.
 	 *
 	 * @param persister Writes cells and returns the equal, persisted value
-	 * @return Persisted value, or null if the cursor holds none
+	 * @return Value now held: persisted unless the attempts ran out; null if the cursor holds none
 	 * @throws IOException If the persister fails
 	 */
-	public V persist(Persister<V> persister) throws IOException {
+	public V persist(Persister persister) throws IOException {
+		int[] attempts={0};
 		try {
-			return updateAndGet(value -> persistValue(persister,value));
+			return updateAndGet(value -> (attempts[0]++<PERSIST_ATTEMPTS)?persistValue(persister,value):value);
 		} catch (StoreException e) {
 			if (e.getCause() instanceof IOException cause) throw cause;
 			throw e;
 		}
 	}
 
-	private static <V extends ACell> V persistValue(Persister<V> persister,V value) {
+	private static <V extends ACell> V persistValue(Persister persister,V value) {
 		if (value==null) return null;
 		try {
 			return persister.persist(value);
@@ -301,7 +302,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>Reading from the path cursor returns the nested value; writing to it
 	 * atomically updates this cursor's entire value with the nested change. A write
-	 * through an absent intermediate fails; components supply any construction logic.</p>
+	 * where the location does not exist fails; components supply any construction logic.</p>
 	 *
 	 * @param <T> Type of value at the path
 	 * @param path Keys to navigate through nested data structures

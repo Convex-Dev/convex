@@ -16,8 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
@@ -51,13 +51,18 @@ public class IntegerColumnsTest {
 	private static final BigInteger BELOW = MIN.subtract(BigInteger.ONE);
 	private static final BigInteger HUGE = BigInteger.TWO.pow(200);
 
-	private ConvexDB cdb;
-	private SQLDatabase db;
-	private String dbName;
-	private PgServer server;
+	/*
+	 * One database for the class, whose big and ints tables no test changes: tests that
+	 * write create tables of their own. The PostgreSQL server serves this one database,
+	 * and starts only when a test first connects through it.
+	 */
+	private static ConvexDB cdb;
+	private static SQLDatabase db;
+	private static String dbName;
+	private static PgServer server;
 
-	@BeforeEach
-	public void setUp() throws Exception {
+	@BeforeAll
+	public static void setUp() throws Exception {
 		dbName = "integers_" + DB_COUNTER.getAndIncrement();
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
@@ -78,15 +83,13 @@ public class IntegerColumnsTest {
 		for (long id = 1; id <= 3; id++) {
 			assertTrue(db.tables().insert("ints", Vectors.of(CVMLong.create(id), CVMLong.MAX_VALUE)));
 		}
-
-		server = PgServer.builder().port(0).database(dbName).build();
-		server.start();
 	}
 
-	@AfterEach
-	public void tearDown() {
-		if (server != null && server.isRunning()) server.stop();
-		if (cdb != null) cdb.unregister(dbName);
+	@AfterAll
+	public static synchronized void tearDown() {
+		assertAll("Stop the class's server and close its database",
+			() -> { if (server != null && server.isRunning()) server.stop(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	private Connection jdbc() throws SQLException {
@@ -94,7 +97,22 @@ public class IntegerColumnsTest {
 	}
 
 	private Connection pgwire() throws SQLException {
-		return DriverManager.getConnection("jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser");
+		return DriverManager.getConnection("jdbc:postgresql://localhost:" + server().getPort() + "/" + dbName + "?user=testuser");
+	}
+
+	/** The class's PostgreSQL server, started by the first test that needs it. */
+	private static synchronized PgServer server() throws SQLException {
+		if (server == null) {
+			PgServer started = PgServer.builder().port(0).database(dbName).build();
+			try {
+				started.start();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new SQLException("Interrupted while starting the PostgreSQL server", e);
+			}
+			server = started;
+		}
+		return server;
 	}
 
 	// ========== Reported cases ==========
@@ -305,26 +323,30 @@ public class IntegerColumnsTest {
 
 	@Test
 	public void testInsertThroughSql() throws SQLException {
+		// A version 0 BIGINT table of this test's own, so the shared big table stays as read
+		db.tables().createTable("big_writes", new String[] {"id", "v"}, new ConvexType[] {ConvexType.BIGINT, ConvexType.BIGINT});
 		try (Connection conn = jdbc(); Statement st = conn.createStatement()) {
-			assertEquals(1, st.executeUpdate("INSERT INTO big VALUES (7, 99999999999999999999)"));
-			assertEquals(1, st.executeUpdate("UPDATE big SET v = v + 1 WHERE id = 7"));
+			assertEquals(1, st.executeUpdate("INSERT INTO big_writes VALUES (7, 99999999999999999999)"));
+			assertEquals(1, st.executeUpdate("UPDATE big_writes SET v = v + 1 WHERE id = 7"));
 		}
 		// Stored canonically, so the key is the 8-byte key of 7
-		assertEquals(AInteger.parse("100000000000000000000"), db.tables().selectByKey("big", CVMLong.create(7)).get(1));
-		try (Connection conn = pgwire(); PreparedStatement ps = conn.prepareStatement("INSERT INTO big VALUES (?, ?)")) {
+		assertEquals(AInteger.parse("100000000000000000000"), db.tables().selectByKey("big_writes", CVMLong.create(7)).get(1));
+		try (Connection conn = pgwire(); PreparedStatement ps = conn.prepareStatement("INSERT INTO big_writes VALUES (?, ?)")) {
 			ps.setLong(1, 8);
 			ps.setBigDecimal(2, new BigDecimal(HUGE));
 			assertEquals(1, ps.executeUpdate());
 		}
-		assertEquals(AInteger.create(HUGE), db.tables().selectByKey("big", CVMLong.create(8)).get(1));
+		assertEquals(AInteger.create(HUGE), db.tables().selectByKey("big_writes", CVMLong.create(8)).get(1));
 	}
 
 	@Test
 	public void testIntegerColumnOutOfRange() throws SQLException {
-		// INTEGER columns are presented as BIGINT, which cannot hold this stored value
-		assertTrue(db.tables().insert("ints", Vectors.of(CVMLong.create(4), CVMBigInteger.wrap(ABOVE))));
+		// INTEGER columns are presented as BIGINT, which cannot hold this stored value.
+		// A table of this test's own, so the shared ints table stays as read.
+		db.tables().createTable("ints_out_of_range", new String[] {"id", "v"}, new ConvexType[] {ConvexType.INTEGER, ConvexType.INTEGER});
+		assertTrue(db.tables().insert("ints_out_of_range", Vectors.of(CVMLong.create(4), CVMBigInteger.wrap(ABOVE))));
 		try (Connection conn = jdbc()) {
-			SQLException e = assertThrows(SQLException.class, () -> column(conn, "SELECT v FROM ints WHERE id = 4"));
+			SQLException e = assertThrows(SQLException.class, () -> column(conn, "SELECT v FROM ints_out_of_range WHERE id = 4"));
 			assertEquals("22003", sqlState(e));
 		}
 	}

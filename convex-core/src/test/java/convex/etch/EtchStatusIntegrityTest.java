@@ -42,10 +42,10 @@ import convex.test.Samples;
  * - refs returned or cached by a store must be bound to that store, never to a
  *   foreign store
  * - status already earned by THIS store is never downgraded (monotonic merge
- *   with the store's own entry flags)
+ *   with the store's own entry flags), neither in its files nor in the refs a
+ *   write returns or a cache insertion keeps
  *
- * See convex-core/docs/ETCH_GC.md "Ref status invariants". The failing tests
- * here prove the current defects; they must pass after the write-boundary fix.
+ * See convex-core/docs/ETCH_GC.md, "Refs, status and store identity".
  */
 public class EtchStatusIntegrityTest {
 
@@ -65,7 +65,7 @@ public class EtchStatusIntegrityTest {
 	}
 
 	// -----------------------------------------------------------------
-	// Regression tests: prove current defects, must pass after the fix
+	// A store records and returns no status it has not proved
 	// -----------------------------------------------------------------
 
 	/**
@@ -266,18 +266,17 @@ public class EtchStatusIntegrityTest {
 		assertThrows(IllegalArgumentException.class, () -> cache.putCell(RefSoft.createForHash(v.getHash(), null)));
 		assertSame(direct, cache.getCell(direct.getHash()), "Rejected insertions must not evict");
 
+		cache.putCell(RefSoft.createForHash(v.getHash(), b));
+		assertNull(cache.getCell(v.getHash()), "A soft ref without a live value is a cache miss");
 		Ref<?> local=b.storeTopRef(fromA, Ref.PERSISTED, null);
 		cache.putCell(local);
 		assertSame(local, cache.getCell(v.getHash()));
-		cache.putCell(RefSoft.createForHash(v.getHash(), b));
-		assertNull(cache.getCell(v.getHash()), "A soft ref without a live value is a cache miss");
 		cache.putCell(RefDirect.NULL_VALUE);
 		assertSame(RefDirect.NULL_VALUE, cache.getCell(Hash.NULL_HASH));
 	}
 
 	// -----------------------------------------------------------------
-	// Positive controls: pass today, must STILL pass after the fix.
-	// Guard against the cap being applied too aggressively.
+	// Status a store has proved is recorded, and never lost
 	// -----------------------------------------------------------------
 
 	/**
@@ -345,5 +344,96 @@ public class EtchStatusIntegrityTest {
 
 		assertTrue(store.getEtch().read(h).getStatus() >= Ref.ANNOUNCED,
 				"Earned status must never be downgraded");
+	}
+
+	/**
+	 * A write that finds the entry already at a higher status returns that status,
+	 * as when a STORED write lands just after a concurrent persist of the same value.
+	 */
+	@Test
+	public void testWriteReturnsRecordedStatus() throws IOException {
+		Etch etch = SOURCE.getEtch();
+
+		AString v = nonEmbedded(191);
+		Hash h = v.getHash();
+		etch.write(h, v.getRef().withStatus(Ref.PERSISTED));
+
+		Ref<?> returned = etch.write(h, nonEmbedded(191).getRef().withStatus(Ref.STORED));
+		assertEquals(Ref.PERSISTED, returned.getStatus());
+		assertEquals(Ref.PERSISTED, etch.read(h).getStatus());
+	}
+
+	/**
+	 * A STORED writer whose cache insertion lands after a concurrent persist of the
+	 * same value leaves the persisted status cached.
+	 */
+	@Test
+	public void testLateStoredInsertionKeepsPersistedStatus() throws IOException {
+		EtchStore store = SOURCE;
+
+		AString v = nonEmbedded(201);
+		Hash h = v.getHash();
+		Ref<?> stored = store.storeTopRef(v.getRef(), Ref.STORED, null);
+		assertEquals(Ref.STORED, stored.getStatus());
+
+		Cells.persist(nonEmbedded(201), store);
+		store.addToCache(stored); // the STORED writer's insertion, arriving late
+
+		assertTrue(store.refForHash(h).getStatus() >= Ref.PERSISTED);
+	}
+
+	/**
+	 * Once a persisted value has left the cache, decoding it again caches a cell that
+	 * makes no claim about the file: a lookup still finds the persisted entry.
+	 */
+	@Test
+	public void testDecodedCellDoesNotHideStoredStatus() throws Exception {
+		// One slot makes eviction deterministic
+		try (EtchStore store = EtchStore.createTemp(EtchConfig.create().withRefCacheSize(1))) {
+			AString v = nonEmbedded(211);
+			Hash h = v.getHash();
+			Cells.persist(v, store);
+			Cells.persist(nonEmbedded(212), store); // takes the only slot
+
+			store.decode(v.getEncoding());
+			assertEquals(Ref.UNKNOWN, store.checkCache(h).getStatus());
+
+			Ref<ACell> ref = store.refForHash(h);
+			assertTrue(ref.getStatus() >= Ref.PERSISTED);
+			assertSame(store, ((RefSoft<?>) ref).getStore());
+			assertSame(ref, store.checkCache(h));
+		}
+	}
+
+	/**
+	 * A cache insertion never lowers the status held for its hash: a live entry with
+	 * a higher status stays, and a cleared one passes its status on.
+	 */
+	@Test
+	public void testCacheInsertionNeverLowersStatus() throws IOException {
+		EtchStore store = SOURCE;
+		RefCache cache = RefCache.create(store, 1);
+
+		AString v = nonEmbedded(221);
+		Hash h = v.getHash();
+		Ref<?> stored = store.storeTopRef(v.getRef(), Ref.STORED, null);
+		Ref<?> persisted = store.storeTopRef(nonEmbedded(221).getRef(), Ref.PERSISTED, null);
+
+		cache.putCell(persisted);
+		cache.putCell(stored);
+		assertSame(persisted, cache.getCell(h), "A live entry with a higher status stays");
+		cache.putCell(nonEmbedded(221).getRef());
+		assertSame(persisted, cache.getCell(h), "A decoded cell does not replace it either");
+
+		cache.putCell(RefSoft.createForHash(h, store).withMinimumStatus(Ref.PERSISTED));
+		assertNull(cache.getCell(h));
+		cache.putCell(stored);
+		Ref<?> raised = cache.getCell(h);
+		assertEquals(Ref.PERSISTED, raised.getStatus(), "A cleared entry passes its status on");
+		assertEquals(v, raised.getValue());
+
+		Ref<?> announced = Cells.announce(nonEmbedded(221), null, store).getRef();
+		cache.putCell(announced);
+		assertTrue(cache.getCell(h).getStatus() >= Ref.ANNOUNCED, "A higher status replaces a lower one");
 	}
 }

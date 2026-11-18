@@ -187,10 +187,12 @@ Three classes, distinguished only for diagnostics:
 - **Failing migration** (bug): throws identically on every peer of that
   release; the network stalls at the boundary until a corrected release ships.
   A stall is recoverable, divergence is not.
-- **Environmental failure** (peer-local, for example missing store data): only
-  the affected peer withdraws, with the cause preserved. This class must stay
-  retryable: treating it as a permanent freeze would let a transient or induced
-  local fault become a permanent outage.
+- **Environmental failure** (peer-local, for example missing store data): a
+  migration upgrades state the peer holds, so a peer missing that state cannot
+  proceed. Only the affected peer withdraws, with the cause preserved, and it
+  does not retry by itself. This class must stay recoverable without a release
+  change: requiring one would let a transient or induced local fault become a
+  permanent outage.
 
 **Withdrawal is a full consensus freeze.** A peer votes on block order through
 belief merge independently of applying state, so stopping only the executor
@@ -200,11 +202,11 @@ proposing and publishing, and its consensus state freezes at the last
 pre-boundary state. It stays alive to serve queries and report its condition
 ("upgrade required: version N at T; this release supports M").
 
-**Recovery differs by cause.** Deterministic failures are cured by a corrected
-release: the peer freezes, does not auto-retry, and rejoins after an operator
-update and restart. Environmental failures retry after acquiring the missing
-data, exactly as missing data is handled outside an upgrade. The cause on
-`UpgradeError` selects between the two.
+**Recovery differs by cause.** No failure is retried automatically: the peer
+freezes and rejoins after an operator restart. A deterministic failure needs a
+corrected release first; an environmental failure needs the peer's store
+repaired or resynced, with no release change. The cause on `UpgradeError`
+tells the operator which, in the halt report.
 
 **Early detection and stake withdrawal.** Because the schedule is on-chain and
 `MAX_VERSION` is a release constant, a peer knows the moment a scheduling
@@ -243,8 +245,8 @@ way to upgrade a running network.
   identically on every peer of a release, triggered by a finalised event, so no
   per-peer input can make one honest peer withdraw while others continue.
 - The schedule cannot be forged: it requires a governance-signed transaction.
-- Environmental failures staying retryable is a security requirement, not
-  ergonomics.
+- Environmental failures staying recoverable without a release change is a
+  security requirement, not ergonomics.
 - A future-dated block that reached finality could once teleport the consensus
   clock past an activation and force mass withdrawal. The forward-dating
   confirmation policy in `CONSENSUS.md` closes this; governance should still

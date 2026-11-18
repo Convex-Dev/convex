@@ -1,5 +1,6 @@
 package convex.net.impl.netty;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.LinkedHashSet;
 
@@ -7,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.message.Message;
+import convex.core.util.ThreadUtils;
 import convex.peer.Config;
 import io.netty.channel.Channel;
 
@@ -17,10 +19,10 @@ import io.netty.channel.Channel;
  * thread, which flushes each touched channel once per batch. The queue is a
  * burst absorber bounded by the total encoded bytes it holds: bytes are
  * released as soon as a message is handed to Netty, so a slow reader can never
- * pin the shared bound or delay other connections. Traffic to trusted peers is
- * queued in a lane that the writer drains first and that is exempt from the
- * shared bound, so consensus and lattice replies are never held up behind
- * client results.</p>
+ * pin the shared bound or delay other connections. Traffic to peer links, those
+ * verified as a staked peer's own and those a lattice node trusts, is queued in a
+ * lane that the writer drains first and that is exempt from the shared bound, so
+ * consensus and lattice replies are never held up behind client results.</p>
  *
  * <p>Nothing waits to add a message: it is queued, or refused at once. The writer
  * is the only thread that waits, for work. What a connection has handed to Netty
@@ -45,9 +47,9 @@ final class ServerOutboundQueue {
 
 	private final long byteLimit;
 	private final long connectionByteLimit;
-	private final long trustedConnectionByteLimit;
+	private final long peerConnectionByteLimit;
 
-	/** Replies to trusted peers, drained first and exempt from the shared bound. Guarded by this. */
+	/** Replies to peer links, drained first and exempt from the shared bound. Guarded by this. */
 	private final ArrayDeque<Entry> priority = new ArrayDeque<>();
 	/** Replies to everyone else, bounded by {@link #byteLimit}. Guarded by this. */
 	private final ArrayDeque<Entry> ordinary = new ArrayDeque<>();
@@ -58,7 +60,7 @@ final class ServerOutboundQueue {
 	private final Thread writer;
 
 	/**
-	 * @param byteLimit Maximum encoded bytes held in the queue for untrusted connections
+	 * @param byteLimit Maximum encoded bytes held in the queue for connections other than peer links
 	 * @param connectionByteLimit Bytes handed to Netty but unwritten beyond which a client connection's replies are refused
 	 */
 	ServerOutboundQueue(long byteLimit, long connectionByteLimit) {
@@ -71,15 +73,15 @@ final class ServerOutboundQueue {
 	}
 
 	/**
-	 * @param trustedConnectionByteLimit The same allowance for a verified peer connection
+	 * @param peerConnectionByteLimit The same allowance for a peer link
 	 */
-	ServerOutboundQueue(long byteLimit, long connectionByteLimit, long trustedConnectionByteLimit, boolean startWriter) {
-		if (byteLimit < 1 || connectionByteLimit < 1 || trustedConnectionByteLimit < 1) {
+	ServerOutboundQueue(long byteLimit, long connectionByteLimit, long peerConnectionByteLimit, boolean startWriter) {
+		if (byteLimit < 1 || connectionByteLimit < 1 || peerConnectionByteLimit < 1) {
 			throw new IllegalArgumentException("Byte limits must be positive");
 		}
 		this.byteLimit = byteLimit;
 		this.connectionByteLimit = connectionByteLimit;
-		this.trustedConnectionByteLimit = trustedConnectionByteLimit;
+		this.peerConnectionByteLimit = peerConnectionByteLimit;
 		this.writer = startWriter ? Thread.ofVirtual().name("Server outbound writer").start(this::drain) : null;
 	}
 
@@ -95,7 +97,7 @@ final class ServerOutboundQueue {
 		Entry e = new Entry(connection, channel, message, bytes);
 		synchronized (this) {
 			if (!running) return false;
-			if (connection.isTrusted()) {
+			if (isPeerLink(connection)) {
 				priority.addLast(e);
 			} else {
 				if (queuedBytes + bytes > byteLimit) return false;
@@ -114,7 +116,15 @@ final class ServerOutboundQueue {
 	 * its replies, which it is buffered for instead.
 	 */
 	boolean isBacklogged(NettyServerConnection connection) {
-		return !connection.isTrusted() && connection.getBacklog() >= connectionByteLimit / 2;
+		return !isPeerLink(connection) && connection.getBacklog() >= connectionByteLimit / 2;
+	}
+
+	/**
+	 * Whether a connection is a peer link: verified by a consensus peer as a staked peer's
+	 * own, or trusted by a lattice node, which trusts the connections it admits as routes.
+	 */
+	private static boolean isPeerLink(NettyServerConnection connection) {
+		return connection.isVerified() || connection.isTrusted();
 	}
 
 	/**
@@ -129,15 +139,15 @@ final class ServerOutboundQueue {
 	}
 
 	private long allowance(NettyServerConnection connection) {
-		return connection.isTrusted() ? trustedConnectionByteLimit : connectionByteLimit;
+		return isPeerLink(connection) ? peerConnectionByteLimit : connectionByteLimit;
 	}
 
-	/** Encoded bytes currently held for untrusted connections, not yet handed to Netty. */
+	/** Encoded bytes currently held for connections other than peer links, not yet handed to Netty. */
 	synchronized long getQueuedBytes() {
 		return queuedBytes;
 	}
 
-	/** Next entry to hand over, trusted lane first, or null if nothing is queued. */
+	/** Next entry to hand over, peer lane first, or null if nothing is queued. */
 	private synchronized Entry poll() {
 		Entry e = priority.pollFirst();
 		if (e != null) return e;
@@ -211,12 +221,21 @@ final class ServerOutboundQueue {
 		}
 	}
 
-	/** Stops the writer. Replies still queued are discarded: their channels are closed by now. */
+	/**
+	 * Stops the writer and waits for it, at most the internal timeout. Replies still
+	 * queued are discarded: their channels are closed by now.
+	 */
 	void close() {
 		synchronized (this) {
 			running = false;
 			notifyAll();
 		}
-		if (writer != null) writer.interrupt();
+		if (writer == null) return;
+		writer.interrupt();
+		// Bounded: the writer only hands replies to Netty, which never waits, so this is prompt
+		if (!ThreadUtils.joinUninterruptibly(writer, Duration.ofMillis(Config.DEFAULT_INTERNAL_TIMEOUT))
+				&& (writer != Thread.currentThread())) {
+			log.warn("Server outbound writer did not stop within {} ms", Config.DEFAULT_INTERNAL_TIMEOUT);
+		}
 	}
 }

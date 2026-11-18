@@ -18,6 +18,7 @@ import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.peer.Server;
 
@@ -33,14 +34,37 @@ public class StrimziKafka extends AObserverQueue<Object> {
 
 	private static HashMap<Server,StrimziKafka> instances=new HashMap<>();
 	
+	/**
+	 * Gets the observer for a Server, creating and starting it on first use. The
+	 * observer is closed and forgotten once the Server shuts down.
+	 *
+	 * @param server Server to observe
+	 * @return The Server's observer
+	 */
 	public synchronized static StrimziKafka get(Server server) {
 		StrimziKafka obs=instances.get(server);
 		if (obs==null) {
-			obs=new StrimziKafka(server);
-			instances.put(server, obs);
-			obs.start();
+			StrimziKafka created=new StrimziKafka(server);
+			instances.put(server, created);
+			created.start();
+			// Off the thread closing the Server, which holds the Server while it signals
+			server.whenShutDown().whenCompleteAsync((done,error) -> release(server,created),ThreadUtils.getVirtualExecutor());
+			obs=created;
 		}
 		return obs;
+	}
+
+	/** Forgets a shut-down Server's observer, so neither stays reachable, and closes it. */
+	private static void release(Server server, StrimziKafka observer) {
+		synchronized (StrimziKafka.class) {
+			instances.remove(server,observer);
+		}
+		observer.close();
+	}
+
+	/** Whether a Server has an observer, for tests */
+	static synchronized boolean isObserving(Server server) {
+		return instances.containsKey(server);
 	}
 	
 	public StrimziKafka(Server server) {

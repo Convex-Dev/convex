@@ -26,6 +26,7 @@ import convex.core.exceptions.ValidationException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.util.Bits;
+import convex.core.util.MergeFunction;
 import convex.test.Samples;
 
 /**
@@ -185,6 +186,154 @@ public class MapsTest {
 		// should merge back to original map. Useful also for testing empty children
 		// merges.
 		assertEquals(m, m1.mergeDifferences(m2, (a, b) -> (a == null) ? b : a));
+	}
+
+	/**
+	 * Removals that leave more than a leaf's entries, all under one hash prefix, give the
+	 * map of those entries: a tree has at least two children (CAD003)
+	 */
+	@Test
+	public void testRemovalsLeavingOneHashPrefix() {
+		// Prefix of one digit collapses the root; of two digits, the level below it too
+		for (int digits=1; digits<=2; digits++) {
+			AHashMap<CVMLong, CVMLong> kept = Maps.empty();
+			AHashMap<CVMLong, CVMLong> m = Maps.empty();
+			AHashMap<CVMLong, CVMLong> changed = Maps.empty(); // every key, another value
+			for (long i=0; kept.count()<=MapLeaf.MAX_ENTRIES+3; i++) {
+				CVMLong k = CVMLong.create(i);
+				Hash h = k.getHash();
+				boolean keep = (h.getHexDigit(0)==0) && ((digits==1)||(h.getHexDigit(1)==0));
+				if (keep) kept = kept.assoc(k, CVMLong.ONE);
+				m = m.assoc(k, keep ? CVMLong.ONE : CVMLong.ZERO);
+				changed = changed.assoc(k, CVMLong.create(2));
+			}
+			MergeFunction<CVMLong> keepOnes = (a, b) -> ((a!=null)&&(a.longValue()==1)) ? a : null;
+			for (AHashMap<CVMLong, CVMLong> r : java.util.List.of(
+					m.filterValues(v -> v.longValue()==1),
+					m.mapEntries(e -> (e.getValue().longValue()==1) ? e : null),
+					m.mergeDifferences(changed, keepOnes),
+					m.mergeWith(changed, keepOnes))) {
+				assertEquals(kept, r);
+				ObjectsTest.doAnyValueTests(r);
+			}
+		}
+	}
+
+	/**
+	 * Merging hash maps whose trees branch at different hex digits or under different prefixes,
+	 * at the root or below it, gives the map built by assoc (CAD003)
+	 */
+	@Test
+	public void testMergesAcrossTreeShapes() throws InvalidDataException {
+		java.util.List<java.util.List<CVMLong>> shapes=TreeShapes.SHAPES;
+		MergeFunction<CVMLong> preferFirst=(a,b)->(a!=null)?a:b;
+		MergeFunction<CVMLong> both=(a,b)->((a!=null)&&(b!=null))?a:null;
+		MergeFunction<CVMLong> sum=(a,b)->(a==null)?b:((b==null)?a:CVMLong.create(a.longValue()+b.longValue()));
+		for (int i=0; i<shapes.size(); i++) {
+			for (int j=0; j<shapes.size(); j++) {
+				// Shapes of the same parity give a shared key the same value
+				java.util.Map<CVMLong,CVMLong> xs=shapeValues(shapes.get(i),i), ys=shapeValues(shapes.get(j),j);
+				AHashMap<CVMLong,CVMLong> x=assocAll(xs), y=assocAll(ys);
+				for (MergeFunction<CVMLong> f: java.util.List.of(preferFirst,both,sum)) {
+					assertMergeResult(expectedMerge(xs,ys,f,false),x.mergeWith(y,f));
+				}
+				for (MergeFunction<CVMLong> f: java.util.List.of(preferFirst,both)) {
+					assertMergeResult(expectedMerge(xs,ys,f,true),x.mergeDifferences(y,f));
+				}
+			}
+		}
+
+		// An unchanged result is the receiver: a submap under one child, and a map sharing no prefix
+		AHashMap<CVMLong,CVMLong> holding=assocAll(shapeValues(shapes.get(8),8));
+		AHashMap<CVMLong,CVMLong> sub=assocAll(shapeValues(shapes.get(1),1));
+		assertSame(holding,holding.mergeWith(sub,preferFirst));
+		assertSame(holding,holding.mergeDifferences(sub,preferFirst));
+		MergeFunction<CVMLong> firstOnly=(a,b)->(b==null)?a:null;
+		AHashMap<CVMLong,CVMLong> other=assocAll(shapeValues(shapes.get(2),2));
+		assertSame(sub,sub.mergeWith(other,firstOnly));
+		assertSame(sub,sub.mergeDifferences(other,firstOnly));
+	}
+
+	private static java.util.Map<CVMLong,CVMLong> shapeValues(java.util.List<CVMLong> keys, int shape) {
+		java.util.Map<CVMLong,CVMLong> m=new java.util.LinkedHashMap<>();
+		for (CVMLong k: keys) m.put(k,CVMLong.create(k.longValue()+(shape%2)));
+		return m;
+	}
+
+	private static AHashMap<CVMLong,CVMLong> assocAll(java.util.Map<CVMLong,CVMLong> m) {
+		AHashMap<CVMLong,CVMLong> result=Maps.empty();
+		for (java.util.Map.Entry<CVMLong,CVMLong> e: m.entrySet()) result=result.assoc(e.getKey(),e.getValue());
+		return result;
+	}
+
+	/** The merge by its contract: the function for each key, or with differences only, each key whose values differ */
+	private static AHashMap<CVMLong,CVMLong> expectedMerge(java.util.Map<CVMLong,CVMLong> xs, java.util.Map<CVMLong,CVMLong> ys, MergeFunction<CVMLong> f, boolean differences) {
+		java.util.Set<CVMLong> keys=new java.util.LinkedHashSet<>(xs.keySet());
+		keys.addAll(ys.keySet());
+		java.util.Map<CVMLong,CVMLong> merged=new java.util.LinkedHashMap<>();
+		for (CVMLong k: keys) {
+			CVMLong a=xs.get(k), b=ys.get(k);
+			CVMLong v=(differences&&java.util.Objects.equals(a,b))?a:f.merge(a,b);
+			if (v!=null) merged.put(k,v);
+		}
+		return assocAll(merged);
+	}
+
+	private static void assertMergeResult(AHashMap<CVMLong,CVMLong> expected, AHashMap<CVMLong,CVMLong> result) throws InvalidDataException {
+		assertEquals(expected,result);
+		result.validate();
+	}
+
+	/**
+	 * mergeDifferences of a leaf with a tree, at the root or as children below it, calls the
+	 * function only for keys whose values differ, and gives the receiver itself when the result
+	 * equals it
+	 */
+	@Test
+	public void testLeafMergeDifferencesWithTree() {
+		AHashMap<CVMLong,CVMLong> leaf=Maps.empty(), small=Maps.empty(), big=Maps.empty();
+		for (long i=0; i<300; i++) {
+			CVMLong k=CVMLong.create(i);
+			if (i<5) leaf=leaf.assoc(k,k);
+			if (i<40) small=small.assoc(k,k);
+			big=big.assoc(k,k);
+		}
+		assertTrue(leaf instanceof MapLeaf);
+		// The small tree's children are leaves, the big tree's are trees
+		assertTrue(small instanceof MapTree);
+		assertTrue(big instanceof MapTree);
+
+		java.util.List<CVMLong> calledOnBoth=new java.util.ArrayList<>();
+		MergeFunction<CVMLong> firstOnly=new MergeFunction<>() {
+			@Override public CVMLong merge(CVMLong a, CVMLong b) {
+				if ((a!=null)&&(b!=null)) calledOnBoth.add(a);
+				return (b==null)?a:null;
+			}
+		};
+		// Every shared key has the same value, so only the receiver's keys remain
+		assertSame(leaf,leaf.mergeDifferences(big,firstOnly));
+		assertSame(small,small.mergeDifferences(big,firstOnly));
+		assertTrue(calledOnBoth.isEmpty());
+
+		// mergeWith too gives the receiver itself when the result equals it
+		MergeFunction<CVMLong> both=(a,b)->((a!=null)&&(b!=null))?a:null;
+		assertSame(leaf,leaf.mergeWith(big,both));
+		assertSame(small,small.mergeWith(big,both));
+	}
+
+	/**
+	 * Key subset tests between hash maps whose trees branch at different hex digits or under
+	 * different prefixes, at the root or below it, answer by the keys
+	 */
+	@Test
+	public void testContainsAllKeysAcrossTreeShapes() {
+		java.util.List<java.util.List<CVMLong>> shapes=TreeShapes.SHAPES;
+		for (int i=0; i<shapes.size(); i++) {
+			for (int j=0; j<shapes.size(); j++) {
+				AHashMap<CVMLong,CVMLong> x=assocAll(shapeValues(shapes.get(i),i)), y=assocAll(shapeValues(shapes.get(j),j));
+				assertEquals(shapes.get(i).containsAll(shapes.get(j)),x.containsAllKeys(y));
+			}
+		}
 	}
 
 	@Test

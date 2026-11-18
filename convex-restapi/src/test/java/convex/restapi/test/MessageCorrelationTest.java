@@ -51,8 +51,9 @@ public class MessageCorrelationTest extends ARESTTest {
 				assertFalse(client.hasPendingRequests());
 			} finally {
 				// Resolve pending requests before stopping the HTTP server on assertion failure.
-				client.close();
-				app.stop();
+				assertAll("Close the client, then stop the HTTP server",
+						client::close,
+						app::stop);
 			}
 		}
 	}

@@ -2,12 +2,25 @@ package convex.db.psql;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.sql.SQLException;
+
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests for the PostgreSQL query rewriting in PgProtocolHandler.
  */
 public class PgProtocolHandlerTest {
+
+	@Test
+	public void testInternalSqlFailuresAreNotQueryRejections() {
+		assertFalse(PgProtocolHandler.isInternalFailure(new SQLException("Invalid input","22P02")));
+		assertFalse(PgProtocolHandler.isInternalFailure(new SQLException("Calcite query error")));
+		assertTrue(PgProtocolHandler.isInternalFailure(new SQLException("Internal error","XX000")));
+		assertTrue(PgProtocolHandler.isInternalFailure(new SQLException("Unclassified failure","HY000")));
+		assertTrue(PgProtocolHandler.isInternalFailure(new SQLException("Query wrapper","42000",
+			new SQLException("Internal cause","XX001"))));
+	}
+
 
 	@Test
 	public void testStripCasts() {

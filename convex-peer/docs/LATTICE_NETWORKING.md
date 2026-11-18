@@ -22,10 +22,11 @@ For TCP networking with dynamically managed groups,
 `LatticeNode` supplies an optional application assembly:
 
 ```java
-try (var network = new LatticeNode<>(host, config).launch()) {
+try (var network = new LatticeNode<>(host, config)) {
     network.setIdentity(nodeDID, nodeKey, didAuthorizer);
     var group = network.createPropagator();
     network.serveAllInbound(group);
+    network.launch();
     // Applications publish to the existing host; host.sync() publishes to the network.
 }
 ```
@@ -64,12 +65,13 @@ applications' own signers.
 
 `serveAllInbound(group)` is an explicit public serving choice on the node's own
 listener. Otherwise a listener denies inbound access unless the caller installs a
-selector. The selector can change while running; existing sockets keep their assigned
-group until closed or revoked. `addListener(listenerConfig)` adds a listener on another
+selector or connection handler. The selector can change while running; existing
+sockets keep their assigned group until closed or revoked.
+`addListener(listenerConfig)` adds a listener on another
 port, with its own connection and message limits, for groups reached separately, such
 as a trusted or replication port. Any group can be assigned through any listener, and
-a new listener denies every connection until given a selector. It opens with the
-node, or at once if the node is running. The wrapper starts the server before its
+a new listener denies every connection until given a selector or handler. It opens
+with the node, or at once if the node is running. The wrapper starts the server before its
 listeners, closes every listener before draining the server, and cleans up a failed
 launch. Closing a listener is final. Neither the node nor its listeners take a lock:
 the node's identity, serving policy and peer methods never wait, and network
@@ -93,7 +95,7 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 |---|---|---|
 | `LatticeHost` and its applications | The published root, which applications receive incoming values, and the lattices that merge them | Replication, transport, persistence scheduling |
 | `NodeServer` | Node store root, persistence barriers, attached-group lifecycle and update fan-out for one assembled host | Lattice, merge policy, sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
-| `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
+| `LatticeListener` | Application-owned TCP acceptance, physical limits and one handler per connection; standard routing selects a group | Propagator lifecycle, serving stores, trust or lattice merge |
 | `LatticePropagator` | One propagator group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification, admitted outbound routes and serving `DATA_REQUEST` on them from the group's store | Discovery records, listener assignment, lattice merge or application-owner validation |
@@ -104,6 +106,124 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 `LatticeProtocolEndpoint` remains package-private behind the transport-facing
 methods on `LatticePropagator`, so alternate transports need not access protocol
 internals.
+
+## Incoming connection handlers
+
+### Keeping the defaults
+
+Given an assembled `LatticeHost` named `host`, an embedder can use the standard
+lattice handling without implementing an incoming handler:
+
+```java
+try (var network = new LatticeNode<>(host, NodeConfig.port(18888))) {
+    var group = network.createPropagator();
+    network.serveAllInbound(group);
+    network.launch();
+    // Run the application here, keeping network open for its lifetime.
+}
+```
+
+This explicitly serves the group's view to incoming connections. It does not
+authenticate them or configure outbound peers. The node starts the group before
+opening the listener and closes them in the reverse order. Without a serving
+policy, the listener denies incoming access.
+
+To select the same standard handler at connection acceptance, replace
+`network.serveAllInbound(group)` with:
+
+```java
+network.getListener().setConnectionHandler(group::accept);
+```
+
+The selector used by `serveAllInbound` assigns a group on the first message;
+the handler factory assigns it when the connection is accepted. Both use the
+group's standard decoding, acquisition and delivery to the hosted applications.
+The listener owns the returned handler and closes it on disconnect.
+
+### Custom handling
+
+`LatticeListener.setConnectionHandler(Function<AConnection, IncomingHandler>)`
+selects a handler once when each connection is accepted, before receiving its
+first message. A handler can serve an application directly, route messages to
+another bounded destination, or wrap the standard lattice handler. No node or
+propagator is required for a custom handler. `NettyServer` exposes the same
+factory for services using the transport directly.
+
+For a wrapper, with an existing `listener`, an attached and running `group`, and
+the embedder's non-blocking `maySend(AConnection)` policy:
+
+```java
+listener.setConnectionHandler(connection -> {
+    IncomingHandler standard = group.accept(connection);
+    return new IncomingHandler() {
+        public Predicate<Message> handle(Message message) {
+            if (!maySend(connection)) {
+                message.closeConnection();
+                return null;
+            }
+            return standard.handle(message);
+        }
+        public void close() {
+            standard.close();
+        }
+    };
+});
+```
+
+Here `maySend` is the embedder's policy and can inspect the connection's current
+authenticated identity. Connection acceptance itself does not prove that identity.
+`group.accept(connection)` attaches the socket and supplies the standard
+acquisition, merge and reply handling. The caller must start the group first.
+It must assign a connection's lattice traffic to at most one group, preserving
+the serving boundary in [CAD036](https://docs.convex.world/docs/cad/lattice_node).
+
+The factory and the initial `handle` call run on the network event loop and must
+not block. Return null from the factory to refuse the connection. Return null
+from `handle` when the message has been handled, rejected explicitly, or accepted
+for processing. To apply backpressure, return a `Predicate<Message>` without
+having processed the message: reads pause while the transport invokes that
+predicate once on a virtual thread. It may wait for capacity; true means accepted,
+and false reports overload. A retry failure closes the connection. A factory or
+initial handler failure also closes that connection without stopping the listener.
+Delivery and retry failures are passed to `IncomingHandler.onFailure(Throwable)`
+before the transport closes the connection. Its default logs the original
+throwable; an override can report it to the application's supervisor instead.
+The callback must not throw or block and can run on the retry thread. Wrappers
+that need their delegate's reporting policy should forward this callback too.
+
+Accepting work is not an acknowledgement of merge completion or durability;
+those guarantees belong to the application's response protocol.
+
+Messages carry their source connection but arrive **undecoded**. The handler
+chooses whether and where to decode; routing alone performs no missing-cell
+acquisition. `getType()` can return `UNKNOWN` before decoding a vector envelope,
+and `getRequestID()` is unavailable until decoded. A custom protocol handler must
+decode its envelope before inspecting the request ID or calling `returnResult`.
+For example, a complete embedded request can use `message.getPayload(null)`.
+Delegating the untouched message to the standard handler lets it decode in its
+serving store and acquire missing cells under the existing trust rules.
+
+Framing and size limits remain in the transport. Replies matching outstanding
+requests on the same connection complete those requests before invoking the
+handler. Handlers must not synchronously wait for a reply on their event loop or
+inside a backpressure retry while that connection's reading is paused.
+
+The transport calls the returned handler's `close()` once on disconnect, including
+listener shutdown and connections that sent no messages. The default is a no-op;
+wrappers must close their delegates. Cleanup must not block the event loop and
+must be safe alongside an outstanding retry on another thread. Retries must be
+bounded and tolerate disconnect; already accepted work may finish after close.
+
+Changing the factory affects new connections only. Setting it to null restores
+the existing selector. `setSelector` also restores standard routing for new
+connections; its existing selection on the first message is retained. The
+selector admits only registered groups. A custom factory chooses its destinations
+explicitly, without that registry restriction. Unregistering a registered group
+also closes this listener's connections attached through wrapped group handlers.
+
+The factory runs once per connection; message delivery reuses that handler and
+adds no per-message handler allocation, future, queue or thread handoff. The
+standard handler retains its existing bounded queue and acquisition behaviour.
 
 ## Application composition
 
@@ -247,7 +367,8 @@ up and reported; each lost route starts a new period.
 A connection future reports an expected failure as a checked exception: a
 `PeerConnectionException` when the name cannot be resolved or the peer reached, with
 the network error as its cause, or its subtype `PeerRefusedException` when the peer is
-reached but not admitted, because it fails the challenge, proves a key other than
+reached but not admitted, because it fails the challenge (with the invalid reply's
+exception in its cause chain, where it sent one), proves a key other than
 the one expected, turns out to be this node, or the application refuses it. A wait or
 attempt that is abandoned, because the manager closes or the peer is released,
 removed or replaced, is cancelled. Misuse, such as an invalid argument or identifying
@@ -300,7 +421,8 @@ least one, so a single peer cannot crowd out the rest. A request beyond either
 limit makes its route stop reading until a permit frees, and is answered with
 `:LOAD` only if none frees within 8 seconds. Values and other messages a peer
 sends over such a route enter the group's queue as they do on an inbound
-connection, and wait for room in the same way.
+connection, and wait for room in the same way, but are offered by a worker of the
+client ingress rather than the event loop ([BACKPRESSURE.md](BACKPRESSURE.md#connections-a-node-opens)).
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
 logical root publication. It does not wait for every propagator group to
@@ -362,6 +484,12 @@ remaining steps.
 Store failures while the node runs are surfaced by `NodeServer` and host sync;
 saving failures by the host's `checkpoint()` or `flush()`. Listener failures are
 surfaced independently to the application that owns the transport.
+
+A received value that fails to merge, or a message whose handling fails with an
+`Error`, is logged as a peer logs a failed request
+([failure containment](../../convex-core/docs/CONSENSUS.md#failure-containment)): at
+debug, except that the first out-of-memory failure and the first probable defect
+of each node, and of each group's message handling, warn.
 
 ### Removing a group while the node runs
 

@@ -25,7 +25,7 @@ public class KeyOwnedIndex<V extends ACell> extends OwnedIndex<AccountKey,V> {
 		super(owners,cursor);
 	}
 
-	@Override protected KeyOwnedIndex<V> rebind(AForkableCursor<Index<AccountKey,SignedData<V>>> cursor) {
+	@Override public KeyOwnedIndex<V> rebind(AForkableCursor<Index<AccountKey,SignedData<V>>> cursor) {
 		return new KeyOwnedIndex<>(getLattice(),cursor);
 	}
 

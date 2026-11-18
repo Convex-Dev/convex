@@ -11,7 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,11 +36,11 @@ import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.LatticeOps;
 import convex.lattice.Regions;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
+import convex.lattice.LatticeComponent;
 
 /** The mail components: atomic sends, open, receive and hosting. */
 public class MailTest {
@@ -120,14 +122,14 @@ public class MailTest {
 		var commits=new AtomicInteger();
 		var signatures=new AtomicInteger();
 		var root=new Root<>(initial) {
-			@Override public boolean compareAndSet(Index<ABlob,SignedData<ACell>> expected,
+			@Override protected boolean install(Index<ABlob,SignedData<ACell>> held,
 					Index<ABlob,SignedData<ACell>> value) {
 				assertSame(first.signed(),get().get(first.key()));
 				assertSame(second.signed(),get().get(second.key()));
 				assertNotNull(MailReceipt.parse(value.get(first.key())));
 				assertNotNull(MailReceipt.parse(value.get(second.key())));
-				if (commits.incrementAndGet()==1) set(expected.assoc(concurrent.key(),concurrent.signed()));
-				return super.compareAndSet(expected,value);
+				if (commits.incrementAndGet()==1) set(held.assoc(concurrent.key(),concurrent.signed()));
+				return super.install(held,value);
 			}
 		};
 		var inbox=new Mailbox(root,Mail.LATTICE.forMailbox(BOB_DID),(owner,value) -> {
@@ -211,7 +213,7 @@ public class MailTest {
 			assertSame(before,mail.cursor().get());
 		});
 		assertEquals(2,mail.cursor().get().count());
-		Mail rebound=mail.withCursor(mail.cursor());
+		Mail rebound=mail.rebind(mail.cursor());
 		assertEquals(List.of(first),rebound.mailbox(BOB_DID).deposited());
 		assertEquals(List.of(second),rebound.mailbox(CAROL_DID).deposited());
 		// A fresh component over a saved snapshot needs no separate sender state.
@@ -235,30 +237,29 @@ public class MailTest {
 		assertTrue(mail.mailbox(BOB_DID).deposited().isEmpty());
 	}
 
-	/** A forced CAS conflict retries the same envelope without duplicating it or leaking the failed attempt. */
-	@Test void retryKeepsOnlyCommittedSends() {
-		var envelope=aliceToBob(1000,"retry");
-		var abandoned=aliceToBob(1001,"first attempt only");
+	/** A concurrent deposit before the commit merges with a send, without running it again. */
+	@Test void aConcurrentDepositMergesWithASend() {
+		var envelope=aliceToBob(1000,"send");
 		var concurrent=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1002,Strings.create("concurrent"));
-		var commits=new AtomicInteger();
+		var armed=new AtomicBoolean();
 		var root=new Root<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>>(Mail.LATTICE.zero()) {
-			@Override public boolean compareAndSet(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> expected,
-					AHashMap<ACell,Index<ABlob,SignedData<ACell>>> value) {
-				if (commits.incrementAndGet()==1) {
-					// Another writer deposits before the first transaction can commit.
-					super.set(expected.assoc(CAROL_DID,Index.create(concurrent.key(),concurrent.signed())));
-					return false;
+			@Override public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> updateAndGet(
+					UnaryOperator<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> update) {
+				if (armed.compareAndSet(true,false)) {
+					// Another writer deposits before the transaction can commit.
+					super.set(get().assoc(CAROL_DID,Index.create(concurrent.key(),concurrent.signed())));
 				}
-				return super.compareAndSet(expected,value);
+				return super.updateAndGet(update);
 			}
 		};
 		Mail mail=Mail.connect(root,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
+		armed.set(true);
 		var attempts=new AtomicInteger();
 		mail.execute(draft -> {
+			attempts.incrementAndGet();
 			draft.send(envelope);
-			if (attempts.incrementAndGet()==1) draft.send(abandoned);
 		});
-		assertEquals(2,attempts.get());
+		assertEquals(1,attempts.get());
 		assertEquals(List.of(envelope),mail.mailbox(BOB_DID).deposited());
 		assertEquals(List.of(concurrent),mail.mailbox(CAROL_DID).deposited());
 	}
@@ -457,8 +458,8 @@ public class MailTest {
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> lattice.merge(own,other));
 		}
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.mergePublication(lattice,LatticeContext.EMPTY,own,other);
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeComponent.reconcile(lattice,LatticeContext.EMPTY,own,other);
 		}
 	}
 

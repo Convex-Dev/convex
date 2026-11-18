@@ -122,18 +122,13 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	}
 
 	@Override
-	public Mail withCursor(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected Mail rebind(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor) {
+	public Mail rebind(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor) {
 		return new Mail(cursor,lattice,signer);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergePublication(
+	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> reconcile(
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
 		return lattice.merge(own,other);

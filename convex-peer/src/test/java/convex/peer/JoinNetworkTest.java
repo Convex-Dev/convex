@@ -1,5 +1,6 @@
 package convex.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -36,7 +38,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 
 public class JoinNetworkTest {
 	private static TestNetwork network;
@@ -59,41 +61,48 @@ public class JoinNetworkTest {
 		Address user=network.createAccount(kp.getAccountKey(),STAKE);
 
 		synchronized(network.SERVER) {
-			Convex convex=Convex.connect(network.SERVER.getHostAddress(), controller, kp);
-			Result cresult=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
-			assertFalse(cresult.isError(),()->"Failed to create peer: "+cresult.toString());
+			try (Convex convex=Convex.connect(network.SERVER.getHostAddress(), controller, kp)) {
+				Result cresult=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
+				assertFalse(cresult.isError(),()->"Failed to create peer: "+cresult.toString());
+			}
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
-			config.put(Keywords.STORE,EtchStore.createTemp()); // Etch store as per real peer startup
 			config.put(Keywords.CONTROLLER,controller);
 			config.put(Keywords.SOURCE,network.SERVER.getHostAddress());
+			config.put(Keywords.PORT,0);
 
-			Server newServer=API.launchPeer(config);
+			// Closed when the test ends: later tests on the shared network do not run with this peer
+			try (MemoryStore store=new MemoryStore()) {
+				config.put(Keywords.STORE,store);
+				try (Server newServer=API.launchPeer(config)) {
+					// make peer connections directly
+					newServer.getConnectionManager().connectToPeer(network.SERVER.getHostAddress()).join();
+					network.SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress()).join();
 
-			// make peer connections directly
-			newServer.getConnectionManager().connectToPeer(network.SERVER.getHostAddress()).join();
-			network.SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress()).join();
+					// TODO: should these be in consensus at this point since just synced
+					// note: shouldn't matter which is the current store
+					// assertEquals(newServer.getPeer().getConsensusState(),network.SERVER.getPeer().getConsensusState());
 
-			// TODO: should these be in consensus at this point since just synced
-			// note: shouldn't matter which is the current store
-			// assertEquals(newServer.getPeer().getConsensusState(),network.SERVER.getPeer().getConsensusState());
+					try (Convex client=Convex.connect(newServer.getHostAddress(), user, kp)) {
+						client.setNextSequence(1); // avoids a potential stale query
 
-			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
-			client.setNextSequence(1); // avoids a potential stale query
-			
-			// TODO: this failed for some people, why is it even here?
-			// assertEquals(ErrorCodes.NOBODY,client.transactSync("*address*").getErrorCode());
-			
-			Result r=client.requestStatus().get(10000,TimeUnit.MILLISECONDS);
-			assertFalse(r.isError());
+						// TODO: this failed for some people, why is it even here?
+						// assertEquals(ErrorCodes.NOBODY,client.transactSync("*address*").getErrorCode());
+
+						Result r=client.requestStatus().get(10000,TimeUnit.MILLISECONDS);
+						assertFalse(r.isError());
+					}
+				}
+			}
 		}
 	}
 
 	@Test
 	public void testJoinReplaysInsteadOfAdoptingRemoteState() throws Exception {
 		AKeyPair sourceKeyPair=AKeyPair.createSeeded(987654321);
-		State genesis=Init.createState(List.of(sourceKeyPair.getAccountKey()));
+		// Shared: the soak test runs this test thousands of times in one JVM
+		State genesis=GenesisStates.of(sourceKeyPair);
 		Peer correct=Peer.create(sourceKeyPair,genesis);
 		Block block=Block.of(correct.getTimestamp(),sourceKeyPair.signData(
 				Invoke.create(Init.GENESIS_ADDRESS,1,"*address*")));
@@ -104,6 +113,8 @@ public class JoinNetworkTest {
 
 		Server source=null;
 		Server destination=null;
+		MemoryStore sourceStore=new MemoryStore();
+		MemoryStore destinationStore=new MemoryStore();
 		try {
 			State corruptState=correct.getConsensusState().withTimestamp(
 					correct.getConsensusState().getTimestamp().longValue()+1);
@@ -116,13 +127,13 @@ public class JoinNetworkTest {
 			// queueUpdate, and that Order carries no blocks (finality 0), so the executor
 			// correctly truncates the state back to 0 and the source then advertises 0.
 			// Restoring at launch initialises every component from the same peer data.
-			EtchStore sourceStore=EtchStore.createTemp();
 			AMap<ACell,ACell> rootData=Maps.empty().assoc(sourceKeyPair.getAccountKey(),corruptData);
-			rootData=sourceStore.setRootData(rootData).getValue();
+			// Persisted: a memory store's root holds only what is set, and a restore reads it from the store
+			rootData=Cells.persist(rootData,sourceStore);
+			sourceStore.setRootData(rootData);
 			sourceStore.storeTopRef(advertised.getGenesisState().getRef(),Ref.PERSISTED,null);
 			sourceStore.storeTopRef(advertised.getBelief().getRef(),Ref.PERSISTED,null);
 			Cells.persist(corruptState,sourceStore);
-			sourceStore.flush();
 
 			HashMap<Keyword,Object> sourceConfig=new HashMap<>();
 			sourceConfig.put(Keywords.KEYPAIR,sourceKeyPair);
@@ -142,10 +153,16 @@ public class JoinNetworkTest {
 			AKeyPair destinationKeyPair=AKeyPair.createSeeded(987654322);
 			HashMap<Keyword,Object> destinationConfig=new HashMap<>();
 			destinationConfig.put(Keywords.KEYPAIR,destinationKeyPair);
-			destinationConfig.put(Keywords.STORE,EtchStore.createTemp());
+			destinationConfig.put(Keywords.STORE,destinationStore);
 			destinationConfig.put(Keywords.PORT,0);
 			destinationConfig.put(Keywords.SOURCE,source.getHostAddress());
-			destination=API.launchPeer(destinationConfig);
+			// Joining warns on this thread that its replay differs from the state advertised
+			ExpectedLogs logs=ExpectedLogs.onThreads(Server.class.getName(),Thread.currentThread()).open();
+			try (logs) {
+				destination=API.launchPeer(destinationConfig);
+			}
+			assertEquals(List.of(Level.WARN),logs.records().stream().map(ExpectedLogs.Entry::level).toList(),
+				"the divergence warning, and nothing else");
 
 			// Wait on the real signal rather than reading the live peer: the executor thread
 			// advances state asynchronously once launched, and a peer whose finality point is
@@ -161,8 +178,13 @@ public class JoinNetworkTest {
 			assertNotEquals(advertised.getConsensusState().getHash(),
 					joined.getConsensusState().getHash());
 		} finally {
-			if (destination!=null) destination.close();
-			if (source!=null) source.close();
+			Server destinationPeer=destination;
+			Server sourcePeer=source;
+			assertAll("Close the peers and their stores",
+				() -> { if (destinationPeer!=null) destinationPeer.close(); },
+				() -> { if (sourcePeer!=null) sourcePeer.close(); },
+				destinationStore::close,
+				sourceStore::close);
 		}
 	}
 

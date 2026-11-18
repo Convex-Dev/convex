@@ -13,7 +13,7 @@ import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.MapComponent;
@@ -28,7 +28,7 @@ import convex.lattice.generic.MapLattice;
 /**
  * Component representing all named drives belonging to one owner.
  *
- * <p>The optional store is handed to each drive for incremental blob checkpoints
+ * <p>The optional persister is handed to each drive for incremental blob checkpoints
  * during streamed writes; it is not used for anything else.</p>
  */
 public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVector<ACell>>> implements TransactionalComponent<AHashMap<AString, AVector<ACell>>,DLFSDrives> {
@@ -39,17 +39,17 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public static final MapLattice<AString, AVector<ACell>> LATTICE=
 		MapLattice.create(DLFSLattice.INSTANCE);
 
-	private final AStore store;
+	private final Persister persister;
 	private final Supplier<CVMLong> clock;
 	private final DLFSLattice files;
 	private final MapLattice<AString,AVector<ACell>> values;
 	private final DLFSLocation location;
 	private final ConcurrentHashMap<AString,DLFSDrive> drives=new ConcurrentHashMap<>();
 
-	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store,DLFSLocation location,
+	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,Persister persister,DLFSLocation location,
 			Supplier<CVMLong> clock,DLFSLattice files) {
 		super(cursor);
-		this.store=store;
+		this.persister=persister;
 		this.location=location;
 		this.clock=clock;
 		this.files=files;
@@ -79,22 +79,22 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/**
 	 * Connects one owner's drive map at the position of a cursor, checkpointing
-	 * streamed blob data into the supplied store. The owning component hands the
+	 * streamed blob data through the supplied persister. The owning component hands the
 	 * cursor down; signing belongs to that cursor's owner boundary.
 	 *
 	 * @param cursor Cursor at the drive map
-	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
+	 * @param persister Persister for incremental blob checkpoints, or null for heap-only file data
 	 * @return Drives component
 	 */
-	public static DLFSDrives connect(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store) {
-		return connect(cursor,store,Utils::getCurrentTimestampCell);
+	public static DLFSDrives connect(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,Persister persister) {
+		return connect(cursor,persister,Utils::getCurrentTimestampCell);
 	}
 
-	/** Connects unsigned drives with an explicit clock and optional blob store. */
+	/** Connects unsigned drives with an explicit clock and optional blob persister. */
 	public static DLFSDrives connect(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,
-			AStore store,Supplier<CVMLong> clock) {
+			Persister persister,Supplier<CVMLong> clock) {
 		if (cursor==null) throw new IllegalArgumentException("Drives cursor must not be null");
-		return new DLFSDrives(cursor,store,DLFSLocation.at(cursor),clock,
+		return new DLFSDrives(cursor,persister,DLFSLocation.at(cursor),clock,
 			DLFSLattice.withClock(clock,DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW));
 	}
 
@@ -111,7 +111,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return new DLFSDrive(key,new MapComponent<>(cursor()).path(key),store,location.child(key),clock,files);
+			return new DLFSDrive(key,new MapComponent<>(cursor()).path(key),persister,location.child(key),clock,files);
 		});
 	}
 
@@ -282,18 +282,13 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		}
 	}
 	@Override
-	public DLFSDrives withCursor(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected DLFSDrives rebind(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return new DLFSDrives(cursor,store,DLFSLocation.at(cursor),clock,files);
+	public DLFSDrives rebind(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
+		return new DLFSDrives(cursor,persister,DLFSLocation.at(cursor),clock,files);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<AString, AVector<ACell>> mergePublication(
+	protected AHashMap<AString, AVector<ACell>> reconcile(
 			AHashMap<AString, AVector<ACell>> own,
 			AHashMap<AString, AVector<ACell>> other) {
 		return values.merge(own,other);

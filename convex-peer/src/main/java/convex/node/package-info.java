@@ -11,8 +11,9 @@
  *       applications do. It owns no socket or transport and never interprets
  *       application paths or records.</li>
  *   <li>{@link convex.node.LatticeListener} is the standard application-owned
- *       TCP transport. It may route connections to several registered groups;
- *       groups may instead use independent listeners or custom transports.</li>
+ *       TCP transport. A connection factory may handle messages directly or
+ *       delegate to a propagator. Its standard selector routes connections to
+ *       registered groups; groups may also use independent or custom transports.</li>
  *   <li>{@link convex.node.LatticePropagator} owns one application-configured
  *       policy group: its routes, protocol endpoint, filters, serving store,
  *       delta generation and root announcements.</li>

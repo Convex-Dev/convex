@@ -22,6 +22,7 @@ import convex.core.data.Hash;
 import convex.core.data.RefSoft;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
+import convex.test.Samples;
 
 public class BlobOutputStreamTest {
 
@@ -90,14 +91,13 @@ public class BlobOutputStreamTest {
 
 	@Test public void testEtchBranchesAreSoft() throws IOException {
 		byte[] bs=randomBytes(5*CHUNK);
-		try (EtchStore store=EtchStore.createTemp("blob-output-stream")) {
-			BlobOutputStream out=BlobOutputStream.create(store,2*CHUNK);
-			out.write(bs);
-			ABlob blob=out.toBlob();
-			assertArrayEquals(bs,blob.getBytes());
-			RefSoft<?> ref=assertInstanceOf(RefSoft.class,blob.getRef(0));
-			assertSame(store,ref.getStore());
-		}
+		EtchStore store=Samples.TEST_STORE;
+		BlobOutputStream out=BlobOutputStream.create(store,2*CHUNK);
+		out.write(bs);
+		ABlob blob=out.toBlob();
+		assertArrayEquals(bs,blob.getBytes());
+		RefSoft<?> ref=assertInstanceOf(RefSoft.class,blob.getRef(0));
+		assertSame(store,ref.getStore());
 	}
 
 	@Test public void testFromStream() throws IOException {

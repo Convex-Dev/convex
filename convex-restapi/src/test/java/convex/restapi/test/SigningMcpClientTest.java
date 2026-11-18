@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -75,8 +76,9 @@ public class SigningMcpClientTest extends ARESTTest {
 
 	@AfterAll
 	public void closeClients() {
-		if (mcpAlice!=null) mcpAlice.close();
-		if (mcpNoAuth!=null) mcpNoAuth.close();
+		assertAll("Close the MCP clients",
+				() -> { if (mcpAlice!=null) mcpAlice.close(); },
+				() -> { if (mcpNoAuth!=null) mcpNoAuth.close(); });
 	}
 
 	// ===== Protocol-level tests =====

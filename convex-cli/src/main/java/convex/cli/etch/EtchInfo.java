@@ -48,8 +48,7 @@ public class EtchInfo extends AEtchCommand{
 		} catch (IOException e) {
 			throw new CLIError("IO Error accessing Etch database: "+e.getMessage());
 		} finally {
-			store.close();
-			closeKeyContexts();
+			closeStoreAndKeys(store);
 		}
 	}
 }

@@ -8,10 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -25,10 +27,15 @@ import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
+import convex.test.LogCapture;
 import convex.test.Samples;
 
 public class ResultTest {
@@ -96,24 +103,54 @@ public class ResultTest {
 		// This should round trip efficiently
 		Result a=Result.error(Keywords.FOO, "Blah").withSource(SourceCodes.CLIENT);
 		assertSame(a,Result.fromException(new ResultException(a)));
+
+		// Invalid data keeps its meaning, with no stack trace
+		for (ValidationException e: List.of(new InvalidDataException("simulated",null),new MisbehaviourException("simulated"))) {
+			Result r=Result.fromException(e);
+			assertEquals(ErrorCodes.FORMAT,r.getErrorCode(),e.toString());
+			assertTrue(r.getInfo()==null || r.getInfo().get(Keywords.TRACE)==null,e.toString());
+		}
+		assertEquals(ErrorCodes.SIGNATURE,Result.fromException(new BadSignatureException("simulated",null)).getErrorCode());
 	}
 
-	@Test public void testFromExceptionLeavesInterruptStatus() {
+	@Test
+	@ResourceLock("java.util.logging:convex.core.Result")
+	public void testFromExceptionLeavesInterruptStatus() throws ReflectiveOperationException {
 		Thread.interrupted();
 		try {
-			// An interrupt passed in may come from another thread: this one stays uninterrupted
-			assertInterrupted(Result.fromException(new InterruptedException()));
-			assertInterrupted(Result.fromException(new ExecutionException(new InterruptedException())));
-			assertInterrupted(Result.fromException(new CompletionException(new InterruptedException())));
-			assertInterrupted(new ResultException(new InterruptedException()).getResult());
-			assertFalse(Thread.currentThread().isInterrupted());
+			InterruptedException direct=new InterruptedException("direct");
+			InterruptedException execution=new InterruptedException("execution");
+			InterruptedException completion=new InterruptedException("completion");
+			InterruptedException wrapped=new InterruptedException("result exception");
+			assertInterruptDiagnostics(()->{
+				// Deliberately exercise the diagnostic for an unrestored or foreign interrupt.
+				assertInterrupted(Result.fromException(direct));
+				assertFalse(Thread.currentThread().isInterrupted());
+				assertInterrupted(Result.fromException(new ExecutionException(execution)));
+				assertFalse(Thread.currentThread().isInterrupted());
+				assertInterrupted(Result.fromException(new CompletionException(completion)));
+				assertFalse(Thread.currentThread().isInterrupted());
+				assertInterrupted(new ResultException(wrapped).getResult());
+				assertFalse(Thread.currentThread().isInterrupted());
+			},direct,execution,completion,wrapped);
 
 			// A status the caller already restored is kept
 			Thread.currentThread().interrupt();
-			assertInterrupted(Result.fromException(new InterruptedException()));
+			assertInterruptDiagnostics(()->assertInterrupted(Result.fromException(new InterruptedException())));
 			assertTrue(Thread.currentThread().isInterrupted());
 		} finally {
 			Thread.interrupted();
+		}
+	}
+
+	/** Capture this test's expected JUL diagnostics without muting other threads or loggers. */
+	private static void assertInterruptDiagnostics(Runnable action, InterruptedException... expected)
+			throws ReflectiveOperationException {
+		List<LogCapture.Entry> records=LogCapture.capture(Result.class.getName(),action);
+		assertEquals(expected.length,records.size(),"Interrupt diagnostics");
+		for (int i=0;i<expected.length;i++) {
+			assertEquals("SEVERE",records.get(i).level());
+			assertSame(expected[i],records.get(i).thrown());
 		}
 	}
 

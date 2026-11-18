@@ -82,7 +82,13 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	public void validateCell() throws InvalidDataException {
 		// TODO Anything to check?
 	}
-	
+
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		// This cell's children are those of the vector it wraps
+		data.validateStructure();
+	}
+
 	protected abstract AFn<T> recreate(AVector<ACell> newData);
 
 	/**

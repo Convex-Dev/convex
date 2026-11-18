@@ -1,5 +1,6 @@
 package convex.etch;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -128,8 +129,7 @@ public class EtchGCLifecycleTest {
 		AVector<ACell> t1 = tree(10); // pre-cycle tree, resolvable only via old file
 
 		// ----- Populate the old file, then reopen for cold caches -----
-		{
-			EtchStore store = EtchStore.create(f);
+		try (EtchStore store = EtchStore.create(f)) {
 			Cells.persist(t1, store);
 			store.setRootData(t0);
 			// Sweep must preserve ANNOUNCED; callbacks cannot upgrade the persist's
@@ -139,113 +139,119 @@ public class EtchGCLifecycleTest {
 			// parent must retain its own announcement without announcing children.
 			store.getEtch().write(t1.getHash(), t1.getRef().withStatus(Ref.ANNOUNCED));
 			store.flush();
-			store.close();
 		}
 		EtchStore store = EtchStore.create(f);
-		assertFalse(store.isGCInProgress());
-		assertFalse(store.isGCComplete());
-		assertThrows(IllegalStateException.class, store::transferGC); // no cycle
-		assertThrows(IllegalStateException.class, store::verifyGC);
+		Etch targetEtch;
+		AString v2;
+		AVector<ACell> t3;
+		try {
+			assertFalse(store.isGCInProgress());
+			assertFalse(store.isGCComplete());
+			assertThrows(IllegalStateException.class, store::transferGC); // no cycle
+			assertThrows(IllegalStateException.class, store::verifyGC);
 
-		// ----- A stale target file is neither adopted nor deleted: the cycle
-		// starts on the next generational name, preserving it for recovery -----
-		File stale = new File(f.getCanonicalPath() + "~");
-		assertTrue(stale.createNewFile());
-		stale.deleteOnExit();
+			// ----- A stale target file is neither adopted nor deleted: the cycle
+			// starts on the next generational name, preserving it for recovery -----
+			File stale = new File(f.getCanonicalPath() + "~");
+			assertTrue(stale.createNewFile());
+			stale.deleteOnExit();
 
-		// ----- Start the cycle -----
-		store.startGC();
-		assertTrue(store.isGCInProgress());
-		assertThrows(IllegalStateException.class, store::startGC); // double start rejected
-		Etch targetEtch = store.getTargetEtch();
-		targetEtch.getFile().deleteOnExit();
-		assertNotEquals(stale.getCanonicalPath(), targetEtch.getFile().getCanonicalPath());
-		assertEquals(0L, stale.length()); // stale file untouched
+			// ----- Start the cycle -----
+			store.startGC();
+			assertTrue(store.isGCInProgress());
+			assertThrows(IllegalStateException.class, store::startGC); // double start rejected
+			targetEtch = store.getTargetEtch();
+			targetEtch.getFile().deleteOnExit();
+			assertNotEquals(stale.getCanonicalPath(), targetEtch.getFile().getCanonicalPath());
+			assertEquals(0L, stale.length()); // stale file untouched
 
-		// Root hash carried into the target at cycle start
-		assertEquals(t0.getHash(), store.getRootHash());
-		assertEquals(t0.getHash(), targetEtch.getRootHash());
+			// Root hash carried into the target at cycle start
+			assertEquals(t0.getHash(), store.getRootHash());
+			assertEquals(t0.getHash(), targetEtch.getRootHash());
 
-		// ----- Read fallback: old data resolves (caches are cold), no copy-on-read -----
-		Ref<ACell> r1 = store.refForHash(t1.getHash());
-		assertNotNull(r1);
-		assertEquals(t1, r1.getValue());
-		assertNull(targetEtch.read(t1.getHash()), "Read fallback must not populate the target");
+			// ----- Read fallback: old data resolves (caches are cold), no copy-on-read -----
+			Ref<ACell> r1 = store.refForHash(t1.getHash());
+			assertNotNull(r1);
+			assertEquals(t1, r1.getValue());
+			assertNull(targetEtch.read(t1.getHash()), "Read fallback must not populate the target");
 
-		// ----- Write redirection: new data lands in the target only -----
-		AString v2 = nonEmbedded(20);
-		Cells.persist(v2, store);
-		assertNotNull(targetEtch.read(v2.getHash()));
-		assertNull(store.getEtch().read(v2.getHash()), "Old file must not receive writes");
-		assertEquals(v2, store.refForHash(v2.getHash()).getValue());
+			// ----- Write redirection: new data lands in the target only -----
+			v2 = nonEmbedded(20);
+			Cells.persist(v2, store);
+			assertNotNull(targetEtch.read(v2.getHash()));
+			assertNull(store.getEtch().read(v2.getHash()), "Old file must not receive writes");
+			assertEquals(v2, store.refForHash(v2.getHash()).getValue());
 
-		// ----- Transfer sweep: root tree is only in the old file, so the cycle
-		// is incomplete until the sweep copies it across -----
-		assertFalse(store.isGCComplete());
-		assertTrue(store.verifyGC().contains(t0.getHash()));
+			// ----- Transfer sweep: root tree is only in the old file, so the cycle
+			// is incomplete until the sweep copies it across -----
+			assertFalse(store.isGCComplete());
+			assertTrue(store.verifyGC().contains(t0.getHash()));
 
-		store.transferGC();
-		assertTrue(store.isGCComplete());
-		assertTrue(store.verifyGC().isEmpty());
-		// Status preserved from the old file: ANNOUNCED, not merely PERSISTED
-		assertAllInEtch(targetEtch, treeHashes(t0), Ref.ANNOUNCED);
+			store.transferGC();
+			assertTrue(store.isGCComplete());
+			assertTrue(store.verifyGC().isEmpty());
+			// Status preserved from the old file: ANNOUNCED, not merely PERSISTED
+			assertAllInEtch(targetEtch, treeHashes(t0), Ref.ANNOUNCED);
 
-		// ----- INV-1 core: old-file entries must not satisfy a persist; the
-		// descent must copy the whole tree into the target -----
-		Ref<ACell> out = store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
-		assertTrue(out.getStatus() >= Ref.PERSISTED);
-		assertAllInEtch(targetEtch, treeHashes(t1), Ref.PERSISTED);
-		assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, targetEtch.read(t1.get(0).getHash()).getStatus());
+			// ----- INV-1 core: old-file entries must not satisfy a persist; the
+			// descent must copy the whole tree into the target -----
+			Ref<ACell> out = store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
+			assertTrue(out.getStatus() >= Ref.PERSISTED);
+			assertAllInEtch(targetEtch, treeHashes(t1), Ref.PERSISTED);
+			assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, targetEtch.read(t1.get(0).getHash()).getStatus());
 
-		// Repeat persist prunes on target-resident entries: no bytes written
-		long len = targetEtch.getDataLength();
-		store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
-		assertEquals(len, targetEtch.getDataLength());
+			// Repeat persist prunes on target-resident entries: no bytes written
+			long len = targetEtch.getDataLength();
+			store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
+			assertEquals(len, targetEtch.getDataLength());
 
-		// ----- Root update during the cycle: hash and full tree land in the target -----
-		AVector<ACell> t3 = tree(30);
-		store.setRootData(t3);
-		assertEquals(t3.getHash(), store.getRootHash());
-		assertEquals(t3.getHash(), targetEtch.getRootHash());
-		assertAllInEtch(targetEtch, treeHashes(t3), Ref.PERSISTED);
+			// ----- Root update during the cycle: hash and full tree land in the target -----
+			t3 = tree(30);
+			store.setRootData(t3);
+			assertEquals(t3.getHash(), store.getRootHash());
+			assertEquals(t3.getHash(), targetEtch.getRootHash());
+			assertAllInEtch(targetEtch, treeHashes(t3), Ref.PERSISTED);
 
-		// Completion is STICKY: the root update landed its full tree in the
-		// target via the cycle write path, so the earlier sweep still counts
-		assertTrue(store.isGCComplete());
-		assertTrue(store.verifyGC().isEmpty());
+			// Completion is STICKY: the root update landed its full tree in the
+			// target via the cycle write path, so the earlier sweep still counts
+			assertTrue(store.isGCComplete());
+			assertTrue(store.verifyGC().isEmpty());
 
-		// The old file's root is never touched during a cycle
-		assertEquals(t0.getHash(), store.getEtch().getRootHash());
+			// The old file's root is never touched during a cycle
+			assertEquals(t0.getHash(), store.getEtch().getRootHash());
 
-		// ----- close() closes both files; idempotent -----
-		store.close();
-		store.close();
-		assertThrows(StoreException.class,
-				() -> store.refForHash(nonEmbedded(99).getHash()));
-		assertThrows(IOException.class,
-				() -> targetEtch.read(nonEmbedded(99).getHash()));
+			// ----- close() closes both files; idempotent -----
+			store.close();
+			store.close();
+			assertThrows(StoreException.class,
+					() -> store.refForHash(nonEmbedded(99).getHash()));
+			assertThrows(IOException.class,
+					() -> targetEtch.read(nonEmbedded(99).getHash()));
+		} finally {
+			store.close();
+		}
 
 		// ----- Reopen via EtchStore.create: automatic recovery (phase 3e)
 		// rolls the abandoned cycle forward - nothing written during it is
 		// lost, and the root advances to the cycle's last root -----
 		assertTrue(targetEtch.getFile().exists()); // cycle data durably on disk
-		EtchStore reopened = EtchStore.create(f);
-		assertEquals(t3.getHash(), reopened.getRootHash());
-		assertEquals(t3, reopened.getRootData());
-		assertNotNull(reopened.getEtch().read(v2.getHash())); // cycle novelty recovered
-		assertAllInEtch(reopened.getEtch(), treeHashes(t3), Ref.PERSISTED);
-		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED); // pre-cycle data intact
-		assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, reopened.getEtch().read(t1.get(0).getHash()).getStatus());
-		assertAllInEtch(reopened.getEtch(), treeHashes(t0), Ref.ANNOUNCED);
-		reopened.close();
+		try (EtchStore reopened = EtchStore.create(f)) {
+			assertEquals(t3.getHash(), reopened.getRootHash());
+			assertEquals(t3, reopened.getRootData());
+			assertNotNull(reopened.getEtch().read(v2.getHash())); // cycle novelty recovered
+			assertAllInEtch(reopened.getEtch(), treeHashes(t3), Ref.PERSISTED);
+			assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED); // pre-cycle data intact
+			assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, reopened.getEtch().read(t1.get(0).getHash()).getStatus());
+			assertAllInEtch(reopened.getEtch(), treeHashes(t0), Ref.ANNOUNCED);
+		}
 
 		// Recovery is idempotent: a second open is clean (any target files
 		// still pinned by this process are re-rolled-back harmlessly)
-		EtchStore again = EtchStore.create(f);
-		assertEquals(t3.getHash(), again.getRootHash());
-		again.close();
+		try (EtchStore again = EtchStore.create(f)) {
+			assertEquals(t3.getHash(), again.getRootHash());
+		}
 	}
 
 	/**
@@ -262,123 +268,128 @@ public class EtchGCLifecycleTest {
 		AVector<ACell> t1 = tree(110);
 
 		// ----- Populate the old file, then reopen for cold caches -----
-		{
-			EtchStore store = EtchStore.create(f);
+		try (EtchStore store = EtchStore.create(f)) {
 			Cells.persist(t1, store);
 			store.setRootData(v0);
 			Cells.announce(t1.get(0), null, store);
 			store.flush();
-			store.close();
 		}
 		EtchStore store = EtchStore.create(f);
-		assertThrows(IllegalStateException.class, store::cancelGC); // no cycle to cancel
-
-		store.startGC();
-		Etch targetEtch = store.getTargetEtch();
-		targetEtch.getFile().deleteOnExit(); // cancel's delete may fail while mapped
-		// Even a low-status touch must preserve this store's previously earned
-		// status and its subtree guarantee when moving the entry to the target.
-		store.storeTopRef(t1.getRef(), Ref.STORED, null);
-		assertEquals(Ref.PERSISTED, targetEtch.read(t1.getHash()).getStatus());
-		assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.get(0).getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, targetEtch.read(t1.get(1).getHash()).getStatus());
-
-		// ----- Cycle activity: novelty, a root update, a STORED-only entry -----
-		AString v2 = nonEmbedded(120);
-		Ref<ACell> v2ref = Cells.persist(v2, store).getRef();
-		AVector<ACell> t3 = tree(130);
-		store.setRootData(t3);
-		AVector<ACell> storedOnly = tree(140);
-		// Incoming flags alone are not evidence of an earned announcement, even
-		// during GC. The assertions below require exactly STORED and no children.
-		store.storeTopRef(storedOnly.getRef().withStatus(Ref.ANNOUNCED), Ref.STORED, null);
-		assertNull(store.getEtch().read(v2.getHash())); // target-only so far
-
-		// A completed sweep does not survive cancellation
-		store.transferGC();
-		assertTrue(store.isGCComplete());
-
-		// ----- Cancel: reverse migration back into the old file -----
-		store.cancelGC();
-		assertFalse(store.isGCInProgress());
-		assertFalse(store.isGCComplete());
-		assertNull(store.getTargetEtch());
-		assertThrows(IllegalStateException.class, store::cancelGC); // cycle is over
-
-		Etch old = store.getEtch();
-		// Novelty and root tree fully in the old file at earned status
-		assertTrue(old.read(v2.getHash()).getStatus() >= Ref.PERSISTED);
-		assertAllInEtch(old, treeHashes(t3), Ref.PERSISTED);
-		assertEquals(Ref.ANNOUNCED, old.read(t1.get(0).getHash()).getStatus());
-		// STORED-only entry migrated at exactly STORED: no subtree claim, and
-		// its children (never written anywhere) stay absent
-		RefSoft<?> so = old.read(storedOnly.getHash());
-		assertNotNull(so);
-		assertEquals(Ref.STORED, so.getStatus());
-		assertNull(old.read(nonEmbedded(140).getHash()));
-		// Root hash carried back
-		assertEquals(t3.getHash(), store.getRootHash());
-		assertEquals(t3.getHash(), old.getRootHash());
-		// Refs issued during the cycle still resolve
-		assertEquals(v2, v2ref.getValue());
-
-		// ----- Store fully operational: writes land in the old file again -----
-		AString v4 = nonEmbedded(150);
-		Cells.persist(v4, store);
-		assertNotNull(old.read(v4.getHash()));
-
-		// ----- A new cycle starts even if the cancelled target file is pinned
-		// (generational naming). Cancel races live persists: writers before the
-		// flip are drained and their values reverse-migrated; writers after go
-		// straight to the old file. Nothing may be lost -----
-		int NT = 4, PER = 50;
-		ExecutorService ex = Executors.newFixedThreadPool(NT);
-		List<Future<?>> futures = new ArrayList<>();
-		futures.add(ex.submit(() -> {
-			Cells.announce(t1.get(1), null, store);
-			return null;
-		}));
-		store.startGC(); // must drain any persist already writing to the old file
-		store.getTargetEtch().getFile().deleteOnExit();
-		for (int w = 0; w < NT; w++) {
-			final int base = 200 + w * PER;
-			futures.add(ex.submit(() -> {
-				Cells.announce(t1.get(1), null, store);
-				for (int i = 0; i < PER; i++) {
-					Cells.persist(nonEmbedded(base + i), store);
-				}
-				return null;
-			}));
-		}
-		store.cancelGC(); // concurrent with the writers
+		AString v2;
+		AVector<ACell> t3;
 		try {
-			for (Future<?> fut : futures) {
-				fut.get(); // propagate any writer failure
+			assertThrows(IllegalStateException.class, store::cancelGC); // no cycle to cancel
+
+			store.startGC();
+			Etch targetEtch = store.getTargetEtch();
+			targetEtch.getFile().deleteOnExit(); // cancel's delete may fail while mapped
+			// Even a low-status touch must preserve this store's previously earned
+			// status and its subtree guarantee when moving the entry to the target.
+			store.storeTopRef(t1.getRef(), Ref.STORED, null);
+			assertEquals(Ref.PERSISTED, targetEtch.read(t1.getHash()).getStatus());
+			assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.get(0).getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, targetEtch.read(t1.get(1).getHash()).getStatus());
+
+			// ----- Cycle activity: novelty, a root update, a STORED-only entry -----
+			v2 = nonEmbedded(120);
+			Ref<ACell> v2ref = Cells.persist(v2, store).getRef();
+			t3 = tree(130);
+			store.setRootData(t3);
+			AVector<ACell> storedOnly = tree(140);
+			// Incoming flags alone are not evidence of an earned announcement, even
+			// during GC. The assertions below require exactly STORED and no children.
+			store.storeTopRef(storedOnly.getRef().withStatus(Ref.ANNOUNCED), Ref.STORED, null);
+			assertNull(store.getEtch().read(v2.getHash())); // target-only so far
+
+			// A completed sweep does not survive cancellation
+			store.transferGC();
+			assertTrue(store.isGCComplete());
+
+			// ----- Cancel: reverse migration back into the old file -----
+			store.cancelGC();
+			assertFalse(store.isGCInProgress());
+			assertFalse(store.isGCComplete());
+			assertNull(store.getTargetEtch());
+			assertThrows(IllegalStateException.class, store::cancelGC); // cycle is over
+
+			Etch old = store.getEtch();
+			// Novelty and root tree fully in the old file at earned status
+			assertTrue(old.read(v2.getHash()).getStatus() >= Ref.PERSISTED);
+			assertAllInEtch(old, treeHashes(t3), Ref.PERSISTED);
+			assertEquals(Ref.ANNOUNCED, old.read(t1.get(0).getHash()).getStatus());
+			// STORED-only entry migrated at exactly STORED: no subtree claim, and
+			// its children (never written anywhere) stay absent
+			RefSoft<?> so = old.read(storedOnly.getHash());
+			assertNotNull(so);
+			assertEquals(Ref.STORED, so.getStatus());
+			assertNull(old.read(nonEmbedded(140).getHash()));
+			// Root hash carried back
+			assertEquals(t3.getHash(), store.getRootHash());
+			assertEquals(t3.getHash(), old.getRootHash());
+			// Refs issued during the cycle still resolve
+			assertEquals(v2, v2ref.getValue());
+
+			// ----- Store fully operational: writes land in the old file again -----
+			AString v4 = nonEmbedded(150);
+			Cells.persist(v4, store);
+			assertNotNull(old.read(v4.getHash()));
+
+			// ----- A new cycle starts even if the cancelled target file is pinned
+			// (generational naming). Cancel races live persists: writers before the
+			// flip are drained and their values reverse-migrated; writers after go
+			// straight to the old file. Nothing may be lost -----
+			int NT = 4, PER = 50;
+			ExecutorService ex = Executors.newFixedThreadPool(NT);
+			try {
+				List<Future<?>> futures = new ArrayList<>();
+				futures.add(ex.submit(() -> {
+					Cells.announce(t1.get(1), null, store);
+					return null;
+				}));
+				store.startGC(); // must drain any persist already writing to the old file
+				store.getTargetEtch().getFile().deleteOnExit();
+				for (int w = 0; w < NT; w++) {
+					final int base = 200 + w * PER;
+					futures.add(ex.submit(() -> {
+						Cells.announce(t1.get(1), null, store);
+						for (int i = 0; i < PER; i++) {
+							Cells.persist(nonEmbedded(base + i), store);
+						}
+						return null;
+					}));
+				}
+				store.cancelGC(); // concurrent with the writers
+				try {
+					for (Future<?> fut : futures) {
+						fut.get(); // propagate any writer failure
+					}
+				} catch (Exception e) {
+					throw new IOException("Writer failed during concurrent cancel", e);
+				}
+			} finally {
+				ex.shutdown();
 			}
-		} catch (Exception e) {
-			throw new IOException("Writer failed during concurrent cancel", e);
+			assertFalse(store.isGCInProgress());
+			for (int i = 200; i < 200 + NT * PER; i++) {
+				assertNotNull(old.read(nonEmbedded(i).getHash()),
+						"Value lost during concurrent cancel: " + i);
+			}
+			assertEquals(t3.getHash(), store.getRootHash());
+			assertEquals(Ref.ANNOUNCED, old.read(t1.get(1).getHash()).getStatus());
 		} finally {
-			ex.shutdown();
+			store.close();
 		}
-		assertFalse(store.isGCInProgress());
-		for (int i = 200; i < 200 + NT * PER; i++) {
-			assertNotNull(old.read(nonEmbedded(i).getHash()),
-					"Value lost during concurrent cancel: " + i);
-		}
-		assertEquals(t3.getHash(), store.getRootHash());
-		assertEquals(Ref.ANNOUNCED, old.read(t1.get(1).getHash()).getStatus());
-		store.close();
 
 		// ----- Reopen: the cancelled state is durable -----
-		EtchStore reopened = EtchStore.create(f);
-		assertEquals(t3.getHash(), reopened.getRootHash());
-		assertEquals(t3, reopened.getRootData());
-		assertNotNull(reopened.getEtch().read(v2.getHash()));
-		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
-		assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.get(0).getHash()).getStatus());
-		assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.get(1).getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, reopened.getEtch().read(t1.getHash()).getStatus());
-		reopened.close();
+		try (EtchStore reopened = EtchStore.create(f)) {
+			assertEquals(t3.getHash(), reopened.getRootHash());
+			assertEquals(t3, reopened.getRootData());
+			assertNotNull(reopened.getEtch().read(v2.getHash()));
+			assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
+			assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.get(0).getHash()).getStatus());
+			assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.get(1).getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, reopened.getEtch().read(t1.getHash()).getStatus());
+		}
 	}
 
 	/**
@@ -393,148 +404,156 @@ public class EtchGCLifecycleTest {
 
 		AVector<ACell> t1 = tree(210); // parent will become garbage; one child is retained
 		AVector<ACell> t0 = tree(201); // pre-cycle root, superseded during the cycle
-		{
-			EtchStore store = EtchStore.create(f);
+		try (EtchStore store = EtchStore.create(f)) {
 			Cells.persist(t1, store);
 			store.setRootData(t0);
 			Cells.announce(t0.get(0), null, store);
 			Cells.announce(t1.get(0), null, store);
 			store.flush();
-			store.close();
 		}
 		EtchStore store = EtchStore.create(f);
-		store.startGC();
-		Etch targetEtch = store.getTargetEtch();
-		targetEtch.getFile().deleteOnExit();
+		EtchStore newStore = null;
+		EtchStore finalStore = null;
+		try {
+			store.startGC();
+			Etch targetEtch = store.getTargetEtch();
+			targetEtch.getFile().deleteOnExit();
 
-		// Cutover is hard-gated on a completed sweep (no force override)
-		assertThrows(IllegalStateException.class, store::completeGC);
+			// Cutover is hard-gated on a completed sweep (no force override)
+			assertThrows(IllegalStateException.class, store::completeGC);
 
-		// #747: a live persist before the sweep must copy each descendant's own
-		// status, even though its PERSISTED parent will let the sweep prune it.
-		store.setRootData(t0);
-		assertEquals(Ref.ANNOUNCED, targetEtch.read(t0.get(0).getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, targetEtch.read(t0.getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, targetEtch.read(t0.get(1).getHash()).getStatus());
+			// #747: a live persist before the sweep must copy each descendant's own
+			// status, even though its PERSISTED parent will let the sweep prune it.
+			store.setRootData(t0);
+			assertEquals(Ref.ANNOUNCED, targetEtch.read(t0.get(0).getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, targetEtch.read(t0.getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, targetEtch.read(t0.get(1).getHash()).getStatus());
 
-		// Cycle activity, then a root update superseding t0
-		AString v2 = nonEmbedded(220);
-		Cells.persist(v2, store);
-		AVector<ACell> t3 = tree(230).assoc(0,t0).assoc(1,t0.get(0)).assoc(2,t1.get(0));
-		store.setRootData(t3);
-		// New roots may share copied subtrees and old announced descendants that
-		// the root sweep has never visited. Both must keep their earned status.
-		assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.get(0).getHash()).getStatus());
+			// Cycle activity, then a root update superseding t0
+			AString v2 = nonEmbedded(220);
+			Cells.persist(v2, store);
+			AVector<ACell> t3 = tree(230).assoc(0,t0).assoc(1,t0.get(0)).assoc(2,t1.get(0));
+			store.setRootData(t3);
+			// New roots may share copied subtrees and old announced descendants that
+			// the root sweep has never visited. Both must keep their earned status.
+			assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.get(0).getHash()).getStatus());
 
-		store.transferGC();
-		assertTrue(store.isGCComplete());
+			store.transferGC();
+			assertTrue(store.isGCComplete());
 
-		// ----- Cutover -----
-		EtchStore newStore = store.completeGC();
-		assertFalse(store.isGCInProgress());
-		assertFalse(store.isGCComplete());
-		assertThrows(IllegalStateException.class, store::completeGC); // no second successor
-		assertThrows(IllegalStateException.class, store::cancelGC);   // successor's file is live
-		assertThrows(IllegalStateException.class, store::transferGC);
-		assertThrows(IllegalStateException.class, store::startGC);
+			// ----- Cutover -----
+			newStore = store.completeGC();
+			assertFalse(store.isGCInProgress());
+			assertFalse(store.isGCComplete());
+			assertThrows(IllegalStateException.class, store::completeGC); // no second successor
+			assertThrows(IllegalStateException.class, store::cancelGC);   // successor's file is live
+			assertThrows(IllegalStateException.class, store::transferGC);
+			assertThrows(IllegalStateException.class, store::startGC);
 
-		// Successor runs on the target file with the cycle's final state
-		assertSame(targetEtch, newStore.getEtch());
-		assertEquals(t3.getHash(), newStore.getRootHash());
-		assertEquals(t3, newStore.getRootData());
-		assertEquals(v2, newStore.refForHash(v2.getHash()).getValue());
-		assertEquals(Ref.ANNOUNCED, newStore.getEtch().read(t0.get(0).getHash()).getStatus());
-		assertEquals(Ref.ANNOUNCED, newStore.getEtch().read(t1.get(0).getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, newStore.getEtch().read(t3.getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, newStore.getEtch().read(t0.get(1).getHash()).getStatus());
+			// Successor runs on the target file with the cycle's final state
+			assertSame(targetEtch, newStore.getEtch());
+			assertEquals(t3.getHash(), newStore.getRootHash());
+			assertEquals(t3, newStore.getRootData());
+			assertEquals(v2, newStore.refForHash(v2.getHash()).getValue());
+			assertEquals(Ref.ANNOUNCED, newStore.getEtch().read(t0.get(0).getHash()).getStatus());
+			assertEquals(Ref.ANNOUNCED, newStore.getEtch().read(t1.get(0).getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, newStore.getEtch().read(t3.getHash()).getStatus());
+			assertEquals(Ref.PERSISTED, newStore.getEtch().read(t0.get(1).getHash()).getStatus());
 
-		// GARBAGE IS COLLECTED: t1's parent was unreachable from the final root
-		assertNull(newStore.refForHash(t1.getHash()));
+			// GARBAGE IS COLLECTED: t1's parent was unreachable from the final root
+			assertNull(newStore.refForHash(t1.getHash()));
 
-		// Old store remains a full view: migrated data via the target file,
-		// garbage still readable via the old file
-		assertEquals(v2, store.refForHash(v2.getHash()).getValue());
-		assertEquals(t1, store.refForHash(t1.getHash()).getValue());
+			// Old store remains a full view: migrated data via the target file,
+			// garbage still readable via the old file
+			assertEquals(v2, store.refForHash(v2.getHash()).getValue());
+			assertEquals(t1, store.refForHash(t1.getHash()).getValue());
 
-		// Old store still accepts writes: they land in the successor's file
-		AString v4 = nonEmbedded(240);
-		Cells.persist(v4, store);
-		assertEquals(v4, newStore.refForHash(v4.getHash()).getValue());
-		assertNull(store.getEtch().read(v4.getHash())); // not in the old file
+			// Old store still accepts writes: they land in the successor's file
+			AString v4 = nonEmbedded(240);
+			Cells.persist(v4, store);
+			assertEquals(v4, newStore.refForHash(v4.getHash()).getValue());
+			assertNull(store.getEtch().read(v4.getHash())); // not in the old file
 
-		// Completion marker names the generational target file
-		File marker = new File(f.getCanonicalPath() + ".gc-complete");
-		marker.deleteOnExit();
-		assertTrue(marker.exists());
-		assertTrue(java.nio.file.Files.readString(marker.toPath())
-				.contains(targetEtch.getFile().getName()));
-
-		// ----- Caller decides retirement: closing the old store must not
-		// touch the successor -----
-		store.close();
-		AString v5 = nonEmbedded(250);
-		assertRetiredFileDeleted(store.getEtch());
-		Cells.persist(v5, newStore);
-		assertEquals(v5, newStore.refForHash(v5.getHash()).getValue());
-		assertNull(newStore.refForHash(t1.getHash())); // garbage now gone for good
-
-		// ----- Second GC on the successor: cutovers chain via markers, and
-		// target names stay bounded off the BASE file (f~, f~1 - never f~~) -----
-		newStore.startGC();
-		Etch target2 = newStore.getTargetEtch();
-		target2.getFile().deleteOnExit();
-		assertEquals(f.getCanonicalPath() + "~1", target2.getFile().getCanonicalPath());
-		newStore.transferGC();
-		EtchStore finalStore = newStore.completeGC();
-		// The single base marker was REWRITTEN to name the new current file
-		assertTrue(java.nio.file.Files.readString(marker.toPath())
-				.contains(target2.getFile().getName()));
-		AString v6 = nonEmbedded(260);
-		Cells.persist(v6, finalStore);
-		newStore.close(); // deletes f~ (or defers via its .gc-defunct tombstone)
-		assertRetiredFileDeleted(newStore.getEtch());
-		finalStore.close();
-		new File(f.getCanonicalPath() + ".gc-defunct").deleteOnExit();
-		new File(f.getCanonicalPath() + "~.gc-defunct").deleteOnExit();
-
-		// ----- Restart via EtchStore.create(f): recovery (phase 3e) adopts
-		// (or defers to) the marker-named current file f~1 -----
-		EtchStore adopted = EtchStore.create(f);
-		assertEquals(t3.getHash(), adopted.getRootHash());
-		assertNotNull(adopted.getEtch().read(v6.getHash())); // post-second-cutover data retained
-		assertNull(adopted.getEtch().read(t1.getHash()));    // garbage stays collected
-		assertNull(adopted.getEtch().read(v4.getHash()));    // never root-reachable: collected by cycle 2
-		assertNull(adopted.getEtch().read(v5.getHash()));    // ditto
-		assertAllInEtch(adopted.getEtch(), treeHashes(t3), Ref.PERSISTED);
-		assertEquals(Ref.ANNOUNCED, adopted.getEtch().read(t0.get(0).getHash()).getStatus());
-		assertEquals(Ref.ANNOUNCED, adopted.getEtch().read(t1.get(0).getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, adopted.getEtch().read(t3.getHash()).getStatus());
-		assertEquals(Ref.PERSISTED, adopted.getEtch().read(t0.get(1).getHash()).getStatus());
-		// The logical base survives regardless of which physical file is open
-		assertEquals(f.getCanonicalFile(), adopted.getBaseFile().getCanonicalFile());
-
-		File adoptedFile = adopted.getFile().getCanonicalFile();
-		if (adoptedFile.equals(f.getCanonicalFile())) {
-			// Full adoption: marker consumed; superseded files are DELETED, not
-			// archived - the deletion is the disk reclamation
-			assertFalse(marker.exists());
-		} else {
-			// Deferred adoption (files pinned by this same process, e.g. on
-			// Windows): running on the chain tail with the correct data; the
-			// renames are retried on the next start via the marker breadcrumb
-			assertEquals(target2.getFile().getCanonicalFile(), adoptedFile);
+			// Completion marker names the generational target file
+			File marker = new File(f.getCanonicalPath() + ".gc-complete");
+			marker.deleteOnExit();
 			assertTrue(marker.exists());
-		}
-		adopted.close();
+			assertTrue(java.nio.file.Files.readString(marker.toPath())
+					.contains(targetEtch.getFile().getName()));
 
-		// Closing the legacy view again after adoption must not delete the
-		// successor now installed under the legacy file name. CLI cleanup can
-		// legitimately close the same store from both its body and finally block.
-		store.close();
-		EtchStore afterDuplicateClose = EtchStore.create(f);
-		assertEquals(t3.getHash(), afterDuplicateClose.getRootHash());
-		assertEquals(t3, afterDuplicateClose.getRootData());
-		afterDuplicateClose.close();
+			// ----- Caller decides retirement: closing the old store must not
+			// touch the successor -----
+			store.close();
+			AString v5 = nonEmbedded(250);
+			assertRetiredFileDeleted(store.getEtch());
+			Cells.persist(v5, newStore);
+			assertEquals(v5, newStore.refForHash(v5.getHash()).getValue());
+			assertNull(newStore.refForHash(t1.getHash())); // garbage now gone for good
+
+			// ----- Second GC on the successor: cutovers chain via markers, and
+			// target names stay bounded off the BASE file (f~, f~1 - never f~~) -----
+			newStore.startGC();
+			Etch target2 = newStore.getTargetEtch();
+			target2.getFile().deleteOnExit();
+			assertEquals(f.getCanonicalPath() + "~1", target2.getFile().getCanonicalPath());
+			newStore.transferGC();
+			finalStore = newStore.completeGC();
+			// The single base marker was REWRITTEN to name the new current file
+			assertTrue(java.nio.file.Files.readString(marker.toPath())
+					.contains(target2.getFile().getName()));
+			AString v6 = nonEmbedded(260);
+			Cells.persist(v6, finalStore);
+			newStore.close(); // deletes f~ (or defers via its .gc-defunct tombstone)
+			assertRetiredFileDeleted(newStore.getEtch());
+			finalStore.close();
+			new File(f.getCanonicalPath() + ".gc-defunct").deleteOnExit();
+			new File(f.getCanonicalPath() + "~.gc-defunct").deleteOnExit();
+
+			// ----- Restart via EtchStore.create(f): recovery (phase 3e) adopts
+			// (or defers to) the marker-named current file f~1 -----
+			try (EtchStore adopted = EtchStore.create(f)) {
+				assertEquals(t3.getHash(), adopted.getRootHash());
+				assertNotNull(adopted.getEtch().read(v6.getHash())); // post-second-cutover data retained
+				assertNull(adopted.getEtch().read(t1.getHash()));    // garbage stays collected
+				assertNull(adopted.getEtch().read(v4.getHash()));    // never root-reachable: collected by cycle 2
+				assertNull(adopted.getEtch().read(v5.getHash()));    // ditto
+				assertAllInEtch(adopted.getEtch(), treeHashes(t3), Ref.PERSISTED);
+				assertEquals(Ref.ANNOUNCED, adopted.getEtch().read(t0.get(0).getHash()).getStatus());
+				assertEquals(Ref.ANNOUNCED, adopted.getEtch().read(t1.get(0).getHash()).getStatus());
+				assertEquals(Ref.PERSISTED, adopted.getEtch().read(t3.getHash()).getStatus());
+				assertEquals(Ref.PERSISTED, adopted.getEtch().read(t0.get(1).getHash()).getStatus());
+				// The logical base survives regardless of which physical file is open
+				assertEquals(f.getCanonicalFile(), adopted.getBaseFile().getCanonicalFile());
+
+				File adoptedFile = adopted.getFile().getCanonicalFile();
+				if (adoptedFile.equals(f.getCanonicalFile())) {
+					// Full adoption: marker consumed; superseded files are DELETED, not
+					// archived - the deletion is the disk reclamation
+					assertFalse(marker.exists());
+				} else {
+					// Deferred adoption (files pinned by this same process, e.g. on
+					// Windows): running on the chain tail with the correct data; the
+					// renames are retried on the next start via the marker breadcrumb
+					assertEquals(target2.getFile().getCanonicalFile(), adoptedFile);
+					assertTrue(marker.exists());
+				}
+			}
+
+			// Closing the legacy view again after adoption must not delete the
+			// successor now installed under the legacy file name. CLI cleanup can
+			// legitimately close the same store from both its body and finally block.
+			store.close();
+			try (EtchStore afterDuplicateClose = EtchStore.create(f)) {
+				assertEquals(t3.getHash(), afterDuplicateClose.getRootHash());
+				assertEquals(t3, afterDuplicateClose.getRootData());
+			}
+		} finally {
+			EtchStore successor = newStore, last = finalStore;
+			assertAll("Close the stores",
+					() -> { if (last != null) last.close(); },
+					() -> { if (successor != null) successor.close(); },
+					store::close);
+		}
 	}
 
 	@Test

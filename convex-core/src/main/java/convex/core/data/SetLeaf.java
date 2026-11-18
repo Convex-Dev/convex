@@ -316,6 +316,24 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
+	 * Filters this SetLeaf to the elements whose hashes do, or do not, start with the same hex
+	 * digits as a given hash
+	 *
+	 * @param h Hash to compare with
+	 * @param n Number of leading hex digits to compare
+	 * @param same True for the elements that match h, false for the others
+	 * @return Filtered SetLeaf
+	 */
+	SetLeaf<T> filterPrefix(Hash h, int n, boolean same) {
+		int sel = 0;
+		int c = size();
+		for (int i = 0; i < c; i++) {
+			if ((elements[i].getHash().commonHexPrefixLength(h, n) >= n) == same) sel = sel | (1 << i);
+		}
+		return filterEntries(sel);
+	}
+
+	/**
 	 * Filters entries using the given bit mask
 	 * 
 	 * @param selection
@@ -343,9 +361,13 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 	
 	@Override
-	protected AHashSet<T>  mergeWith(AHashSet<T>  b, int setOp, int shift) {
-		if (b instanceof SetLeaf) return mergeWith((SetLeaf<T>) b, setOp,shift);
-		if (b instanceof SetTree) return b.mergeWith(this, reverseOp(setOp),shift);
+	protected AHashSet<T>  mergeWith(AHashSet<T>  b, int setOp, int prefix) {
+		if (b instanceof SetLeaf) return mergeWith((SetLeaf<T>) b, setOp, prefix);
+		if (b instanceof SetTree) {
+			AHashSet<T> result = b.mergeWith(this, reverseOp(setOp), prefix);
+			// The tree returns itself when unchanged, so an unchanged leaf is found by equality
+			return equals(result) ? this : result;
+		}
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
@@ -414,35 +436,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return true;
 	}
 	
-	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		validateWithPrefix(Hash.EMPTY_HASH,0,-1);
-	}
-
-	@Override
-	protected void validateWithPrefix(Hash prefix, int digit, int position) throws InvalidDataException {
-		if (!isValidOrder(elements)) {
-			throw new InvalidDataException("Bad ordering of set elements!",this);
-		}
-		
-		for (int i = 0; i < elements.length; i++) {
-			Ref<T> e = elements[i];
-			Hash h = e.getHash();
-			long match=h.hexMatch(prefix);
-			if (match<(position-1)) {
-				throw new InvalidDataException("Parent prefix did not match",this);
-			}
-			if (position>=0) {
-				int mydigit=h.getHexDigit(position);
-				if (mydigit!=digit) {
-					throw new InvalidDataException("Bad hex digit at position: "+position,this);
-				}
-			}
-			e.validate();
-
-		}
-	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {

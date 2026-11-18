@@ -85,18 +85,21 @@ public class SeedsTest {
 	}
 
 	@Test void additionsAndRemovalsSurviveARestart() throws Exception {
-		var store=new MemoryStore();
-		var host=LatticeHost.create(store);
-		var application=alice(host);
-		PeerName hub=name("tcp://hub.example:18888",HUB);
-		PeerName gone=name("tcp://gone.example:18888",null);
-		application.seeds().add(hub);
-		application.seeds().add(gone);
-		application.syncHost();
-		application.seeds().remove(gone);
-		application.syncHost();
+		try (var store=new MemoryStore();
+				var host=LatticeHost.create(store)) {
+			var application=alice(host);
+			PeerName hub=name("tcp://hub.example:18888",HUB);
+			PeerName gone=name("tcp://gone.example:18888",null);
+			application.seeds().add(hub);
+			application.seeds().add(gone);
+			application.syncHost();
+			application.seeds().remove(gone);
+			application.syncHost();
 
-		assertEquals(List.of(hub),alice(LatticeHost.open(store)).seeds().all());
+			try (var restartedHost=LatticeHost.open(store)) {
+				assertEquals(List.of(hub),alice(restartedHost).seeds().all());
+			}
+		}
 	}
 
 	@Test void aNodeWithoutAKeyKeepsItsSeedsInMemory() {

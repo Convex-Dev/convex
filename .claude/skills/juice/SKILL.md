@@ -46,7 +46,7 @@ network's price is whatever its genesis state carries.
 CAD007 also specifies **dynamic pricing** — the price rising under sustained
 load and decaying towards a hard floor of 1 — but this is not yet implemented:
 nothing updates `*juice-price*` after genesis, so treat the price as constant
-today. Implementation is tracked in #408 / #423.
+today. Implementation is tracked in #423.
 
 Dynamic pricing is the intended cryptoeconomic defence: sustaining an attack
 would mean paying exponentially rising prices, so a burst while prices are low

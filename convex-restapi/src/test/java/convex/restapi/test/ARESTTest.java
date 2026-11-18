@@ -9,6 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -21,6 +22,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;
+import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
 import convex.peer.API;
@@ -36,12 +38,16 @@ public abstract class ARESTTest {
 	protected static String API_PATH;
 	protected static AKeyPair KP;
 	protected static AKeyPair CLIENT_KP=AKeyPair.createSeeded(568756);
-	
+	/** The shared peer's store: nothing reopens it, so it stays in memory. */
+	private static final MemoryStore STORE=new MemoryStore();
+
 	protected static final HttpClient httpClient = HttpClient.newBuilder()
 			.connectTimeout(Duration.ofSeconds(10))
 			.build();
 	
 	static {
+		Server s=null;
+		RESTServer rs=null;
 		try {
 			// Security-sensitive optional services are disabled by default. The shared
 			// integration fixture opts in only because dedicated tests exercise them.
@@ -50,8 +56,9 @@ public abstract class ARESTTest {
 				""");
 			var launchConfig=config.toLegacy();
 			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
-			Server s = API.launchPeer(launchConfig);
-			RESTServer rs = RESTServer.create(s);
+			launchConfig.put(Keywords.STORE,STORE);
+			s = API.launchPeer(launchConfig);
+			rs = RESTServer.create(s);
 			rs.start(0);
 			port = rs.getPort();
 			server = rs;
@@ -59,6 +66,16 @@ public abstract class ARESTTest {
 			API_PATH=HOST_PATH+"/api/v1";
 			KP=s.getKeyPair();
 		} catch (Exception e) {
+			// A class that fails to initialise never reaches closeFixture, so what was
+			// opened closes here: the server, then the peer, then the store it borrows
+			for (AutoCloseable c:new AutoCloseable[] {rs,s,STORE,httpClient::shutdownNow}) {
+				if (c==null) continue;
+				try {
+					c.close();
+				} catch (Exception closeFailure) {
+					e.addSuppressed(closeFailure);
+				}
+			}
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -68,15 +85,15 @@ public abstract class ARESTTest {
 		if (rs==null) return;
 		Server peer=rs.getServer();
 		server=null;
-		try {
-			rs.close();
-		} finally {
-			if (peer!=null) peer.close();
-			httpClient.shutdownNow();
-			HOST_PATH=null;
-			API_PATH=null;
-			KP=null;
-		}
+		HOST_PATH=null;
+		API_PATH=null;
+		KP=null;
+		// The peer borrows the store, so the store closes after the peer
+		assertAll("Close the shared REST fixture",
+			rs::close,
+			()->{if (peer!=null) peer.close();},
+			STORE::close,
+			httpClient::shutdownNow);
 	}
 	
 	/**

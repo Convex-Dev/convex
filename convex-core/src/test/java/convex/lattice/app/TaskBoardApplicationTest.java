@@ -61,10 +61,11 @@ class TaskBoardApplicationTest {
 	private static final IndexLattice<ABlobLike<?>,AHashMap<Keyword,ACell>> BOARD_LATTICE=
 		IndexLattice.create(Timestamped.lattice());
 
-	/** Constructs the domain component directly at its host path. */
+	/** Makes the board over a working copy of its region, which the application's sync publishes. */
 	static final class TaskBoardApp extends SingleRegion<Board> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			super(host.cursor(),BOARD,new Board(host.cursor().path(BOARD),getTimestamp).fork());
+			super(host.cursor(),BOARD,(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> region) ->
+				new Board(region,getTimestamp).fork());
 		}
 		Board board() { return component(); }
 	}
@@ -87,11 +88,7 @@ class TaskBoardApplicationTest {
 			tasks=new IndexComponent<>(cursor);
 		}
 
-		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
-			return rebind(cursor);
-		}
-
-		@Override protected Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
+		@Override public Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
 			return new Board(cursor,getTimestamp);
 		}
 		@Override public Board fork() { return rebind(storage.fork()); }
@@ -221,7 +218,7 @@ class TaskBoardApplicationTest {
 				assertTrue(host.cursor().get().isEmpty());
 			});
 		}
-		assertEquals(2,attempts.get());
+		assertEquals(1,attempts.get());
 		assertTrue(board.task("review").isDone());
 		assertEquals(Sets.of("publish","other"),board.pending());
 		assertTrue(host.cursor().get().isEmpty());

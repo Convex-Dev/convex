@@ -11,6 +11,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -284,13 +285,17 @@ public class EtchStore extends ACachedStore {
 	@Override
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		Ref<ACell> existing = checkCache(hash);
-		if (existing != null)
+		// A cached ref below STORED is a decoded cell, which says nothing of the file
+		if ((existing != null) && (existing.getStatus() >= Ref.STORED))
 			return (Ref<T>) existing;
 
 		if (hash == Hash.NULL_HASH)
 			return (Ref<T>) RefDirect.NULL_VALUE;
 		try {
-			return readStoreRef(hash);
+			Ref<T> stored = readStoreRef(hash);
+			if (stored != null) return stored;
+			// Not in the file: the decoded cell is still served, as before
+			return (Ref<T>) existing;
 		} catch (IOException e) {
 			// Includes ClosedChannelException. A failed read is a fundamental store
 			// failure: it must never be reported as the value being absent
@@ -319,9 +324,18 @@ public class EtchStore extends ACachedStore {
 		return gc.persist(this,ref,requiredStatus,noveltyHandler,topLevel);
 	}
 
-	@SuppressWarnings("unchecked")
 	<T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
 			boolean topLevel, EtchGC.State state) throws IOException {
+		return storeRef(ref,requiredStatus,noveltyHandler,topLevel,state,false,0);
+	}
+
+	/**
+	 * @param checked True if the cell is inside a tree already recorded as persisted
+	 *        in this store, so its structure has been checked
+	 */
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
+			boolean topLevel, EtchGC.State state, boolean checked, int depth) throws IOException {
 		Etch writeEtch=state.writeEtch();
 
 		// Get the value. If we are persisting, should be there!
@@ -337,18 +351,13 @@ public class EtchStore extends ACachedStore {
 		// if not embedded, worth checking store first for existing value
 		if (!embedded) {
 			hash = ref.getHash();
-			// During a GC cycle, only an entry in the file being written can
-			// satisfy a persist: the shared cache cannot prove file residency, and
-			// early-returning on a hit in the OTHER file would skip a copy —
-			// breaking INV-1 while collecting, or losing data during a cancel's
-			// reverse migration. Outside a cycle the cached path is unchanged
-			Ref<T> existing = (state.target==null && state.owner==this)
-					? refForHash(hash) : writeEtch.read(hash,this);
+			Ref<T> existing = existingRef(hash,state);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
 					return existing;
 				}
+				if (existing.getStatus() >= Ref.PERSISTED) checked=true;
 			}
 		}
 
@@ -367,7 +376,9 @@ public class EtchStore extends ACachedStore {
 			// status is evidence; status carried by an incoming ref is not. Do this
 			// on every copy, so a later parent prune cannot hide a demoted child.
 			if (hash == null) hash = ref.getHash();
-			writeStatus=Math.max(writeStatus,gc.retainedStatus(this,state,writeEtch,hash));
+			int retainedStatus=gc.retainedStatus(this,state,writeEtch,hash);
+			writeStatus=Math.max(writeStatus,retainedStatus);
+			if (retainedStatus >= Ref.PERSISTED) checked=true;
 		}
 		// Retaining a PERSISTED/ANNOUNCED entry also requires its tree in the
 		// target, even for a STORED-only request. Its old ANNOUNCED status must
@@ -377,18 +388,18 @@ public class EtchStore extends ACachedStore {
 
 		// beyond STORED level, need to recursively persist child refs if they exist
 		if ((childStatus > Ref.STORED) && (cell.getRefCount() > 0)) {
+			final boolean childrenChecked = checked;
 			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
 				try {
-					return storeRef((Ref<ACell>) r, childStatus, noveltyHandler, false, state);
+					return storeChild((Ref<ACell>) r, childStatus, noveltyHandler, state, childrenChecked, depth+1);
 				} catch (IOException e) {
 					// OK because overall function throws IOException
 					throw Utils.sneakyThrow(e);
 				}
 			};
 
-			// need to do recursive persistence
-			// TODO: maybe switch to a stack? Mitigate risk of stack overflow?
+			// need to do recursive persistence, to a limited depth
 			ACell newObject = cell.updateRefs(func);
 
 			// perhaps need to update Ref
@@ -396,6 +407,10 @@ public class EtchStore extends ACachedStore {
 				ref = ref.withValue((T) newObject);
 				cell = newObject;
 			}
+
+			// Children are now persisted: check this cell against them before it is
+			// recorded as persisted for the first time
+			if (!checked) Cells.checkStructure(cell);
 		}
 
 		// Actually write top level an non-embedded cells only
@@ -427,6 +442,56 @@ public class EtchStore extends ACachedStore {
 		}
 		cell.attachRef(ref);
 		return ref;
+	}
+
+	/**
+	 * Gets the entry for a hash that can satisfy a persist, or null if there is none.
+	 */
+	private <T extends ACell> Ref<T> existingRef(Hash hash, EtchGC.State state) throws IOException {
+		// During a GC cycle, only an entry in the file being written can
+		// satisfy a persist: the shared cache cannot prove file residency, and
+		// early-returning on a hit in the OTHER file would skip a copy —
+		// breaking INV-1 while collecting, or losing data during a cancel's
+		// reverse migration. Outside a cycle the cached path is unchanged
+		return (state.target==null && state.owner==this)
+				? refForHash(hash) : state.writeEtch().read(hash,this);
+	}
+
+	/**
+	 * Stores a child Ref at the given nesting depth, storing what lies beneath it
+	 * bottom up first if that depth is too deep to recurse further.
+	 */
+	private Ref<ACell> storeChild(Ref<ACell> ref, int status, Consumer<Ref<ACell>> noveltyHandler,
+			EtchGC.State state, boolean checked, int depth) throws IOException {
+		if (depth>=MAX_PERSIST_DEPTH) {
+			ACell cell=ref.getValue();
+			if (cell!=null) {
+				// Everything beneath a checked cell lies in the same persisted tree
+				persistBeneath(cell,r->isStored(r,status,state),r->{
+					try {
+						return storeRef(r,status,noveltyHandler,false,state,checked,0);
+					} catch (IOException e) {
+						throw Utils.sneakyThrow(e);
+					}
+				});
+			}
+			depth=0;
+		}
+		return storeRef(ref,status,noveltyHandler,false,state,checked,depth);
+	}
+
+	/**
+	 * Tests whether a branch Ref is already stored at the given status or above, as
+	 * storeRef checks before writing.
+	 */
+	private boolean isStored(Ref<ACell> ref, int status, EtchGC.State state) {
+		if (ref.isEmbedded()) return false;
+		try {
+			Ref<ACell> existing=existingRef(ref.getHash(),state);
+			return (existing!=null)&&(existing.getStatus()>=status);
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
 	}
 
 	protected <T extends ACell> void addToCache(Ref<T> ref) {

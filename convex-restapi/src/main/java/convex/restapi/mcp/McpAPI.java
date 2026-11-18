@@ -49,6 +49,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.Cleanup;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.restapi.PreparedTransaction;
@@ -151,6 +152,9 @@ public class McpAPI extends ABaseAPI {
 	/** Connection map: session ID → McpConnection (created on GET /mcp) */
 	private final ConcurrentHashMap<String, McpConnection> connections = new ConcurrentHashMap<>();
 
+	/** Set when shutdown begins, before it closes the registered streams */
+	private volatile boolean shutDown;
+
 	/** Convex-specific state watcher */
 	private final ConvexStateWatcher stateWatcher = new ConvexStateWatcher();
 
@@ -193,14 +197,19 @@ public class McpAPI extends ABaseAPI {
 	 * Stops peer-state observation for this API instance.
 	 */
 	public void shutdown() {
+		shutDown=true;
+		Cleanup cleanup=new Cleanup();
 		// Ends each stream's keep-alive loop, so a graceful server stop need not wait for it
-		closeConnections(connections);
-		stateWatcher.shutdown();
+		cleanup.run(() -> closeConnections(connections));
+		cleanup.run(stateWatcher::shutdown);
+		cleanup.finish();
 	}
 
 	/** Closes every registered stream; each stream's request then completes. */
 	static void closeConnections(Map<String, McpConnection> connections) {
-		for (McpConnection conn : connections.values()) conn.close();
+		Cleanup cleanup=new Cleanup();
+		for (McpConnection conn : connections.values()) cleanup.run(conn::close);
+		cleanup.finish();
 	}
 
 	/**
@@ -325,6 +334,14 @@ public class McpAPI extends ABaseAPI {
 					return;
 				case OK:
 					break;
+			}
+			// Checked after registering: shutdown sets the flag before closing the
+			// registered streams, so it either closes this one or this sees the flag
+			if (shutDown) {
+				conn.close();
+				connections.remove(sessionId, conn);
+				ctx.status(503);
+				return;
 			}
 			res.flushBuffer();
 			try {
@@ -1606,9 +1623,11 @@ public class McpAPI extends ABaseAPI {
 
 		private convex.core.util.StateWatcher<Peer> updates;
 		private Consumer<Peer> updateObserver;
+		/** Set by shutdown under this watcher's lock, which starting also holds */
+		private boolean shutDown;
 
 		synchronized void ensureRunning() {
-			if (updateObserver!=null) return;
+			if (shutDown || (updateObserver!=null)) return;
 			var newUpdates=new convex.core.util.StateWatcher<Peer>(this::checkAllConnections);
 			Consumer<Peer> newObserver=newUpdates::update;
 			server.addStateUpdateObserver(newObserver);
@@ -1616,17 +1635,39 @@ public class McpAPI extends ABaseAPI {
 			updateObserver=newObserver;
 		}
 
-		synchronized void stopIfIdle() {
-			if (!hasAnyWatches()) shutdown();
+		void stopIfIdle() {
+			Runnable stop;
+			synchronized (this) {
+				if (hasAnyWatches()) return;
+				stop=detach();
+			}
+			stop.run();
 		}
 
-		synchronized void shutdown() {
+		void shutdown() {
+			Runnable stop;
+			synchronized (this) {
+				shutDown=true;
+				stop=detach();
+			}
+			stop.run();
+		}
+
+		/**
+		 * Detaches the running observer and watcher. The returned task stops them, and
+		 * runs outside this watcher's lock: closing waits for the watcher's thread.
+		 */
+		private Runnable detach() {
 			Consumer<Peer> observer=updateObserver;
 			var watcher=updates;
 			updateObserver=null;
 			updates=null;
-			if (observer!=null) server.removeStateUpdateObserver(observer);
-			if (watcher!=null) watcher.close();
+			return () -> {
+				Cleanup cleanup=new Cleanup();
+				if (observer!=null) cleanup.run(() -> server.removeStateUpdateObserver(observer));
+				if (watcher!=null) cleanup.run(watcher::close);
+				cleanup.finish();
+			};
 		}
 
 		ACell resolveValue(ACell[] path) {

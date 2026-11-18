@@ -22,6 +22,7 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.InsecureRandom;
 import convex.core.cvm.Address;
 import convex.core.data.impl.LongBlob;
+import convex.core.data.impl.RepeatByteBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -59,7 +60,24 @@ public class BlobsTest {
 		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k
 		assertEquals(Blob.CHUNK_LENGTH,1<<Blobs.CHUNK_SHIFT);
 	}
-	
+
+	@Test
+	public void testNotEqualToNullBlob() {
+		ABlob tree=Blob.wrap(new byte[Blob.CHUNK_LENGTH+1]).toCanonical();
+		assertTrue(tree instanceof BlobTree);
+		ABlob[] blobs= {
+			Blob.fromHex("01"),
+			Blob.wrap(new byte[Blob.CHUNK_LENGTH+1]), // a non-canonical Blob
+			tree,
+			LongBlob.create(17),
+			new RepeatByteBlob(3,(byte)1) {},
+			Samples.BAD_SIGNATURE
+		};
+		for (ABlob b: blobs) {
+			assertFalse(b.equals((ABlob)null),()->b.getClass().getName());
+		}
+	}
+
 	@Test
 	public void testCompare() {
 		assertTrue(Blob.fromHex("01").compareTo(Blob.fromHex("FF")) < 0);

@@ -23,6 +23,7 @@ import convex.core.data.Keyword;
 import convex.core.cvm.Keywords;
 import convex.core.init.Init;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
@@ -229,11 +230,12 @@ public class PeerStart extends APeerCommand {
 			} catch (LaunchException e) {
 				throw new CLIError("Error launching peer: "+e.getMessage(),e);
 			} finally {
-				if (trayInstalled) TrayManager.remove();
-				if (restServer!=null) restServer.close();
-				if (server!=null) {
-					server.close();
-				}
+				// A failing step still leaves the peer to close before its store
+				Cleanup cleanup=new Cleanup();
+				if (trayInstalled) cleanup.run(TrayManager::remove);
+				if (restServer!=null) cleanup.run(restServer::close);
+				if (server!=null) cleanup.run(server::close);
+				cleanup.finish();
 			}
 		}
 	}

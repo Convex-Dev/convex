@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +28,8 @@ import io.netty.channel.embedded.EmbeddedChannel;
 /**
  * Replies to inbound connections pass through one shared queue bounded by the
  * bytes it holds. No send waits. A channel that stops draining pins only its own
- * small backlog allowance; trusted peers are served first and never wait behind
- * client results.
+ * small backlog allowance; peer links, verified by a consensus peer or trusted by a
+ * lattice node, are served first and never wait behind client results.
  */
 public class ServerOutboundQueueTest {
 
@@ -186,7 +189,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testTrustedPeerHasItsOwnLargerAllowance() {
+	public void testVerifiedPeerHasItsOwnLargerAllowance() {
 		Message m = message(600);
 		int size = size(m);
 		// A client may have 1.5 replies pending; a verified peer 3.5
@@ -195,7 +198,7 @@ public class ServerOutboundQueueTest {
 		EmbeddedChannel slow = new EmbeddedChannel(stuck);
 		try {
 			NettyServerConnection conn = connection(slow, queue);
-			conn.setTrustedKey(AKeyPair.generate().getAccountKey());
+			conn.setVerifiedKey(AKeyPair.generate().getAccountKey());
 			for (int i = 0; i < 4; i++) {
 				assertTrue(conn.trySendMessage(m), "reply " + i + " is within the peer allowance");
 				assertEquals(1, queue.drainBatch());
@@ -214,7 +217,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testTrustedPeerServedFirstAndNeverWaits() throws Exception {
+	public void testTrustedRouteServedFirstAndNeverWaits() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size + size / 2, size * 10, false);
@@ -223,14 +226,15 @@ public class ServerOutboundQueueTest {
 		try {
 			NettyServerConnection clientConn = connection(client, queue);
 			NettyServerConnection peerConn = connection(peer, queue);
+			// As a lattice node trusts a connection it admits as a route
 			peerConn.setTrustedKey(AKeyPair.createSeeded(7).getAccountKey());
 
 			assertTrue(clientConn.trySendMessage(m));
 			assertFalse(clientConn.trySendMessage(m), "shared bound is full");
-			assertTrue(peerConn.trySendMessage(m), "a trusted peer is exempt from the shared bound");
+			assertTrue(peerConn.trySendMessage(m), "a trusted route is exempt from the shared bound");
 			assertTrue(peerConn.sendMessage(m), "and never waits for it");
 
-			// The writer hands the trusted peer's replies over before the client's
+			// The writer hands the trusted route's replies over before the client's
 			assertEquals(1, queue.drainBatch(1));
 			assertTrue(peer.outboundMessages().size() > 0);
 			assertEquals(0, client.outboundMessages().size());
@@ -240,6 +244,44 @@ public class ServerOutboundQueueTest {
 			queue.close();
 			client.finishAndReleaseAll();
 			peer.finishAndReleaseAll();
+		}
+	}
+
+	/** Closing stops the writer and returns once it has ended, though it was handing a reply to Netty. */
+	@Test
+	public void testCloseWaitsForTheWriter() throws Exception {
+		Message m = message(100);
+		Thread closer = Thread.currentThread();
+		CountDownLatch writing = new CountDownLatch(1);
+		AtomicBoolean closing = new AtomicBoolean();
+		AtomicBoolean closeReturned = new AtomicBoolean();
+		AtomicBoolean written = new AtomicBoolean();
+		ServerOutboundQueue queue = new ServerOutboundQueue(1 << 20, 1 << 20, true);
+		EmbeddedChannel ch = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+			@Override
+			public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+				writing.countDown();
+				// Held until the close waits, so a close that does not wait finds the write unfinished
+				while (!(closing.get() && closer.getState() == Thread.State.TIMED_WAITING) && !closeReturned.get()) {
+					Thread.onSpinWait();
+				}
+				written.set(true);
+				promise.trySuccess();
+			}
+		});
+		try {
+			NettyServerConnection conn = connection(ch, queue);
+			assertTrue(conn.trySendMessage(m));
+			assertTrue(writing.await(5, TimeUnit.SECONDS));
+			closing.set(true);
+			queue.close();
+			boolean waited = written.get();
+			closeReturned.set(true);
+			assertTrue(waited, "the writer finished before close returned");
+		} finally {
+			closeReturned.set(true);
+			queue.close();
+			ch.finishAndReleaseAll();
 		}
 	}
 

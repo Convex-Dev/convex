@@ -1,5 +1,6 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -8,10 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -22,7 +26,8 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.node.NodeConfig;
 
@@ -35,20 +40,27 @@ public class P2PUserTest {
 	private static final AKeyPair KP = AKeyPair.generate();
 	private static final AccountKey KEY = KP.getAccountKey();
 
-	private EtchStore store;
+	private MemoryStore store;
 	private P2PNode node;
 
 	@BeforeEach
-	public void setUp() throws IOException {
-		store = EtchStore.createTemp("p2p-user-test");
+	public void setUp() {
+		// No test reopens the store, so it need not be on disk
+		store = new MemoryStore();
 		// Negative port = local-only; these tests exercise lattice behaviour, not networking
 		node = P2PNode.create(store, NodeConfig.port(-1), KP);
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		if (node != null) node.close();
-		if (store != null) store.close();
+	public void tearDown() {
+		List<Executable> closes=new ArrayList<>();
+		if (node != null) {
+			closes.add(node::close);
+			// The node leaves open the host it opened
+			closes.add(node.getNodeServer().getHost()::close);
+		}
+		if (store != null) closes.add(store::close);
+		assertAll("Close the node, its host and its store",closes);
 	}
 
 	/** Reads the raw signed slot straight from the root, bypassing the user view. */
@@ -129,9 +141,12 @@ public class P2PUserTest {
 
 	@Test
 	public void testOwnUserShorthandRequiresKeyPair() throws IOException {
-		try (EtchStore keylessStore = EtchStore.createTemp("p2p-user-keyless2");
-				P2PNode keyless = P2PNode.create(keylessStore, NodeConfig.port(-1), null)) {
-			assertThrows(IllegalStateException.class, keyless::p2p);
+		try (MemoryStore keylessStore = new MemoryStore()) {
+			P2PNode keyless = P2PNode.create(keylessStore, NodeConfig.port(-1), null);
+			// Closed in reverse: the node, then the host it opened
+			try (var keylessHost = keyless.getNodeServer().getHost(); keyless) {
+				assertThrows(IllegalStateException.class, keyless::p2p);
+			}
 		}
 	}
 
@@ -223,12 +238,11 @@ public class P2PUserTest {
 	}
 
 	/**
-	 * A stale forked edit loses to a newer parent value. This is the :id region's LWW
-	 * wiring showing through P2PUser.fork() — the fork/sync mechanism itself is core's
-	 * ({@code SignedCursorTest.testForkSyncAboveSigningBoundary}).
+	 * A forked edit cannot sync over an identity that changed while the fork was open:
+	 * the sync fails and changes nothing, and the fork keeps its edit.
 	 */
 	@Test
-	public void testForkSyncMergesByTimestamp() {
+	public void testForkSyncRefusesAnIdentityThatChangedToo() {
 		P2PUser me = node.p2p(KEY);
 		me.cursor().set(P2PLattice.createIdentity(Strings.create("base"), null, null, 1000L));
 		me.sync();
@@ -241,11 +255,13 @@ public class P2PUserTest {
 		me2.cursor().set(P2PLattice.createIdentity(Strings.create("newer"), null, null, 3000L));
 		me2.sync();
 
-		draft.sync();
+		assertThrows(MergeConflictException.class, draft::sync);
 
 		assertEquals(Strings.create("newer"),
 			node.p2p(KEY).getIdentity().get(P2PLattice.ID_NAME),
-			"Older forked edit must not overwrite a newer parent value");
+			"A refused sync changes nothing");
+		assertEquals(Strings.create("stale"), draft.getIdentity().get(P2PLattice.ID_NAME),
+			"The fork keeps its edit");
 	}
 
 	// ===== Scoping =====

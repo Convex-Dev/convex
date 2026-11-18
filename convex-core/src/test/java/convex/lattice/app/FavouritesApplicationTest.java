@@ -176,7 +176,7 @@ class FavouritesApplicationTest {
 		assertNull(alice.sync(),"Sync returns the absent bound value without materialising editing defaults");
 		assertEquals(Maps.empty(),alice.cursor().get());
 		assertNull(app.component().get(ALICE.getAccountKey()),"Reading the default view creates no envelope");
-		alice.cursor().path(Keyword.intern("note")).set(CVMLong.ONE);
+		alice.cursor().assoc(Keyword.intern("note"),CVMLong.ONE);
 		var record=app.component().get(ALICE.getAccountKey());
 		assertEquals(CVMLong.create(123),record.getValue().get(TIMESTAMP));
 		assertTrue(record.checkSignature());
@@ -460,6 +460,8 @@ class FavouritesApplicationTest {
 		assertEquals(Sets.of(10,20),alice.items());
 		assertTrue(host.cursor().get().isEmpty(),"sharing the workspace does not publish edits");
 		second.sync();
+		assertTrue(host.cursor().get().isEmpty(),"only the application that made the region publishes it");
+		first.sync();
 		var published=host.cursor().get();
 		assertEquals(first.component().cursor().get(),published.get(FAVOURITES));
 		assertEquals(CVMLong.create(200),first.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));

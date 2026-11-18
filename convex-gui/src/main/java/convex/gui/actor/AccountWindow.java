@@ -22,12 +22,6 @@ public class AccountWindow extends AbstractGUI {
 		this.account = account;
 		setLayout(new MigLayout());
 		AccountStatus as = manager.getValue().getAccount(account);
-
-
-		manager.addPropertyChangeListener(e -> {
-
-		});
-
 		add(tabbedPane, "dock center");
 
 		tabbedPane.add("Overview", new AccountInfoPanel(manager, account));

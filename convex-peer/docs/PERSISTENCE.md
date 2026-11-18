@@ -59,7 +59,11 @@ accepts private application drafts and never exchanges a forked host with its
 origin. Checkpointing a private host with a separate store therefore saves a
 private draft; explicit fork sync or delivery accepts it into another host.
 `persist()` writes a draft's cells to its host's store without publishing it; the
-draft is still not retained until it is synced and checkpointed.
+draft is still not retained until it is synced and checkpointed. Persisting is also
+what releases a draft's memory, and a component given a persistence function does it
+at each `sync()`. A host save leaves a draft on the cells it already held, as
+[cursor persistence](../../convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence)
+explains.
 
 A service that accepts delayed durability can have the host save on a schedule.
 Nothing runs on a timer unless the service starts it, and a host has at most one
@@ -87,25 +91,25 @@ reasonable defaults. A request requiring durable completion calls
 completion guarantee.
 
 Host construction expresses opening intent: `create` rejects a retained root,
-`open` adopts one, and `replace` explicitly writes a replacement. Optional cursor
-coordination is supplied at host construction with `Cursors::transactionalRoot`.
+`open` adopts one, and `replace` explicitly writes a replacement.
 `RelayHost.open(lattice, store, context)` adds one live relay application using
 these ordinary host rules. Storage flags are not `NodeConfig` settings.
 
 ## Ordering
 
 All publication entry points run inside the host's ordered sync, which captures
-the current root, publishes it and installs the store-backed result by identity
-compare-and-set. Launch seeds replication through this path. The same host lock
+the current root, publishes it and switches the root to the store-backed result
+while the root still holds that snapshot. Launch seeds replication through this path. The same host lock
 serialises checkpoints and flushes with root publication; an older snapshot
 cannot arrive late and replace a newer retained root. Network close does not
 publish another snapshot.
 
-If a local write intervenes during publication, the store-backed result is not
-installed and the racing write stays pending for the next sync. The sync result
-is the exact completed publication, while the live cursor may contain additional
-pending changes. A subsequent quiescent sync installs the complete store-backed
-tree; no special reference-rewriting merge is used.
+If a local write intervenes during publication, the root no longer holds the
+snapshot: the store-backed result is not installed and the racing write stays
+pending for the next sync. The sync result is the exact completed publication, while the live
+cursor may contain additional pending changes. The root then persists as it
+stands, racing write included, so what was saved can still leave memory. Its
+cells are written, but the store's root pointer stays at the published snapshot.
 
 Propagators merge nothing. Each group serialises only the announcement of the
 host's published root into its own serving store. A value replicated back from a
@@ -118,11 +122,11 @@ Consecutive node notifications use a latest-update queue and may
 coalesce because lattice snapshots are monotonic. Coalescing affects transport
 work, not the ordering or durability of the node root.
 
-These are the implementation's directional `ALattice` semantics. CAD035/036 in
-the current design checkout still require universal commutativity (and CAD035
-describes value-equality CAS); those specification discrepancies need resolution
-separately from this publication ordering. This pipeline uses identity CAS and
-does not change generic lattice conflict resolution.
+The switch is the host persisting its own root, not a write: cursor writes compare
+by value, as CAD035 specifies, and only the holder of a value replaces its cells
+with equal ones
+([Values and the cells that hold them](../../convex-core/docs/LATTICE_CURSOR_DESIGN.md#values-and-the-cells-that-hold-them)).
+The pipeline does not change generic lattice conflict resolution.
 
 The node and a propagator may deliberately share the same thread-safe `AStore`.
 Only the node calls `setRootData` while attached; propagators merely announce
@@ -170,8 +174,14 @@ Propagation failures are isolated:
   timeout; and
 - `NodeServer.close()` still reaches `STOPPED` unless its own resource fails.
 
-Fatal JVM conditions such as out-of-memory remain process failures. Recoverable
-stack overflow at untrusted decode or policy boundaries is contained and logged.
+A failure while handling one connection, one message or one group's publication,
+including running out of memory or stack, fails that work alone and is logged.
+Running out of memory merging a received value says nothing about its sender, so the
+value fails with a `:LOAD` result that does not count towards closing the sender's
+connection. Only a failure of the JVM itself (`InternalError`, `UnknownError`) is
+not contained there. It stops the group's inbound processing or publication,
+whichever it struck, and is recorded as that group's failure; a group whose inbound
+processing has stopped refuses inbound messages.
 
 ## Lifecycle
 

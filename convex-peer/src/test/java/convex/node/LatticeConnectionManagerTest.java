@@ -13,7 +13,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +37,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
@@ -734,12 +737,17 @@ public class LatticeConnectionManagerTest {
 		manager.setPeerTargets(0,0); // the next pass would retire this route
 
 		CompletableFuture<Void> closing=CompletableFuture.runAsync(() -> manager.close(60_000));
-		peer.flushRequested.get(5,TimeUnit.SECONDS);
-		manager.maintainConnections();
-		assertTrue(peer.isConnected(),"no route is retired while close waits for its messages");
-		peer.written.complete(null);
-		closing.get(5,TimeUnit.SECONDS);
-		assertFalse(peer.isConnected());
+		try {
+			peer.flushRequested.get(5,TimeUnit.SECONDS);
+			manager.maintainConnections();
+			assertTrue(peer.isConnected(),"no route is retired while close waits for its messages");
+			peer.written.complete(null);
+			closing.get(5,TimeUnit.SECONDS);
+			assertFalse(peer.isConnected());
+		} finally {
+			// Lets a close still waiting for the write end now, not at its 60 second timeout
+			peer.written.complete(null);
+		}
 	}
 
 	/** A route that never finishes writing is closed at the timeout. */
@@ -828,6 +836,44 @@ public class LatticeConnectionManagerTest {
 		assertTrue(manager.getDesiredPeers().isEmpty());
 	}
 
+	/** A node whose challenge reply proves it misbehaved, as a forged signature does, is refused with that evidence. */
+	@Test public void testEndpointWithForgedChallengeReplyIsRefused() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey claimed=AKeyPair.createSeeded(201).getAccountKey();
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		for (int attempt=1;attempt<=LatticeConnectionManager.MAX_ENDPOINT_ATTEMPTS;attempt++) {
+			manager.maintainConnections();
+			ForgingPeer forging=new ForgingPeer(claimed);
+			manager.endpointDials.remove(ENDPOINT).complete(forging);
+			assertFalse(forging.isConnected(),"the client that sent a forged reply is closed");
+			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		}
+		Throwable failure=failure(connecting);
+		assertInstanceOf(PeerRefusedException.class,failure);
+		assertTrue(causedBy(failure,BadSignatureException.class),"the forged reply is the cause");
+		assertNull(manager.getConnection(claimed));
+	}
+
+	/** A peer offered for admission whose challenge reply is forged is refused with that evidence. */
+	@Test public void testAdmissionWithForgedChallengeReplyIsRefused() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey key=AKeyPair.createSeeded(201).getAccountKey();
+		ForgingPeer forging=new ForgingPeer(key);
+		Throwable failure=failure(manager.addPeer(key,forging));
+		assertInstanceOf(PeerRefusedException.class,failure);
+		assertTrue(causedBy(failure,BadSignatureException.class),"the forged reply is the cause");
+		assertFalse(forging.isConnected());
+		assertNull(manager.getConnection(key));
+	}
+
+	/** Whether the failure or any of its causes is of the given type. */
+	private static boolean causedBy(Throwable failure,Class<? extends Throwable> type) {
+		for (Throwable t=failure;t!=null;t=t.getCause()) {
+			if (type.isInstance(t)) return true;
+		}
+		return false;
+	}
+
 	/** A node that proves its key but drops before admission fails the caller and leaves nothing to dial. */
 	@Test public void testEndpointDroppedBeforeAdmissionLeavesNoIntent() {
 		manager.setKeyPair(AKeyPair.createSeeded(200));
@@ -889,6 +935,50 @@ public class LatticeConnectionManagerTest {
 		inFlight.complete(late);
 		assertFalse(late.isConnected());
 		assertEquals(0,manager.getConnectionCount());
+	}
+
+	/** A client still answering its challenge closes with the manager, not when the challenge times out. */
+	@Test public void testCloseClosesAClientBeingIdentified() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		manager.maintainConnections();
+		UnverifiedPeer challenged=new UnverifiedPeer(AKeyPair.createSeeded(201).getAccountKey());
+		manager.endpointDials.remove(ENDPOINT).complete(challenged);
+		assertTrue(challenged.isConnected(),"waiting for its challenge to be answered");
+		manager.close();
+		assertTrue(connecting.isCancelled());
+		assertFalse(challenged.isConnected());
+	}
+
+	/** Closing interrupts a probe running on a worker, and returns once the worker has ended. */
+	@Test public void testCloseWaitsForAWorker() throws Exception {
+		AccountKey key=candidate(1);
+		StubInbound inbound=new StubInbound();
+		inbound.setTrustedKey(key);
+		Thread closer=Thread.currentThread();
+		CountDownLatch started=new CountDownLatch(1);
+		AtomicBoolean closeReturned=new AtomicBoolean();
+		AtomicBoolean ended=new AtomicBoolean();
+		manager.setInboundProbe(connection -> {
+			started.countDown();
+			try {
+				new CountDownLatch(1).await();
+			} catch (InterruptedException e) {
+				// Ends only once the close waits for it, so a close that does not wait finds it running
+				while (closer.getState()!=Thread.State.TIMED_WAITING && !closeReturned.get()) Thread.onSpinWait();
+			}
+			ended.set(true);
+			return new CompletableFuture<>();
+		},AConnection::close);
+		manager.workerProbes=true;
+		manager.upgradeInboundConnection(inbound);
+		now.addAndGet(KEEP_ALIVE);
+		manager.maintainConnections();
+		assertTrue(started.await(5,TimeUnit.SECONDS));
+		manager.close();
+		boolean waited=ended.get();
+		closeReturned.set(true);
+		assertTrue(waited,"the worker ended before close returned");
 	}
 
 	private static PeerTarget target(List<AccountKey> keys,String... endpoints) {
@@ -1055,6 +1145,8 @@ public class LatticeConnectionManagerTest {
 		final Map<Object,CompletableFuture<Void>> probes=new HashMap<>();
 		int openCount;
 		boolean respond=true;
+		/** Probes run as the manager runs them, on its workers. */
+		boolean workerProbes;
 		TestManager(AtomicLong now) { super(new MemoryStore(),now::get); }
 		@Override CompletableFuture<Convex> openPeer(DesiredPeer peer) {
 			openCount++;
@@ -1068,6 +1160,7 @@ public class LatticeConnectionManagerTest {
 			return future;
 		}
 		@Override CompletableFuture<?> probePeer(Object route) {
+			if (workerProbes) return super.probePeer(route);
 			CompletableFuture<Void> future=new CompletableFuture<>();
 			probes.put(route,future);
 			if (respond) future.complete(null);
@@ -1135,6 +1228,15 @@ public class LatticeConnectionManagerTest {
 			AccountKey proved=(expected==null || expected.equals(proves)) ? proves : null;
 			if (proved!=null) setVerifiedPeer(proved);
 			return CompletableFuture.completedFuture(proved);
+		}
+	}
+
+	/** A newly opened client whose challenge reply has a forged signature, as its verification reports. */
+	private static class ForgingPeer extends IdentifyingPeer {
+		ForgingPeer(AccountKey claims) { super(claims); }
+		@Override public CompletableFuture<AccountKey> verifyPeer(AccountKey expected,ACell context) {
+			return CompletableFuture.failedFuture(new CompletionException(
+				new BadSignatureException("Challenge response signature does not verify",null)));
 		}
 	}
 

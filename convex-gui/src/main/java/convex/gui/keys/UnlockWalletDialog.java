@@ -96,9 +96,13 @@ public class UnlockWalletDialog extends JDialog {
 		passwordField.requestFocus();
 	}
 
+	/**
+	 * Closes this dialog and releases its window; the pass phrase entered, if any,
+	 * stays available.
+	 */
 	public void close() {
 		passwordField = null;
-		setVisible(false);
+		dispose();
 	}
 
 	/**

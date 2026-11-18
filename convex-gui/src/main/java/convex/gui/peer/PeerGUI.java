@@ -2,6 +2,7 @@ package convex.gui.peer;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
+import convex.core.util.Cleanup;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.account.AccountsPanel;
 import convex.gui.keys.KeyGenPanel;
@@ -97,22 +99,40 @@ public class PeerGUI extends AbstractGUI {
 		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.SOURCE,sa);
 		Server server=API.launchPeer(config);
-		ConvexLocal convex=ConvexLocal.connect(server);
-		peerList.addElement(convex);
-		PeerGUI manager =  new PeerGUI(peerList,null,List.of());
-		manager.run();
-		return manager;
+		try {
+			ConvexLocal convex=ConvexLocal.connect(server);
+			peerList.addElement(convex);
+			PeerGUI manager =  new PeerGUI(peerList,null,List.of());
+			manager.run();
+			return manager;
+		} catch (Throwable e) {
+			abandon(e,peerList,List.of(server));
+			throw e;
+		}
 	}
 
+	/**
+	 * Launches a Peer Manager for a server, which it takes over: the server closes with
+	 * the Peer Manager, or at once if the launch fails.
+	 * @param server Server to launch and manage
+	 * @return The running Peer Manager
+	 * @throws InterruptedException In case of interrupt
+	 * @throws PeerException In case of peer launch error
+	 */
 	public static PeerGUI launchPeerGUI(Server server) throws InterruptedException, PeerException {
 		DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
 
-		server.launch();
-		ConvexLocal convex=ConvexLocal.connect(server);
-		peerList.addElement(convex);
-		PeerGUI manager =  new PeerGUI(peerList,null,List.of());
-		manager.run();
-		return manager;
+		try {
+			server.launch();
+			ConvexLocal convex=ConvexLocal.connect(server);
+			peerList.addElement(convex);
+			PeerGUI manager =  new PeerGUI(peerList,null,List.of());
+			manager.run();
+			return manager;
+		} catch (Throwable e) {
+			abandon(e,peerList,List.of(server));
+			throw e;
+		}
 	}
 
 	public static PeerGUI create(int peerCount, AKeyPair genesisKey) throws PeerException {
@@ -129,8 +149,50 @@ public class PeerGUI extends AbstractGUI {
 	 */
 	public static PeerGUI create(int peerCount, AKeyPair genesisKey, Integer restPort) throws PeerException {
 		List<AWalletEntry> tempKeys=new ArrayList<>();
-		DefaultListModel<ConvexLocal> peerList=launchAllPeers(peerCount,genesisKey,tempKeys);
-		return new PeerGUI(peerList,restPort,tempKeys);
+		try {
+			DefaultListModel<ConvexLocal> peerList=launchAllPeers(peerCount,genesisKey,tempKeys);
+			try {
+				return new PeerGUI(peerList,restPort,tempKeys);
+			} catch (Throwable e) {
+				abandon(e,peerList,List.of());
+				throw e;
+			}
+		} catch (Throwable e) {
+			// Added for a network that never came up
+			removeKeys(tempKeys);
+			throw e;
+		}
+	}
+
+	/**
+	 * Closes what a launch that failed had opened: each listed peer's client and server,
+	 * then the other servers given. A failure closing one is added to the launch failure
+	 * and leaves the rest to close.
+	 */
+	private static void abandon(Throwable failure, DefaultListModel<ConvexLocal> peerList, List<Server> servers) {
+		List<AutoCloseable> opened=new ArrayList<>();
+		for (int i=0; i<peerList.getSize(); i++) {
+			ConvexLocal peer=peerList.getElementAt(i);
+			opened.add(peer);
+			opened.add(peer.getLocalServer());
+		}
+		opened.addAll(servers);
+		for (AutoCloseable resource: opened) {
+			try {
+				resource.close();
+			} catch (Throwable t) {
+				if (t instanceof InterruptedException) Thread.currentThread().interrupt();
+				failure.addSuppressed(t);
+			}
+		}
+	}
+
+	/** Removes keys from the key ring. */
+	private static void removeKeys(List<AWalletEntry> keys) {
+		KeyRing keyRing=KeyRing.get();
+		for (AWalletEntry we: keys) {
+			keyRing.remove(we);
+		}
 	}
 
 	/**
@@ -159,26 +221,31 @@ public class PeerGUI extends AbstractGUI {
 		try {
 			DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
 			List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
-			for (Server server: serverList) {
-				Address controller=server.getPeerController();
-				AKeyPair kp=server.getControllerKey();
-				ConvexLocal convex=Convex.connect(server, controller, kp); 
-				
-				if (kp==null) {
-					// Use the controller key from the key ring if present and unlocked.
-					// No prompt here: launching may not be on the EDT.
-					AWalletEntry we=KeyRing.get().findFor(convex);
-					if ((we!=null)&&!we.isLocked()) kp=we.getKeyPair();
-					convex.setKeyPair(kp);
+			try {
+				for (Server server: serverList) {
+					Address controller=server.getPeerController();
+					AKeyPair kp=server.getControllerKey();
+					ConvexLocal convex=Convex.connect(server, controller, kp);
+					peerList.addElement(convex);
+
+					if (kp==null) {
+						// Use the controller key from the key ring if present and unlocked.
+						// No prompt here: launching may not be on the EDT.
+						AWalletEntry we=KeyRing.get().findFor(convex);
+						if ((we!=null)&&!we.isLocked()) kp=we.getKeyPair();
+						convex.setKeyPair(kp);
+					}
+
+					// initial wallet list
+			        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair (temp)");
+					addTempKey(tempKeys,we);
 				}
-				
-				peerList.addElement(convex);
-				
-				// initial wallet list
-		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair (temp)");
-				addTempKey(tempKeys,we);
+				return peerList;
+			} catch (Throwable e) {
+				// Running but in no Peer Manager yet, so nothing else would close them
+				abandon(e,peerList,serverList);
+				throw e;
 			}
-			return peerList;
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new PeerException("Peer launch interrupted",e);
@@ -212,53 +279,61 @@ public class PeerGUI extends AbstractGUI {
 		own(this::closeNetwork);
 		own(this::removeTempKeys);
 
-		// Create key pairs for peers, use genesis key as first keypair
-		Server firstServer=peerList.get(0).getLocalServer();
-		genesisState=firstServer.getPeer().getGenesisState();
-
-		latestState = StateModel.create(genesisState);
-
-
-		
-		serverPanel= new ServerListPanel(this);
-		keyRingPanel = new KeyRingPanel();
-
-		
-		Server first=peerList.firstElement().getLocalServer();
-		ConvexLocal convex=peerList.firstElement();
-		
-		// Set up observability
-		
 		try {
-			RESTServer rs=RESTServer.create(first);
-			rs.start(restPort);
-			restServer=rs;
-		} catch (Exception t) {
-			log.warn("Unable to start REST Server: ",t);
+			Server first=peerList.firstElement().getLocalServer();
+			ConvexLocal convex=peerList.firstElement();
+			genesisState=first.getPeer().getGenesisState();
+			latestState = StateModel.create(genesisState);
+
+			setLayout(new BorderLayout());
+			tabs = new JTabbedPane();
+			tabs.setPreferredSize(new Dimension(1000,800));
+			this.add(tabs, BorderLayout.CENTER);
+
+			// Each panel joins the tabs as it is made, where closing this GUI finds it
+			serverPanel= new ServerListPanel(this);
+			tabs.add("Peer Servers", serverPanel);
+			accountsPanel = new AccountsPanel(convex,latestState);
+			tabs.add("Accounts", accountsPanel);
+			keyRingPanel = new KeyRingPanel();
+			tabs.add("Keyring", keyRingPanel);
+			keyGenPanel = new KeyGenPanel(this);
+			tabs.add("KeyGen", keyGenPanel);
+			messagePanel = new MessageFormatPanel();
+			tabs.add("Message", messagePanel);
+			// tabs.add("Actors", new ActorsPanel(this));
+			tabs.add("Torus", new TorusPanel(this));
+			tabs.add("About", new AboutPanel(convex));
+			tabs.setSelectedComponent(serverPanel);
+
+			// Set up observability
+			RESTServer rs=null;
+			try {
+				rs=RESTServer.create(first);
+				rs.start(restPort);
+				restServer=rs;
+			} catch (Exception t) {
+				// The network runs without one, but a server that failed to start still holds its clients
+				if (rs!=null) {
+					try {
+						rs.close();
+					} catch (Exception closeFailure) {
+						t.addSuppressed(closeFailure);
+					}
+				}
+				log.warn("Unable to start REST Server: ",t);
+			}
+
+			own(new PeerStateUpdates(first, this::showConsensus));
+		} catch (Throwable e) {
+			// The caller never gets this GUI to close, so release what it has set up, the network included
+			if (EventQueue.isDispatchThread()) {
+				closeGUI();
+			} else {
+				close();
+			}
+			throw e;
 		}
-		
-		keyGenPanel = new KeyGenPanel(this);
-		messagePanel = new MessageFormatPanel();
-		accountsPanel = new AccountsPanel(convex,latestState);
-
-		setLayout(new BorderLayout());
-
-		tabs = new JTabbedPane();
-		tabs.setPreferredSize(new Dimension(1000,800));
-		this.add(tabs, BorderLayout.CENTER);
-
-		tabs.add("Peer Servers", serverPanel);
-		tabs.add("Accounts", accountsPanel);
-		tabs.add("Keyring", keyRingPanel);
-		tabs.add("KeyGen", keyGenPanel);
-		tabs.add("Message", messagePanel);
-		// tabs.add("Actors", new ActorsPanel(this));
-		tabs.add("Torus", new TorusPanel(this));
-		tabs.add("About", new AboutPanel(convex));
-		
-		tabs.setSelectedComponent(serverPanel);
-
-		own(new PeerStateUpdates(first, this::showConsensus));
 	}
 
 	/** Shows the latest consensus state of the primary peer. Runs on the EDT. */
@@ -367,6 +442,7 @@ public class PeerGUI extends AbstractGUI {
 	/**
 	 * Launches an extra peer, staked from the source peer's controller account.
 	 * The launch runs off the EDT; the peer joins the list when it is running.
+	 * The peer closes with this Peer Manager, and at once if it fails to join.
 	 * @param source Connection to an existing peer
 	 * @return Future for the new peer's connection
 	 */
@@ -382,24 +458,36 @@ public class PeerGUI extends AbstractGUI {
 			addTempKey(tempKeys,HotWalletEntry.create(kp,"Generated peer key"));
 
 			// Set up Peer in base server
-			ConvexLocal convex=Convex.connect(base, a, kp);
-			AccountKey key=kp.getAccountKey();
-			Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
-			if (rcr.isError()) {
-				throw new IllegalStateException("Unable to create peer: "+rcr);
+			try (ConvexLocal convex=Convex.connect(base, a, kp)) {
+				AccountKey key=kp.getAccountKey();
+				Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
+				if (rcr.isError()) {
+					throw new IllegalStateException("Unable to create peer: "+rcr);
+				}
+
+				HashMap<Keyword, Object> config=new HashMap<>();
+				config.put(Keywords.KEYPAIR, kp);
+				config.put(Keywords.CONTROLLER, a);
+				config.put(Keywords.SOURCE, convex);
+				Server server=API.launchPeer(config);
+				// Owned from launch: listed only later, so the list cannot be what closes it
+				own(server);
+				try {
+					server.getCVMExecutor().setPeer(server.syncPeer(kp,convex));
+					server.getConnectionManager().connectToPeer(base.getHostAddress());
+					server.setHostname("localhost:"+server.getPort());
+					base.getConnectionManager().connectToPeer(server.getHostAddress());
+					return Convex.connect(server, a, kp);
+				} catch (Throwable e) {
+					disown(server);
+					try {
+						server.close();
+					} catch (Throwable closeFailure) {
+						e.addSuppressed(closeFailure);
+					}
+					throw e;
+				}
 			}
-
-			HashMap<Keyword, Object> config=new HashMap<>();
-			config.put(Keywords.KEYPAIR, kp);
-			config.put(Keywords.CONTROLLER, a);
-			config.put(Keywords.SOURCE, convex);
-			Server server=API.launchPeer(config);
-			server.getCVMExecutor().setPeer(server.syncPeer(kp,convex));
-			server.getConnectionManager().connectToPeer(base.getHostAddress());
-			server.setHostname("localhost:"+server.getPort());
-			base.getConnectionManager().connectToPeer(server.getHostAddress());
-
-			return Convex.connect(server, a, kp);
 		}).thenApplyAsync(convex->{
 			peerList.addElement(convex);
 			return convex;
@@ -411,23 +499,28 @@ public class PeerGUI extends AbstractGUI {
 	 * every peer. Released when the GUI closes.
 	 */
 	private void closeNetwork() {
+		// A failure closing the REST server or one peer still leaves every peer to close
+		Cleanup cleanup=new Cleanup();
 		RESTServer rs=restServer;
 		if (rs!=null) {
 			restServer=null;
-			rs.close();
+			cleanup.run(rs::close);
 		}
 		DefaultListModel<ConvexLocal> peerList = getPeerList();
 		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
 			Convex p = peerList.getElementAt(i);
-			try {
-				p.getLocalServer().close();
-			} catch (Exception e) {
-				log.warn("Error closing peer",e);
-			} finally {
-				p.close();
-			}
+			cleanup.run(() -> {
+				try {
+					p.getLocalServer().close();
+				} catch (Exception e) {
+					log.warn("Error closing peer",e);
+				} finally {
+					p.close();
+				}
+			});
 		}
+		cleanup.finish();
 	}
 
 	/**
@@ -435,10 +528,7 @@ public class PeerGUI extends AbstractGUI {
 	 * that were already present are left alone. Released when the GUI closes.
 	 */
 	private void removeTempKeys() {
-		KeyRing keyRing=KeyRing.get();
-		for (AWalletEntry we: tempKeys) {
-			keyRing.remove(we);
-		}
+		removeKeys(tempKeys);
 	}
 
 	public void addPeer(ConvexLocal cvl) {

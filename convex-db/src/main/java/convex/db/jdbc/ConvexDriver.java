@@ -25,6 +25,7 @@ import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexTableModifyRule;
 import convex.db.calcite.rules.ConvexRules;
+import convex.db.calcite.rules.ConvexEnumerableAggregateRule;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
@@ -59,6 +60,8 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * <p>A file-backed database is saved durably on each commit, when a connection
  * closes, by {@link #closeAll()} and at JVM shutdown. Auto-committed statements
  * on a connection that stays open are saved when it closes.
+ * Read-only connections request no save unless they attempted writes before
+ * switching to read-only mode.
  *
  * <p>The in-memory and file-backed instances this driver creates merge with the
  * per-row last-write-wins policy, {@link RowLWW#merge}, which also reconciles
@@ -92,14 +95,22 @@ public class ConvexDriver extends Driver {
 	/** Open database instances, keyed by canonical identifier. */
 	public static final ConcurrentHashMap<String, ManagedInstance> instances = new ConcurrentHashMap<>();
 
-	/** Save action of the connection being opened; Avatica creates the meta inside {@code super.connect}. */
-	private static final ThreadLocal<Runnable> CONNECTING = new ThreadLocal<>();
+	/** Setup shared while Avatica creates the meta inside {@code super.connect}. */
+	private static final class Opening {
+		final Runnable save;
+		final boolean readOnly;
+		ConvexMeta meta;
+		Opening(Runnable save, boolean readOnly) { this.save = save; this.readOnly = readOnly; }
+	}
+	private static final ThreadLocal<Opening> CONNECTING = new ThreadLocal<>();
 
 	static {
 		new ConvexDriver().register();
 
 		// Register Convex rules with the planner.
 		Hook.PLANNER.add((RelOptPlanner planner) -> {
+			planner.removeRule(EnumerableRules.ENUMERABLE_AGGREGATE_RULE);
+			planner.addRule(ConvexEnumerableAggregateRule.INSTANCE);
 			planner.removeRule(EnumerableRules.ENUMERABLE_TABLE_MODIFICATION_RULE);
 			planner.addRule(ConvexTableModifyRule.INSTANCE);
 			planner.addRule(ConvexLogicalTableModifyRule.INSTANCE);
@@ -115,7 +126,10 @@ public class ConvexDriver extends Driver {
 
 	@Override
 	public Meta createMeta(AvaticaConnection connection) {
-		return ConvexMeta.create(connection, CONNECTING.get());
+		Opening opening = CONNECTING.get();
+		if (opening == null) return ConvexMeta.create(connection);
+		opening.meta = ConvexMeta.create(connection, opening.save, opening.readOnly);
+		return opening.meta;
 	}
 
 	@Override
@@ -150,7 +164,20 @@ public class ConvexDriver extends Driver {
 	 * @return JDBC Connection
 	 */
 	public static Connection connect(ConvexDB cdb, String database) throws SQLException {
-		Connection conn = new ConvexDriver().open(cdb.database(database), null);
+		return connect(cdb.database(database));
+	}
+
+	/**
+	 * Opens a connection directly on a database binding, without registering a name.
+	 * A {@link SQLDatabase#readOnly()} binding cannot be made writable through JDBC.
+	 * Persistence remains the embedder's responsibility.
+	 *
+	 * @param database Live database binding
+	 * @return Connection bound to the supplied database
+	 * @throws SQLException if connection creation fails
+	 */
+	public static Connection connect(SQLDatabase database) throws SQLException {
+		Connection conn = new ConvexDriver().open(database, null);
 		if (conn == null) {
 			throw new SQLException("Failed to create connection");
 		}
@@ -179,7 +206,8 @@ public class ConvexDriver extends Driver {
 
 		// Get connection from Calcite
 		Connection conn;
-		CONNECTING.set(save);
+		Opening opening = new Opening(save, db.isReadOnly());
+		CONNECTING.set(opening);
 		try {
 			conn = super.connect(PREFIX, props);
 		} finally {
@@ -194,8 +222,9 @@ public class ConvexDriver extends Driver {
 			rootSchema.add(name, new ConvexSchema(db, name));
 			calciteConn.setSchema(name);
 		}
+		conn.setReadOnly(db.isReadOnly());
 
-		return conn;
+		return JdbcErrors.wrap(conn, opening.meta::writeAttempted);
 	}
 
 	// ========== URL Parsing ==========

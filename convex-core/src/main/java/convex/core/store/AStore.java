@@ -3,16 +3,20 @@ package convex.core.store;
 import convex.core.data.RefDirect;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
 import convex.core.data.CAD3Encoder;
 import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.exceptions.MissingDataException;
 
 /**
@@ -22,7 +26,7 @@ import convex.core.exceptions.MissingDataException;
  * made" ― Robert C. Martin
  *
  */
-public abstract class AStore implements Closeable {
+public abstract class AStore implements Closeable, Persister {
 	
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
@@ -41,6 +45,8 @@ public abstract class AStore implements Closeable {
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If status is PERSISTED or above, and a cell
+	 *         stored at that status for the first time is inconsistent with a child
 	 */
 	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
@@ -60,18 +66,35 @@ public abstract class AStore implements Closeable {
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 * @throws IOException in case of IO error during persistence
+	 * @throws InvalidStructureException If status is PERSISTED or above, and a cell
+	 *         stored at that status for the first time is inconsistent with a child
 	 */
 	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
+	/**
+	 * Persists a value in this store, including an embedded top-level value.
+	 *
+	 * @param <T> Value type
+	 * @param value Value to persist
+	 * @return Equal value whose cells are retained in this store
+	 * @throws IOException in case of IO error during persistence
+	 */
+	@Override
+	public <T extends ACell> T persist(T value) throws IOException {
+		return storeTopRef(Ref.get(value),Ref.PERSISTED,null).getValue();
+	}
+
 	
 	/**
-	 * Gets the stored Ref for a given hash value, or null if not found in the store.
-	 * 
-	 * If the result is non-null, the Ref will have a status equal to STORED at minimum.
-	 * Calls to Ref.getValue() should therefore never throw MissingDataException.
-	 * 
-	 * @param hash A hash value to look up in the persisted store
-	 * @return The stored Ref, or null if the hash value is not persisted
+	 * Gets the Ref for a given hash value, or null if the store holds no entry for it
+	 * and has no decoded copy of it cached.
+	 *
+	 * A Ref for an entry the store holds has status STORED at minimum. With no such
+	 * entry, a store may return a cell it has decoded but not stored, at status UNKNOWN.
+	 * Calls to Ref.getValue() on the result never throw MissingDataException.
+	 *
+	 * @param hash A hash value to look up in the store
+	 * @return The Ref, or null if the store neither holds nor caches the value
 	 */
 	public abstract <T extends ACell> Ref<T> refForHash(Hash hash);
 
@@ -238,5 +261,56 @@ public abstract class AStore implements Closeable {
 	 */
 	public boolean isPersistent() {
 		return false;
+	}
+
+	/**
+	 * Nesting depth to which a store persists child Refs recursively. Data nested
+	 * deeper is persisted with {@link #persistBeneath(ACell, Predicate, IRefFunction)}.
+	 */
+	protected static final int MAX_PERSIST_DEPTH=256;
+
+	/**
+	 * Persists every Ref beneath a Cell that is not yet done, children before parents,
+	 * without recursion. A Ref that cannot be read is left for the caller's own persist.
+	 *
+	 * @param cell Cell whose descendants to persist
+	 * @param isDone Tests whether a Ref needs no persisting
+	 * @param persist Persists one Ref, as the store's own persist does
+	 */
+	@SuppressWarnings("unchecked")
+	protected static void persistBeneath(ACell cell, Predicate<Ref<ACell>> isDone, IRefFunction persist) {
+		// Each Ref is persisted only once everything beneath it is, so the store's own
+		// persist finds its children done and does not recurse into them. The stack is
+		// last in, first out, so a Ref shared within the tree is done before its next
+		// occurrence is tested, and its subtree is walked once
+		ArrayList<Ref<ACell>> stack=new ArrayList<>();
+		pushRefs(stack,cell);
+		while (!stack.isEmpty()) {
+			Ref<ACell> ref=stack.removeLast();
+			if (ref==null) {
+				// A null marker means everything beneath the preceding Ref is persisted
+				persist.apply(stack.removeLast());
+				continue;
+			}
+			ACell child;
+			try {
+				if (isDone.test(ref)) continue;
+				child=ref.getValue();
+			} catch (MissingDataException e) {
+				continue;
+			}
+			if ((child==null)||(child.getRefCount()==0)) continue;
+			stack.add(ref);
+			stack.add(null);
+			pushRefs(stack,child);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void pushRefs(ArrayList<Ref<ACell>> stack, ACell cell) {
+		// Reverse push order preserves the recursive visitation order
+		for (int i=cell.getRefCount()-1; i>=0; i--) {
+			stack.add((Ref<ACell>)cell.getRef(i));
+		}
 	}
 }

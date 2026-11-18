@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.io.TempDir;
 
 import convex.cli.CLTester;
@@ -41,25 +42,28 @@ class EtchEncryptionCLITest {
 	@TempDir
 	Path temporaryDirectory;
 
+	/**
+	 * In-place GC of an encrypted store keeps its data and writes an encrypted backup.
+	 * One cipher: the GC path does not depend on it, and the commands test below uses AES.
+	 */
 	@Test
 	void encryptedInPlaceGCWithBackup() throws Exception {
-		for (CipherMode cipher:new CipherMode[] {CipherMode.AES_256_CTR,CipherMode.CHACHA20}) {
-			Path source=etchFile("encrypted-gc-"+cipher.configName());
-			Path backup=Path.of(source+".snapshot");
-			backup.toFile().deleteOnExit();
-			Path sourceKey=keyFile(cipher.configName()+".key",SOURCE_KEY);
-			EtchConfig sourceConfig=config(cipher,true,SOURCE_KEY);
-			AString root=Strings.create("Encrypted snapshot root ".repeat(20));
-			createStore(source,sourceConfig,root);
-			CLTester tester=CLTester.run("etch","gc","--etch",source.toString(),
-					"--etch-key-file",sourceKey.toString(),"--backup",backup.toString());
-			tester.assertExitCode(ExitCodes.SUCCESS);
-			try (EtchStore live=EtchStore.create(source.toFile(),sourceConfig);
-					EtchStore snapshot=EtchStore.create(backup.toFile(),sourceConfig)) {
-				assertEquals(root,live.getRootData());
-				assertEquals(root,snapshot.getRootData());
-				assertEquals(cipher,snapshot.getEtch().getConfig().getCipherMode());
-			}
+		CipherMode cipher=CipherMode.CHACHA20;
+		Path source=etchFile("encrypted-gc-"+cipher.configName());
+		Path backup=Path.of(source+".snapshot");
+		backup.toFile().deleteOnExit();
+		Path sourceKey=keyFile(cipher.configName()+".key",SOURCE_KEY);
+		EtchConfig sourceConfig=config(cipher,true,SOURCE_KEY);
+		AString root=Strings.create("Encrypted snapshot root ".repeat(20));
+		createStore(source,sourceConfig,root);
+		CLTester tester=CLTester.run("etch","gc","--etch",source.toString(),
+				"--etch-key-file",sourceKey.toString(),"--backup",backup.toString());
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		try (EtchStore live=EtchStore.create(source.toFile(),sourceConfig);
+				EtchStore snapshot=EtchStore.create(backup.toFile(),sourceConfig)) {
+			assertEquals(root,live.getRootData());
+			assertEquals(root,snapshot.getRootData());
+			assertEquals(cipher,snapshot.getEtch().getConfig().getCipherMode());
 		}
 	}
 
@@ -106,47 +110,53 @@ class EtchEncryptionCLITest {
 		assertPreservedEncryptedStore(source,repaired,sourceConfig,root,SOURCE_KEY);
 	}
 
+	/**
+	 * Migration's destination options reach the new store: an encrypted source, read with
+	 * its own key, migrates to every destination cipher under a separate destination key.
+	 * Migration between different ciphers is covered in convex-core
+	 * (EtchVersionMatrixTest), so one source cipher is enough here.
+	 */
 	@Test
-	void migrationSupportsEveryCipherTransitionAndSeparateKeys() throws Exception {
+	void migrationSetsEveryDestinationCipherWithSeparateKeys() throws Exception {
 		Path sourceKey=keyFile("transition-source.key",SOURCE_KEY);
 		Path destinationKey=keyFile("transition-destination.key",DESTINATION_KEY);
-		for (CipherMode sourceCipher:CipherMode.values()) {
-			Path source=etchFile("cli-from-"+sourceCipher.configName());
-			AString root=Strings.create("CLI transition from "+sourceCipher.configName()
-					+" "+"abcdef0123456789".repeat(10));
-			createStore(source,config(sourceCipher,sourceCipher!=CipherMode.NONE,SOURCE_KEY),root);
+		CipherMode sourceCipher=CipherMode.AES_256_CTR;
+		Path source=etchFile("cli-from-"+sourceCipher.configName());
+		AString root=Strings.create("CLI transition from "+sourceCipher.configName()
+				+" "+"abcdef0123456789".repeat(10));
+		createStore(source,config(sourceCipher,true,SOURCE_KEY),root);
 
-			for (CipherMode destinationCipher:CipherMode.values()) {
-				Path destination=etchFile("cli-from-"+sourceCipher.configName()
-						+"-to-"+destinationCipher.configName());
-				ArrayList<String> args=new ArrayList<>(Arrays.asList("etch","migrate",
-						"--etch",source.toString(),"--etch-key-file",sourceKey.toString(),
-						"--into",destination.toString(),"--set-root","--into-version","3",
-						"--into-cipher",destinationCipher.configName()));
-				if (destinationCipher==CipherMode.NONE) {
-					args.add("--no-into-encrypt-index");
-				} else {
-					args.add("--into-encrypt-index");
-					args.add("--into-key-file");
-					args.add(destinationKey.toString());
-				}
+		for (CipherMode destinationCipher:CipherMode.values()) {
+			Path destination=etchFile("cli-from-"+sourceCipher.configName()
+					+"-to-"+destinationCipher.configName());
+			ArrayList<String> args=new ArrayList<>(Arrays.asList("etch","migrate",
+					"--etch",source.toString(),"--etch-key-file",sourceKey.toString(),
+					"--into",destination.toString(),"--set-root","--into-version","3",
+					"--into-cipher",destinationCipher.configName()));
+			if (destinationCipher==CipherMode.NONE) {
+				args.add("--no-into-encrypt-index");
+			} else {
+				args.add("--into-encrypt-index");
+				args.add("--into-key-file");
+				args.add(destinationKey.toString());
+			}
 
-				CLTester tester=CLTester.run(args.toArray(String[]::new));
-				tester.assertExitCode(ExitCodes.SUCCESS);
-				EtchConfig open=EtchConfig.create().withKeyFunction(
-						hint->DESTINATION_KEY.clone());
-				try (EtchStore migrated=EtchStore.create(destination.toFile(),open)) {
-					assertEquals(root,migrated.getRootData());
-					assertEquals(destinationCipher,
-							migrated.getEtch().getConfig().getCipherMode());
-					assertEquals(destinationCipher!=CipherMode.NONE,
-							migrated.getEtch().getConfig().isIndexEncrypted());
-				}
+			CLTester tester=CLTester.run(args.toArray(String[]::new));
+			tester.assertExitCode(ExitCodes.SUCCESS);
+			EtchConfig open=EtchConfig.create().withKeyFunction(
+					hint->DESTINATION_KEY.clone());
+			try (EtchStore migrated=EtchStore.create(destination.toFile(),open)) {
+				assertEquals(root,migrated.getRootData());
+				assertEquals(destinationCipher,
+						migrated.getEtch().getConfig().getCipherMode());
+				assertEquals(destinationCipher!=CipherMode.NONE,
+						migrated.getEtch().getConfig().isIndexEncrypted());
 			}
 		}
 	}
 
 	@Test
+	@ResourceLock("java.lang.System.in")
 	void hintedKeystoreAndStdinResolutionDoNotLeakSecrets() throws Exception {
 		char[] storePassword="store-secret".toCharArray();
 		char[] keyPassword="entry-secret".toCharArray();

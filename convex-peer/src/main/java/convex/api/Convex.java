@@ -46,7 +46,11 @@ import convex.core.data.Lists;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MisbehaviourException;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.ChallengeSigner;
@@ -69,7 +73,8 @@ import convex.peer.Server;
  * This can be used by both peers and JVM-based clients.
  *
  * Futures returned by a client may complete on the thread that delivers the
- * reply, such as a network event loop or a local peer's own thread. Stages
+ * reply, such as an ingress worker shared by many connections or a local peer's
+ * own thread. Stages
  * attached with non-async methods such as {@code thenApply} then run on that
  * thread, so they must not block: chain further requests with
  * {@code thenCompose}, and attach only work that must wait with an
@@ -147,6 +152,12 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected AccountKey verifiedPeer = null;
 
+	/**
+	 * Key of the peer this client was opened to reach, or null. Set before the client
+	 * sends anything, and read when answering a challenge on the receive thread.
+	 */
+	protected volatile AccountKey dialledPeer = null;
+
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
@@ -169,6 +180,26 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected void setVerifiedPeer(AccountKey key) {
 		verifiedPeer = key;
+	}
+
+	/**
+	 * Records the key of the peer this client was opened to reach. While set, the
+	 * client answers a challenge in the bound form naming this key
+	 * ({@link Message#answerBoundChallenge}) instead of the plain form.
+	 *
+	 * @param key Peer key, or null to answer plainly
+	 */
+	public void setDialledPeer(AccountKey key) {
+		dialledPeer = key;
+	}
+
+	/**
+	 * Gets the key of the peer this client was opened to reach.
+	 *
+	 * @return Peer key, or null if none is recorded
+	 */
+	public AccountKey getDialledPeer() {
+		return dialledPeer;
 	}
 
 	/**
@@ -1169,7 +1200,7 @@ public abstract class Convex implements AutoCloseable {
 	 * <p>Works with both NodeServer (lattice) and peer Server (consensus).
 	 *
 	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
-	 * @return Future that completes with the verified remote AccountKey, or null on failure
+	 * @return As {@link #verifyPeer(AccountKey, ACell)} returns
 	 */
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey) {
 		return verifyPeer(expectedKey, null);
@@ -1181,7 +1212,11 @@ public abstract class Convex implements AutoCloseable {
 	 *
 	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
 	 * @param contextID   Optional context (e.g. network ID for consensus peers), or null
-	 * @return Future that completes with the verified remote AccountKey, or null on failure
+	 * @return Future for the verified remote key, or null if the remote proves none. It
+	 *         fails with a {@link ValidationException} if the reply is bad: a
+	 *         {@link BadFormatException} if it is malformed, a {@link BadSignatureException}
+	 *         if its signature does not verify, and a {@link MisbehaviourException} if it is
+	 *         validly signed for another challenge
 	 */
 	@SuppressWarnings("unchecked")
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
@@ -1208,6 +1243,9 @@ public abstract class Convex implements AutoCloseable {
 
 				setVerifiedPeer(remoteKey);
 				return remoteKey;
+			} catch (ValidationException e) {
+				// Proves the remote misbehaved, which only the caller can act on
+				throw new CompletionException(e);
 			} catch (Exception e) {
 				log.debug("verifyPeer failed: {}", e.getMessage());
 				return null;

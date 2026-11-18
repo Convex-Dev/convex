@@ -42,7 +42,7 @@ public class SignedComponentTest {
 	public void testNestedDraftsReconcileUnsignedAndSignOnlyAtTheEnvelopeBoundary() {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		var signatures=new AtomicInteger();
-		var notebook=new SignedComponent<>(SIGNED,destination,signer(signatures::incrementAndGet));
+		var notebook=new SignedSetComponent<>(SIGNED,destination,signer(signatures::incrementAndGet));
 		var first=notebook.fork();
 		var second=notebook.fork();
 		new SetComponent<>(first.cursor()).add(CVMLong.ONE);
@@ -63,18 +63,20 @@ public class SignedComponentTest {
 		assertEquals(1,signatures.get(),"Unchanged publication must not sign again");
 	}
 
+	/** A whole-record payload keeps one side, so local edits on both sides conflict; incoming ties keep the own value. */
 	@Test
-	public void testSignedLocalEditWinsAnEqualTimestampConflict() {
+	public void testLocalEditsToAWholeRecordOnBothSidesConflict() {
 		var lattice=OwnerKeyLattice.create(LWWLattice.<CVMLong>create(v -> 100)).signingFor(KEY.getAccountKey());
 		var destination=new Root<>(KEY.signData(CVMLong.ZERO));
 		var component=new SignedComponent<>(lattice,destination,KEY::signData);
 		component.cursor().set(CVMLong.ONE);
-		destination.set(KEY.signData(CVMLong.TWO));
-		component.sync();
-		assertEquals(CVMLong.ONE,destination.get().getValue());
-		assertTrue(destination.get().checkSignature());
+		var theirs=KEY.signData(CVMLong.TWO);
+		destination.set(theirs);
+		assertThrows(MergeConflictException.class,component::sync);
+		assertSame(theirs,destination.get());
+		assertEquals(CVMLong.ONE,component.cursor().get());
 		assertEquals(CVMLong.ONE,component.merge(KEY.signData(CVMLong.TWO)),
-			"Incoming ties also preserve the existing own value");
+			"Incoming ties preserve the existing own value");
 	}
 
 	@Test
@@ -125,22 +127,21 @@ public class SignedComponentTest {
 	}
 
 	@Test
-	public void testUnrelatedAncestorCASFailureReusesSignature() {
+	public void testUnrelatedAncestorWriteDuringSigningKeepsBothWrites() {
 		Keyword slot=Keyword.intern("owner");
 		Keyword sibling=Keyword.intern("sibling");
 		var root=new Root<>(Index.<Keyword,ACell>none());
-		var destination=root.<SignedData<ASet<CVMLong>>>path(slot);
+		var destination=new IndexComponent<>(root).<SignedData<ASet<CVMLong>>>path(slot);
 		AtomicInteger signatures=new AtomicInteger();
 		var component=new SignedComponent<>(SIGNED,destination,signer(() -> {
-			signatures.incrementAndGet();
 			// Change the ancestor after the update reads it, forcing a CAS retry.
-			root.updateAndGet(value -> value.assoc(sibling,CVMLong.ONE));
+			if (signatures.incrementAndGet()==1) root.updateAndGet(value -> value.assoc(sibling,CVMLong.ONE));
 		}));
 		component.cursor().set(Sets.of(1));
 		component.sync();
-		assertEquals(1,signatures.get());
 		assertEquals(CVMLong.ONE,root.get().get(sibling));
 		assertEquals(Sets.of(1),destination.get().getValue());
+		assertTrue(destination.get().checkSignature());
 	}
 
 	@Test
@@ -160,7 +161,7 @@ public class SignedComponentTest {
 	public void testChangedDestinationPayloadIsMergedAndResigned() {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		AtomicInteger signatures=new AtomicInteger();
-		var component=new SignedComponent<>(SIGNED,destination,signer(() -> {
+		var component=new SignedSetComponent<>(SIGNED,destination,signer(() -> {
 			if (signatures.incrementAndGet()==1) destination.set(KEY.signData(Sets.of(2)));
 		}));
 		component.cursor().set(Sets.of(1));
@@ -206,5 +207,62 @@ public class SignedComponentTest {
 		component.sync();
 		assertEquals(Sets.of(1,2),destination.get().getValue());
 		assertEquals(2,signatures.get());
+	}
+
+	@Test
+	public void testStoredEnvelopesBothChangedReconcileByThePayloadMergeAndSignTheResult() {
+		var signatures=new AtomicInteger();
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer(signatures::incrementAndGet));
+		ACell result=component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3)));
+		SignedData<?> envelope=(SignedData<?>)result;
+		assertEquals(Sets.of(1,2,3),envelope.getValue());
+		assertTrue(envelope.checkSignature());
+		assertEquals(KEY.getAccountKey(),envelope.getAccountKey());
+		assertEquals(1,signatures.get());
+	}
+
+	@Test
+	public void testAReconciledPayloadEqualToOneSideKeepsThatSidesEnvelope() {
+		var signatures=new AtomicInteger();
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer(signatures::incrementAndGet));
+		var own=KEY.signData(Sets.of(1,2));
+		assertSame(own,component.reconcileStored(KEY.signData(Sets.of(1)),own,KEY.signData(Sets.of(2))));
+		assertEquals(0,signatures.get(),"an existing envelope is never signed again");
+	}
+
+	@Test
+	public void testANewReconciledPayloadWithoutASignerIsAConflict() {
+		var component=new SignedSetComponent<>(SIGNED,new Root<ASet<CVMLong>>());
+		assertThrows(MergeConflictException.class,() ->
+			component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3))));
+	}
+
+	@Test
+	public void testANewReconciledPayloadWithAnUnauthorisedSignerIsAConflict() {
+		var stranger=AKeyPair.createSeeded(7311);
+		Function<ASet<CVMLong>,SignedData<ASet<CVMLong>>> signer=stranger::signData;
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer);
+		assertThrows(MergeConflictException.class,() ->
+			component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3))));
+	}
+
+	@Test
+	public void testADestinationEnvelopeTheOwnerRuleRejectsIsNeitherTakenNorMerged() {
+		var stranger=AKeyPair.createSeeded(7312);
+		var signatures=new AtomicInteger();
+		var component=new SignedSetComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),signer(signatures::incrementAndGet));
+		var base=KEY.signData(Sets.of(1));
+		var foreign=stranger.signData(Sets.of(1,3));
+		assertSame(base,component.reconcileStored(base,base,foreign),"an unchanged working envelope does not take it");
+		var own=KEY.signData(Sets.of(1,2));
+		assertSame(own,component.reconcileStored(base,own,foreign),"nor is its payload merged into a changed one");
+		assertEquals(0,signatures.get());
+	}
+
+	@Test
+	public void testStoredEnvelopesBothChangedConflictWhereThePayloadCannotMerge() {
+		var component=new SignedComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),KEY::signData);
+		assertThrows(MergeConflictException.class,() ->
+			component.reconcileStored(KEY.signData(Sets.of(1)),KEY.signData(Sets.of(1,2)),KEY.signData(Sets.of(1,3))));
 	}
 }

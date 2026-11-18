@@ -36,9 +36,20 @@ class QueryWatchAPITest extends ARESTTest {
 
 	static {
 		RESTConfig config=RESTConfig.parse("{rest:{queryWatch:true},mcp:{enabled:false}}");
-		QUERY_SERVER=RESTServer.create(server.getServer(),config);
-		QUERY_SERVER.start(0);
-		QUERY_API_PATH="http://localhost:"+QUERY_SERVER.getPort()+"/api/v1";
+		RESTServer rs=RESTServer.create(server.getServer(),config);
+		try {
+			rs.start(0);
+			QUERY_API_PATH="http://localhost:"+rs.getPort()+"/api/v1";
+		} catch (RuntimeException | Error e) {
+			// A class that fails to initialise never reaches its @AfterAll, so the server closes here
+			try {
+				rs.close();
+			} catch (RuntimeException | Error closeFailure) {
+				e.addSuppressed(closeFailure);
+			}
+			throw e;
+		}
+		QUERY_SERVER=rs;
 	}
 
 	@AfterAll
@@ -74,25 +85,28 @@ class QueryWatchAPITest extends ARESTTest {
 			.GET().build();
 
 		HttpResponse<InputStream> response=httpClient.send(request,HttpResponse.BodyHandlers.ofInputStream());
-		assertEquals(200,response.statusCode());
-		try (InputStream input=response.body(); ConvexHTTP convex=newClient()) {
-			SseReader reader=new SseReader(input);
-			SseEvent initial=readAsync(reader);
-			assertEquals("result",initial.type());
-			AMap<ACell,ACell> initialEnvelope=JSON.parse(initial.data());
-			AMap<ACell,ACell> initialResult=initialEnvelope.getIn("result");
-			CVMLong initialTimestamp=initialResult.getIn("value");
+		try (InputStream input=response.body()) {
+			// Inside the block, so a failed check still closes the stream
+			assertEquals(200,response.statusCode());
+			try (ConvexHTTP convex=newClient()) {
+				SseReader reader=new SseReader(input);
+				SseEvent initial=readAsync(reader);
+				assertEquals("result",initial.type());
+				AMap<ACell,ACell> initialEnvelope=JSON.parse(initial.data());
+				AMap<ACell,ACell> initialResult=initialEnvelope.getIn("result");
+				CVMLong initialTimestamp=initialResult.getIn("value");
 
-			Result transaction=convex.transactSync("(+ 1 2)");
-			assertSucceeded(transaction);
+				Result transaction=convex.transactSync("(+ 1 2)");
+				assertSucceeded(transaction);
 
-			SseEvent changed=readAsync(reader);
-			assertEquals("result",changed.type());
-			assertTrue(Long.parseLong(changed.id())>Long.parseLong(initial.id()));
-			AMap<ACell,ACell> changedEnvelope=JSON.parse(changed.data());
-			AMap<ACell,ACell> changedResult=changedEnvelope.getIn("result");
-			CVMLong changedTimestamp=changedResult.getIn("value");
-			assertTrue(changedTimestamp.longValue()>initialTimestamp.longValue());
+				SseEvent changed=readAsync(reader);
+				assertEquals("result",changed.type());
+				assertTrue(Long.parseLong(changed.id())>Long.parseLong(initial.id()));
+				AMap<ACell,ACell> changedEnvelope=JSON.parse(changed.data());
+				AMap<ACell,ACell> changedResult=changedEnvelope.getIn("result");
+				CVMLong changedTimestamp=changedResult.getIn("value");
+				assertTrue(changedTimestamp.longValue()>initialTimestamp.longValue());
+			}
 		}
 	}
 

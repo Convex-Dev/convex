@@ -32,102 +32,96 @@ public class ConvexHTTPTest extends ARESTTest {
 
 	
 	@Test public void testQuery() throws ResultException, InterruptedException {
-		ConvexHTTP convex=connect();
-		Long l=convex.getBalance();
-		assertNotNull(l);
-		
-		Result r=convex.querySync(Reader.read("(+ 2 3)"), null);
-		assertFalse(r.isError());
-		assertEquals(CVMLong.create(5),r.getValue());
+		try (ConvexHTTP convex=connect()) {
+			Long l=convex.getBalance();
+			assertNotNull(l);
+
+			Result r=convex.querySync(Reader.read("(+ 2 3)"), null);
+			assertFalse(r.isError());
+			assertEquals(CVMLong.create(5),r.getValue());
+		}
 	}
-	
+
 	@Test public void testPreCalculate() throws ResultException, InterruptedException {
-		ConvexHTTP convex=newClient();
-		
-		// A large command also exercises binary transport of referenced cells.
-		String source="(count \""+"x".repeat(1_000)+"\")";
-		Invoke tx=Invoke.create(convex.getAddress(),convex.getSequence()+1,source);
-		Result r=convex.simulateSync(tx);
-		assertFalse(r.isError());
-		assertEquals(CVMLong.create(1_000),r.getValue());
-		AInteger fees=r.getIn(Keywords.INFO,Keywords.FEES);
-		assertNotNull(fees);
-		Result signedEstimate=convex.querySync(CLIENT_KP.signData(tx));
-		assertSucceeded(signedEstimate);
-		assertEquals(fees,signedEstimate.getIn(Keywords.INFO,Keywords.FEES));
-		
-		Result r2=convex.transactSync(source);
-		assertNull(r2.getErrorCode());
-		assertEquals(fees,r2.getIn(Keywords.INFO,Keywords.FEES));
+		try (ConvexHTTP convex=newClient()) {
+			// A large command also exercises binary transport of referenced cells.
+			String source="(count \""+"x".repeat(1_000)+"\")";
+			Invoke tx=Invoke.create(convex.getAddress(),convex.getSequence()+1,source);
+			Result r=convex.simulateSync(tx);
+			assertFalse(r.isError());
+			assertEquals(CVMLong.create(1_000),r.getValue());
+			AInteger fees=r.getIn(Keywords.INFO,Keywords.FEES);
+			assertNotNull(fees);
+			Result signedEstimate=convex.querySync(CLIENT_KP.signData(tx));
+			assertSucceeded(signedEstimate);
+			assertEquals(fees,signedEstimate.getIn(Keywords.INFO,Keywords.FEES));
+
+			Result r2=convex.transactSync(source);
+			assertNull(r2.getErrorCode());
+			assertEquals(fees,r2.getIn(Keywords.INFO,Keywords.FEES));
+		}
 	}
 
 	@Test public void testZeroBalanceQuery() throws ResultException, InterruptedException {
-		ConvexHTTP convex=newClient();
-		Address empty=convex.createAccountSync(CLIENT_KP.getAccountKey());
-		Result r=convex.querySync(Reader.read("[*balance* *juice-limit*]"),empty);
-		assertSucceeded(r);
-		assertEquals(Reader.read("[0 "+server.getRESTConfig().getMaxQueryJuice()+"]"),r.getValue());
-		assertNull(r.getIn(Keywords.INFO,Keywords.FEES));
-		assertNotNull(r.getIn(Keywords.INFO,Keywords.JUICE));
-		Result exhausted=convex.querySync(Reader.read("(loop [] (recur))"),empty);
-		assertEquals(ErrorCodes.JUICE,exhausted.getErrorCode());
-		assertEquals(CVMLong.create(server.getRESTConfig().getMaxQueryJuice()),exhausted.getIn(Keywords.INFO,Keywords.JUICE));
-		assertEquals(ErrorCodes.JUICE,convex.simulate(Invoke.create(empty,1,"1")).join().getErrorCode());
+		try (ConvexHTTP convex=newClient()) {
+			Address empty=convex.createAccountSync(CLIENT_KP.getAccountKey());
+			Result r=convex.querySync(Reader.read("[*balance* *juice-limit*]"),empty);
+			assertSucceeded(r);
+			assertEquals(Reader.read("[0 "+server.getRESTConfig().getMaxQueryJuice()+"]"),r.getValue());
+			assertNull(r.getIn(Keywords.INFO,Keywords.FEES));
+			assertNotNull(r.getIn(Keywords.INFO,Keywords.JUICE));
+			Result exhausted=convex.querySync(Reader.read("(loop [] (recur))"),empty);
+			assertEquals(ErrorCodes.JUICE,exhausted.getErrorCode());
+			assertEquals(CVMLong.create(server.getRESTConfig().getMaxQueryJuice()),exhausted.getIn(Keywords.INFO,Keywords.JUICE));
+			assertEquals(ErrorCodes.JUICE,convex.simulate(Invoke.create(empty,1,"1")).join().getErrorCode());
+		}
 	}
 
-	@Test public void testOffensiveMessages() throws ResultException, InterruptedException {
-		ConvexHTTP convex=connect();
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
-		
-		// TODO: blast with illegal messages
-		// CompletableFuture<Result> r=convex.message(Blob.fromHex("0xBADBADBADBAD"));
-	}
-	
 	@Test public void testTransact() throws ResultException, InterruptedException {
-		ConvexHTTP convex=newClient();
-		
-		Result r=convex.transactSync("(+ 2 3)");
-		assertFalse(r.isError());
-		assertEquals(CVMLong.create(5),r.getValue());
-		
-		// Should be a transaction hash
-		Hash tx=RT.ensureHash(RT.getIn(r,Keywords.INFO,Keywords.TX));
-		assertNotNull(tx);
-		
-		r=convex.transactSync("(+ :foo 3)");
-		assertEquals(ErrorCodes.CAST,r.getErrorCode());
-		assertEquals(SourceCodes.CODE,r.getSource()); // should fail in user code
+		try (ConvexHTTP convex=newClient()) {
+			Result r=convex.transactSync("(+ 2 3)");
+			assertFalse(r.isError());
+			assertEquals(CVMLong.create(5),r.getValue());
+
+			// Should be a transaction hash
+			Hash tx=RT.ensureHash(RT.getIn(r,Keywords.INFO,Keywords.TX));
+			assertNotNull(tx);
+
+			r=convex.transactSync("(+ :foo 3)");
+			assertEquals(ErrorCodes.CAST,r.getErrorCode());
+			assertEquals(SourceCodes.CODE,r.getSource()); // should fail in user code
+		}
 	}
-	
+
 	@Test public void testBadHost() throws ResultException, InterruptedException, URISyntaxException {
-		ConvexHTTP convex= ConvexHTTP.connect(new URI("http://localhost:1"),Init.GENESIS_ADDRESS,KP);
-		assertEquals(1,convex.getHostAddress().getPort());
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
-		
-		Result r=convex.transactSync("(+ 2 3)");
-		assertTrue(r.isError());
-		assertEquals(ErrorCodes.IO,r.getErrorCode());
-		assertEquals(SourceCodes.NET,r.getSource());
+		try (ConvexHTTP convex= ConvexHTTP.connect(new URI("http://localhost:1"),Init.GENESIS_ADDRESS,KP)) {
+			assertEquals(1,convex.getHostAddress().getPort());
+			convex.setAddress(Init.GENESIS_ADDRESS);
+			convex.setKeyPair(KP);
+
+			Result r=convex.transactSync("(+ 2 3)");
+			assertTrue(r.isError());
+			assertEquals(ErrorCodes.IO,r.getErrorCode());
+			assertEquals(SourceCodes.NET,r.getSource());
+		}
 	}
-	
+
 	@Test public void testRequestStatus() throws ResultException, InterruptedException {
-		ConvexHTTP convex=connect();
-		
-		Result r=convex.requestStatusSync();
-		assertSucceeded(r);
-		assertNotNull(r.getValue(), "Status result should have a value");
-		assertTrue(r.getValue() instanceof convex.core.data.AMap, 
-			"Status result should be a map but got: " + Utils.getClassName(r.getValue()));
-		
-		// Check that the status map contains expected keys
-		@SuppressWarnings("unchecked")
-		convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell> statusMap = 
-			(convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell>) r.getValue();
-		
-		// Verify common status fields exist
-		assertNotNull(statusMap.get(Keywords.BELIEF), "Status should contain belief hash");
-		assertNotNull(statusMap.get(Keywords.PEER), "Status should contain peer key");
+		try (ConvexHTTP convex=connect()) {
+			Result r=convex.requestStatusSync();
+			assertSucceeded(r);
+			assertNotNull(r.getValue(), "Status result should have a value");
+			assertTrue(r.getValue() instanceof convex.core.data.AMap,
+				"Status result should be a map but got: " + Utils.getClassName(r.getValue()));
+
+			// Check that the status map contains expected keys
+			@SuppressWarnings("unchecked")
+			convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell> statusMap =
+				(convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell>) r.getValue();
+
+			// Verify common status fields exist
+			assertNotNull(statusMap.get(Keywords.BELIEF), "Status should contain belief hash");
+			assertNotNull(statusMap.get(Keywords.PEER), "Status should contain peer key");
+		}
 	}
 }

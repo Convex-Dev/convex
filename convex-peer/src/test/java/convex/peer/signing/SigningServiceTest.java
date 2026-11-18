@@ -32,10 +32,10 @@ import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.LatticeOps;
 import convex.lattice.LocalLattice;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
+import convex.lattice.LatticeComponent;
 
 /**
  * Tests for SigningService — encrypted key store kept as a peer's local record.
@@ -82,8 +82,8 @@ public class SigningServiceTest {
 		}
 
 		@Override
-		protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
-			return LatticeOps.mergePublication(LATTICE, LatticeContext.EMPTY, own, other);
+		protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+			return LatticeComponent.reconcile(LATTICE, LatticeContext.EMPTY, own, other);
 		}
 
 		@Override

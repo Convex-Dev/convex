@@ -104,7 +104,10 @@ public class MessageAPITest extends ARESTTest {
 	@Test
 	public void testTransactViaMessage() throws Exception {
 		Address addr = newAccount();
-		long seq = connect().getSequence(addr) + 1;
+		long seq;
+		try (convex.api.Convex convex = connect()) {
+			seq = convex.getSequence(addr) + 1;
+		}
 		Invoke tx = Invoke.create(addr, seq, Reader.read("(+ 10 20)"));
 		SignedData<ATransaction> signed = CLIENT_KP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);
@@ -116,13 +119,14 @@ public class MessageAPITest extends ARESTTest {
 	@Test
 	public void testChallengeViaMessage() throws Exception {
 		AKeyPair clientKP = AKeyPair.createSeeded(99999);
-		convex.api.Convex convex = connect();
-		convex.setKeyPair(clientKP);
+		try (convex.api.Convex convex = connect()) {
+			convex.setKeyPair(clientKP);
 
-		convex.core.data.AccountKey serverKey = server.getServer().getPeerKey();
-		convex.core.data.AccountKey result = convex.verifyPeer(serverKey).get(5, java.util.concurrent.TimeUnit.SECONDS);
-		assertEquals(serverKey, result);
-		assertEquals(serverKey, convex.getVerifiedPeer());
+			convex.core.data.AccountKey serverKey = server.getServer().getPeerKey();
+			convex.core.data.AccountKey result = convex.verifyPeer(serverKey).get(5, java.util.concurrent.TimeUnit.SECONDS);
+			assertEquals(serverKey, result);
+			assertEquals(serverKey, convex.getVerifiedPeer());
+		}
 	}
 
 	@Test
@@ -193,12 +197,9 @@ public class MessageAPITest extends ARESTTest {
 
 	@Test
 	public void testHugePayload() throws Exception {
-		// Just over the limit, deliberately. The server rejects on Content-Length without
-		// reading the body, so a body far above the limit is still in flight when the socket
-		// closes — the resulting TCP reset discards the 413 that was already written, and the
-		// client sees "header parser received no bytes" instead. Draining an oversized body to
-		// avoid that is exactly what rejecting early exists to prevent, so the reset is accepted
-		// behaviour for very large bodies; what must be deterministic is the limit itself.
+		// Just over the limit, deliberately: within the bound the server reads before
+		// answering, so the 413 arrives. A body far beyond that bound is not read, and the
+		// connection reset that follows can discard the 413; that is accepted.
 		byte[] huge = new byte[(int) RESTServer.MAX_REQUEST_BODY_BYTES + 4096];
 		HttpResponse<byte[]> resp = postRaw(huge);
 		assertEquals(413, resp.statusCode(), "Oversized payload should use the request-size response");
@@ -314,7 +315,10 @@ public class MessageAPITest extends ARESTTest {
 	public void testTransactBadSignature() throws Exception {
 		Address addr = newAccount();
 		AKeyPair wrongKP = AKeyPair.createSeeded(777);
-		long seq = connect().getSequence(addr) + 1;
+		long seq;
+		try (convex.api.Convex convex = connect()) {
+			seq = convex.getSequence(addr) + 1;
+		}
 		Invoke tx = Invoke.create(addr, seq, Reader.read("(+ 1 1)"));
 		SignedData<ATransaction> signed = wrongKP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);

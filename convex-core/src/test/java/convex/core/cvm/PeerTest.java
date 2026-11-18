@@ -16,12 +16,17 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
@@ -32,6 +37,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.ObjectsTest;
+import convex.core.data.SharedVectors;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -43,6 +49,7 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class PeerTest {
 
 	public static String seed="1a44bbe097e38d2ba90e9426e9b1ab0ec12444a25e4d23b77fd121da728737f2";
@@ -375,6 +382,129 @@ public class PeerTest {
 		// First tx in block 1 is good (index 0, not 0%7==3)
 		assertFalse(results1.get(0).isError(), "First good tx should succeed");
 
+		doPeerTest(p);
+	}
+
+	/** A Peer whose own Order has finalised one Block. */
+	private static Peer finalise(Peer p, Block block) throws InvalidDataException {
+		p = p.proposeBlock(block);
+		p = p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs();
+		assertEquals(1, p.getFinalityPoint());
+		return p;
+	}
+
+	/**
+	 * A finalised Block with transaction entries that are not signed transactions is
+	 * invalid, leaving the State unchanged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testUnsignedTransactionInBlock() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		SignedData<ATransaction> tx = KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "*address*"));
+		Block block = Block.create(p.getTimestamp(), (AVector)Vectors.of(tx, CVMLong.ONE, null));
+		p = finalise(p, block);
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertTrue(p.getBlockResult(0).isError(0));
+		assertEquals(block, p.getOwnBlock(0));
+		doPeerTest(p);
+	}
+
+	/**
+	 * A finalised Order entry that is not a signed Block is applied as an invalid
+	 * Block, leaving the State unchanged.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testUnsignedBlockInOrder() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		Order order=Order.create().withBlocks((AVector)Vectors.of(CVMLong.ONE)).withConsensusPoints(new long[] {1,1,1,1});
+		p = p.updateBelief(Belief.create(KP.signData(order)));
+		assertEquals(1, p.getFinalityPoint());
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertNull(p.getTransactionLocation(Hash.NULL_HASH));
+		assertNull(p.getOwnBlock(0));
+
+		doPeerTest(p);
+	}
+
+	/** A Peer whose Belief holds no Order of its own has no finality point to compute its State to. */
+	@Test
+	public void testUpdateStateWithoutOwnOrder() {
+		Peer p=Peer.create(KP, GENESIS);
+		Peer other=p.updateBelief(Belief.create(AKeyPair.generate().signData(Order.create())));
+		assertNull(other.getPeerOrder());
+		assertThrows(IllegalStateException.class,()->other.updateState());
+		assertThrows(IllegalStateException.class,()->other.updateState(0));
+	}
+
+	/**
+	 * Transactions can be located after a finalised Block with transaction entries that
+	 * are not signed transactions.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testLocateAfterUnsignedTransactionInBlock() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		SignedData<ATransaction> tx = KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "*address*"));
+		p = finalise(p, Block.create(p.getTimestamp(), (AVector)Vectors.of(tx, CVMLong.ONE, null)));
+
+		p = p.updateState();
+		assertEquals(Vectors.createLongs(0,0), p.getTransactionLocation(tx.getHash()));
+	}
+
+	/**
+	 * A lookup covers no more of a Block's entries than a Block may hold: in a Block
+	 * claiming more, which is invalid, an entry beyond that maximum is not found.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test
+	public void testLocateInOversizedBlock() throws InvalidDataException {
+		int max=Constants.MAX_TRANSACTIONS_PER_BLOCK;
+		ACell[] entries=new ACell[max+1];
+		for (int i=0; i<=max; i++) entries[i]=CVMLong.create(i);
+		Peer p=Peer.create(KP, GENESIS);
+		p = finalise(p, Block.create(p.getTimestamp(), (AVector)Vectors.create(entries)));
+
+		p = p.updateState();
+		assertEquals(Vectors.createLongs(0,max-1), p.getTransactionLocation(CVMLong.create(max-1).getHash()));
+		assertNull(p.getTransactionLocation(CVMLong.create(max).getHash()));
+	}
+
+	/**
+	 * A Block claiming far more transactions than a Block may hold is invalid, leaving
+	 * the State unchanged.
+	 */
+	@Test
+	public void testBlockClaimingHugeTransactionCount() throws InvalidDataException {
+		checkOversizedBlock(1L<<32);
+	}
+
+	/**
+	 * A Block claiming nearly 2^31 transactions is invalid, leaving the State unchanged.
+	 */
+	@Test
+	public void testBlockClaimingNearlyIntMaxTransactions() throws InvalidDataException {
+		checkOversizedBlock(Integer.MAX_VALUE-15);
+	}
+
+	private void checkOversizedBlock(long count) throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		SignedData<ATransaction> tx = KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "*address*"));
+		AVector<SignedData<ATransaction>> txs=SharedVectors.repeat(tx, count);
+		assertEquals(count, txs.count());
+		p = finalise(p, Block.create(p.getTimestamp(), txs));
+
+		p = p.updateState();
+		assertEquals(1, p.getStatePosition());
+		assertEquals(GENESIS, p.getConsensusState());
+		assertTrue(p.getBlockResult(0).isError(0));
 		doPeerTest(p);
 	}
 

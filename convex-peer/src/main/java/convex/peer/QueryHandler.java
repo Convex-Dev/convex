@@ -1,7 +1,6 @@
 package convex.peer;
 
 import java.util.ArrayList;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -14,10 +13,15 @@ import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
+import convex.core.util.Utils;
+import convex.net.RequestFailures;
+import convex.net.ingress.Destination;
+import convex.net.ingress.QueueDestination;
 
 public class QueryHandler extends AThreadedComponent {
 
@@ -26,36 +30,39 @@ public class QueryHandler extends AThreadedComponent {
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
-	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Config.QUERY_QUEUE_SIZE);
+	private final QueueDestination queryQueue = new QueueDestination(Config.QUERY_QUEUE_SIZE,Config.DEFAULT_INTERNAL_TIMEOUT);
 
 	public QueryHandler(Server server) {
 		super(server);
-		queryQueue= new ArrayBlockingQueue<>(Config.QUERY_QUEUE_SIZE);
+		queryQueue.setConsumer(thread);
 	}
-	
+
 	/**
-	 * Offer a transaction for handling
+	 * Offer a query or data request for handling
 	 * @param m Message offered
 	 * @return True if queued for handling, false otherwise
 	 */
 	public boolean offerQuery(Message m) {
-		return queryQueue.offer(m);
+		return queryQueue.tryOffer(m);
 	}
 
 	/**
-	 * Offer a query for handling, blocking until space is available or timeout.
-	 * Used as the retry predicate for backpressure. Does not wait on this handler's
-	 * own thread, for example in a local client's callback for a query result.
-	 * @param m Message offered
-	 * @return True if queued for handling, false on timeout or interruption
+	 * Gets the queue of queries and data requests as a destination, which signals
+	 * when it has room and, tested, waits a bounded time for it, except on this
+	 * handler's own thread.
+	 *
+	 * @return Query destination
 	 */
-	public boolean offerQueryBlocking(Message m) {
-		return offerBlocking(queryQueue, m);
+	Destination getDestination() {
+		return queryQueue;
 	}
 	
 
 	/** Reusable drain buffer — only accessed from the handler thread */
 	private final ArrayList<Message> batch = new ArrayList<>();
+
+	/** One per handler, so this site warns once of each kind of failure that warrants it. */
+	private final RequestFailures failures = new RequestFailures(log);
 
 	@Override
 	protected void loop() throws InterruptedException {
@@ -65,26 +72,41 @@ public class QueryHandler extends AThreadedComponent {
 		LoadMonitor.up();
 		if (first == null) return;
 
-		// Drain any additional queued messages (single lock acquisition)
-		batch.clear();
-		batch.add(first);
-		queryQueue.drainTo(batch);
+		try {
+			// Drain any additional queued messages (single lock acquisition)
+			batch.add(first);
+			queryQueue.drainTo(batch);
 
-		for (int i = 0; i < batch.size(); i++) {
-			Message m = batch.get(i);
-			MessageType type = m.getType();
-			switch (type) {
-			case QUERY:
-				handleQuery(m);
-				break;
-			case DATA_REQUEST:
-				handleDataRequest(m);
-				break;
-			default:
-				log.warn("Unexpected Message type on query queue: " + type);
+			for (int i = 0; i < batch.size(); i++) {
+				Message m = batch.get(i);
+				MessageType type = m.getType();
+				// The one guard for every request this thread handles. Anyone can send
+				// queries, at a high rate, so a request that fails in any way is dropped
+				// here unless the JVM itself has failed: it must never cost the other
+				// queued requests or end this thread.
+				try {
+					switch (type) {
+					case QUERY:
+						handleQuery(m);
+						break;
+					case DATA_REQUEST:
+						handleDataRequest(m);
+						break;
+					default:
+						log.warn("Unexpected Message type on query queue: " + type);
+					}
+				} catch (Throwable e) {
+					Utils.checkRequestFailure(e);
+					failures.log(e, "Dropped {} request", type);
+					if (type == MessageType.QUERY) Server.returnBestEffort(m,RequestFailures.reply(e));
+					// Only a validation failure is in the request itself: any other may be this peer's own
+					if (e instanceof ValidationException bad) server.getConnectionManager().handleBadInput(m.getConnection(),bad);
+				}
 			}
+		} finally {
+			// Released even if this pass fails: recovering from running out of memory relies on it
+			batch.clear();
 		}
-		batch.clear(); // release references
 	}
 	
 	/**
@@ -92,54 +114,39 @@ public class QueryHandler extends AThreadedComponent {
 	 * missing data we do not hold are ignored.
 	 *
 	 * @param m
-	 * @throws BadFormatException
+	 * @throws BadFormatException If the request is badly formatted
 	 */
-	protected void handleDataRequest(Message m)  {
+	protected void handleDataRequest(Message m) throws BadFormatException {
 		// payload for a missing data request should be a valid Hash
-		try {
-			Message response=m.makeDataResponse(server.getStore());
-			boolean sent = m.returnMessage(response);
-			if (!sent) {
-				log.debug("Dropped data request response for connection {}", m.getConnection());
-			} else {
-				// log.info("Missing data request handled. Load = "+LoadMonitor.getLoad());
-			}
-		} catch (BadFormatException e) {
-			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
-		} catch (Exception e) {
-			log.warn("Unable to deliver missing data due to exception:", e);
+		Message response=m.makeDataResponse(server.getStore());
+		boolean sent = m.returnMessage(response);
+		if (!sent) {
+			log.debug("Dropped data request response for connection {}", m.getConnection());
 		}
 	}
-	
-	private void handleQuery(Message m) {
-		try {
-			// query is a vector [id , form, address?]
-			AVector<ACell> v= m.getPayload();
-			ACell id = v.get(1);
-			ACell form = v.get(2);
-	
-			// extract the Address, might be null
-			Address address = RT.ensureAddress(v.get(3));
-	
-			log.debug( "Processing query: {} with address: {}" , form, address);
-			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
-			// address);
-			
-			// Return result
-			ResultContext resultContext = server.getPeer().executeQuery(form, address);
-			Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
-			
-			// Report result back to message sender
-			boolean resultReturned= m.returnResult(result);
 
-			if (!resultReturned) {
-				log.debug("Dropped query result {} for connection {}", id, m.getConnection());
-			}
-		} catch (Exception e) {
-			log.debug("Terminated client: "+e.getMessage());
-			m.closeConnection();
+	private void handleQuery(Message m) throws BadFormatException {
+		// query is a vector [:Q id form address?]
+		AVector<ACell> v=RT.ensureVector(m.getPayload());
+		if ((v==null)||(v.count()<3)) throw new BadFormatException("Query is not [:Q id form address?]");
+		ACell id = v.get(1);
+		ACell form = v.get(2);
+
+		// The address is optional, and might be null
+		Address address = (v.count()>3)?RT.ensureAddress(v.get(3)):null;
+
+		log.debug( "Processing query: {} with address: {}" , form, address);
+
+		// Return result
+		ResultContext resultContext = server.getPeer().executeQuery(form, address);
+		Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
+
+		// Report result back to message sender
+		boolean resultReturned= m.returnResult(result);
+
+		if (!resultReturned) {
+			log.debug("Dropped query result {} for connection {}", id, m.getConnection());
 		}
-
 	}
 
 	@Override

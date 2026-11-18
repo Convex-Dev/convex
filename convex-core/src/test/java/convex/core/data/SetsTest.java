@@ -218,6 +218,112 @@ public class SetsTest {
 
 		assertThrows(Throwable.class,()->a.intersectAll(null));
 	}
+
+	/**
+	 * Removals that leave more than a leaf's elements, all under one hash prefix, give the
+	 * set of those elements: a tree has at least two children (CAD003)
+	 */
+	@Test
+	public void testRemovalsLeavingOneHashPrefix() {
+		// Prefix of one digit collapses the root; of two digits, the level below it too
+		for (int digits=1; digits<=2; digits++) {
+			ASet<CVMLong> kept=Sets.empty();
+			ASet<CVMLong> removed=Sets.empty();
+			ASet<CVMLong> all=Sets.empty();
+			for (long i=0; kept.count()<=SetLeaf.MAX_ELEMENTS+3; i++) {
+				CVMLong k=CVMLong.create(i);
+				Hash h=k.getHash();
+				boolean keep=(h.getHexDigit(0)==0)&&((digits==1)||(h.getHexDigit(1)==0));
+				if (keep) kept=kept.conj(k); else removed=removed.conj(k);
+				all=all.conj(k);
+			}
+			ASet<CVMLong> r=all.excludeAll(removed);
+			assertEquals(kept,r);
+			ObjectsTest.doAnyValueTests(r);
+		}
+	}
+
+	/**
+	 * Union, intersection and difference of hash sets whose trees branch at different hex digits
+	 * or under different prefixes, at the root or below it, give the set built by conj (CAD003)
+	 */
+	@Test
+	public void testMergesAcrossTreeShapes() throws InvalidDataException {
+		for (java.util.List<CVMLong> xs: TreeShapes.SHAPES) {
+			for (java.util.List<CVMLong> ys: TreeShapes.SHAPES) {
+				ASet<CVMLong> x=conjAll(xs), y=conjAll(ys);
+
+				java.util.Set<CVMLong> union=new java.util.LinkedHashSet<>(xs);
+				union.addAll(ys);
+				assertMergeResult(conjAll(union),x.includeAll(y));
+
+				java.util.Set<CVMLong> intersection=new java.util.LinkedHashSet<>(xs);
+				intersection.retainAll(ys);
+				assertMergeResult(conjAll(intersection),x.intersectAll(y));
+
+				java.util.Set<CVMLong> difference=new java.util.LinkedHashSet<>(xs);
+				difference.removeAll(ys);
+				assertMergeResult(conjAll(difference),x.excludeAll(y));
+			}
+		}
+
+		// An unchanged result is the receiver: a subset under one child, and a set sharing no prefix
+		java.util.List<java.util.List<CVMLong>> shapes=TreeShapes.SHAPES;
+		ASet<CVMLong> holding=conjAll(shapes.get(8));
+		assertSame(holding,holding.includeAll(conjAll(shapes.get(1))));
+		ASet<CVMLong> under0=conjAll(shapes.get(1));
+		assertSame(under0,under0.excludeAll(conjAll(shapes.get(2))));
+	}
+
+	/**
+	 * Subset tests between hash sets whose trees branch at different hex digits or under
+	 * different prefixes, at the root or below it, answer by the elements
+	 */
+	@Test
+	public void testSubsetsAcrossTreeShapes() {
+		for (java.util.List<CVMLong> xs: TreeShapes.SHAPES) {
+			for (java.util.List<CVMLong> ys: TreeShapes.SHAPES) {
+				ASet<CVMLong> x=conjAll(xs), y=conjAll(ys);
+				boolean expected=xs.containsAll(ys);
+				assertEquals(expected,x.containsAll(y));
+				assertEquals(expected,y.isSubset(x));
+			}
+		}
+	}
+
+	/**
+	 * A leaf merged with a tree, at the root or as children below it, gives the receiver itself
+	 * when the result equals it
+	 */
+	@Test
+	public void testLeafMergeWithTreeIdentity() {
+		ASet<CVMLong> leaf=Sets.empty(), small=Sets.empty(), big=Sets.empty(), other=Sets.empty();
+		for (long i=0; i<300; i++) {
+			CVMLong k=CVMLong.create(i);
+			if (i<5) leaf=leaf.conj(k);
+			if (i<40) small=small.conj(k);
+			big=big.conj(k);
+			other=other.conj(CVMLong.create(i+1000));
+		}
+		assertTrue(leaf instanceof SetLeaf);
+		// The small tree's children are leaves, the big tree's are trees
+		assertTrue(small instanceof SetTree);
+		assertSame(leaf,leaf.intersectAll(big));
+		assertSame(leaf,leaf.excludeAll(other));
+		assertSame(small,small.intersectAll(big));
+		assertSame(small,small.excludeAll(other));
+	}
+
+	private static ASet<CVMLong> conjAll(java.util.Collection<CVMLong> keys) {
+		ASet<CVMLong> s=Sets.empty();
+		for (CVMLong k: keys) s=s.conj(k);
+		return s;
+	}
+
+	private static void assertMergeResult(ASet<CVMLong> expected, ASet<CVMLong> result) throws InvalidDataException {
+		assertEquals(expected,result);
+		result.validate();
+	}
 	
 	@Test
 	public void testBigSlice() {

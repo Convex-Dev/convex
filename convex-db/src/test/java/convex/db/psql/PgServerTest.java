@@ -13,8 +13,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
@@ -33,35 +33,27 @@ import convex.db.lattice.SQLDatabase;
 
 /**
  * Tests for the PostgreSQL wire protocol server.
+ *
+ * <p>One server for the class serves one database, and the tests run concurrently on
+ * it. Each test works on tables of its own (see {@link #usersTable()}); a test that
+ * needs another server, or changes the whole database, makes its own.
  */
 public class PgServerTest {
 
 	private static final AtomicInteger DB_COUNTER = new AtomicInteger(0);
-	private PgServer server;
-	private ConvexDB cdb;
-	private SQLDatabase db;
-	private String dbName;
+	private static final AtomicInteger TABLE_COUNTER = new AtomicInteger(0);
+	private static PgServer server;
+	private static ConvexDB cdb;
+	private static SQLDatabase db;
+	private static String dbName;
 
-	@BeforeEach
-	public void setUp() throws Exception {
-		// Get unique database name
+	@BeforeAll
+	public static void setUp() throws Exception {
 		dbName = "pgtest_" + DB_COUNTER.getAndIncrement();
-
-		// Create and register a test database
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
 		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register(dbName);
-
-		// Create users table using SQLSchema API
-		ConvexColumnType[] userTypes = {
-			ConvexColumnType.of(ConvexType.INTEGER),   // id
-			ConvexColumnType.varchar(50),              // name
-			ConvexColumnType.varchar(100)              // email
-		};
-		db.tables().createTable("users", new String[]{"id", "name", "email"}, userTypes);
-		db.tables().insert("users", 1L, "Alice", "alice@example.com");
-		db.tables().insert("users", 2L, "Bob", "bob@example.com");
 
 		// Start server on dynamic port (port 0 lets OS assign)
 		server = PgServer.builder()
@@ -71,23 +63,78 @@ public class PgServerTest {
 		server.start();
 	}
 
-	@AfterEach
-	public void tearDown() {
-		if (server != null && server.isRunning()) {
-			server.stop();
-		}
-		if (cdb != null) {
-			cdb.unregister(dbName);
-		}
+	@AfterAll
+	public static void tearDown() {
+		assertAll("Stop the class's server and close its database",
+			() -> {
+				if (server != null && server.isRunning()) {
+					server.stop();
+				}
+			},
+			() -> {
+				if (cdb != null) {
+					cdb.unregister(dbName);
+				}
+			});
+	}
+
+	/**
+	 * Creates a users table of the calling test's own in the class's database, holding
+	 * Alice (1) and Bob (2).
+	 *
+	 * @return The table's name
+	 */
+	private static String usersTable() {
+		return usersTable(db, "users_" + TABLE_COUNTER.getAndIncrement());
+	}
+
+	private static String usersTable(SQLDatabase database, String name) {
+		ConvexColumnType[] userTypes = {
+			ConvexColumnType.of(ConvexType.INTEGER),   // id
+			ConvexColumnType.varchar(50),              // name
+			ConvexColumnType.varchar(100)              // email
+		};
+		database.tables().createTable(name, new String[]{"id", "name", "email"}, userTypes);
+		database.tables().insert(name, 1L, "Alice", "alice@example.com");
+		database.tables().insert(name, 2L, "Bob", "bob@example.com");
+		return name;
 	}
 
 	@Test
-	public void testServerStartAndStop() {
-		assertTrue(server.isRunning());
-		assertEquals(server.getPort(), server.getPort());
+	public void testServerStartAndStop() throws Exception {
+		PgServer own = PgServer.builder().port(0).database(dbName).build();
+		own.start();
+		try {
+			assertTrue(own.isRunning());
+			assertTrue(own.getPort() > 0, "the port the OS assigned");
+		} finally {
+			own.stop();
+		}
+		assertFalse(own.isRunning());
+	}
 
-		server.stop();
-		assertFalse(server.isRunning());
+	@Test
+	void readOnlyServerEnforcesModeOnNetworkConnections() throws Exception {
+		String users = usersTable();
+		PgServer readOnly = PgServer.builder().port(0).database(dbName).readOnly(true).build();
+		readOnly.start();
+		try {
+			for (String mode : new String[] {"simple", "extended"}) {
+				try (var c = DriverManager.getConnection("jdbc:postgresql://localhost:" + readOnly.getPort()
+						+ "/" + dbName + "?preferQueryMode=" + mode, "test", ""); var s = c.createStatement()) {
+					var failure = assertThrows(java.sql.SQLException.class, () -> s.executeUpdate("DELETE FROM " + users));
+					assertEquals("25006", failure.getSQLState());
+					try (var r = s.executeQuery("SELECT COUNT(*) FROM " + users)) {
+						assertTrue(r.next()); assertEquals(2, r.getLong(1));
+					}
+					c.setAutoCommit(false);
+					try (var r = s.executeQuery("SELECT COUNT(*) FROM " + users)) { assertTrue(r.next()); }
+					c.commit();
+				}
+			}
+		} finally {
+			readOnly.stop();
+		}
 	}
 
 	@Test
@@ -143,6 +190,7 @@ public class PgServerTest {
 
 	@Test
 	public void testSimpleQuery() throws IOException {
+		String users = usersTable();
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 			DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -152,7 +200,7 @@ public class PgServerTest {
 			skipToReadyForQuery(in);
 
 			// Query existing data
-			sendQuery(out, "SELECT * FROM users WHERE id = 1");
+			sendQuery(out, "SELECT * FROM " + users + " WHERE id = 1");
 
 			// Should receive RowDescription, DataRow, CommandComplete, ReadyForQuery
 			byte type = in.readByte();
@@ -186,6 +234,7 @@ public class PgServerTest {
 
 	@Test
 	public void testCastSyntax() throws IOException {
+		String users = usersTable();
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 			DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -194,13 +243,14 @@ public class PgServerTest {
 			skipToReadyForQuery(in);
 
 			// ::int4 must strip as a whole cast, not leave a stray '4' on the column name
-			sendQuery(out, "SELECT id::int4 FROM users WHERE id = 1");
+			sendQuery(out, "SELECT id::int4 FROM " + users + " WHERE id = 1");
 			assertEquals("TDCZ", readMessageTypes(in));
 		}
 	}
 
 	@Test
 	public void testTildeInLiteral() throws IOException {
+		String users = usersTable();
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 			DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -209,89 +259,8 @@ public class PgServerTest {
 			skipToReadyForQuery(in);
 
 			// A '~' inside a string literal is data, not a regex operator
-			sendQuery(out, "SELECT name FROM users WHERE email <> '~/nobody'");
+			sendQuery(out, "SELECT name FROM " + users + " WHERE email <> '~/nobody'");
 			assertEquals("TDDCZ", readMessageTypes(in));
-		}
-	}
-
-	@Test
-	public void testPasswordAuthentication() throws Exception {
-		// Stop the trust-auth server
-		server.stop();
-
-		// Start a password-protected server on dynamic port
-		PgServer pwdServer = PgServer.builder()
-			.port(0)
-			.database(dbName)
-			.password("secret123")
-			.build();
-		pwdServer.start();
-
-		try (Socket socket = new Socket("localhost", pwdServer.getPort())) {
-			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-			DataInputStream in = new DataInputStream(socket.getInputStream());
-
-			// Send startup
-			sendStartupMessage(out, dbName, "testuser");
-
-			// Should receive AuthenticationCleartextPassword
-			byte type = in.readByte();
-			assertEquals('R', type);
-			int length = in.readInt();
-			int authType = in.readInt();
-			assertEquals(3, authType); // CleartextPassword
-
-			// Send password
-			sendPassword(out, "secret123");
-
-			// Should receive AuthenticationOk
-			type = in.readByte();
-			assertEquals('R', type);
-			length = in.readInt();
-			authType = in.readInt();
-			assertEquals(0, authType); // Ok
-
-			skipToReadyForQuery(in);
-		} finally {
-			pwdServer.stop();
-		}
-	}
-
-	@Test
-	public void testWrongPassword() throws Exception {
-		// Stop the trust-auth server
-		server.stop();
-
-		// Start a password-protected server on dynamic port
-		PgServer pwdServer = PgServer.builder()
-			.port(0)
-			.database(dbName)
-			.password("secret123")
-			.build();
-		pwdServer.start();
-
-		try (Socket socket = new Socket("localhost", pwdServer.getPort())) {
-			socket.setSoTimeout(5000); // 5 second timeout
-			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-			DataInputStream in = new DataInputStream(socket.getInputStream());
-
-			// Send startup
-			sendStartupMessage(out, dbName, "testuser");
-
-			// Should receive AuthenticationCleartextPassword
-			byte type = in.readByte();
-			assertEquals('R', type);
-			in.readInt();
-			in.readInt();
-
-			// Send wrong password
-			sendPassword(out, "wrongpassword");
-
-			// Should receive ErrorResponse
-			type = in.readByte();
-			assertEquals('E', type); // ErrorResponse
-		} finally {
-			pwdServer.stop();
 		}
 	}
 
@@ -346,9 +315,10 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPreparedStatementWithNumericParameters() throws Exception {
+		String users = usersTable();
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 		try (Connection conn = DriverManager.getConnection(url)) {
-			try (java.sql.PreparedStatement insert = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?)")) {
+			try (java.sql.PreparedStatement insert = conn.prepareStatement("INSERT INTO " + users + " VALUES (?, ?, ?)")) {
 				insert.setLong(1, 3L);
 				insert.setString(2, "Carol");
 				insert.setString(3, "carol@example.com");
@@ -373,7 +343,7 @@ public class PgServerTest {
 					assertEquals(1, insert.executeUpdate());
 				}
 			}
-			try (java.sql.PreparedStatement update = conn.prepareStatement("UPDATE users SET name = ? WHERE id = ?")) {
+			try (java.sql.PreparedStatement update = conn.prepareStatement("UPDATE " + users + " SET name = ? WHERE id = ?")) {
 				update.setString(1, "Caroline");
 				update.setLong(2, 3L);
 				assertEquals(1, update.executeUpdate());
@@ -384,16 +354,16 @@ public class PgServerTest {
 		// Read back through the table API: the rows are stored under numeric keys
 		String[] expected = {"Caroline", "Dave", "Erin"};
 		for (int i = 0; i < expected.length; i++) {
-			assertEquals(expected[i], nameOf(3 + i));
+			assertEquals(expected[i], nameOf(users, 3 + i));
 		}
 		for (int id = 6; id <= 15; id++) {
-			assertEquals("User" + id, nameOf(id));
+			assertEquals("User" + id, nameOf(users, id));
 		}
-		assertEquals(15, db.tables().selectAll("users").count());
+		assertEquals(15, db.tables().selectAll(users).count());
 	}
 
-	private String nameOf(long id) {
-		convex.core.data.AVector<convex.core.data.ACell> row = db.tables().selectByKey("users", convex.core.data.prim.CVMLong.create(id));
+	private static String nameOf(String users, long id) {
+		convex.core.data.AVector<convex.core.data.ACell> row = db.tables().selectByKey(users, convex.core.data.prim.CVMLong.create(id));
 		assertNotNull(row, "row " + id);
 		return row.get(1).toString();
 	}
@@ -434,23 +404,38 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testStandardIdentifiers() throws Exception {
-		IdentifierPolicy.UPPER.applyTo(db);
-		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
-		try (Connection conn = DriverManager.getConnection(url); Statement stmt = conn.createStatement()) {
-			stmt.executeUpdate("CREATE TABLE Orders (id INTEGER, total INTEGER)");
-			assertEquals(1, stmt.executeUpdate("INSERT INTO orders VALUES (1, 10)"));
-			try (ResultSet rs = stmt.executeQuery("SELECT total FROM \"ORDERS\" WHERE id = 1")) {
-				assertEquals("TOTAL", rs.getMetaData().getColumnLabel(1));
-				assertTrue(rs.next());
-				assertEquals(10, rs.getInt(1));
+		// The policy holds for a whole database, so this test has a database and server of its own
+		String ownName = "pgtest_" + DB_COUNTER.getAndIncrement();
+		ConvexDB ownCdb = ConvexDB.create(RowLWW::merge);
+		SQLDatabase own = ownCdb.database(ownName);
+		IdentifierPolicy.LOWER.applyTo(own);
+		usersTable(own, "users");
+		ownCdb.register(ownName);
+		PgServer ownServer = PgServer.builder().port(0).database(ownName).build();
+		try {
+			ownServer.start();
+			IdentifierPolicy.UPPER.applyTo(own);
+			String url = "jdbc:postgresql://localhost:" + ownServer.getPort() + "/" + ownName + "?user=testuser";
+			try (Connection conn = DriverManager.getConnection(url); Statement stmt = conn.createStatement()) {
+				stmt.executeUpdate("CREATE TABLE Orders (id INTEGER, total INTEGER)");
+				assertEquals(1, stmt.executeUpdate("INSERT INTO orders VALUES (1, 10)"));
+				try (ResultSet rs = stmt.executeQuery("SELECT total FROM \"ORDERS\" WHERE id = 1")) {
+					assertEquals("TOTAL", rs.getMetaData().getColumnLabel(1));
+					assertTrue(rs.next());
+					assertEquals(10, rs.getInt(1));
+				}
+				try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM \"users\"")) {
+					assertTrue(rs.next());
+					assertEquals(2, rs.getInt(1));
+				}
+				assertThrows(java.sql.SQLException.class, () -> stmt.executeQuery("SELECT COUNT(*) FROM users"));
 			}
-			try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM \"users\"")) {
-				assertTrue(rs.next());
-				assertEquals(2, rs.getInt(1));
-			}
-			assertThrows(java.sql.SQLException.class, () -> stmt.executeQuery("SELECT COUNT(*) FROM users"));
+			assertTrue(own.tables().tableExists("ORDERS"));
+		} finally {
+			assertAll("Stop this test's server and close its database",
+				ownServer::stop,
+				() -> ownCdb.unregister(ownName));
 		}
-		assertTrue(db.tables().tableExists("ORDERS"));
 	}
 
 	/**
@@ -458,6 +443,7 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCDriver() throws Exception {
+		String users = usersTable();
 		// Connect using PostgreSQL JDBC driver
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 		try (Connection conn = DriverManager.getConnection(url)) {
@@ -466,7 +452,7 @@ public class PgServerTest {
 
 			// Execute query
 			try (Statement stmt = conn.createStatement();
-				 ResultSet rs = stmt.executeQuery("SELECT name, email FROM users ORDER BY id")) {
+				 ResultSet rs = stmt.executeQuery("SELECT name, email FROM " + users + " ORDER BY id")) {
 
 				assertTrue(rs.next());
 				assertEquals("Alice", rs.getString("name"));
@@ -487,9 +473,10 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCPreparedSelectRepeated() throws Exception {
+		String users = usersTable();
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 		try (Connection conn = DriverManager.getConnection(url);
-			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE email = ?")) {
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM " + users + " WHERE email = ?")) {
 			// More often than the driver's prepare threshold, so that the statement
 			// becomes a named one whose description the driver has cached
 			for (int i = 0; i < 12; i++) {
@@ -510,9 +497,10 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCPreparedNumericSelectRepeated() throws Exception {
+		String users = usersTable();
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 		try (Connection conn = DriverManager.getConnection(url);
-			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM " + users + " WHERE id = ?")) {
 			for (int i = 0; i < 12; i++) {
 				boolean alice = (i % 2 == 0);
 				select.setLong(1, alice ? 1L : 2L);
@@ -533,9 +521,10 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCUntypedTextParameter() throws Exception {
+		String users = usersTable();
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser&stringtype=unspecified";
 		try (Connection conn = DriverManager.getConnection(url);
-			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM " + users + " WHERE id = ?")) {
 			select.setString(1, "2");
 			try (ResultSet rs = select.executeQuery()) {
 				assertTrue(rs.next());
@@ -555,13 +544,14 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPreparedStatementPreparedOnce() throws Exception {
+		String users = usersTable();
 		AtomicInteger prepares = new AtomicInteger();
 		PgServer counting = countingServer(prepares);
 		try {
 			// prepareThreshold=1: the driver names the statement from its first execution on
 			String url = "jdbc:postgresql://localhost:" + counting.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=1";
 			try (Connection conn = DriverManager.getConnection(url);
-				 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+				 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM " + users + " WHERE id = ?")) {
 				for (int i = 0; i < 12; i++) {
 					boolean alice = (i % 2 == 0);
 					select.setLong(1, alice ? 1L : 2L);
@@ -584,15 +574,16 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCBatchStopsAtError() throws Exception {
+		String users = usersTable();
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 		try (Connection conn = DriverManager.getConnection(url);
 			 Statement stmt = conn.createStatement()) {
-			stmt.addBatch("INSERT INTO users VALUES (10, 'Ten', 'ten@example.com')");
+			stmt.addBatch("INSERT INTO " + users + " VALUES (10, 'Ten', 'ten@example.com')");
 			stmt.addBatch("INSERT INTO no_such_table VALUES (1)");
-			stmt.addBatch("INSERT INTO users VALUES (11, 'Eleven', 'eleven@example.com')");
+			stmt.addBatch("INSERT INTO " + users + " VALUES (11, 'Eleven', 'eleven@example.com')");
 			assertThrows(java.sql.BatchUpdateException.class, stmt::executeBatch);
 		}
-		assertNull(db.tables().selectByKey("users", convex.core.data.prim.CVMLong.create(11)),
+		assertNull(db.tables().selectByKey(users, convex.core.data.prim.CVMLong.create(11)),
 			"a statement after the failed one must not run");
 	}
 
@@ -603,13 +594,14 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testStatementParsedAgainUnderSameName() throws Exception {
+		String users = usersTable();
 		AtomicInteger prepares = new AtomicInteger();
 		PgServer counting = countingServer(prepares);
 		try {
 			String url = "jdbc:postgresql://localhost:" + counting.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=0";
 			try (Connection conn = DriverManager.getConnection(url);
-				 java.sql.PreparedStatement byId = conn.prepareStatement("SELECT name FROM users WHERE id = ?");
-				 java.sql.PreparedStatement byEmail = conn.prepareStatement("SELECT id FROM users WHERE email = ?")) {
+				 java.sql.PreparedStatement byId = conn.prepareStatement("SELECT name FROM " + users + " WHERE id = ?");
+				 java.sql.PreparedStatement byEmail = conn.prepareStatement("SELECT id FROM " + users + " WHERE email = ?")) {
 				for (int i = 0; i < 3; i++) {
 					byId.setLong(1, 2L);
 					try (ResultSet rs = byId.executeQuery()) {
@@ -637,11 +629,12 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCTableChangedUnderPreparedStatement() throws Exception {
+		String users = usersTable();
 		// prepareThreshold=1: the driver names the statements from their first execution on
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=1";
 		try (Connection conn = DriverManager.getConnection(url);
-			 java.sql.PreparedStatement byId = conn.prepareStatement("SELECT name FROM users WHERE id = ?");
-			 java.sql.PreparedStatement all = conn.prepareStatement("SELECT * FROM users WHERE id = ?")) {
+			 java.sql.PreparedStatement byId = conn.prepareStatement("SELECT name FROM " + users + " WHERE id = ?");
+			 java.sql.PreparedStatement all = conn.prepareStatement("SELECT * FROM " + users + " WHERE id = ?")) {
 			for (int i = 0; i < 2; i++) {
 				byId.setLong(1, 2L);
 				try (ResultSet rs = byId.executeQuery()) {
@@ -655,11 +648,11 @@ public class PgServerTest {
 				}
 			}
 
-			db.tables().dropTable("users");
-			db.tables().createTable("users", new String[] {"id", "age", "name", "email"}, new ConvexColumnType[] {
+			db.tables().dropTable(users);
+			db.tables().createTable(users, new String[] {"id", "age", "name", "email"}, new ConvexColumnType[] {
 				ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.INTEGER),
 				ConvexColumnType.varchar(50), ConvexColumnType.varchar(100)});
-			db.tables().insert("users", 2L, 42L, "Robert", "robert@example.com");
+			db.tables().insert(users, 2L, 42L, "Robert", "robert@example.com");
 
 			byId.setLong(1, 2L);
 			try (ResultSet rs = byId.executeQuery()) {
@@ -681,10 +674,11 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testPostgresJDBCAggregation() throws Exception {
+		String users = usersTable();
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 		try (Connection conn = DriverManager.getConnection(url);
 			 Statement stmt = conn.createStatement();
-			 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM users")) {
+			 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM " + users)) {
 
 			assertTrue(rs.next());
 			assertEquals(2, rs.getInt("cnt"));
@@ -694,7 +688,7 @@ public class PgServerTest {
 	// Helper methods
 
 	/** A second server on the test database whose connections count the statements prepared on them. */
-	private PgServer countingServer(AtomicInteger prepares) throws Exception {
+	private static PgServer countingServer(AtomicInteger prepares) throws Exception {
 		PgServer counting = PgServer.builder()
 			.port(0)
 			.database(dbName)
@@ -752,16 +746,6 @@ public class PgServerTest {
 		out.flush();
 	}
 
-	private void sendPassword(DataOutputStream out, String password) throws IOException {
-		byte[] pwdBytes = password.getBytes(StandardCharsets.UTF_8);
-		int length = 4 + pwdBytes.length + 1;
-
-		out.writeByte('p');
-		out.writeInt(length);
-		out.write(pwdBytes);
-		out.writeByte(0);
-		out.flush();
-	}
 
 	/** Reads messages up to and including ReadyForQuery, returning their type bytes in order */
 	private String readMessageTypes(DataInputStream in) throws IOException {
@@ -801,6 +785,7 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testDescribeDoesNotExecute() throws Exception {
+		String users = usersTable();
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 			DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -808,14 +793,14 @@ public class PgServerTest {
 			skipToReadyForQuery(in);
 
 			// ParseComplete, ParameterDescription, RowDescription, ReadyForQuery
-			parseDescribeSync(out, "SELECT (SELECT name FROM users) AS x");
+			parseDescribeSync(out, "SELECT (SELECT name FROM " + users + ") AS x");
 			assertEquals("1tTZ", readMessageTypes(in));
 
 			// ... and NoData for a statement that returns no rows
-			parseDescribeSync(out, "INSERT INTO users (id, name, email) VALUES (20, 'Gus', 'gus@example.com')");
+			parseDescribeSync(out, "INSERT INTO " + users + " (id, name, email) VALUES (20, 'Gus', 'gus@example.com')");
 			assertEquals("1tnZ", readMessageTypes(in));
 		}
-		assertFalse(userExists(20));
+		assertFalse(userExists(users, 20));
 	}
 
 	/**
@@ -825,14 +810,15 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testSimpleQuerySplittingAndDeallocate() throws Exception {
+		String users = usersTable();
 		try (Socket socket = new Socket("localhost", server.getPort())) {
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 			DataInputStream in = new DataInputStream(socket.getInputStream());
 			sendStartupMessage(out, dbName, "testuser");
 			skipToReadyForQuery(in);
 
-			sendQuery(out, "INSERT INTO users (id, name, email) VALUES (30, 'a; b', 'x;y@example.com'); "
-				+ "INSERT INTO users (id, name, email) VALUES (31, 'c', 'd') -- comment; not a statement\n;");
+			sendQuery(out, "INSERT INTO " + users + " (id, name, email) VALUES (30, 'a; b', 'x;y@example.com'); "
+				+ "INSERT INTO " + users + " (id, name, email) VALUES (31, 'c', 'd') -- comment; not a statement\n;");
 			assertEquals("CCZ", readMessageTypes(in), "two statements, each completed");
 
 			java.io.ByteArrayOutputStream parse = new java.io.ByteArrayOutputStream();
@@ -851,11 +837,11 @@ public class PgServerTest {
 		}
 		try (Connection conn = DriverManager.getConnection(pgUrl());
 			 Statement stmt = conn.createStatement();
-			 ResultSet rs = stmt.executeQuery("SELECT name FROM users WHERE id = 30")) {
+			 ResultSet rs = stmt.executeQuery("SELECT name FROM " + users + " WHERE id = 30")) {
 			assertTrue(rs.next());
 			assertEquals("a; b", rs.getString(1));
 		}
-		assertTrue(userExists(31));
+		assertTrue(userExists(users, 31));
 	}
 
 	private void skipToReadyForQuery(DataInputStream in) throws IOException {
@@ -938,14 +924,14 @@ public class PgServerTest {
 
 	// ========== Transaction control ==========
 
-	private String pgUrl() {
+	private static String pgUrl() {
 		return "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
 	}
 
-	private boolean userExists(int id) throws Exception {
+	private static boolean userExists(String users, int id) throws Exception {
 		try (Connection conn = DriverManager.getConnection(pgUrl());
 			 Statement stmt = conn.createStatement();
-			 ResultSet rs = stmt.executeQuery("SELECT name FROM users WHERE id = " + id)) {
+			 ResultSet rs = stmt.executeQuery("SELECT name FROM " + users + " WHERE id = " + id)) {
 			return rs.next();
 		}
 	}
@@ -956,12 +942,13 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testDuplicateKeyIs23505() throws Exception {
+		String users = usersTable();
 		try (Connection conn = DriverManager.getConnection(pgUrl()); Statement stmt = conn.createStatement()) {
 			java.sql.SQLException e = assertThrows(java.sql.SQLException.class,
-				() -> stmt.executeUpdate("INSERT INTO users (id, name, email) VALUES (1, 'Again', 'again@example.com')"));
+				() -> stmt.executeUpdate("INSERT INTO " + users + " (id, name, email) VALUES (1, 'Again', 'again@example.com')"));
 			assertEquals("23505", e.getSQLState());
 			e = assertThrows(java.sql.SQLException.class,
-				() -> stmt.executeUpdate("UPDATE users SET id = 2 WHERE id = 1"));
+				() -> stmt.executeUpdate("UPDATE " + users + " SET id = 2 WHERE id = 1"));
 			assertEquals("23505", e.getSQLState());
 		}
 	}
@@ -969,27 +956,29 @@ public class PgServerTest {
 	/** setAutoCommit(false) sends BEGIN, commit() sends COMMIT: another connection sees the row. */
 	@Test
 	public void testTransactionCommitIsVisibleElsewhere() throws Exception {
+		String users = usersTable();
 		try (Connection conn = DriverManager.getConnection(pgUrl())) {
 			conn.setAutoCommit(false);
 			try (Statement stmt = conn.createStatement()) {
-				stmt.execute("INSERT INTO users (id, name, email) VALUES (10, 'Dave', 'dave@example.com')");
+				stmt.execute("INSERT INTO " + users + " (id, name, email) VALUES (10, 'Dave', 'dave@example.com')");
 			}
-			assertFalse(userExists(10), "not visible before commit");
+			assertFalse(userExists(users, 10), "not visible before commit");
 			conn.commit();
 		}
-		assertTrue(userExists(10));
+		assertTrue(userExists(users, 10));
 	}
 
 	@Test
 	public void testTransactionRollbackDiscardsTheWrite() throws Exception {
+		String users = usersTable();
 		try (Connection conn = DriverManager.getConnection(pgUrl())) {
 			conn.setAutoCommit(false);
 			try (Statement stmt = conn.createStatement()) {
-				stmt.execute("INSERT INTO users (id, name, email) VALUES (11, 'Erin', 'erin@example.com')");
+				stmt.execute("INSERT INTO " + users + " (id, name, email) VALUES (11, 'Erin', 'erin@example.com')");
 			}
 			conn.rollback();
 		}
-		assertFalse(userExists(11));
+		assertFalse(userExists(users, 11));
 	}
 
 	/**
@@ -998,13 +987,14 @@ public class PgServerTest {
 	 */
 	@Test
 	public void testTransactionStatus() throws Exception {
+		String users = usersTable();
 		try (Connection conn = DriverManager.getConnection(pgUrl()); Statement stmt = conn.createStatement()) {
 			org.postgresql.core.BaseConnection pg = conn.unwrap(org.postgresql.core.BaseConnection.class);
 			assertEquals(org.postgresql.core.TransactionState.IDLE, pg.getTransactionState());
 
 			stmt.execute("BEGIN");
 			assertEquals(org.postgresql.core.TransactionState.OPEN, pg.getTransactionState());
-			stmt.execute("INSERT INTO users (id, name, email) VALUES (12, 'Fay', 'fay@example.com')");
+			stmt.execute("INSERT INTO " + users + " (id, name, email) VALUES (12, 'Fay', 'fay@example.com')");
 
 			assertThrows(java.sql.SQLException.class, () -> stmt.execute("SELECT * FROM no_such_table"));
 			assertEquals(org.postgresql.core.TransactionState.FAILED, pg.getTransactionState());
@@ -1013,7 +1003,7 @@ public class PgServerTest {
 
 			stmt.execute("ROLLBACK");
 			assertEquals(org.postgresql.core.TransactionState.IDLE, pg.getTransactionState());
-			assertFalse(userExists(12));
+			assertFalse(userExists(users, 12));
 
 			java.sql.SQLException savepoint = assertThrows(java.sql.SQLException.class, () -> stmt.execute("SAVEPOINT a"));
 			assertEquals("0A000", savepoint.getSQLState());

@@ -28,11 +28,13 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.store.StructureCheckTest;
 import convex.test.Samples;
 
 public class PeerTest {
@@ -66,6 +68,18 @@ public class PeerTest {
 		// Run a query
 		assertEquals(RT.cvm(3L), (p.executeQuery(Reader.read("(+ 1 2)")).getResult()));
 		
+	}
+
+	/** A query's structure is checked before it runs */
+	@Test
+	public void testQueryWithInvalidStructure() {
+		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
+		String badTree="80"+StructureCheckTest.badTreeBody();
+		ResultContext rc=p.executeQuery(Reader.read("(count (quote #["+badTree+"]))"));
+		assertEquals(ErrorCodes.FORMAT,rc.getErrorCode());
+
+		// The same query over a valid vector runs
+		assertEquals(CVMLong.create(256),p.executeQuery(Reader.read("(count (quote "+Vectors.repeat(CVMLong.ONE,256)+"))")).getResult());
 	}
 
 	@Test

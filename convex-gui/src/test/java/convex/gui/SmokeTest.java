@@ -1,7 +1,9 @@
 package convex.gui;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import java.awt.GraphicsEnvironment;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -12,7 +14,6 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AArrayBlob;
@@ -34,7 +35,6 @@ import convex.lattice.fs.DLPath;
  * Smoke tests for convex-gui infrastructure classes.
  * These test pure logic and data models — no GUI/Swing interactions required.
  */
-@ExtendWith(GUIFixtureExtension.class)
 public class SmokeTest {
 
 	// ========== StateModel ==========
@@ -365,7 +365,7 @@ public class SmokeTest {
 
 	/** Creates a DLFSBrowser backed by a temporary Etch store */
 	private static convex.gui.dlfs.DLFSBrowser createTempBrowser() throws IOException {
-		GUITest.assumeGUI(); // DLFSBrowser extends AbstractGUI, needs display
+		assumeFalse(GraphicsEnvironment.isHeadless()); // DLFSBrowser extends AbstractGUI, needs display
 		File tempDb = File.createTempFile("dlfs-test-", ".db");
 		tempDb.deleteOnExit();
 		return new convex.gui.dlfs.DLFSBrowser(tempDb);

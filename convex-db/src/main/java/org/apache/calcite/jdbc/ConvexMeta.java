@@ -1,5 +1,7 @@
 package org.apache.calcite.jdbc;
 
+import java.sql.SQLException;
+
 import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.schema.SchemaPlus;
 
@@ -14,7 +16,8 @@ import convex.db.lattice.SQLDatabase;
  * uses Convex's lattice component fork/sync model:
  * <ul>
  *   <li><b>BEGIN</b> (setAutoCommit(false)): forks the SQLDatabase component</li>
- *   <li><b>COMMIT</b>: syncs the fork back into the live database</li>
+ *   <li><b>COMMIT</b>: syncs a writable fork back into the live database;
+ *       a read-only snapshot is discarded</li>
  *   <li><b>ROLLBACK</b>: discards the fork</li>
  * </ul>
  *
@@ -23,7 +26,8 @@ import convex.db.lattice.SQLDatabase;
  * connections continue to read from the live cursor.
  *
  * <p>An optional durability action, supplied by the driver for store-backed
- * databases, runs after each commit and when the connection closes.
+ * databases, runs after each writable commit and when a writable connection closes.
+ * A read-only connection requests it only to retain the save obligation of earlier writes.
  *
  * <p>Must live in {@code org.apache.calcite.jdbc} to access the package-private
  * CalciteConnectionImpl.
@@ -34,6 +38,11 @@ public class ConvexMeta extends CalciteMetaImpl {
 
 	/** Saves published state durably, or null for an in-memory database. */
 	private final Runnable durability;
+	private final boolean permanentlyReadOnly;
+	private boolean readOnly;
+	private boolean savePending;
+	/** Retained only for a reversible JDBC setting, never for a restricted binding. */
+	private ConvexSchema writableSchema;
 
 	/** The forked database for the current transaction, or null if not in a transaction. */
 	private SQLDatabase txDatabase;
@@ -50,11 +59,17 @@ public class ConvexMeta extends CalciteMetaImpl {
 	private boolean inSync = false;
 
 	protected ConvexMeta(CalciteConnectionImpl connection, Runnable durability) {
+		this(connection, durability, false);
+	}
+
+	protected ConvexMeta(CalciteConnectionImpl connection, Runnable durability, boolean readOnly) {
 		super(connection,
 			CalciteMetaTableFactoryImpl.INSTANCE,
 			CalciteMetaColumnFactoryImpl.INSTANCE);
 		this.calciteConnection = connection;
 		this.durability = durability;
+		this.permanentlyReadOnly = readOnly;
+		this.readOnly = readOnly;
 	}
 
 	/** Creates a meta for an in-memory database. */
@@ -68,14 +83,19 @@ public class ConvexMeta extends CalciteMetaImpl {
 	 * @param durability Saves published state durably, or null for none
 	 */
 	public static ConvexMeta create(AvaticaConnection connection, Runnable durability) {
-		return new ConvexMeta((CalciteConnectionImpl) connection, durability);
+		return create(connection, durability, false);
+	}
+
+	/** Creates transaction handling with an immutable upper bound on write access. */
+	public static ConvexMeta create(AvaticaConnection connection, Runnable durability, boolean readOnly) {
+		return new ConvexMeta((CalciteConnectionImpl) connection, durability, readOnly);
 	}
 
 	/** Syncs fork to parent and saves, then starts a new fork if still in manual-commit mode. */
 	@Override
 	public void commit(ConnectionHandle ch) {
 		if (txDatabase != null) {
-			txDatabase.sync();
+			if (!readOnly) txDatabase.sync();
 			endTransaction();
 		}
 		save();
@@ -95,8 +115,14 @@ public class ConvexMeta extends CalciteMetaImpl {
 	}
 
 	private void save() {
-		if (durability != null) durability.run();
+		if ((!readOnly || savePending) && durability != null) {
+			durability.run();
+			savePending = false;
+		}
 	}
+
+	/** Retains the save obligation of earlier writes when the caller later becomes read-only. */
+	public void writeAttempted() { if (durability != null) savePending = true; }
 
 	/** Discards fork, then starts a new fork if still in manual-commit mode. */
 	@Override
@@ -120,34 +146,41 @@ public class ConvexMeta extends CalciteMetaImpl {
 
 	/** Detects autoCommit transitions from the requested connProps. */
 	private ConnectionProperties doConnectionSync(ConnectionHandle ch, ConnectionProperties connProps) {
-		ConnectionProperties result = super.connectionSync(ch, connProps);
-
-		boolean committed = false;
-		try {
-			// Read from connProps (the request), not result (Calcite internal state)
-			boolean newAutoCommit = connProps.isAutoCommit();
-			if (newAutoCommit != autoCommit) {
-				if (!newAutoCommit) {
-					beginTransaction();
-					if (txDatabase != null) {
-						autoCommit = false;
-					}
-				} else {
-					if (txDatabase != null) {
-						txDatabase.sync();
-						endTransaction();
-						committed = true;
-					}
-					autoCommit = true;
-				}
-			}
-		} catch (Exception e) {
-			// connProps.isAutoCommit() throws if not explicitly set (e.g. during init)
+		Boolean requestedReadOnly = connProps.isReadOnly();
+		if (Boolean.FALSE.equals(requestedReadOnly) && permanentlyReadOnly) {
+			throw new RuntimeException(new SQLException("Database binding is permanently read-only", "25006"));
 		}
-		// Enabling autoCommit commits the open transaction; save failures must surface
-		if (committed) save();
-
-		return result;
+		if (requestedReadOnly != null && requestedReadOnly != readOnly) {
+			if (!autoCommit) {
+				throw new RuntimeException(new SQLException("Cannot change read-only mode during a transaction", "25001"));
+			}
+			String name = getSchemaName();
+			ConvexSchema schema = name == null ? null : findConvexSchema(name);
+			if (schema != null) {
+				if (requestedReadOnly) {
+					writableSchema = schema;
+					schema = new ConvexSchema(schema.getDatabase().readOnly(), name);
+				} else if (writableSchema != null) {
+					schema = writableSchema;
+					writableSchema = null;
+				}
+				calciteConnection.getRootSchema().add(name, schema);
+			}
+			readOnly = requestedReadOnly;
+		}
+		// Missing properties are null, not requests to reset the connection defaults.
+		Boolean requestedAutoCommit = connProps.isAutoCommit();
+		if (requestedAutoCommit != null && requestedAutoCommit != autoCommit) {
+			if (!requestedAutoCommit) {
+				beginTransaction();
+			} else if (txDatabase != null) {
+				if (!readOnly) txDatabase.sync();
+				endTransaction();
+				save();
+			}
+			autoCommit = requestedAutoCommit;
+		}
+		return super.connectionSync(ch, connProps);
 	}
 
 	/** Forks the SQLDatabase and swaps the connection's schema to the fork. */

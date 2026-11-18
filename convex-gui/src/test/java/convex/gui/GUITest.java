@@ -1,10 +1,12 @@
 package convex.gui;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -51,16 +53,30 @@ public class GUITest {
 	static {
 		try {
 			Toolkit.init();
+			// One peer: no test needs more than the primary server.
 			// REST API on port 0 (random): tests must not contend for the default port
-			manager=PeerGUI.create(3,AKeyPair.generate(),0);
+			manager=PeerGUI.create(1,AKeyPair.generate(),0);
 			SERVER=manager.getPrimaryServer();
 			CONVEX=Convex.connect(SERVER);
 		} catch (HeadlessException e) {
 			// ensure null manager
 			manager=null;
 		} catch (PeerException e) {
+			closeAfterFailedSetup(e);
 			throw new Error(e);
-		} 
+		} catch (RuntimeException | Error e) {
+			closeAfterFailedSetup(e);
+			throw e;
+		}
+	}
+
+	/** A class that fails to initialise never reaches closeFixture, so its setup closes what it opened */
+	private static void closeAfterFailedSetup(Throwable failure) {
+		try {
+			closeFixture();
+		} catch (Throwable closeFailure) {
+			failure.addSuppressed(closeFailure);
+		}
 	}
 	
 	/**
@@ -73,11 +89,15 @@ public class GUITest {
 	}
 
 	static synchronized void closeFixture() {
-		if (manager==null) return;
-		manager.close();
+		Convex convex=CONVEX;
+		PeerGUI gui=manager;
 		manager=null;
 		CONVEX=null;
 		SERVER=null;
+		// The client closes before the network it connects to
+		assertAll("Close the shared GUI network",
+			() -> { if (convex!=null) convex.close(); },
+			() -> { if (gui!=null) gui.close(); });
 	}
 
 	/**
@@ -105,8 +125,8 @@ public class GUITest {
 		AKeyPair genesis=AKeyPair.generate();
 		AWalletEntry existing=HotWalletEntry.create(genesis,"Test genesis key");
 		keyRing.add(existing);
-		try {
-			PeerGUI gui=PeerGUI.create(1,genesis,0);
+		// Closing again after the window has closed it does nothing
+		try (PeerGUI gui=PeerGUI.create(1,genesis,0)) {
 			Server server=gui.getPrimaryServer();
 			AccountKey peerKey=server.getKeyPair().getAccountKey();
 			assertTrue(server.isLive());
@@ -128,6 +148,16 @@ public class GUITest {
 		} finally {
 			keyRing.remove(existing);
 		}
+	}
+
+	/** A Peer Manager that fails to launch leaves none of its temporary keys in the key ring. */
+	@Test
+	public void testFailedPeerManagerLaunchRemovesItsKeys() {
+		GUITest.assumeGUI();
+		AKeyPair genesis=AKeyPair.generate();
+		// No peers to manage, which fails once the genesis key is in the key ring, whichever step notices
+		assertThrows(Throwable.class,() -> PeerGUI.create(0,genesis,0));
+		assertNull(KeyRing.get().find(genesis.getAccountKey()));
 	}
 
 	/**
@@ -153,15 +183,18 @@ public class GUITest {
 	public void testHackerTools() {
 		GUITest.assumeGUI();
 		
-		HackerTools tools=new HackerTools();
-		assertNotNull(tools.tabs);
+		try (HackerTools tools=new HackerTools()) {
+			assertNotNull(tools.tabs);
+		}
 	}
-	
+
 	@Test
 	public void testClientTools() {
 		GUITest.assumeGUI();
-		
-		REPLClient client=new REPLClient(CONVEX);
-		assertNotNull(client.tabs);
+
+		// Closing the client leaves the shared connection open: the caller owns it
+		try (REPLClient client=new REPLClient(CONVEX)) {
+			assertNotNull(client.tabs);
+		}
 	}
 }

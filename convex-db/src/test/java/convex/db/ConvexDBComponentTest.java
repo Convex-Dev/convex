@@ -1,5 +1,6 @@
 package convex.db;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -7,7 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -21,6 +27,7 @@ import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLTable;
 import convex.lattice.LatticeHost;
+import convex.lattice.MergeConflictException;
 
 /** Tests Convex DB components over a hosted root: state and forks travel through cursors. */
 public class ConvexDBComponentTest {
@@ -28,8 +35,20 @@ public class ConvexDBComponentTest {
 	private static final String DB_NAME="component-test";
 	private static final String TABLE_NAME="items";
 
-	private static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host() {
-		return LatticeHost.create(Maps.empty(),new MemoryStore());
+	/** Hosts this test created, closed after it */
+	private final List<LatticeHost<?>> hosts=new ArrayList<>();
+
+	@AfterEach
+	public void closeHosts() {
+		List<Executable> cleanup=new ArrayList<>();
+		for (LatticeHost<?> host:hosts) cleanup.add(host::close);
+		assertAll("Close this test's hosts",cleanup);
+	}
+
+	private LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host() {
+		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host=LatticeHost.create(Maps.empty(),new MemoryStore());
+		hosts.add(host);
+		return host;
 	}
 
 	private static SQLDatabase createDatabase(ConvexDB cdb) {
@@ -86,6 +105,25 @@ public class ConvexDBComponentTest {
 		var published=original.cursor().get();
 		fork.sync();
 		assertSame(published,original.cursor().get());
+	}
+
+	/** A fork of the whole collection publishes alone, but refuses to reconcile a concurrent change. */
+	@Test
+	public void testCollectionForkRefusesConcurrentChanges() {
+		ConvexDB cdb=ConvexDB.connect(host(),RowLWW::merge);
+		SQLDatabase db=createDatabase(cdb);
+		ConvexDB fork=cdb.fork();
+		assertTrue(fork.database(DB_NAME).tables().insert(TABLE_NAME,1,"forked"));
+		assertTrue(db.tables().insert(TABLE_NAME,2,"concurrent"));
+		var current=cdb.cursor().get();
+
+		assertThrows(MergeConflictException.class,fork::sync);
+		assertSame(current,cdb.cursor().get());
+
+		ConvexDB alone=cdb.fork();
+		assertTrue(alone.database(DB_NAME).tables().insert(TABLE_NAME,3,"alone"));
+		alone.sync();
+		assertNotNull(db.tables().selectByKey(TABLE_NAME,CVMLong.create(3)));
 	}
 
 	/** A database is the unit of forking: its table store and tables are live views. */

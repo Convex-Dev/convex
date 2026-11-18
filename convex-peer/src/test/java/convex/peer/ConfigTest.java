@@ -34,11 +34,11 @@ public class ConfigTest {
 	@Test public void testStoreSetup() throws ConfigException {
 		// Empty config should create a default new store
 		HashMap<Keyword,Object> config=new HashMap<>();
-		EtchStore store=Config.ensureStore(config);
-		assertNotNull(store);
-		
-		assertTrue(store.getFile().exists());
-		store.close();
+		try (EtchStore store=Config.ensureStore(config)) {
+			assertNotNull(store);
+
+			assertTrue(store.getFile().exists());
+		}
 	}
 
 	@Test public void testConfiguredEtchStore() throws Exception {
@@ -171,35 +171,37 @@ public class ConfigTest {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 
-		{ // just a peer keypair
-			Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,kp);
-			Server s=API.launchPeer(config);
-			assertSame(kp,s.getKeyPair());
-			Peer p=s.getPeer();
-			assertTrue(p.getConsensusState().getPeers().containsKey(peerKey));
-			assertEquals(0,p.getFinalityPoint());
-			// Fresh network defaults to the latest supported protocol version
-			assertEquals(Migrations.MAX_VERSION,p.getConsensusState().getProtocolVersion());
-			s.close();
+		{ // just a peer keypair, apart from an in-memory store and any free port
+			Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,kp,Keywords.STORE,new MemoryStore(),Keywords.PORT,0);
+			try (Server s=API.launchPeer(config)) {
+				assertSame(kp,s.getKeyPair());
+				Peer p=s.getPeer();
+				assertTrue(p.getConsensusState().getPeers().containsKey(peerKey));
+				assertEquals(0,p.getFinalityPoint());
+				// Fresh network defaults to the latest supported protocol version
+				assertEquals(Migrations.MAX_VERSION,p.getConsensusState().getProtocolVersion());
+			}
 		}
 	}
 
 	@Test public void testServerOwnsImplicitTemporaryStore() throws Exception {
-		Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,AKeyPair.generate());
-		Server server=API.launchPeer(config);
-		EtchStore store=(EtchStore)server.getStore();
-		File file=store.getFile();
-		assertTrue(file.exists());
+		Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,AKeyPair.generate(),Keywords.PORT,0);
+		try (Server server=API.launchPeer(config)) {
+			EtchStore store=(EtchStore)server.getStore();
+			File file=store.getFile();
+			assertTrue(file.exists());
 
-		server.close();
-		assertThrows(IOException.class,store::flush);
+			server.close();
+			assertThrows(IOException.class,store::flush);
+		}
 	}
 
 	@Test public void testServerDoesNotCloseCallerStore() throws Exception {
 		TrackingMemoryStore store=new TrackingMemoryStore();
 		Map<Keyword,Object> config=Config.of(
 				Keywords.KEYPAIR,AKeyPair.generate(),
-				Keywords.STORE,store);
+				Keywords.STORE,store,
+				Keywords.PORT,0);
 		Server server=API.launchPeer(config);
 
 		server.close();
@@ -214,7 +216,8 @@ public class ConfigTest {
 		file.deleteOnExit();
 		Map<Keyword,Object> config=Config.of(
 				Keywords.KEYPAIR,AKeyPair.generate(),
-				Keywords.STORE,file.getPath());
+				Keywords.STORE,file.getPath(),
+				Keywords.PORT,0);
 
 		Server server=API.launchPeer(config);
 		server.close();
@@ -263,10 +266,12 @@ public class ConfigTest {
 		// A network pinned to protocol version 0 launches with the raw genesis
 		Map<Keyword,Object> config=Config.of(
 				Keywords.KEYPAIR,AKeyPair.generate(),
+				Keywords.STORE,new MemoryStore(),
+				Keywords.PORT,0,
 				Keywords.PROTOCOL_VERSION,0L);
-		Server s=API.launchPeer(config);
-		assertEquals(0L,s.getPeer().getConsensusState().getProtocolVersion());
-		s.close();
+		try (Server s=API.launchPeer(config)) {
+			assertEquals(0L,s.getPeer().getConsensusState().getProtocolVersion());
+		}
 	}
 
 }

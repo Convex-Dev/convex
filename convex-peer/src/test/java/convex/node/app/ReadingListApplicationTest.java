@@ -34,7 +34,8 @@ class ReadingListApplicationTest {
 	/** Routes the books region to its component, which owns merging and publication. */
 	static final class ReadingListApp extends SingleRegion<Books> {
 		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) {
-			super(host.cursor(),BOOKS,new Books(host.cursor().path(BOOKS)).fork());
+			// The books are the host index's entry, created by their first publication
+			super(host.cursor(),BOOKS,(AForkableCursor<ASet<AString>> region) -> new Books(region).fork());
 		}
 		void recommend(String title) { component().recommend(title); }
 		ASet<AString> titles() { return component().titles(); }
@@ -43,7 +44,7 @@ class ReadingListApplicationTest {
 	/** Staged recommendations, combined by union both on receipt and on publication. */
 	static final class Books extends UnionSet<AString> {
 		Books(AForkableCursor<ASet<AString>> cursor) { super(cursor); }
-		@Override protected Books rebind(AForkableCursor<ASet<AString>> cursor) {
+		@Override public Books rebind(AForkableCursor<ASet<AString>> cursor) {
 			return new Books(cursor);
 		}
 		@Override public Books fork() { return rebind(storage.fork()); }

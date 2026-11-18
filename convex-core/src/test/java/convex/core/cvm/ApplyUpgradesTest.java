@@ -250,7 +250,7 @@ public class ApplyUpgradesTest {
 	public void testEnvironmentalFailure() {
 		// Peer-local conditions (e.g. missing store data) also resolve to withdraw,
 		// with the cause preserved so the peer layer can report accurately: this is
-		// a resync-and-retry condition, not a release update
+		// recovered by repairing or resyncing the store, not by a release update
 		long activation = TS + 1000;
 		State pending = INIT_STATE.withProtocolGlobals(0, upgrades(activation));
 

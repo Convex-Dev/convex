@@ -63,7 +63,8 @@ command is not a confirmed snapshot; inspect the recovery state first.
 On Windows use the same NTFS volume. Live writes after cutover use the collected
 file, so they do not update the snapshot. The FFM backend releases mappings on
 close; `MappedByteBuffer` mappings may defer installation at the live filename.
-Etch follows its completion marker until a later open can finish installation.
+Etch follows its completion marker until a later open can finish installation;
+`validate` and `repair` follow it too, so pass the store's own filename.
 
 `repair` is the offline salvage path for a dirty or damaged source. It holds an
 exclusive source lock, scans through physical EOF, and writes only canonical

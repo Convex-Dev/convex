@@ -108,7 +108,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	@Override
-	protected LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
+	public LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
 		return new LatticeKV(cursor,replicaID,clock);
 	}
 
@@ -503,7 +503,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<AString, AVector<ACell>> mergePublication(
+	protected Index<AString, AVector<ACell>> reconcile(
 			Index<AString, AVector<ACell>> own,
 			Index<AString, AVector<ACell>> other) {
 		return KVStoreLattice.INSTANCE.merge(own,other);

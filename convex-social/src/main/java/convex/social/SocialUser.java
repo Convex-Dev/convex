@@ -96,18 +96,13 @@ public class SocialUser extends IndexComponent<Keyword, ACell> implements Transa
 	}
 
 	@Override
-	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected SocialUser rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+	public SocialUser rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new SocialUser(cursor,ownerDid,clock);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+	protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
 		return SocialLattice.INSTANCE.merge(own,other);
 	}
 }

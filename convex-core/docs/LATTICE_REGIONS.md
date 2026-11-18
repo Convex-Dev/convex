@@ -31,7 +31,8 @@ Lattice.ROOT (KeyedLattice)
 ├── :queue → OwnerLattice(MapLattice(TopicLattice))         Message queues
 ├── :p2p   → P2PLattice (KeyedLattice)                      Peer discovery metadata
 │   └── :nodes → OwnerLattice(LWWLattice)                     Signed NodeInfo per node
-└── :local → LocalLattice                                   Application state that is not shared externally
+├── :local → LocalLattice                                   Application state that is not shared externally
+└── :app   → KeyedLattice                                   Each application's own state, by name
 ```
 
 Source of truth: `convex.lattice.Lattice.ROOT`.
@@ -46,6 +47,7 @@ Source of truth: `convex.lattice.Lattice.ROOT`.
 | `:queue` | `OwnerLattice(MapLattice(TopicLattice))` | `[:queue <ownerKey> :value <topicName>]` | Per-owner message topics with partitions and metadata ([CAD040](https://docs.convex.world/docs/cad/lattice_queue)). |
 | `:p2p :nodes` | `OwnerLattice(LWWLattice)` | `[:p2p :nodes <accountKey>]` | Each node publishes `SignedData<NodeInfo>`: transport URIs, Points of Presence, relay willingness, regions of interest, software version, timestamp. Latest timestamp wins. Each node keeps only the records it wants; the record format belongs to `convex-p2p`. |
 | `:local` | `LocalLattice` | `[:local <peerKey>]` | Any application state that is not meant to be shared externally, such as configuration, keys or what a node has seen of other nodes, in a slot signed by the node's key. One application instance writes and manages it. It may be replicated, for example for backup, but is not published for others to use. Each service keeps one timestamped record in the slot, through an `ALocalComponent`. |
+| `:app` | `KeyedLattice` | `[:app <application-name>]` | Each application's own state under its name ([CAD045](https://docs.convex.world/docs/cad/lattice_apps)). The core root registers no application: a node adds those it hosts, and merges ignore incoming applications it has not registered. |
 
 The `:value` paths in the table describe local unsigned views only. Deliver the
 complete owner's envelope when replicating these regions.
@@ -56,8 +58,9 @@ The `:p2p` region and its use for discovery are designed in
 ## Adding application state
 
 ```java
-KeyedLattice applications = KeyedLattice.create(Keyword.intern("myapp"), myAppLattice);
-KeyedLattice root = Lattice.ROOT.addLattice(Keyword.intern("app"), applications);
+KeyedLattice apps = (KeyedLattice) Lattice.ROOT.<Index<Keyword, ACell>>path(Keywords.APP);
+KeyedLattice root = Lattice.ROOT.addLattice(Keywords.APP,
+	apps.addLattice(Keyword.intern("myapp"), myAppLattice));
 ```
 
 This declares merge semantics at `[:app :myapp]`; it does not register a receiving

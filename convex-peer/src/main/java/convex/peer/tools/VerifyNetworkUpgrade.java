@@ -1,6 +1,7 @@
 package convex.peer.tools;
 
 import java.io.File;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -44,6 +46,7 @@ import convex.core.init.Init;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.FutureUtils;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
@@ -104,11 +107,25 @@ public class VerifyNetworkUpgrade {
 	static final long TIMEOUT_MILLIS = 60000;
 	static final int MAX_DIFF_ITEMS = 20;
 
-	static int failures = 0;
-	static int warnings = 0;
-	static Report report = new Report();
+	// Each invocation owns its diagnostics; independent rehearsals may run concurrently.
+	int failures = 0;
+	int warnings = 0;
+	final Report report = new Report();
+	private final PrintStream output;
+
+	public VerifyNetworkUpgrade() {
+		this(System.out);
+	}
+
+	VerifyNetworkUpgrade(PrintStream output) {
+		this.output=Objects.requireNonNull(output);
+	}
 
 	public static void main(String[] args) throws Exception {
+		System.exit(new VerifyNetworkUpgrade().runMain(args));
+	}
+
+	private int runMain(String[] args) throws Exception {
 		String host = DEFAULT_HOST;
 		boolean hostSet = false;
 		Path reportPath = Path.of("upgrade-rehearsal-report.json");
@@ -125,9 +142,6 @@ public class VerifyNetworkUpgrade {
 				throw new IllegalArgumentException("Only one host may be specified");
 			}
 		}
-		failures = 0;
-		warnings = 0;
-		report = new Report();
 		report.put("tool", VerifyNetworkUpgrade.class.getName());
 		report.put("release", Utils.getVersion());
 		report.put("commit", firstNonBlank(System.getProperty("convex.commit"), System.getenv("GITHUB_SHA")));
@@ -154,7 +168,7 @@ public class VerifyNetworkUpgrade {
 			}
 		} catch (Throwable t) {
 			fail("Unhandled rehearsal failure: " + t);
-			t.printStackTrace(System.out);
+			t.printStackTrace(output);
 		}
 
 		info("");
@@ -173,10 +187,10 @@ public class VerifyNetworkUpgrade {
 		} catch (Exception e) {
 			fail("Could not write machine-readable report " + reportPath + ": " + e);
 		}
-		System.exit((failures > 0) ? 1 : ((warnings > 0) ? 2 : 0));
+		return (failures > 0) ? 1 : ((warnings > 0) ? 2 : 0);
 	}
 
-	static void run(Convex convex) throws Exception {
+	void run(Convex convex) throws Exception {
 		// ==================== Phase 1: SYNC ====================
 		heading("Phase 1: SYNC");
 
@@ -255,7 +269,7 @@ public class VerifyNetworkUpgrade {
 	 *
 	 * @return The replayed state on success, null if replay failed or was skipped
 	 */
-	static State replay(State genesis, Belief belief, AccountKey remotePeerKey,
+	State replay(State genesis, Belief belief, AccountKey remotePeerKey,
 			State remoteState, Hash stateHash, Long advertisedStatePosition) {
 		SignedData<Order> so = belief.getOrders().get(remotePeerKey);
 		if (so == null) {
@@ -301,7 +315,7 @@ public class VerifyNetworkUpgrade {
 			s=replayPeer.getConsensusState();
 		} catch (Throwable t) {
 			fail("Peer replay threw while computing position " + targetPosition + ": " + t);
-			t.printStackTrace(System.out);
+			t.printStackTrace(output);
 			return null;
 		}
 		info("Replayed to position " + targetPosition + " through Peer startup path in "
@@ -338,7 +352,7 @@ public class VerifyNetworkUpgrade {
 	 * Finds an Order prefix matching a state from a legacy status response.
 	 * Returns -1 if current code does not reproduce the remote state at any finalised prefix.
 	 */
-	static long findLegacyStatePosition(State genesis, AVector<SignedData<Block>> blocks,
+	long findLegacyStatePosition(State genesis, AVector<SignedData<Block>> blocks,
 			long finalityPoint, State remoteState) {
 		State s=genesis;
 		if (s.equals(remoteState)) return 0;
@@ -359,7 +373,7 @@ public class VerifyNetworkUpgrade {
 	 * Applies this release's pending migrations directly to the given state and
 	 * verifies the result. Returns the upgraded state, or null on failure.
 	 */
-	static State verifyMigration(State pre) {
+	State verifyMigration(State pre) {
 		long fromVersion = pre.getProtocolVersion();
 		report.put("preMigrationHash", pre.getHash());
 		report.put("preMigrationVersion", fromVersion);
@@ -374,7 +388,7 @@ public class VerifyNetworkUpgrade {
 			upgraded = Migrations.applyTo(pre, Migrations.MAX_VERSION);
 		} catch (Throwable t) {
 			fail("Migration threw: " + t);
-			t.printStackTrace(System.out);
+			t.printStackTrace(output);
 			return null;
 		}
 		pass("Migrations applied without error");
@@ -490,7 +504,7 @@ public class VerifyNetworkUpgrade {
 	 * invoked as a governance account exactly as the bootstrap transaction does, and
 	 * the activation boundary is crossed for real.
 	 */
-	static void verifyBoundary(State pre, State upgraded) {
+	void verifyBoundary(State pre, State upgraded) {
 		if (pre.getProtocolVersion() >= Migrations.MAX_VERSION) {
 			info("No pending migrations — boundary rehearsal skipped");
 			return;
@@ -566,7 +580,7 @@ public class VerifyNetworkUpgrade {
 			afterBlock = scheduled.applyBlock(block).getState();
 		} catch (Throwable t) {
 			fail("applyBlock threw crossing the boundary: " + t);
-			t.printStackTrace(System.out);
+			t.printStackTrace(output);
 			return;
 		}
 		if (afterBlock.getProtocolVersion() == Migrations.MAX_VERSION) {
@@ -627,7 +641,7 @@ public class VerifyNetworkUpgrade {
 	 *         sequences, peer set) — as opposed to pure cost accounting (balances,
 	 *         memory, fee/memory globals, peer stake records)
 	 */
-	static boolean diffStates(State expected, State actual, String expectedName, String actualName) {
+	boolean diffStates(State expected, State actual, String expectedName, String actualName) {
 		if (expected.equals(actual)) {
 			info("  (states are identical)");
 			return false;
@@ -756,14 +770,14 @@ public class VerifyNetworkUpgrade {
 	// ==================== Check helpers ====================
 
 	@SuppressWarnings("unchecked")
-	static <T extends ACell> T acquire(Convex convex, Hash hash, Class<T> type, String desc) {
+	<T extends ACell> T acquire(Convex convex, Hash hash, Class<T> type, String desc) {
 		if (hash == null) {
 			fail("No hash provided for " + desc);
 			return null;
 		}
 		try {
 			long start = System.currentTimeMillis();
-			ACell cell = convex.acquire(hash).get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			ACell cell = FutureUtils.getOrCancel(convex.acquire(hash), TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 			info("Acquired " + desc + " in " + (System.currentTimeMillis() - start) + "ms"
 					+ " (memory size " + cell.getMemorySize() + " bytes)");
 			return (T) cell;
@@ -773,7 +787,7 @@ public class VerifyNetworkUpgrade {
 		}
 	}
 
-	static void validateCell(ACell cell, String desc) {
+	void validateCell(ACell cell, String desc) {
 		try {
 			cell.validate();
 			pass("Validated " + desc);
@@ -783,7 +797,7 @@ public class VerifyNetworkUpgrade {
 	}
 
 	/** Evaluates code locally against the state and checks the result. */
-	static void evalCheck(State state, String code, ACell expected, String desc) {
+	void evalCheck(State state, String code, ACell expected, String desc) {
 		try {
 			Context ctx = Context.create(state, Init.GENESIS_ADDRESS).eval(Reader.read(code));
 			if (ctx.isExceptional()) {
@@ -799,7 +813,7 @@ public class VerifyNetworkUpgrade {
 	}
 
 	/** Evaluates code and checks the string result contains/omits given fragments. */
-	static void containsCheck(State state, String code, String mustContain, String mustNotContain, String desc) {
+	void containsCheck(State state, String code, String mustContain, String mustNotContain, String desc) {
 		try {
 			Context ctx = Context.create(state, Init.GENESIS_ADDRESS).eval(Reader.read(code));
 			if (ctx.isExceptional()) {
@@ -819,30 +833,30 @@ public class VerifyNetworkUpgrade {
 
 	// ==================== Output ====================
 
-	static void heading(String s) {
-		System.out.println();
-		System.out.println("==== " + s + " ====");
+	void heading(String s) {
+		output.println();
+		output.println("==== " + s + " ====");
 	}
 
-	static void info(String s) {
-		System.out.println(s);
+	void info(String s) {
+		output.println(s);
 	}
 
-	static void pass(String s) {
+	void pass(String s) {
 		report.record("pass", s);
-		System.out.println("[PASS] " + s);
+		output.println("[PASS] " + s);
 	}
 
-	static void warn(String s) {
+	void warn(String s) {
 		warnings++;
 		report.record("warning", s);
-		System.out.println("[WARN] " + s);
+		output.println("[WARN] " + s);
 	}
 
-	static void fail(String s) {
+	void fail(String s) {
 		failures++;
 		report.record("failure", s);
-		System.out.println("[FAIL] " + s);
+		output.println("[FAIL] " + s);
 	}
 
 	static String firstNonBlank(String... values) {

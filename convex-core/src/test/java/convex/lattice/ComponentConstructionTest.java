@@ -19,7 +19,6 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.cursor.Transactions;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
@@ -116,9 +115,8 @@ public class ComponentConstructionTest {
 	}
 
 	@Test public void projectionSupportsAtomicOperationsAndTransactions() {
-		var root=new TransactionalRootCursor<Index<Keyword,ACell>>(null);
+		var root=new Root<Index<Keyword,ACell>>(null);
 		AForkableCursor<CVMLong> view=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
-		assertTrue(view.supportsExclusiveTransactions());
 		assertTrue(view.compareAndSet(null,CVMLong.ONE));
 		assertFalse(view.compareAndSet(null,CVMLong.TWO));
 		assertEquals(CVMLong.ONE,view.getAndSet(CVMLong.TWO));

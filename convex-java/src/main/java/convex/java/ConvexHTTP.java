@@ -6,8 +6,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 
 import convex.api.ContentTypes;
@@ -43,12 +49,50 @@ import convex.core.util.Utils;
 public class ConvexHTTP extends convex.api.Convex {
 	
 	private final URI uri;
+	/** Shared by every client in the process, so never closed by one */
 	private final HttpClient httpClient;
+
+	/** Exchanges sent and not yet completed, which closing cancels */
+	private final Set<CompletableFuture<?>> exchanges = ConcurrentHashMap.newKeySet();
+	private volatile boolean closed;
 
 	protected ConvexHTTP(Address address, AKeyPair keyPair, URI uri) {
 		super(address, keyPair);
 		this.uri = uri;
 		this.httpClient = HTTPClients.getDefault();
+	}
+
+	/**
+	 * Sends a request, tracked until its exchange completes, and makes its result with the
+	 * given handler. A request sent once this client is closed, or still waiting when it
+	 * closes, has the result {@link Result#CLOSED_CONNECTION}.
+	 */
+	private <T> CompletableFuture<Result> send(HttpRequest request, HttpResponse.BodyHandler<T> body,
+			BiFunction<HttpResponse<T>, Throwable, Result> handler) {
+		if (closed) return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
+		CompletableFuture<HttpResponse<T>> exchange = httpClient.sendAsync(request, body);
+		exchanges.add(exchange);
+		// Tracked before the check, so a close either finds this exchange or it is cancelled here
+		if (closed) exchange.cancel(true);
+		return exchange.handle((response, error) -> {
+			// First, so that nothing completed stays tracked whatever the handler does
+			exchanges.remove(exchange);
+			if (closed && (error != null)) return Result.CLOSED_CONNECTION;
+			return handler.apply(response, error);
+		});
+	}
+
+	/** A handler that makes a result from a response, and passes a failure on as it is. */
+	private static <T> BiFunction<HttpResponse<T>, Throwable, Result> onResponse(Function<HttpResponse<T>, Result> toResult) {
+		return (response, error) -> {
+			if (error != null) throw (error instanceof CompletionException c) ? c : new CompletionException(error);
+			return toResult.apply(response);
+		};
+	}
+
+	/** Exchanges sent and not yet completed, for tests */
+	int getPendingExchangeCount() {
+		return exchanges.size();
 	}
 	
 	public static ConvexHTTP connect(URI uri,Address address, AKeyPair keyPair) {
@@ -68,7 +112,7 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	public boolean isConnected() {
-		return true;
+		return !closed;
 	}
 
 	@Override
@@ -82,11 +126,7 @@ public class ConvexHTTP extends convex.api.Convex {
 				.POST(HttpRequest.BodyPublishers.ofByteArray(Format.encodeMultiCell(signedTransaction, true).getBytes()))
 				.build();
 		
-		CompletableFuture<HttpResponse<byte[]>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
-		CompletableFuture<Result> result = future.thenApply(response->{
-			return extractResult(response);
-		});
-		return result;
+		return send(request, HttpResponse.BodyHandlers.ofByteArray(), onResponse(this::extractResult));
 	}
 
 	private Result extractResult(HttpResponse<byte[]> response) {
@@ -135,11 +175,10 @@ public class ConvexHTTP extends convex.api.Convex {
 				.GET()
 				.build();
 		
-		CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-		CompletableFuture<Result> result = future.handle((response, ex) -> {
+		return send(request, HttpResponse.BodyHandlers.ofString(), (response, ex) -> {
 			// In case of exception, convert to result
 			if (ex != null) return Result.fromException(ex).withSource(SourceCodes.NET);
-			
+
 			// Check HTTP status code
 			int statusCode = response.statusCode();
 			if (statusCode != 200) {
@@ -162,7 +201,6 @@ public class ConvexHTTP extends convex.api.Convex {
 				return Result.fromException(e).withSource(SourceCodes.NET);
 			}
 		});
-		return result;
 	}
 
 	@Override
@@ -188,11 +226,10 @@ public class ConvexHTTP extends convex.api.Convex {
 				.POST(requestBody)
 				.build();
 		
-		CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-		CompletableFuture<Result> result = future.handle((response,ex)->{
+		return send(request, HttpResponse.BodyHandlers.ofString(), (response,ex)->{
 			// In case of exception, convert to result
 			if (ex!=null) return Result.fromException(ex).withSource(SourceCodes.NET);
-			
+
 			String body = response.body();
 			try {
 				// System.out.println(body);
@@ -205,7 +242,6 @@ public class ConvexHTTP extends convex.api.Convex {
 				return Result.fromException(e).withSource(SourceCodes.NET);
 			}
 		});
-		return result;
 	}
 	
 	@Override
@@ -219,8 +255,7 @@ public class ConvexHTTP extends convex.api.Convex {
 				.POST(HttpRequest.BodyPublishers.ofByteArray(rawData.getBytes()))
 				.build();
 
-		return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
-				.thenApply(this::extractResult);
+		return send(request, HttpResponse.BodyHandlers.ofByteArray(), onResponse(this::extractResult));
 	}
 
 	@Override
@@ -229,9 +264,16 @@ public class ConvexHTTP extends convex.api.Convex {
 		return messageRaw(encoded);
 	}
 
+	/**
+	 * Closes this client for good. Requests still waiting have their exchanges cancelled
+	 * and the result {@link Result#CLOSED_CONNECTION}, as do any sent later. The shared
+	 * HTTP client stays open for other clients.
+	 */
 	@Override
 	public void close() {
-		// The process-wide HTTP client and its connection pool are shared.
+		closed = true;
+		// Cancelling with interruption ends the exchange itself, not only its future
+		for (CompletableFuture<?> exchange : List.copyOf(exchanges)) exchange.cancel(true);
 	}
 
 	@Override

@@ -2,6 +2,9 @@ package convex.net.impl.netty;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -16,11 +19,15 @@ import convex.core.Constants;
 import convex.core.crypto.TLS;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.NullStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
+import convex.net.IncomingHandler;
+import convex.net.ingress.Ingress;
 import convex.peer.Config;
 import convex.peer.Server;
 import io.netty.bootstrap.ServerBootstrap;
@@ -29,6 +36,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.EventLoop;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
@@ -73,6 +81,14 @@ public class NettyServer extends AServer {
 	 */
 	private Function<Message, Predicate<Message>> deliver;
 
+	/** Ingress that decodes and routes messages of accepted connections, or null to deliver on the event loop. */
+	private volatile Ingress ingress;
+	private volatile Function<Message, Predicate<Message>> ingressRoute;
+
+	private volatile Function<AConnection,IncomingHandler> connectionHandler;
+	/** Close futures on channels can finish before their disconnect callbacks. */
+	private final Set<AcceptedConnection> incomingHandlers=ConcurrentHashMap.newKeySet();
+
 	protected synchronized static EventLoopGroup getEventLoopGroup() {
 		if (bossGroup!=null) return bossGroup;
 		// Boss group only accepts inbound connections — 1 thread is sufficient.
@@ -113,7 +129,6 @@ public class NettyServer extends AServer {
 
 	public static NettyServer create(Server server) {
 		NettyServer ns=new NettyServer(null);
-		ns.receiveAction=server.getReceiveAction();
 		ns.deliver=server::deliverMessage;
 		Object maxConns=server.getConfig().get(Keywords.MAX_CONNECTIONS);
 		if (maxConns!=null) {
@@ -152,7 +167,8 @@ public class NettyServer extends AServer {
              public void initChannel(SocketChannel ch) throws Exception {
             	 // Enforce connection limit
             	 if (clientChannels.size() >= maxClientConnections) {
-            		 log.warn("Connection limit reached ({}), rejecting {}",
+            		 // Any remote can cause this, so it is a routine failure, not a warning
+            		 log.debug("Connection limit reached ({}), rejecting {}",
             			 maxClientConnections, ch.remoteAddress());
             		 ch.close();
             		 return;
@@ -165,13 +181,33 @@ public class NettyServer extends AServer {
 					 ch.pipeline().addLast(ssl);
 				 }
 
-				 Function<Message, Predicate<Message>> deliverFn =
-					 (deliver != null) ? deliver : wrapReceiveAction();
+				 Function<AConnection,IncomingHandler> factory=connectionHandler;
+				 AcceptedConnection accepted=(factory==null) ? null : new AcceptedConnection(getDisconnectAction(),incomingHandlers,ch.eventLoop());
+				 if (accepted!=null) incomingHandlers.add(accepted);
+				 Function<Message, Predicate<Message>> deliverFn = (accepted!=null) ? accepted :
+					 ((deliver != null) ? deliver : wrapReceiveAction());
 				 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
+				 if (accepted!=null) inbound.setFailureAction(accepted::reportFailure);
             	 NettyServerConnection conn=new NettyServerConnection(ch,inbound,outbound);
             	 inbound.setConnection(conn);
-            	 inbound.setDisconnectAction(getDisconnectAction()); // #566: eager per-connection cleanup
+				 Ingress in=ingress;
+				 // A connection handler's own dispatch replaces the ingress
+				 if (accepted==null && in!=null) inbound.setSink(NettyInboundHandler.sinkOf(in.register(conn,ingressRoute,inbound::resume)));
+				 inbound.setDisconnectAction((accepted==null) ? getDisconnectAction() : accepted);
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
+				 if (accepted!=null) {
+					 accepted.connection=conn;
+					 try {
+						 accepted.open(factory.apply(conn));
+					 } catch (Throwable e) {
+						 // A failure setting up one connection refuses that connection alone
+						 Utils.checkRequestFailure(e);
+						 log.warn("Incoming connection handler failed: {}: {}",e.getClass().getSimpleName(),e.getMessage());
+						 log.debug("Incoming connection handler failure",e);
+						 if (!accepted.opened) accepted.open(null);
+						 conn.close();
+					 }
+				 }
              }
          })
          .option(ChannelOption.SO_BACKLOG, 128) // Backlog of incoming connection requests
@@ -253,14 +289,24 @@ public class NettyServer extends AServer {
 				}
 			}
 		}
+		if (!eventLoopThread) {
+			// The socket may already have left clientChannels when its cleanup calls close.
+			for (AcceptedConnection accepted:incomingHandlers) {
+				if (accepted.eventLoop.inEventLoop()) { eventLoopThread=true; break; }
+			}
+		}
 		channel = null;
+		Cleanup cleanup=new Cleanup();
 		ChannelFuture serverClose = (serverChannel != null) ? serverChannel.close() : null;
 		var clientsClose = clientChannels.close();
 		if (!eventLoopThread) {
-			if (serverClose != null) serverClose.syncUninterruptibly();
-			clientsClose.awaitUninterruptibly();
+			// A failed close of the listening socket still leaves clients to close
+			if (serverClose != null) cleanup.run(serverClose::syncUninterruptibly);
+			cleanup.run(clientsClose::awaitUninterruptibly);
+			for (AcceptedConnection accepted:incomingHandlers) cleanup.run(accepted.finished::join);
 		}
-		outbound.close();
+		cleanup.run(outbound::close);
+		cleanup.finish();
 	}
 
 	public void waitForClose() throws InterruptedException {
@@ -289,6 +335,19 @@ public class NettyServer extends AServer {
 	}
 
 	/**
+	 * Routes the messages of connections accepted after this call through an ingress,
+	 * which decodes and routes them on its workers instead of the event loop. A
+	 * connection handler ({@link #setConnectionHandler}) takes precedence.
+	 *
+	 * @param ingress Ingress to register accepted connections with
+	 * @param route Delivery of each message, called on an ingress worker
+	 */
+	public void setIngress(Ingress ingress, Function<Message, Predicate<Message>> route) {
+		this.ingressRoute=route;
+		this.ingress=ingress;
+	}
+
+	/**
 	 * Sets the non-blocking message delivery function used by the Netty inbound handler.
 	 * A returned predicate is retried on a virtual thread while reads on that channel pause.
 	 *
@@ -296,6 +355,88 @@ public class NettyServer extends AServer {
 	 */
 	public void setMessageDelivery(Function<Message, Predicate<Message>> handler) {
 		this.deliver=handler;
+	}
+
+	/**
+	 * Chooses a handler once per accepted connection, before its first message.
+	 * The factory must not block; null results refuse the connection. A null factory
+	 * restores the message-delivery/receive-action configuration. Changes affect new
+	 * connections only. Matching replies bypass the selected handler.
+	 *
+	 * @param factory connection handler factory, or null for legacy delivery
+	 * @see IncomingHandler
+	 */
+	public void setConnectionHandler(Function<AConnection,IncomingHandler> factory) {
+		connectionHandler=factory;
+	}
+
+	/** One object per connection; dispatch allocates nothing and looks up no handler map. */
+	static final class AcceptedConnection implements Function<Message,Predicate<Message>>,Consumer<AConnection> {
+		private final Consumer<AConnection> disconnected;
+		private final Set<AcceptedConnection> owners;
+		private final EventLoop eventLoop;
+		private final CompletableFuture<Void> finished=new CompletableFuture<>();
+		AConnection connection;
+		IncomingHandler handler;
+		private boolean closed;
+		private boolean opened;
+
+		AcceptedConnection(Consumer<AConnection> disconnected) {
+			this(disconnected,null,null);
+		}
+
+		AcceptedConnection(Consumer<AConnection> disconnected,Set<AcceptedConnection> owners,EventLoop eventLoop) {
+			this.disconnected=disconnected;
+			this.owners=owners;
+			this.eventLoop=eventLoop;
+		}
+
+		void open(IncomingHandler incoming) {
+			// A factory may close its socket synchronously before returning a handler.
+			handler=incoming;
+			opened=true;
+			if (closed) {
+				finish();
+				return;
+			}
+			if (incoming==null) connection.close();
+		}
+
+		@Override public Predicate<Message> apply(Message message) {
+			if (closed || handler==null) return null;
+			try {
+				if (connection.completeRequest(message)) return null;
+			} catch (convex.core.exceptions.BadFormatException e) {
+				throw new IllegalArgumentException("Malformed response",e);
+			}
+			return handler.handle(message);
+		}
+
+		void reportFailure(Throwable failure) {
+			IncomingHandler target=handler;
+			if (target!=null) target.onFailure(failure);
+			else log.warn("Incoming message handling failed",failure);
+		}
+
+		@Override public void accept(AConnection connection) {
+			if (closed) return;
+			closed=true;
+			if (opened) finish();
+		}
+
+		private void finish() {
+			try {
+				if (handler!=null) handler.close();
+			} finally {
+				handler=null;
+				try {
+					if (disconnected!=null) disconnected.accept(connection);
+				} finally {
+					if (owners!=null) owners.remove(this);
+					finished.complete(null);
+				}
+			}
+		}
 	}
 
 	/**

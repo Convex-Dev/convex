@@ -41,6 +41,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Cleanup;
 import convex.core.util.FileUtils;
 import convex.core.util.Shutdown;
 import convex.dlfs.DLFSServer;
@@ -50,6 +51,7 @@ import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
@@ -313,7 +315,8 @@ public class DLFSBrowser extends AbstractGUI {
 			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
 			var rule=OWNER_LATTICE.signingFor(ownerKey);
-			drivesCursor = SignedCursor.create(rootCursor.path(ownerKey),v -> rule.sign(ctx,v));
+			// The owner's slot is created by its first write, so it is the map's entry and not a plain path
+			drivesCursor = SignedCursor.create(new MapComponent<>(rootCursor).path(ownerKey),v -> rule.sign(ctx,v));
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
@@ -383,24 +386,31 @@ public class DLFSBrowser extends AbstractGUI {
 	 * them.
 	 */
 	private void closeNodeServer() {
-		if (nodeServer != null) {
-			try {
-				nodeServer.close();
-			} catch (IOException e) {
-				log.warn("Error closing NodeServer: {}", e.getMessage());
-			}
-			try {
-				nodeServer.getHost().close();
-			} catch (IOException e) {
-				log.warn("Error saving DLFS store: {}", e.getMessage());
-			}
-			nodeServer = null;
+		var node = nodeServer;
+		EtchStore store = etchStore;
+		nodeServer = null;
+		etchStore = null;
+		// Any failure closing the node still leaves the host to save and the store to close
+		Cleanup cleanup = new Cleanup();
+		if (node != null) {
+			cleanup.run(() -> {
+				try {
+					node.close();
+				} catch (IOException e) {
+					log.warn("Error closing NodeServer: {}", e.getMessage());
+				}
+			});
+			cleanup.run(() -> {
+				try {
+					node.getHost().close();
+				} catch (IOException e) {
+					log.warn("Error saving DLFS store: {}", e.getMessage());
+				}
+			});
 		}
-		drives.clear();
-		if (etchStore != null) {
-			etchStore.close();
-			etchStore = null;
-		}
+		cleanup.run(drives::clear);
+		if (store != null) cleanup.run(store::close);
+		cleanup.finish();
 	}
 
 	private void stopWebDAV() {
@@ -465,10 +475,9 @@ public class DLFSBrowser extends AbstractGUI {
 		DLFSLocal removed = drives.remove(name);
 		if (removed == null) return false;
 
-		// Clear from lattice
+		// Clear from lattice: a write to the drives map, so an entry already gone is nothing to do
 		AString cvmName = Strings.create(name);
-		AForkableCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
-		cursor.set(null);
+		drivesCursor.update(current -> (current==null || !current.containsKey(cvmName))?current:current.assoc(cvmName,null));
 
 		// Remove from WebDAV
 		if (webdavServer != null) {
@@ -693,11 +702,11 @@ public class DLFSBrowser extends AbstractGUI {
 
 	/** Stops the browser, WebDAV and the NodeServer, saving state. Runs once, as {@link #shutdownTask}. */
 	private void shutdown() {
-		if (panel != null) {
-			panel.close();
-		}
-		stopWebDAV();
-		closeNodeServer();
+		Cleanup cleanup = new Cleanup();
+		if (panel != null) cleanup.run(panel::close);
+		cleanup.run(this::stopWebDAV);
+		cleanup.run(this::closeNodeServer);
+		cleanup.finish();
 	}
 
 	public static void main(String[] args) {

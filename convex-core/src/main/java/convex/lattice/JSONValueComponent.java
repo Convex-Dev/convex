@@ -16,6 +16,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ATransformCursor;
+import convex.lattice.cursor.PathCursor;
 
 /**
  * Addresses a value location as its JSON rendering shows it. Vectors and lists take
@@ -149,6 +150,12 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 			return value==MISSING?null:(ACell)value;
 		}
 
+		/** A path writes only where its entry exists; writing back what is there finds a container that cannot hold it. */
+		@Override protected void requireWritable(ACell stored) {
+			write(stored,view(stored));
+			if (viewValue(stored)==MISSING) throw new PathWriteException("Cannot write an entry that does not exist",keys,keys.length-1);
+		}
+
 		@Override protected ACell write(ACell current,ACell value) {
 			ACell container=current;
 			for (int i=0; i<keys.length && container!=null; i++) {
@@ -159,11 +166,11 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 				}
 				container=((ADataStructure<?>)container).get(keys[i]);
 			}
-			return LatticeOps.assocExisting(current,value,keys);
+			return PathCursor.assocExisting(current,value,keys);
 		}
 	}
 
-	@Override protected JSONValueComponent<V> rebind(AForkableCursor<V> cursor) {
+	@Override public JSONValueComponent<V> rebind(AForkableCursor<V> cursor) {
 		return new JSONValueComponent<>(cursor);
 	}
 

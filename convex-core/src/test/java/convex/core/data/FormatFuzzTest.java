@@ -31,7 +31,6 @@ public class FormatFuzzTest {
 		// create lots of random blobs, see what is readable
 
 		for (int i = 0; i < NUM_FUZZ; i++) {
-			long stime = System.currentTimeMillis();
 			Random r = new Random(i * 1007);
 			Blob b = Blob.createRandom(r, 200);
 			try {
@@ -41,11 +40,6 @@ public class FormatFuzzTest {
 				/* OK */
 			} catch (MissingDataException e) {
 				/* also OK */
-			}
-
-			// This happens sometimes, e.g. if loading Core Def 
-			if (System.currentTimeMillis() > stime + 100) {
-				System.err.println("Slow fuzz test: " + b);
 			}
 		}
 	}

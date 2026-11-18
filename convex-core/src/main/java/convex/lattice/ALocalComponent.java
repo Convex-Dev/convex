@@ -12,8 +12,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Persister;
 
 /**
  * Base for one service's state that is not shared externally, held as a record at
@@ -23,8 +23,10 @@ import convex.lattice.cursor.Persister;
  * <p>The component works on a private copy of its record. Edits through
  * {@link #cursor()} stamp {@code :timestamp} from the supplied clock but neither sign
  * nor reach the owner's slot. {@link #sync()} writes the record into the slot with a
- * single signature; a sync with nothing changed writes and signs nothing. When to
- * sync is the application's policy, so any number of edits can share one signature.</p>
+ * single signature; a sync with nothing changed writes and signs nothing. If both the
+ * copy and the slot's record have changed since the copy last synced, the sync fails
+ * with a {@link MergeConflictException} and changes nothing. When to sync is the
+ * application's policy, so any number of edits can share one signature.</p>
  *
  * <p>Several services share an owner's slot, each under its own keyword, and each
  * sync re-signs the slot. Records merge whole, the newer {@code :timestamp} winning
@@ -33,8 +35,9 @@ import convex.lattice.cursor.Persister;
  * into the private copy, for the next sync to publish. Where records come from is the
  * application's decision: {@code :local} is not exchanged with other nodes.</p>
  *
- * <p>Given a persistence function, such as the host's, {@link #persist()} writes the
- * private copy to the application's store without signing or touching the slot.</p>
+ * <p>Given a persistence function, such as the host's, {@link #sync()} also writes the
+ * private copy to the application's store, and {@link #persist()} does so without
+ * signing or touching the slot.</p>
  */
 public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword,ACell>> {
 
@@ -54,7 +57,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	 */
 	protected ALocalComponent(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AccountKey owner,
 			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,Supplier<CVMLong> clock,
-			Persister<AHashMap<Keyword,ACell>> persister) {
+			Persister persister) {
 		super(recordPath(root,service,owner,signer).fork(),persister);
 		record=Timestamped.create(storage.withDefault(Maps.empty()),clock);
 	}
@@ -86,11 +89,5 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	public AHashMap<Keyword,ACell> mergeAt(ACell incoming,ACell... path) {
 		if (path.length!=0 || !(incoming instanceof AHashMap<?,?> map)) return cursor().getOrDefault(null);
 		return merge((AHashMap<Keyword,ACell>)map);
-	}
-
-	/** When the slot's record also changed, the newer record wins. */
-	@Override
-	protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
-		return record.getLattice().merge(own,other);
 	}
 }

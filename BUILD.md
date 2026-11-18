@@ -29,15 +29,23 @@ builds do not generate source/Javadoc jars or load Maven Central publishing;
 
 ### Core test execution
 
-Core tests run in one JVM. Jupiter runs classes and methods concurrently with
-separate test instances; classes that need shared setup declare `PER_CLASS`
-explicitly. Vintage runs the existing JUnit 4/quickcheck classes concurrently.
+Core tests run in one JVM using JUnit 6's worker thread pool. Jupiter runs classes
+and methods concurrently with separate test instances by default. Classes that
+share setup use both `@TestInstance(PER_CLASS)` and `@Execution(CONCURRENT)`;
+`PER_CLASS` alone silently serialises their methods. CVM tests inherit both from
+`ACVMTest`, sharing initial setup and forking a context for each test. Keep mutable
+scratch data local to a test. Use a narrow `@ResourceLock` for shared mutable
+resources, or `SAME_THREAD` within a class only when its lifecycle requires it.
+Vintage runs the existing JUnit 4/quickcheck classes concurrently.
 Ordinary persistence tests reuse `Samples.TEST_STORE` and `TEST_STORE2`; private
 stores are reserved for lifecycle, GC, configuration and exact-content tests.
+Ordinary filesystem fixtures can use a static `@TempDir` for one directory per
+class with automatic cleanup; parallel tests must use distinct child paths.
 
 The everyday run covers representative Etch lifecycle configurations and a
-complete rebuild. Exhaustive lifecycle and physical-rebuild format matrices run
-in CI and release builds. To include them locally:
+complete rebuild. Exhaustive lifecycle and physical-rebuild format matrices, and
+the randomised hash map and set merge checks (`HashMergeFuzzTest`), run in CI
+and release builds. To include them locally:
 
 ```bash
 ./mvnw -B test -pl convex-core -am -Dconvex.test.extended=true
@@ -46,6 +54,32 @@ in CI and release builds. To include them locally:
 In Eclipse, add `-Dconvex.test.extended=true` to the JUnit launch's VM arguments
 for the exhaustive run; omit it for everyday testing. No tests are forked into
 separate processes to obtain concurrency.
+
+### CLI, database and local integration tests
+
+CLI and database Jupiter tests also use the worker thread pool, with concurrent
+classes and methods in a single test JVM. The properties live in each module's
+`src/test/resources/junit-platform.properties`, so Eclipse uses the same defaults.
+CLI tests replacing standard input take `@ResourceLock("java.lang.System.in")`.
+Keystore tests share one file per class and lock its mutations. Local network
+fixtures share their servers across methods and use OS-assigned ports.
+
+Database tests use distinct registry names per invocation and close only the
+managed instances they own; suite-wide driver cleanup would close other tests'
+active connections. Private stores remain appropriate for persistence lifecycle
+tests. Keep command state and JDBC connections local to each test.
+
+`CLTester` bounds asynchronous completion and cancellation, reports worker errors
+to JUnit, and includes captured output in failed assertions. Use try-with-resources
+for asynchronous commands so failed assertions still stop the worker. Local child
+process tests also bound startup and shutdown and isolate temporary files for
+cleanup on Windows. These tests run cross-platform; CI remains Linux-based.
+
+Client correctness coverage in `convex-integration` also runs locally in the
+ordinary test phase: JSON, native HTTP and TCP clients share one in-memory peer
+and REST server, with separate clients and accounts per test. Deployment smoke
+checks are a separate opt-in profile; see
+[the integration module](convex-integration/README.md#deployment-smoke-checks).
 
 ### Property tests
 
@@ -80,6 +114,24 @@ A test run that hangs at near-zero CPU is a class-initialisation deadlock: run
 `ClassInitCycles` (`convex-integration/src/test/java/convex/tools`) to find the
 cycle.
 
+### Expected log records
+
+Tests write warnings and errors only, and the test logging configuration sets no
+logger's level: a warning a test does not expect is written. A test that causes
+one on purpose captures it, so it is asserted and not written:
+
+- Core tests use `convex.test.LogCapture`, which takes what a `System.Logger` logs
+  on the test's own thread.
+- Peer tests use `convex.peer.ExpectedLogs`. A scope takes the records carrying an
+  object the test created, such as the exception it injects or the component it
+  isolates, or the records of one logger on threads the test owns: its own, or
+  the threads of a component it created. Code a test injects into a component
+  that runs on a shared thread, such as a network event loop, calls
+  `expectOnThisThread()` before failing, so the scope takes the next record of
+  its logger there. A scope is open for the whole life of what logs, and fails if
+  nothing was logged; `ifLogged()` makes one for a site that warns only the first
+  time in the JVM. It needs logback as the test logging backend.
+
 ## CI Workflows
 
 Four GitHub Actions workflows handle continuous integration:
@@ -94,16 +146,14 @@ Static security analysis for the Java codebase (tests run separately in `build.y
 
 ### Release (`release.yml`)
 
-Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). A follow-on `docker` job then builds and pushes `convexlive/convex:<version>` and `convexlive/convex:latest` to Docker Hub.
-
-(The Docker build must be a job inside this workflow: releases created with the workflow `GITHUB_TOKEN` do not fire `release: [published]` events, so a separate workflow triggered on release publication would never run.)
+Run by hand on `master` with the version to release (step 6). Builds and tests that commit, then creates the version tag and a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images; step 10 does that by hand.
 
 ### Docker (`docker.yml`)
 
-Manual-dispatch only: builds a Docker image and pushes a single tag to Docker Hub. Use for snapshot builds or ad-hoc re-publishing.
+Manual-dispatch only: builds a Docker image and pushes it to Docker Hub under the given tag, and also as `latest` when that box is ticked. Use after each release (step 10), for snapshot builds or for ad-hoc re-publishing.
 
 - Snapshot: go to Actions > Docker > Run workflow, set tag to `snapshot`
-- Or via CLI: `gh workflow run docker.yml --ref <branch-or-tag> -f tag=<tag>`
+- Or via CLI: `gh workflow run docker.yml --ref <branch-or-tag> -f tag=<tag>`, adding `-f latest=true` to move `latest` too
 
 Requires two secrets configured in the GitHub repository:
 
@@ -140,11 +190,13 @@ release:
   constant names, dependency bumps, build plumbing, test-only refactors and agent
   tooling. Embedders read the code, so Java API changes share one entry pointing
   at the design notes.
+- A fix for an exploitable flaw gets no entry of its own: at most one general
+  hardening headline, never the flaw or what it allowed.
 - A breaking change gets one entry pointing at its doc.
 
 Then:
 
-- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
+- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the version and heading must match).
 - Commit to `develop` and push it. The release is made from `origin/develop`.
 
 ### 3. Merge to master in a release worktree
@@ -187,10 +239,11 @@ As part of the same version-bump commit, also update:
   grep -rl --include=README.md "<previous-version>" . | xargs sed -i 's/<previous-version>/<new-version>/g'
   ```
 
-- **Downstream docs and website** (separate repos) also hardcode the version and must be bumped in
-  lockstep, otherwise onboarding goes stale:
-  - **`design`** — `convex-java` Maven/Gradle coordinates and `releases/download/<version>/convex.jar`
-    URLs under `docs/tutorial/**` (note: release tags have **no** `v` prefix).
+- **Downstream docs and website** (separate repos) each hold the version in one constant, which
+  must be bumped in lockstep, otherwise onboarding goes stale:
+  - **`design`** — `CONVEX_RELEASE_VERSION` in `src/data/release.mjs`, which fills in the
+    `convex-java` coordinates and `convex.jar` download links across the docs (plain `x.y.z`,
+    with no `v` prefix). Check the pages that use it still match the release.
   - **`convex.world`** — `CONVEX_RELEASE_VERSION` in `src/data/release.ts`, shared by
     the footer and Downloads page (plain `x.y.z`, with no `v` prefix). Deploy the
     website update after the GitHub release is available.
@@ -211,30 +264,17 @@ use it before Maven Central has it.
 
 Quick last-line-of-defence check: the uberjar launches, main class resolves, CLI wiring is intact. Maven Central publishes are irrevocable, so catch uberjar class-path regressions now.
 
-### 6. Push master, then tag
-
-Push `master` first. CI has not yet built its version commit, so wait for the
-Build run on that commit to pass before anything public is tagged:
+### 6. Push master and run the release workflow
 
 ```bash
 git push origin master
-gh run list --commit "$(git rev-parse HEAD)" --workflow build.yml
+gh workflow run release.yml --ref master -f version=0.8.4
 ```
 
-Then tag:
-
-```bash
-git tag 0.8.4
-git push origin 0.8.4
-```
-
-The tag triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
-
-A ruleset restricts release tags to accounts that can bypass it. When the push
-bypasses the rule, git still prints a rule message (`Bypassed rule violations`, or
-`Cannot create ref due to creations being restricted`) followed by `* [new tag]`:
-the tag landed. `GH013` with `! [remote rejected]` means it did not. Confirm with
-`git ls-remote --tags origin 0.8.4`.
+The workflow checks that the version matches the poms, has a changelog section and
+is not yet tagged, then builds and tests `master`. Only when all of that passes does
+it create the tag and the GitHub Release, on the commit it built. A ruleset stops
+release tags being moved or deleted, so a tag is final once created.
 
 ### 7. Confirm GitHub Release is live
 
@@ -246,40 +286,24 @@ Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
 - Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
-- Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
-- Docker images pushed: `convexlive/convex:<version>` and a freshly-updated `latest` at https://hub.docker.com/r/convexlive/convex/tags
+- The release text is the version's changelog section.
 
 Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 
 #### If the release workflow fails
 
-First check whether the failure is transient (e.g. a flaky test, runner hiccup) or a
-real problem with the commit. For a transient failure, re-run the failed jobs on the
-same tag — no tag surgery needed:
-
-```bash
-gh run rerun <run-id> --failed
-```
-
-For a real problem, fix the underlying issue on master, then delete and re-push the tag:
-
-```bash
-# Delete locally and on remote
-git tag -d 0.8.4
-git push origin :refs/tags/0.8.4
-
-# Re-tag on the fixed commit and push
-git tag 0.8.4
-git push origin 0.8.4
-```
-
-A stray GitHub Release created by a failed workflow run also needs to be deleted from the Releases page — `softprops/action-gh-release` will refuse to overwrite a release with the same tag name.
+A failed run creates no tag and no release. Find the cause, fix it on `develop`,
+merge it into the release worktree's `master` as in step 3, push `master` and run
+the workflow again. A failure outside the commit, such as a runner fault, needs only
+`gh run rerun <run-id>`.
 
 ### 8. Deploy to Maven Central
 
-Only after confirming the GitHub Release is live, from the release worktree at the tag:
+Only after confirming the GitHub Release is live, from the release worktree, once
+`git fetch --tags` shows the new tag on its `HEAD`:
 
 ```bash
+git fetch --tags && git describe --tags --exact-match HEAD
 ./mvnw deploy -Prelease
 ```
 
@@ -310,6 +334,16 @@ git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycl
 
 - Add new `## [0.8.5-SNAPSHOT] - Unreleased` section to `CHANGELOG.md` with empty `### Added` / `### Changed` / `### Fixed` subsections.
 - Commit and push `develop`.
+
+### 10. Publish the Docker image
+
+The release workflow does not publish Docker images. Once the tag exists, build the
+image from it and push it under the release version and `latest`, which the
+website's Downloads page names:
+
+```bash
+gh workflow run docker.yml --ref 0.8.4 -f tag=0.8.4 -f latest=true
+```
 
 ## Docker
 

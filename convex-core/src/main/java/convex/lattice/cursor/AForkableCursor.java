@@ -1,13 +1,11 @@
 package convex.lattice.cursor;
 
-import java.util.function.BinaryOperator;
-
 import convex.core.data.ACell;
 
 /**
  * Mutable cursors whose paths are themselves mutable cursors and which can be
  * forked. A fork is an isolated working copy that reconciles with this cursor
- * through a merge function supplied to each sync. Cursors carry no lattice, context or signing policy: the merge function
+ * through a merge function supplied to each reconciliation. Cursors carry no lattice, context or signing policy: the merge function
  * closes over whatever policy its owner chooses. A short atomic edit is a
  * {@link Transactions} draft, and a detached snapshot is simply
  * {@code Root.create(cursor.get())}.
@@ -64,8 +62,11 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 	 * views over forks, never publish enclosing storage or invoke the merge function.
 	 * ForkedCursor overrides this to reconcile at its own destination, and a read-only
 	 * view to refuse it.
+	 *
+	 * @param merge Reconciliation of base, working and destination values
+	 * @return The current value, or nil for absence
 	 */
-	public V sync(BinaryOperator<V> merge) {
+	public V reconcile(ThreeWayMerge<V> merge) {
 		return getOrDefault(null);
 	}
 }

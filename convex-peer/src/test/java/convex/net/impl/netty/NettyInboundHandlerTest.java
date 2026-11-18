@@ -128,6 +128,42 @@ public class NettyInboundHandlerTest {
 		}
 	}
 
+	/** A failed delivery after draining replies must close, not strand the paused connection. */
+	@Test
+	public void testResumedDeliveryFailureClosesConnection() {
+		Message reply=reply();
+		int size=(int) reply.getMessageData().count();
+		var expected=new IllegalStateException("resumed delivery failure");
+		List<Throwable> failures=new ArrayList<>();
+		List<Message> delivered=new ArrayList<>();
+		NettyInboundHandler handler=new NettyInboundHandler(m -> {
+			delivered.add(m);
+			throw expected;
+		},null,LIMIT);
+		handler.setFailureAction(failures::add);
+		EmbeddedChannel channel=new EmbeddedChannel(handler);
+		ServerOutboundQueue queue=new ServerOutboundQueue(size*10,4*size,false);
+		try {
+			NettyServerConnection connection=new NettyServerConnection(channel,handler,queue);
+			handler.setConnection(connection);
+			assertTrue(connection.trySendMessage(reply));
+			assertTrue(connection.trySendMessage(reply));
+			channel.writeInbound(frame(new byte[] {0x31}));
+			channel.writeInbound(frame(new byte[] {0x32}));
+			assertTrue(delivered.isEmpty());
+			assertFalse(channel.config().isAutoRead());
+
+			assertEquals(2,queue.drainBatch());
+			channel.runPendingTasks();
+			assertFalse(channel.isOpen());
+			assertEquals(List.of(expected),failures);
+			assertEquals(1,delivered.size(),"Queued messages must not run after a delivery failure");
+		} finally {
+			queue.close();
+			channel.finishAndReleaseAll();
+		}
+	}
+
 	/** Requests are read as normal while a client's replies stay below the pause mark. */
 	@Test
 	public void testReadingContinuesWithSmallBacklog() {

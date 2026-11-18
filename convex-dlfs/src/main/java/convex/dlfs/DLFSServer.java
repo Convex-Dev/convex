@@ -1,6 +1,8 @@
 package convex.dlfs;
 
 import java.io.Closeable;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
@@ -46,6 +48,18 @@ public class DLFSServer implements Closeable {
 	private String bindHost = DEFAULT_BIND_HOST;
 	private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
 	private Javalin app;
+	private Consumer<Exception> failureHandler;
+
+	/**
+	 * Replaces default logging of unhandled HTTP failures with a per-server reporter.
+	 * Must be configured before start. Receives the original exception on a request
+	 * thread and must not throw; the request still receives HTTP 500.
+	 */
+	public DLFSServer onFailure(Consumer<Exception> handler) {
+		if (app!=null) throw new IllegalStateException("Server already started");
+		failureHandler=Objects.requireNonNull(handler);
+		return this;
+	}
 
 	private DLFSServer(DLFSDriveManager driveManager, PeerAuth peerAuth) {
 		this.driveManager = driveManager;
@@ -128,6 +142,7 @@ public class DLFSServer implements Closeable {
 	 */
 	public void start(int port) {
 		if (app != null) throw new IllegalStateException("Server already started");
+		mcpServer.setMaxRequestBytes(maxRequestSize);
 		Javalin newApp = Javalin.create(config -> {
 			config.http.maxRequestSize = maxRequestSize;
 			config.concurrency.useVirtualThreads = true;
@@ -146,6 +161,10 @@ public class DLFSServer implements Closeable {
 			});
 
 			RoutesConfig routes = config.routes;
+			if (failureHandler!=null) routes.exception(Exception.class,(failure,ctx) -> {
+				try { failureHandler.accept(failure); }
+				finally { ctx.status(500).result("Internal Server Error"); }
+			});
 			routes.exception(IllegalArgumentException.class, (e, ctx) ->
 				ctx.status(400).result("Bad Request: " + e.getMessage()));
 

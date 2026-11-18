@@ -3,6 +3,7 @@ package convex.db.calcite;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 
+import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -172,7 +173,8 @@ public class ConvexColumnType {
 	 * Converts a CVM cell to the Java value Calcite expects in a column of the given type.
 	 * Integers keep their exact value: a {@code BigDecimal} for {@code DECIMAL}, and the
 	 * boxed type of an integer type when the value is in its range. Other cells convert as
-	 * {@link RT#jvm}, with blobs as byte arrays.
+	 * {@link RT#jvm}, with blobs as Calcite ByteString values for binary SQL types
+	 * and byte arrays for untyped columns.
 	 *
 	 * @param cell CVM cell, or null
 	 * @param type Calcite type of the column
@@ -197,7 +199,11 @@ public class ConvexColumnType {
 		if (cell instanceof CVMDouble d && type == SqlTypeName.DECIMAL && Double.isFinite(d.doubleValue())) {
 			return BigDecimal.valueOf(d.doubleValue());
 		}
-		if (cell instanceof ABlob b) return b.getBytes();
+		if (cell instanceof ABlob b) {
+			byte[] bytes = b.getBytes();
+			return (type == SqlTypeName.BINARY || type == SqlTypeName.VARBINARY)
+					? new ByteString(bytes) : bytes;
+		}
 		return RT.jvm(cell);
 	}
 
@@ -241,6 +247,8 @@ public class ConvexColumnType {
 	 *
 	 * @param relType Calcite type from DDL parsing
 	 * @return ConvexColumnType
+	 * @throws IllegalArgumentException if the declared type is unsupported, with a
+	 *         SQLFeatureNotSupportedException (SQLSTATE 0A000) as its cause
 	 */
 	public static ConvexColumnType fromRelDataType(RelDataType relType) {
 		ConvexType base = ConvexType.fromSqlTypeName(relType.getSqlTypeName());

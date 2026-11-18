@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,9 @@ import convex.db.lattice.SQLDatabase;
  */
 class JoinSubqueryTest {
 
+	private static final AtomicLong DB_COUNTER=new AtomicLong();
+	private final String dbName="join_test_"+DB_COUNTER.incrementAndGet();
+
 	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
@@ -31,9 +35,9 @@ class JoinSubqueryTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		cdb = ConvexDB.create(RowLWW::merge);
-		db = cdb.database("join_test");
+		db = cdb.database(dbName);
 		IdentifierPolicy.INSENSITIVE.applyTo(db);
-		cdb.register("join_test");
+		cdb.register(dbName);
 
 		// Create customers table
 		ConvexColumnType[] customerTypes = {
@@ -64,13 +68,14 @@ class JoinSubqueryTest {
 		db.tables().insert("orders", 104L, 3L, 300.00, "completed");
 		db.tables().insert("orders", 105L, 5L, 50.00, "completed"); // customer_id 5 doesn't exist
 
-		conn = DriverManager.getConnection("jdbc:convex:database=join_test");
+		conn = DriverManager.getConnection("jdbc:convex:database="+dbName);
 	}
 
 	@AfterEach
 	void tearDown() throws Exception {
-		if (conn != null) conn.close();
-		if (cdb != null) cdb.unregister("join_test");
+		assertAll("Close this test's connection and database",
+			() -> { if (conn != null) conn.close(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	// ========== INNER JOIN Tests ==========

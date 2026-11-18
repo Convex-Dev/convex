@@ -39,7 +39,8 @@ class NodeShutdownTest {
 		try (var senderStore=new MemoryStore();
 				var receiverStore=new MemoryStore()) {
 			LatticeHost<ASet<ACell>> receiverHost=RelayHost.open(lattice,receiverStore);
-			try (var receiver=new LatticeNode<>(receiverHost,NodeConfig.port(0));
+			try (receiverHost;
+					var receiver=new LatticeNode<>(receiverHost,NodeConfig.port(0));
 					var senderHost=LatticeHost.open(lattice.zero(),senderStore);
 					var sender=new LatticeNode<>(senderHost,NodeConfig.port(0))) {
 				var app=senderHost.addApplication(new LatticeComponent<>(lattice,senderHost.cursor().fork()));

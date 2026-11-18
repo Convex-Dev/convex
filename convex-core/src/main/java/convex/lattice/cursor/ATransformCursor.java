@@ -1,8 +1,6 @@
 package convex.lattice.cursor;
 
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
-import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
@@ -19,7 +17,7 @@ import convex.core.util.Utils;
  * stored value. A view that should hold a value when nothing is stored is built
  * over a source with a default ({@link AForkableCursor#withDefault}). A transform
  * creates no storage by default: its write receives null for absent storage, and
- * a navigating view refuses a missing container with
+ * a navigating view refuses a missing entry or container with
  * {@link convex.lattice.PathWriteException}. A subclass whose definition knows how
  * to build its storage, as a default, an authoring view or a component's
  * projection does, builds it in its write.</p>
@@ -53,10 +51,10 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	/** Rebuilds source storage for a changed view value, including nil. */
 	protected abstract S write(S current,V value);
 
-	/** One write operation; subclasses may retain preparation across its retries. */
-	protected BiFunction<S,V,S> writeOperation() { return this::write; }
+	@Override protected Claim claim() {
+		return base.claim();
+	}
 
-	@Override protected Lock exclusiveLock() { return base.exclusiveLock(); }
 	@Override public V get() { return CursorValues.require(readValue()); }
 
 	@SuppressWarnings("unchecked")
@@ -65,13 +63,19 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 		return stored==MISSING?MISSING:viewValue((S)stored);
 	}
 
-	/** Builds one source update, with preparation shared across retries. */
+	/**
+	 * Refuses a source value in which this view has nowhere to write, whatever value
+	 * is being written. A view that can always place a value has nothing to check.
+	 */
+	protected void requireWritable(S stored) {}
+
+	/** Builds one source update, which leaves the source as it is when the view is unchanged. */
 	private UnaryOperator<S> sourceUpdate(UnaryOperator<V> action) {
-		BiFunction<S,V,S> writer=writeOperation();
 		return current -> {
+			requireWritable(current);
 			V previous=view(current);
 			V next=action.apply(previous);
-			return Utils.equals(previous,next)?current:writer.apply(current,next);
+			return Utils.equals(previous,next)?current:write(current,next);
 		};
 	}
 
@@ -92,12 +96,5 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 
 	@Override public V accumulateAndGet(V value,BinaryOperator<V> action) {
 		return updateAndGet(current -> action.apply(current,value));
-	}
-
-	/** One source CAS attempt, comparing the view by value equality. */
-	@Override public boolean compareAndSet(V expected,V value) {
-		S current=base.getOrDefault(null);
-		if (!Utils.equals(expected,view(current))) return false;
-		return base.compareAndSet(current,sourceUpdate(previous -> value).apply(current));
 	}
 }

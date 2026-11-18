@@ -27,8 +27,10 @@ public class GracefulStopTest {
 				return connector;
 			});
 			GracefulStop.install(config);
-		}).start();
+		});
 		try {
+			// Inside the try, so a server that fails to start is still stopped
+			app.start();
 			Server server = app.jettyServer().server();
 			assertEquals(GracefulStop.STOP_TIMEOUT, server.getStopTimeout());
 			assertNotNull(server.getDescendant(GracefulHandler.class),

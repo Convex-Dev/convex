@@ -40,7 +40,7 @@ public class ValueComponent<V extends ACell> extends ALatticeComponent<V> {
 		return new ValueComponent<>(new PathCursor<ACell>(cursor(),segments,start,end));
 	}
 
-	@Override protected ValueComponent<V> rebind(AForkableCursor<V> cursor) {
+	@Override public ValueComponent<V> rebind(AForkableCursor<V> cursor) {
 		return new ValueComponent<>(cursor);
 	}
 

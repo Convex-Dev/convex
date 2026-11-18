@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -20,11 +21,21 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Cells;
+import convex.core.data.Hash;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
@@ -39,6 +50,7 @@ import convex.lattice.Lattice;
  * complete.
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class LatticeNetworkTest {
 
 	/**
@@ -136,24 +148,23 @@ public class LatticeNetworkTest {
 
 	/**
 	 * Tears down the network after all tests complete by closing all NodeServers
-	 * and stores.
-	 *
-	 * @throws IOException If an IO error occurs during shutdown
+	 * and stores, running every close even if an earlier one fails.
 	 */
 	@AfterAll
-	public void tearDownNetwork() throws IOException {
-		for (LatticeListener transport:transports) transport.close();
-		transports.clear();
-		for (NodeServer<?> server : nodeServers) {
-			server.close();
+	public void tearDownNetwork() {
+		List<Executable> closes=new ArrayList<>();
+		// Listeners, then NodeServers, then stores; null if setup failed before creating them
+		if (transports!=null) for (LatticeListener transport:transports) closes.add(transport::close);
+		if (nodeServers!=null) for (NodeServer<?> server:nodeServers) closes.add(server::close);
+		if (stores!=null) for (AStore store:stores) closes.add(store::close);
+		try {
+			assertAll("Close the network",closes);
+		} finally {
+			if (transports!=null) transports.clear();
+			if (nodeServers!=null) nodeServers.clear();
+			if (propagators!=null) propagators.clear();
+			if (stores!=null) stores.clear();
 		}
-		nodeServers.clear();
-		propagators.clear();
-
-		for (AStore store : stores) {
-			store.close();
-		}
-		stores.clear();
 	}
 
 	/**
@@ -206,8 +217,21 @@ public class LatticeNetworkTest {
 	 */
 	@Test
 	public void testSyncNetwork() throws InterruptedException, ExecutionException, TimeoutException {
-		// Sync the entire network
+		// Publish actual content: equal empty roots would pass even if pulls did nothing.
+		Blob value=Blobs.createRandom(512);
+		Hash hash=value.getHash();
+		Keyword data=Keyword.intern("data");
+		NodeServer<?> source=nodeServers.get(0);
+		source.getCursor().assoc(data,Index.<Hash,ACell>none().assoc(hash,value));
+		source.getHost().sync();
+		propagators.get(0).whenAnnounced(root -> Cells.equals(value,RT.getIn(root,data,hash)))
+				.get(10,TimeUnit.SECONDS);
+
 		syncNetwork();
+		for (LatticePropagator propagator:propagators) {
+			propagator.whenAnnounced(root -> Cells.equals(value,RT.getIn(root,data,hash)))
+					.get(10,TimeUnit.SECONDS);
+		}
 		
 		// Get the lattice value from the first server as the reference
 		NodeServer<?> firstServer = nodeServers.get(0);

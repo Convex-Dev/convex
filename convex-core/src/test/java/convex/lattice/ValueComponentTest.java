@@ -27,6 +27,7 @@ import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Transactions;
+import convex.lattice.cursor.PathCursor;
 
 class ValueComponentTest {
 	private static final AString DATA=Strings.create("data");
@@ -127,7 +128,7 @@ class ValueComponentTest {
 		var root=Root.<ACell>create(Maps.of(DATA,Maps.of(NAME,CVMLong.ONE),RAW,CVMLong.ZERO));
 		var component=new ValueComponent<ACell>(root) {
 			private final AForkableCursor<ACell> exposed=ProjectionCursor.create(root,
-				stored -> RT.getIn(stored,DATA),(stored,value) -> LatticeOps.assocExisting(stored,value,DATA));
+				stored -> RT.getIn(stored,DATA),(stored,value) -> PathCursor.assocExisting(stored,value,DATA));
 			@Override public AForkableCursor<ACell> cursor() { return exposed; }
 		};
 		assertEquals(Maps.of(NAME,CVMLong.ONE),component.value());
@@ -251,8 +252,13 @@ class ValueComponentTest {
 		assertFalse(absent.exists());
 		assertEquals(1,assertThrows(PathWriteException.class,() -> absent.cursor().set(CVMLong.ONE)).getIndex());
 		assertEquals(Maps.empty(),root.get());
-		json.resolve(NAME).cursor().set(CVMLong.ONE);
-		assertEquals(Maps.of(NAME,CVMLong.ONE),root.get());
+		// A key its container does not hold is no place to write; writing the container creates it
+		var name=json.resolve(NAME);
+		assertEquals(0,assertThrows(PathWriteException.class,() -> name.cursor().set(CVMLong.ONE)).getIndex());
+		assertEquals(Maps.empty(),root.get());
+		root.assoc(NAME,CVMLong.ONE);
+		name.cursor().set(CVMLong.TWO);
+		assertEquals(Maps.of(NAME,CVMLong.TWO),root.get());
 	}
 
 	@Test void refusedWritesNameTheKeyInTheResolvedComponent() {
@@ -285,8 +291,8 @@ class ValueComponentTest {
 		assertEquals(1,assertThrows(PathWriteException.class,() -> root.path(NAME,ZERO).set(CVMLong.TWO)).getIndex());
 		assertInstanceOf(IllegalStateException.class,missing);
 		assertEquals(Maps.of(DATA,Vectors.of(CVMLong.ONE),NAME,CVMLong.ONE),root.get());
-		// Unchanged writes touch nothing, so they are not refused
-		json.resolve(RAW,ZERO).cursor().set(null);
+		// A write that changes nothing is refused there too: the refusal is about the place, not the value
+		assertEquals(1,assertThrows(PathWriteException.class,() -> json.resolve(RAW,ZERO).cursor().set(null)).getIndex());
 	}
 
 	@Test void JSONForkRetainsItsResolutionPolicyAndPublicationBoundary() {
@@ -301,6 +307,6 @@ class ValueComponentTest {
 		var conflicting=live.fork();
 		conflicting.cursor().set(CVMLong.ONE);
 		live.cursor().set(CVMLong.TWO);
-		assertThrows(UnsupportedOperationException.class,conflicting::sync);
+		assertThrows(MergeConflictException.class,conflicting::sync);
 	}
 }

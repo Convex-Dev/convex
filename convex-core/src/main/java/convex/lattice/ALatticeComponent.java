@@ -7,17 +7,19 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Path;
+import convex.core.exceptions.StoreException;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
-import convex.lattice.cursor.Persister;
+import convex.lattice.cursor.ThreeWayMerge;
 
 /**
  * Domain operations over a cursor at one path.
  *
  * <p>Lightweight components share a working cursor. Components with an independent
  * publication boundary bind a {@link ForkedCursor} of their destination. Sync
- * supplies this component's publication merge to that fork. Representation changes
+ * supplies this component's {@link #reconcile(ACell,ACell,ACell)} to that fork. Representation changes
  * compose through destination cursor views, such as signing or projection.
  * Publication uses ordinary cursor updates; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
@@ -31,8 +33,8 @@ import convex.lattice.cursor.Persister;
  * when its generic merge and navigation are the intended component behaviour.</p>
  *
  * <p>A component never holds a store. One with working state of its own persists
- * it through a function supplied at construction ({@link #persist()}); others are
- * persisted with their parent, and the root by the host ({@link LatticeHost}).
+ * it through a function supplied at construction, at each {@link #sync()} and on
+ * demand with {@link #persist()}; others are persisted with their parent, and the root by the host ({@link LatticeHost}).
  * Components which own a store for their own data, such as DLFS drives, manage it
  * themselves.</p>
  *
@@ -44,7 +46,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	protected final AForkableCursor<V> storage;
 
 	/** Persists this component's own working state, or null when its parent persists it. */
-	private final Persister<V> persister;
+	private final Persister persister;
+
+	/** This component's {@link #reconcile(ACell,ACell,ACell)}, made once rather than at each sync or commit. */
+	private final ThreeWayMerge<V> reconciler=this::reconcile;
 
 	/** Binds the supplied storage directly, without creating another fork. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
@@ -52,17 +57,31 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/** Binds the supplied storage with the function that persists it, for working state of its own. */
-	protected ALatticeComponent(AForkableCursor<V> cursor,Persister<V> persister) {
+	protected ALatticeComponent(AForkableCursor<V> cursor,Persister persister) {
 		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
 		this.persister=persister;
 	}
 
 	/**
-	 * Binds the same domain operations and configuration to supplied working storage.
-	 * Recreate child and editing views against that storage; do not fork it or retain
-	 * children bound to this instance. Components supporting forks override this hook.
+	 * Makes this component's counterpart over the supplied working storage: the same
+	 * domain operations and configuration on a different cursor. {@link #fork()} and
+	 * each attempt of a {@link TransactionalComponent} transaction call it. Bind the
+	 * cursor directly, without forking it.
+	 *
+	 * <p>Only the cursor's value commits or publishes, so the counterpart keeps there
+	 * whatever must survive. The component decides what happens to everything else it
+	 * holds. Keep a reference to what is only read or is safe to use repeatedly, such
+	 * as a clock, signer or store. Give the counterpart its own copy of what it changes;
+	 * the copy lives and dies with the counterpart. Make child components and editing
+	 * views on the supplied cursor, when they are needed, and never retain those bound
+	 * to this instance. Leave out runtime and lifecycle state.</p>
+	 *
+	 * <p>A transaction may call this several times, and concurrently with other use of
+	 * this component, so it must be cheap and free of side effects. The default refuses.
+	 * A subclass with further configuration overrides this; one that inherits it gets
+	 * a counterpart of its parent class.</p>
 	 */
-	protected ALatticeComponent<V> rebind(AForkableCursor<V> cursor) {
+	public ALatticeComponent<V> rebind(AForkableCursor<V> cursor) {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" does not support rebinding");
 	}
 
@@ -79,13 +98,58 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Reconciles a working snapshot with a concurrently changed destination.
-	 * Called only when both sides changed, within the destination's atomic update.
-	 * Implementations must use the supplied values without mutating working state.
-	 * Staged components must define this operation; live views do not need it.
+	 * Resolves a working snapshot that conflicts with a concurrently changed
+	 * destination. Called by {@link #reconcile(ACell,ACell,ACell)} only when both sides
+	 * changed, within the destination's atomic update. Implementations must use the
+	 * supplied values without mutating working state. A component that can merge the
+	 * destination's changes, such as a CRDT, overrides this; by default a change on both
+	 * sides is a conflict.
+	 *
+	 * @param own Working value
+	 * @param other Destination value
+	 * @return Reconciled value
+	 * @throws MergeConflictException If the two values cannot be reconciled
 	 */
-	protected V mergePublication(V own,V other) {
-		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no publication merge");
+	protected V reconcile(V own,V other) {
+		throw new MergeConflictException(getClass().getSimpleName()+" cannot reconcile changes on both sides");
+	}
+
+	/**
+	 * Reconciles this component's working value with its destination, given the value
+	 * both sides last agreed on. Called whatever changed: a side that changed nothing
+	 * contributes nothing. By default a side that changed nothing takes the other's value, and
+	 * {@link #reconcile(ACell,ACell)} resolves changes on both sides. Changes in
+	 * different places combine only where the component's value is independent place
+	 * by place, as a CRDT's is: an override that combines them must hold to that.
+	 *
+	 * @param base Value both sides last agreed on, or null if there was none
+	 * @param own Working value
+	 * @param other Destination value
+	 * @return Reconciled value
+	 */
+	protected V reconcile(V base,V own,V other) {
+		if (Utils.equals(own,base)) return other;
+		if (Utils.equals(other,base)) return own;
+		// Both changed, even to equal values: two increments to the same count are two changes
+		return reconcile(own,other);
+	}
+
+	/**
+	 * Reconciles values in the form stored at this component's place, for a parent
+	 * that reconciles its own value place by place. Called within the parent's atomic
+	 * update, so it uses only the values given. By default the stored form is the
+	 * working form and this is {@link #reconcile(ACell,ACell,ACell)}; a component
+	 * whose storage stores another form overrides this.
+	 *
+	 * @param base Stored value both sides last agreed on, or null if there was none
+	 * @param own Stored working value
+	 * @param other Stored destination value
+	 * @return Reconciled stored value
+	 * @throws MergeConflictException If the two values cannot be reconciled
+	 */
+	@SuppressWarnings("unchecked")
+	protected ACell reconcileStored(ACell base,ACell own,ACell other) {
+		return reconcile((V)base,(V)own,(V)other);
 	}
 
 	/**
@@ -222,13 +286,85 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Syncs the bound storage with this component's reconciliation policy. A fork
+	 * Brings the children this component manages in working copies of their own into
+	 * its working state. {@link #sync()} calls this before reconciling, and a
+	 * {@link TransactionalComponent} transaction calls it on each attempt's view
+	 * before the draft commits. The default does nothing.
+	 *
+	 * <p>Almost every component keeps the default. A child over a live path writes
+	 * straight into this component's working state, so there is nothing to bring in.
+	 * A child with a working copy of its own is normally synced by whoever owns that
+	 * copy, never by its parent.</p>
+	 *
+	 * <p>Override this only to sync children that this component itself made over
+	 * forks of its own storage, and whose working copies it has undertaken to bring
+	 * in. {@link AKeyedRegions} does so for the regions it makes. Never sync a child
+	 * that was handed in, shared or made by someone else: that would publish another
+	 * owner's staged work. A component that overrides this owns the boundaries it
+	 * creates:</p>
+	 * <ul>
+	 * <li>a child's edits are not in this component until the child syncs;</li>
+	 * <li>a transaction on this component does not see work still pending in this
+	 * instance's children: that work merges with whatever the transaction committed
+	 * when the child next syncs;</li>
+	 * <li>a failure part-way through leaves earlier children synced and later ones
+	 * pending.</li>
+	 * </ul>
+	 *
+	 * <p>A transaction may call this several times, once per attempt, each time on a
+	 * new view. Each child it syncs there is one made on that view, so the child's
+	 * own sync runs within the attempt: its preparation and any persistence function
+	 * it was given must be safe to repeat and must not depend on the attempt
+	 * committing.</p>
+	 */
+	protected void syncChildren() {
+	}
+
+	/** Brings a transaction view's managed children into its draft before the draft commits. */
+	static void completeDraft(Object view) {
+		if (view instanceof ALatticeComponent<?> component) component.syncChildren();
+	}
+
+	/**
+	 * Returns the reconciliation of a transacting component, which reconciles a change
+	 * made under its claim without passing through it, or null if it is not a lattice
+	 * component. A component that cannot reconcile changes on both sides fails that
+	 * commit with a {@link MergeConflictException} naming it.
+	 */
+	@SuppressWarnings("unchecked")
+	static <V extends ACell> ThreeWayMerge<V> reconciler(TransactionalComponent<V,?> source) {
+		if (!(source instanceof ALatticeComponent<?> c)) return null;
+		return ((ALatticeComponent<V>)c).reconciler;
+	}
+
+	/**
+	 * Syncs the bound storage with this component's reconciliation policy, after
+	 * {@link #syncChildren()} has brought in any children it manages. A fork
 	 * publishes into its immediate destination; ordinary cursors return their value.
 	 * Editing-view overrides cannot hide this boundary, and descendant views never
 	 * publish enclosing storage. No host persistence is implied.
+	 *
+	 * <p>A component given a persistence function then persists its working state, so
+	 * what it has published can leave memory. Persisting follows publication so that it
+	 * also covers cells built by a merge. If it fails, the publication stands and this
+	 * reports the failure.</p>
+	 *
+	 * @return Published value
+	 * @throws StoreException If persisting the working state fails
 	 */
 	public V sync() {
-		return storage.sync(this::mergePublication);
+		syncChildren();
+		V published=storage.reconcile(reconciler);
+		if (persister!=null) persistWorkingState();
+		return published;
+	}
+
+	private void persistWorkingState() {
+		try {
+			storage.persist(persister);
+		} catch (IOException e) {
+			throw new StoreException("Unable to persist working state after sync",e);
+		}
 	}
 
 	/**

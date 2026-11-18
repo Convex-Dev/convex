@@ -15,10 +15,9 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>Lightweight domain components use this component's working cursor. Their
  * updates do not sign or publish. Sync reconciles a snapshot with the destination
- * using the unsigned lattice and signs the result outside the destination CAS.
- * An unrelated ancestor write reuses the prepared signature; a conflict changing
- * the payload may require another signature. An unchanged publication does not
- * sign. The bound lattice supplies both the merge and the authorisation rule.</p>
+ * using the unsigned lattice and signs the result in the destination update, signing
+ * again if that update retries. An unchanged publication does not sign.
+ * The bound lattice supplies both the merge and the authorisation rule.</p>
  *
  * <p>This component composes an ordinary fork with a {@link SignedCursor} over its
  * destination. The fork reconciles unsigned values; the cursor signs on publication.
@@ -45,8 +44,8 @@ public class SignedComponent<V extends ACell> extends ASignedComponent<V> {
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
 			Function<V,SignedData<V>> signer) {
-		this(lattice,SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork());
-		Objects.requireNonNull(signer,"Signer must not be null");
+		super(lattice,SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork(),
+			Objects.requireNonNull(signer,"Signer must not be null"));
 	}
 
 	/**
@@ -58,8 +57,16 @@ public class SignedComponent<V extends ACell> extends ASignedComponent<V> {
 		super(lattice,cursor);
 	}
 
-	@Override protected SignedComponent<V> rebind(AForkableCursor<V> cursor) {
-		return new SignedComponent<>(lattice,cursor);
+	/**
+	 * Binds existing unsigned working storage with a source's owner rule and signer,
+	 * for a {@link #rebind}. Signing remains at the original signed destination.
+	 */
+	protected SignedComponent(SignedComponent<V> source,AForkableCursor<V> cursor) {
+		super(source,cursor);
+	}
+
+	@Override public SignedComponent<V> rebind(AForkableCursor<V> cursor) {
+		return new SignedComponent<>(this,cursor);
 	}
 
 	@Override public SignedComponent<V> fork() { return rebind(storage.fork()); }

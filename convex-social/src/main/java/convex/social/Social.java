@@ -196,12 +196,7 @@ public class Social extends OwnedMap<ACell,Index<Keyword,ACell>> implements Tran
 	}
 
 	@Override
-	public Social withCursor(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected Social rebind(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+	public Social rebind(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
 		return new Social(cursor,getLattice(),signer,clock);
 	}
 

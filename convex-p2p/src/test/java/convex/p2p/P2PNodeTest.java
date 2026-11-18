@@ -1,7 +1,9 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -11,14 +13,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -34,7 +43,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.lattice.LatticeContext;
 import convex.net.PeerName;
 import convex.node.NodeConfig;
@@ -47,23 +56,42 @@ import convex.social.Social;
  */
 public class P2PNodeTest {
 
-	private EtchStore store;
+	private MemoryStore store;
 	private P2PNode node;
+	private final List<AutoCloseable> resources=new ArrayList<>();
+	private final ConcurrentLinkedQueue<Throwable> unexpectedFailures=new ConcurrentLinkedQueue<>();
+
+	private P2PNode observe(P2PNode created) {
+		return created.onInitialisationFailure((peer,failure) -> unexpectedFailures.add(failure));
+	}
+
+	/** Closes the node after the test, then the host it opened, which closing the node leaves open */
+	private P2PNode track(P2PNode created) {
+		resources.add(created.getNodeServer().getHost());
+		resources.add(created);
+		return created;
+	}
 
 	@BeforeEach
-	public void setUp() throws IOException {
-		store = EtchStore.createTemp("p2p-node-test");
+	public void setUp() {
+		// No test reopens the store, so it need not be on disk
+		store = new MemoryStore();
+		resources.add(store);
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		if (node != null) node.close();
-		if (store != null) store.close();
+	public void tearDown() {
+		Collections.reverse(resources);
+		List<Executable> checks=new ArrayList<>();
+		for (AutoCloseable resource:resources) checks.add(resource::close);
+		// Checked after the closes, even if one throws
+		checks.add(() -> assertEquals(List.of(),new ArrayList<>(unexpectedFailures),"Unexpected peer initialisation failure"));
+		assertAll("Close what the test opened",checks);
 	}
 
 	@Test
 	public void testCreate() {
-		node = P2PNode.create(store, NodeConfig.create(), AKeyPair.generate());
+		node = observe(track(P2PNode.create(store, NodeConfig.create(), AKeyPair.generate())));
 
 		assertNotNull(node.getNodeServer());
 		assertNotNull(node.getCursor());
@@ -75,7 +103,7 @@ public class P2PNodeTest {
 	public void testIncomingRegistryValueReachesApplication() {
 		AKeyPair keyPair=AKeyPair.generate();
 		AKeyPair remote=AKeyPair.generate();
-		node=P2PNode.create(store,NodeConfig.create(),keyPair);
+		node=observe(track(P2PNode.create(store,NodeConfig.create(),keyPair)));
 		AHashMap<Keyword,ACell> info=P2PLattice.createNodeInfo(
 			Vectors.empty(),Strings.create("test"),Strings.create("0"),Vectors.empty(),false,
 			System.currentTimeMillis());
@@ -94,7 +122,7 @@ public class P2PNodeTest {
 	@Test
 	public void testLaunchLocalOnly() throws IOException, InterruptedException {
 		// Negative port = local-only mode, so no listener is opened
-		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate());
+		node = observe(track(P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate())));
 		node.launch();
 
 		assertTrue(node.isRunning());
@@ -106,10 +134,11 @@ public class P2PNodeTest {
 	 */
 	@Test
 	public void testCallsOutOfOrderFail() throws Exception {
-		node=P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate());
+		node=observe(track(P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate())));
 		assertTrue(node.seed(List.of()).isCompletedExceptionally(),"seeding needs a running node");
 		node.launch();
 		assertThrows(IllegalStateException.class,node::relayMessages);
+		assertThrows(IllegalStateException.class,() -> node.onInitialisationFailure((peer,failure) -> {}));
 		assertThrows(IllegalStateException.class,() -> node.pointsOfPresence());
 		assertThrows(IllegalStateException.class,node::launch,"a node launches once");
 		assertTrue(node.isRunning());
@@ -124,9 +153,8 @@ public class P2PNodeTest {
 		NodeConfig config=NodeConfig.create(Maps.of(
 			NodeConfig.URL,Strings.create("tcp://localhost:18888"),
 			NodeConfig.PORT,CVMLong.create(-1)));
-		try (NodeServer<Index<Keyword,ACell>> raw=
-				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,
-					LatticeContext.create(null,keyPair)),config)) {
+		try (var host=RelayHost.open(P2PLattice.ROOT,store,LatticeContext.create(null,keyPair));
+				NodeServer<Index<Keyword,ACell>> raw=new NodeServer<>(host,config)) {
 			raw.launch();
 			ACell nodes=raw.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 			assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()),
@@ -140,7 +168,7 @@ public class P2PNodeTest {
 		NodeConfig config=NodeConfig.create(Maps.of(
 			NodeConfig.URL,Strings.create("tcp://peer.example.com:18888"),
 			NodeConfig.PORT,CVMLong.create(-1)));
-		node=P2PNode.create(store,config,keyPair);
+		node=observe(track(P2PNode.create(store,config,keyPair)));
 
 		node.launch();
 
@@ -156,7 +184,7 @@ public class P2PNodeTest {
 	@Test
 	public void testLocalNetworkNodeInfoUsesBoundPort() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
-		node=P2PNode.create(store,NodeConfig.localNetwork(),keyPair);
+		node=observe(track(P2PNode.create(store,NodeConfig.localNetwork(),keyPair)));
 
 		node.launch();
 
@@ -170,7 +198,7 @@ public class P2PNodeTest {
 	@Test
 	public void testOutboundOnlyNodeInfoHasEmptyTransports() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
-		node=P2PNode.create(store,NodeConfig.port(-1),keyPair);
+		node=observe(track(P2PNode.create(store,NodeConfig.port(-1),keyPair)));
 
 		node.launch();
 
@@ -180,7 +208,7 @@ public class P2PNodeTest {
 
 	@Test
 	public void testKeylessNodeDoesNotPublishNodeInfo() throws Exception {
-		node=P2PNode.create(store,NodeConfig.port(-1),null);
+		node=observe(track(P2PNode.create(store,NodeConfig.port(-1),null)));
 
 		node.launch();
 
@@ -193,7 +221,7 @@ public class P2PNodeTest {
 		NodeConfig rejected=NodeConfig.create(Maps.of(
 			NodeConfig.URL,Strings.create("tcp://localhost:18888"),
 			NodeConfig.PORT,CVMLong.create(-1)));
-		node=P2PNode.create(store,rejected,AKeyPair.generate());
+		node=observe(track(P2PNode.create(store,rejected,AKeyPair.generate())));
 		assertThrows(IllegalStateException.class,node::launch);
 		node.close();
 
@@ -201,7 +229,7 @@ public class P2PNodeTest {
 			NodeConfig.URL,Strings.create("tcp://localhost:18888"),
 			NodeConfig.ALLOW_PRIVATE_URL,CVMBool.TRUE,
 			NodeConfig.PORT,CVMLong.create(-1)));
-		node=P2PNode.create(store,allowed,AKeyPair.generate());
+		node=observe(track(P2PNode.create(store,allowed,AKeyPair.generate())));
 		node.launch();
 		assertNotNull(nodeInfo(node.p2p().getUserKey()));
 	}
@@ -212,17 +240,22 @@ public class P2PNodeTest {
 	 * the old failure.
 	 */
 	@Test
+	@Timeout(30)
 	public void testFailedPeerInitialisationRunsAgain() throws Exception {
 		AKeyPair hubKey=AKeyPair.generate();
-		try (EtchStore hubStore=EtchStore.createTemp("p2p-node-test-hub");
-				P2PNode hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),hubKey).serveAllInbound()) {
-			hub.launch();
-			node=P2PNode.create(store,NodeConfig.port(-1),null);
-			node.launch();
-			Throwable first=connectFailure(hubKey.getAccountKey(),hub);
-			Throwable second=connectFailure(hubKey.getAccountKey(),hub);
-			assertNotSame(first,second);
-		}
+		MemoryStore hubStore=new MemoryStore();
+		resources.add(hubStore);
+		P2PNode hub=observe(track(P2PNode.create(hubStore,NodeConfig.localNetwork(),hubKey))).serveAllInbound();
+		hub.launch();
+		BlockingQueue<Throwable> reported=new LinkedBlockingQueue<>();
+		node=track(P2PNode.create(store,NodeConfig.port(-1),null))
+			.onInitialisationFailure((peer,failure) -> reported.add(failure));
+		node.launch();
+		Throwable first=connectFailure(hubKey.getAccountKey(),hub,reported);
+		Throwable second=connectFailure(hubKey.getAccountKey(),hub,reported);
+		assertNotSame(first,second);
+		node.close();
+		for (Throwable failure:reported) assertInstanceOf(IllegalStateException.class,failure);
 	}
 
 	/**
@@ -231,7 +264,7 @@ public class P2PNodeTest {
 	 */
 	@Test
 	public void testCloseCancelsTheSeedingBackoff() throws Exception {
-		node=P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate());
+		node=observe(track(P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate())));
 		node.launch();
 		node.seed(List.of());
 		CompletableFuture<Void> backoff=node.seedBackoff();
@@ -241,15 +274,24 @@ public class P2PNodeTest {
 		assertTrue(backoff.isCancelled());
 	}
 
-	private Throwable connectFailure(AccountKey key,P2PNode hub) {
-		return assertThrows(ExecutionException.class,
+	private Throwable connectFailure(AccountKey key,P2PNode hub,BlockingQueue<Throwable> reported) throws InterruptedException {
+		Throwable failure=assertThrows(ExecutionException.class,
 			() -> node.connect(key,hub.getHostAddress()).get(10,TimeUnit.SECONDS)).getCause();
+		assertInstanceOf(IllegalStateException.class,failure);
+		// Admission and the explicit connect can each initialise this keyless node.
+		// Check every reported failure, including the exact one returned to the caller.
+		Throwable observed;
+		do {
+			observed=reported.poll(10,TimeUnit.SECONDS);
+			assertInstanceOf(IllegalStateException.class,observed);
+		} while (observed!=failure);
+		return failure;
 	}
 
 	/** The default node serves the application regions as well as the P2P ones. */
 	@Test
 	public void testDefaultNodeServesApplicationRegions() {
-		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate());
+		node = observe(track(P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate())));
 
 		var host=node.getNodeServer().getHost();
 		var root=host.cursor();
@@ -268,7 +310,7 @@ public class P2PNodeTest {
 	 */
 	@Test
 	public void testSocialOffNodeIsStillAP2PNode() throws IOException, InterruptedException {
-		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate(), P2PLattice.ROOT);
+		node = observe(track(P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate(), P2PLattice.ROOT)));
 		node.launch();
 
 		assertTrue(node.isRunning());

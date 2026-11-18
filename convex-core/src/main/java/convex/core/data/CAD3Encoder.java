@@ -169,12 +169,13 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			ds.pos++;
 			return Ref.nil();
 		}
-		// Embedded cell: dispatch through this encoder's virtual read. The Ref is wanted
-		// either way, so take it first and let the check record the status on it.
+		// Embedded cell: dispatch through this encoder's virtual read. A cell decodes only
+		// from its own canonical encoding, so the bytes it consumed are its encoding length.
+		int start = ds.pos;
 		T cell = (T) this.read(ds);
+		if ((ds.pos - start) > Format.MAX_EMBEDDED_LENGTH) throw new BadFormatException("Non-embedded cell found instead of ref");
 		Ref<T> ref = cell.getRef();
-		if (!cell.isEmbedded()) throw new BadFormatException("Non-embedded cell found instead of ref");
-		return ref;
+		return ref.markEmbedded(true);
 	}
 
 	/**
@@ -590,6 +591,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		short mask = (short) ((ds.data[ds.pos] << 8) | (ds.data[ds.pos + 1] & 0xFF));
 		ds.pos += 2;
 		int n = Integer.bitCount(mask & 0xFFFF);
+		// With more than one entry: an entry needs children, and no entry needs two or more
+		if (n < ((me == null) ? 2 : 1)) throw new BadFormatException("Too few Index children: " + n);
 		Ref<Index>[] children = new Ref[n];
 		for (int i = 0; i < n; i++) {
 			children[i] = readRef(ds);
@@ -792,13 +795,15 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Dispatches through this encoder's virtual {@link #read} methods.
 	 * Reads from ds.pos to ds.limit. Each child's hash is taken from its
 	 * received bytes first; a cell the store caches under that hash is reused
-	 * without decoding. Any other child is decoded from a copy of its own bytes.
+	 * without decoding. Any other child is decoded from a copy of its own bytes,
+	 * which becomes its encoding.
 	 *
 	 * Input is adversarial (public internet). Validates:
 	 * <ul>
 	 *   <li>VLQ child length does not exceed remaining data</li>
+	 *   <li>Child encoding is longer than {@link Format#MAX_EMBEDDED_LENGTH}</li>
 	 *   <li>Child encoding consumes exactly the declared length</li>
-	 *   <li>Child is non-null and non-embedded</li>
+	 *   <li>Child is non-null</li>
 	 *   <li>IndexOutOfBoundsException from truncated data → BadFormatException</li>
 	 * </ul>
 	 *
@@ -816,6 +821,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				if (encLength > ds.limit - start) throw new BadFormatException("Child encoding exceeds message bounds");
 				int length = (int)encLength;
 				int childEnd = start + length;
+				// Before hashing, for cached and decoded children alike: either way these
+				// bytes are the child's encoding
+				if (length <= Format.MAX_EMBEDDED_LENGTH) throw new BadFormatException("Embedded Cell as child");
 
 				// The child's hash is needed anyway: take it from the received bytes and
 				// reuse the cell the store already caches under it, without decoding
@@ -824,7 +832,6 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				if (cached!=null) {
 					ACell c = cached.getValue();
 					if (c==null) throw new BadFormatException("Null child encoding");
-					if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
 					acc.put(h, specialiseCached(c));
 					ds.pos = childEnd;
 					continue;
@@ -838,19 +845,15 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				ACell c = this.read(cs);
 
 				if (c==null) throw new BadFormatException("Null child encoding");
-				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
 				if (!cs.isConsumed()) throw new BadFormatException("Child encoding length mismatch");
 				ds.pos = childEnd;
 
-				// Decoding alone does not prove the received bytes canonical. When the
-				// cell's re-encoding matches them, the copy becomes its encoding, with the
-				// hash already computed, so one array holds both its fields and its
-				// encoding. Otherwise the cell keeps its re-encoding and that hash.
-				if (own.equalsBytes(c.getEncoding())) {
-					own.attachContentHash(h);
-					c.attachEncoding(own);
-				}
-				acc.put(c.getHash(), c);
+				// A cell decodes only from its own canonical encoding, so the copy becomes
+				// its encoding, with the hash already computed: one array holds both its
+				// fields and its encoding
+				own.attachContentHash(h);
+				c.attachEncoding(own);
+				acc.put(h, c);
 			}
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Insufficient bytes to decode Cells");

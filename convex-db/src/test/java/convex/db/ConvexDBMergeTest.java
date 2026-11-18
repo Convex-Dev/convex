@@ -1,5 +1,6 @@
 package convex.db;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -9,10 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -76,8 +81,24 @@ public class ConvexDBMergeTest {
 		return () -> CVMLong.create(time.incrementAndGet());
 	}
 
-	private static LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host() {
-		return LatticeHost.create(Maps.empty(), null);
+	/** Hosts this test created, closed after it */
+	private final List<LatticeHost<?>> hosts = new ArrayList<>();
+
+	@AfterEach
+	public void closeHosts() {
+		List<Executable> cleanup = new ArrayList<>();
+		for (LatticeHost<?> host : hosts) cleanup.add(host::close);
+		assertAll("Close this test's hosts", cleanup);
+	}
+
+	private LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host() {
+		return owned(LatticeHost.create(Maps.empty(), null));
+	}
+
+	/** Records a host this test opened, to close after it. */
+	private <V extends ACell> LatticeHost<V> owned(LatticeHost<V> host) {
+		hosts.add(host);
+		return host;
 	}
 
 	/** Registers a ConvexDB with the composed policy, as an application assembles its own host. */
@@ -183,7 +204,7 @@ public class ConvexDBMergeTest {
 		ConvexDB application = install(origin);
 		SQLDatabase db = application.database(DB);
 		populate(db);
-		var fork = origin.fork();
+		var fork = owned(origin.fork());
 		// The fork continues the same application, so it writes with the same clock
 		SQLDatabase forked = install(fork, application.getClock()).database(DB);
 

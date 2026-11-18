@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.util.List;
@@ -264,52 +265,48 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void testRegistrySyncIsExplicit() {
+	public void testRegistrySyncIsExplicit() throws IOException {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
-		LatticeHost<AHashMap<AString, AVector<ACell>>> host=LatticeHost.create(lattice.zero(),null);
-		AtomicReference<ACell> synced=new AtomicReference<>();
-		host.attachPublisher(value->{ synced.set(value); return value; });
-		var component=convex.dlfs.DLFSDrives.wrap(host.cursor());
-		DLFSDriveManager manager=new DLFSDriveManager(component,host::sync);
+		try (LatticeHost<AHashMap<AString, AVector<ACell>>> host=LatticeHost.create(lattice.zero(),null)) {
+			AtomicReference<ACell> synced=new AtomicReference<>();
+			host.attachPublisher(value->{ synced.set(value); return value; });
+			var component=convex.dlfs.DLFSDrives.wrap(host.cursor());
+			DLFSDriveManager manager=new DLFSDriveManager(component,host::sync);
 
-		assertTrue(manager.createDrive(null, "home"));
-		assertNull(synced.get(), "in-memory registry mutation must not perform I/O implicitly");
-		manager.sync();
+			assertTrue(manager.createDrive(null, "home"));
+			assertNull(synced.get(), "in-memory registry mutation must not perform I/O implicitly");
+			manager.sync();
 
-		AHashMap<AString, AVector<ACell>> value=(AHashMap<AString, AVector<ACell>>)synced.get();
-		assertNotNull(value);
-		assertNotNull(value.get(Strings.create("home")));
+			AHashMap<AString, AVector<ACell>> value=(AHashMap<AString, AVector<ACell>>)synced.get();
+			assertNotNull(value);
+			assertNotNull(value.get(Strings.create("home")));
+		}
 	}
 
 	@Test
 	public void testEtchRestartRestoresRegistryAndContents() throws Exception {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
 		try (EtchStore store=EtchStore.createTemp("dlfs-registry")) {
-			NodeServer<AHashMap<AString, AVector<ACell>>> first=
-				new NodeServer<>(RelayHost.open(lattice,store),NodeConfig.port(-1));
-			first.launch();
-			try {
+			// Each node closes before the host it borrows; the first host's close saves what it has just checkpointed
+			try (LatticeHost<AHashMap<AString, AVector<ACell>>> firstHost=RelayHost.open(lattice,store);
+					NodeServer<AHashMap<AString, AVector<ACell>>> first=new NodeServer<>(firstHost,NodeConfig.port(-1))) {
+				first.launch();
 				var drives=DLFSDrives.connect(first.getHost().cursor(),store);
 				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertTrue(manager.createDrive(null, "home"));
 				Files.writeString(manager.getDrive(null, "home").getPath("/hello.txt"), "after restart");
 				manager.sync();
 				first.getHost().checkpoint();
-			} finally {
-				first.close();
 			}
 
-			NodeServer<AHashMap<AString, AVector<ACell>>> restored=
-				new NodeServer<>(RelayHost.open(lattice,store),NodeConfig.port(-1));
-			restored.launch();
-			try {
+			try (LatticeHost<AHashMap<AString, AVector<ACell>>> restoredHost=RelayHost.open(lattice,store);
+					NodeServer<AHashMap<AString, AVector<ACell>>> restored=new NodeServer<>(restoredHost,NodeConfig.port(-1))) {
+				restored.launch();
 				var drives=DLFSDrives.connect(restored.getHost().cursor(),store);
 				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertEquals(List.of("home"), manager.listDrives(null));
 				assertEquals("after restart",
 					Files.readString(manager.getDrive(null, "home").getPath("/hello.txt")));
-			} finally {
-				restored.close();
 			}
 		}
 	}

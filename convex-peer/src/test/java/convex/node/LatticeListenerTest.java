@@ -9,8 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +30,8 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.MaxLattice;
+import convex.net.IncomingHandler;
+import convex.peer.ExpectedLogs;
 
 /** Tests application-owned inbound transport composition. */
 public class LatticeListenerTest {
@@ -147,7 +151,8 @@ public class LatticeListenerTest {
 
 	@Test
 	public void testSelectorFailureDoesNotAffectNodeOrListener() throws Exception {
-		try (AStore store=new MemoryStore();
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				AStore store=new MemoryStore();
 				NodeServer<convex.core.data.prim.AInteger> node=
 					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
@@ -155,6 +160,7 @@ public class LatticeListenerTest {
 			node.addPropagator(group);
 			listener.registerPropagator(group);
 			listener.setSelector(connection -> {
+				logs.expectOnThisThread();
 				throw new IllegalStateException("broken application policy");
 			});
 			node.launch();
@@ -170,6 +176,148 @@ public class LatticeListenerTest {
 		}
 	}
 
+	@Test
+	public void testSelectorOutOfMemoryDeniesOnlyThatConnection() throws Exception {
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				AStore store=new MemoryStore();
+				NodeServer<convex.core.data.prim.AInteger> node=
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
+				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
+			LatticePropagator group=new LatticePropagator(store);
+			node.addPropagator(group);
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> {
+				logs.expectOnThisThread();
+				throw new OutOfMemoryError("simulated");
+			});
+			node.launch();
+			listener.launch();
+
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				Result denied=client.message(Message.createPing(6)).get(5,TimeUnit.SECONDS);
+				assertEquals(ErrorCodes.TRUST,denied.getErrorCode());
+			}
+			listener.setSelector(connection -> group);
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ZERO,queryRoot(client,7).getValue());
+			}
+			assertTrue(node.isRunning());
+			assertTrue(listener.isRunning());
+		}
+	}
+
+	/**
+	 * A group that throws a chosen Error once when accepting, delivering to or releasing a
+	 * connection, expecting the listener to log it.
+	 */
+	private static final class FaultingGroup extends LatticePropagator {
+		final ExpectedLogs logs;
+		volatile Error onAccept;
+		volatile Error onDeliver;
+		volatile Error onRemove;
+
+		FaultingGroup(AStore store,ExpectedLogs logs) {
+			super(store);
+			this.logs=logs;
+		}
+
+		@Override public IncomingHandler accept(AConnection connection) {
+			Error accepting=onAccept;
+			if (accepting!=null) {
+				onAccept=null;
+				logs.expectOnThisThread();
+				throw accepting;
+			}
+			IncomingHandler inner=super.accept(connection);
+			return new IncomingHandler() {
+				@Override public Predicate<Message> handle(Message message) {
+					Error delivering=onDeliver;
+					if (delivering!=null) {
+						onDeliver=null;
+						logs.expectOnThisThread();
+						throw delivering;
+					}
+					return inner.handle(message);
+				}
+				@Override public void close() {
+					inner.close();
+				}
+			};
+		}
+
+		@Override public void removeInboundConnection(AConnection connection) {
+			Error removing=onRemove;
+			if (removing!=null) {
+				onRemove=null;
+				logs.expectOnThisThread();
+				throw removing;
+			}
+			super.removeInboundConnection(connection);
+		}
+	}
+
+	/** Running out of memory accepting or delivering to one connection fails that connection alone. */
+	@Test
+	public void testGroupOutOfMemoryFailsOnlyThatConnection() throws Exception {
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				AStore store=new MemoryStore();
+				NodeServer<convex.core.data.prim.AInteger> node=
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
+				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
+			FaultingGroup group=new FaultingGroup(store,logs);
+			node.addPropagator(group);
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> group);
+			node.launch();
+			listener.launch();
+
+			group.onAccept=new OutOfMemoryError("simulated accept");
+			CompletableFuture<LatticePropagator.Failure> accepting=group.nextFailure();
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				client.message(Message.createPing(1));
+				assertTrue(accepting.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+			}
+			group.onDeliver=new OutOfMemoryError("simulated delivery");
+			CompletableFuture<LatticePropagator.Failure> delivering=group.nextFailure();
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				client.message(Message.createPing(2));
+				assertTrue(delivering.get(5,TimeUnit.SECONDS).cause() instanceof OutOfMemoryError);
+			}
+			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ZERO,queryRoot(client,3).getValue());
+			}
+			assertTrue(node.isRunning());
+			assertTrue(listener.isRunning());
+		}
+	}
+
+	/** Running out of memory releasing one connection does not stop the listener closing. */
+	@Test
+	public void testCloseCompletesDespiteOutOfMemoryReleasingAConnection() throws Exception {
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				AStore store=new MemoryStore();
+				NodeServer<convex.core.data.prim.AInteger> node=
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
+				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
+			FaultingGroup group=new FaultingGroup(store,logs);
+			node.addPropagator(group);
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> group);
+			node.launch();
+			listener.launch();
+			try (ConvexRemote first=ConvexRemote.connect(listener.getHostAddress());
+					ConvexRemote second=ConvexRemote.connect(listener.getHostAddress())) {
+				assertEquals(CVMLong.ZERO,queryRoot(first,1).getValue());
+				assertEquals(CVMLong.ZERO,queryRoot(second,2).getValue());
+				group.onRemove=new OutOfMemoryError("simulated release");
+				listener.close();
+				assertFalse(listener.isRunning());
+				assertNull(group.onRemove,"releasing a connection ran out of memory");
+			}
+			assertTrue(node.isRunning());
+		}
+	}
+
 	private static Result queryRoot(ConvexRemote client,long id) throws Exception {
 		AVector<?> payload=Vectors.create(
 			MessageTag.LATTICE_QUERY,CVMLong.create(id),Vectors.empty());
@@ -179,7 +327,8 @@ public class LatticeListenerTest {
 
 	@Test
 	public void testUnregisterClosesOnlySelectedGroupsConnections() throws Exception {
-		try (AStore store=new MemoryStore();
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				AStore store=new MemoryStore();
 				NodeServer<?> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator first=new LatticePropagator(store);
@@ -190,8 +339,11 @@ public class LatticeListenerTest {
 			listener.registerPropagator(second);
 			AtomicReference<LatticePropagator> selected=new AtomicReference<>(first);
 			AtomicReference<AConnection> assigned=new AtomicReference<>();
+			AtomicBoolean unregistered=new AtomicBoolean();
 			listener.setSelector(connection -> {
 				assigned.set(connection);
+				// The listener warns of a policy that selects a group it no longer serves
+				if (unregistered.get()&&(selected.get()==first)) logs.expectOnThisThread();
 				return selected.get();
 			});
 			node.launch();
@@ -204,6 +356,7 @@ public class LatticeListenerTest {
 				assertFalse(queryRoot(secondClient,11).isError());
 				AConnection secondSocket=assigned.get();
 				assertTrue(listener.unregisterPropagator(first));
+				unregistered.set(true);
 				assertFalse(listener.unregisterPropagator(first));
 				assertTrue(firstSocket.isClosed());
 				assertFalse(secondSocket.isClosed());
@@ -224,7 +377,8 @@ public class LatticeListenerTest {
 	public void testUnregisterDuringSelectionCannotAssignRevokedGroup() throws Exception {
 		CountDownLatch entered=new CountDownLatch(1);
 		CountDownLatch release=new CountDownLatch(1);
-		try (AStore store=new MemoryStore();
+		try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				AStore store=new MemoryStore();
 				NodeServer<?> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator group=new LatticePropagator(store);
@@ -238,6 +392,8 @@ public class LatticeListenerTest {
 					Thread.currentThread().interrupt();
 					throw new AssertionError(e);
 				}
+				// Unregistered meanwhile, so the listener warns of selecting it
+				logs.expectOnThisThread();
 				return group;
 			});
 			node.launch();

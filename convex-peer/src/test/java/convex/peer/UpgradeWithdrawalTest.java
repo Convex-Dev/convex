@@ -2,36 +2,45 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.slf4j.event.Level;
 
 import convex.api.Convex;
 import convex.core.Result;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
+import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
+import convex.core.lang.Core;
+import convex.core.store.MemoryStore;
 
 /**
  * Tests the peer-level response to a required upgrade this release cannot apply:
@@ -47,29 +56,68 @@ public class UpgradeWithdrawalTest {
 	static final AKeyPair PEER_KP = AKeyPair.createSeeded(101);
 	static final Address GENESIS = Address.create(Init.GENESIS_ADDRESS);
 
-	private Server launchIsolatedPeer() throws Exception {
-		State genesis = Init.createState(List.of(PEER_KP.getAccountKey()));
-		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
-		return servers.get(0);
-	}
-
-	/**
-	 * Launches an isolated single peer that reads the given clock from the outset, so no
-	 * block or self-management decision ever sees the wall clock. Like launchLocalPeers it
-	 * sets the peer's hostname, which the peer registers with its own transaction in its
-	 * first block.
-	 */
-	private Server launchIsolatedPeer(State genesis, LongSupplier clock) throws Exception {
+	/** Creates an isolated single peer on the given genesis State, with an in-memory store. */
+	private static Server createIsolatedPeer(State genesis) throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, PEER_KP);
 		config.put(Keywords.STATE, genesis);
 		config.put(Keywords.PORT, 0);
+		config.put(Keywords.STORE, new MemoryStore());
 		config.put(Keywords.AUTO_MANAGE, true);
-		Server s=Server.create(config);
+		return Server.create(config);
+	}
+
+	/** Launches an isolated single peer on the plain genesis State, reading the wall clock. */
+	private Server launchIsolatedPeer() throws Exception {
+		Server s=createIsolatedPeer(GenesisStates.of(PEER_KP));
+		launchIsolated(s);
+		return s;
+	}
+
+	/**
+	 * Creates an isolated single peer that reads the given clock from the outset, so no
+	 * block or self-management decision ever sees the wall clock.
+	 */
+	private Server createIsolatedPeer(State genesis, LongSupplier clock) throws Exception {
+		Server s=createIsolatedPeer(genesis);
 		s.setTimeSource(clock);
+		return s;
+	}
+
+	/**
+	 * Launches a peer from createIsolatedPeer. Like launchLocalPeers it sets the peer's
+	 * hostname, which the peer registers with its own transaction in its first block.
+	 */
+	private static void launchIsolated(Server s) throws Exception {
 		s.launch();
 		s.setHostname("localhost:"+s.getPort());
-		return s;
+	}
+
+	/**
+	 * Expects the upgrade alerts a peer logs as it runs: its executor warns of an upgrade
+	 * it cannot apply and halts at it, and its Belief propagator, preparing its own
+	 * transactions, warns of withdrawing its stake. Opened before the peer launches, since
+	 * its threads exist once it is created.
+	 */
+	private static ExpectedLogs upgradeAlerts(Server s) {
+		return ExpectedLogs.onThreads(Server.upgradeLog.getName(),
+			s.getCVMExecutor().thread,s.getBeliefPropagator().thread).open();
+	}
+
+	/** Closes a peer and waits for the threads that log its upgrade alerts to stop. */
+	private static void stop(Server s) throws InterruptedException {
+		s.close();
+		s.getCVMExecutor().awaitStopped();
+		s.getBeliefPropagator().awaitStopped();
+	}
+
+	/** Halts a peer's consensus from the test thread, which logs the halt as an error. */
+	private static void halt(Server s, UpgradeError error) {
+		ExpectedLogs logs=ExpectedLogs.onThreads(Server.upgradeLog.getName(),Thread.currentThread()).open();
+		try (logs) {
+			s.haltConsensus(error);
+		}
+		assertEquals(Level.ERROR,logs.records().get(0).level());
 	}
 
 	/**
@@ -101,11 +149,11 @@ public class UpgradeWithdrawalTest {
 		AccountKey k2 = AKeyPair.createSeeded(202).getAccountKey();
 
 		// Single peer: withdrawing it would leave no viable peer
-		State single = Init.createState(List.of(k1));
+		State single = GenesisStates.of(List.of(k1));
 		assertFalse(TransactionHandler.leavesAnotherViablePeer(single, k1));
 
 		// Two peers: withdrawing either still leaves the other viable
-		State two = Init.createState(List.of(k1, k2));
+		State two = GenesisStates.of(List.of(k1, k2));
 		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, k1));
 		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, k2));
 
@@ -115,12 +163,13 @@ public class UpgradeWithdrawalTest {
 
 	@Test
 	public void testHaltConsensusFlag() throws Exception {
-		Server s = launchIsolatedPeer();
+		// Not launched: the flag is the Server's own, set and read on this thread
+		Server s = createIsolatedPeer(GenesisStates.of(PEER_KP));
 		try {
 			assertFalse(s.isConsensusHalted());
 			assertNull(s.getConsensusHalt());
 
-			s.haltConsensus(UpgradeError.missing(5));
+			halt(s, UpgradeError.missing(5));
 			assertTrue(s.isConsensusHalted());
 			assertEquals(5L, s.getConsensusHalt().getVersion());
 
@@ -142,7 +191,7 @@ public class UpgradeWithdrawalTest {
 		// release, so crossing it must freeze.
 		long supported = Migrations.MAX_VERSION;
 		long unsupported = supported + 1;
-		State upgraded = Migrations.applyAll(Init.createState(List.of(PEER_KP.getAccountKey())));
+		State upgraded = Migrations.applyAll(GenesisStates.of(PEER_KP));
 		long t0 = upgraded.getTimestamp().longValue();
 		long activation = t0 + 100_000;
 		State genesis = upgraded.withProtocolGlobals(supported,
@@ -151,45 +200,52 @@ public class UpgradeWithdrawalTest {
 		// The peer reads this clock from launch. Start comfortably before the
 		// activation so the peer operates normally.
 		AtomicLong clock = new AtomicLong(t0 + 1000);
-		Server s = launchIsolatedPeer(genesis, clock::get);
-		try {
-			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
+		Server s = createIsolatedPeer(genesis, clock::get);
+		ExpectedLogs alerts = upgradeAlerts(s);
+		// The peer stops before the scope closes
+		try (alerts; AutoCloseable stopping = () -> stop(s)) {
+			launchIsolated(s);
+			try (Convex convex = Convex.connect(s, GENESIS, PEER_KP)) {
+				// Early detection: the peer already knows an unsupported upgrade is
+				// scheduled, well before the activation and before it withdraws.
+				Migrations.UpgradeWarning warn = s.getUpgradeWarning();
+				assertEquals(unsupported, warn.version);
+				assertEquals(activation, warn.activation);
 
-			// Early detection: the peer already knows an unsupported upgrade is
-			// scheduled, well before the activation and before it withdraws.
-			Migrations.UpgradeWarning warn = s.getUpgradeWarning();
-			assertEquals(unsupported, warn.version);
-			assertEquals(activation, warn.activation);
+				// The peer's first block registers its hostname at the start instant
+				s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
 
-			// The peer's first block registers its hostname at the start instant
-			s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
+				// Normal operation before the boundary: a transaction confirms, version unchanged
+				Result r=transactAt(s, convex, clock, t0 + 2000, "(def a 1)");
+				assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
+				assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
+				assertFalse(s.isConsensusHalted());
 
-			// Normal operation before the boundary: a transaction confirms, version unchanged
-			Result r=transactAt(s, convex, clock, t0 + 2000, "(def a 1)");
-			assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
-			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
-			assertFalse(s.isConsensusHalted());
+				// Advance the clock past the activation. The next block is timestamped at
+				// or beyond the activation, so applying it fires the (missing) upgrade
+				// first — deterministically, from the controlled timestamp.
+				clock.set(activation + 1);
+				convex.transact("(def b 2)"); // fire-and-forget: this block never commits
 
-			// Advance the clock past the activation. The next block is timestamped at
-			// or beyond the activation, so applying it fires the (missing) upgrade
-			// first — deterministically, from the controlled timestamp.
-			clock.set(activation + 1);
-			convex.transact("(def b 2)"); // fire-and-forget: this block never commits
+				// Wait on the real halt signal (guaranteed to occur)
+				UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
+				assertEquals(unsupported, halt.getVersion());
+				assertTrue(s.isConsensusHalted());
 
-			// Wait on the real halt signal (guaranteed to occur)
-			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
-			assertEquals(unsupported, halt.getVersion());
-			assertTrue(s.isConsensusHalted());
+				// The peer stayed at the supported version and never applied the boundary
+				assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
 
-			// The peer stayed at the supported version and never applied the boundary
-			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
-
-			// Still alive for queries against the frozen state; b was never defined
-			assertFalse(convex.querySync("a").isError());
-			assertTrue(convex.querySync("b").isError());
-		} finally {
-			s.close();
+				// Still alive for queries against the frozen state; b was never defined
+				assertFalse(convex.querySync("a").isError());
+				assertTrue(convex.querySync("b").isError());
+			}
 		}
+		assertHaltLogged(alerts);
+	}
+
+	/** Checks the operator was told of the halt, as an error. */
+	private static void assertHaltLogged(ExpectedLogs alerts) {
+		assertTrue(alerts.records().stream().anyMatch(e -> e.level()==Level.ERROR), alerts.records()::toString);
 	}
 
 	@Test
@@ -202,55 +258,57 @@ public class UpgradeWithdrawalTest {
 		long supported = Migrations.MAX_VERSION;
 		long unsupported = supported + 1;
 		AccountKey myKey = PEER_KP.getAccountKey();
-		State upgraded = Migrations.applyAll(Init.createState(List.of(myKey)));
+		State upgraded = Migrations.applyAll(GenesisStates.of(PEER_KP));
 		long t0 = upgraded.getTimestamp().longValue();
 		long activation = t0 + 60L*60*1000; // 60 min ahead, so the 5-10 min pre-window fits
 		State genesis = upgraded.withProtocolGlobals(supported, upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
 
 		AtomicLong clock = new AtomicLong(t0 + 1000);
-		Server s = launchIsolatedPeer(genesis, clock::get);
-		try {
+		Server s = createIsolatedPeer(genesis, clock::get);
+		ExpectedLogs alerts = upgradeAlerts(s);
+		// The peer stops before the scope closes
+		try (alerts; AutoCloseable stopping = () -> stop(s)) {
+			launchIsolated(s);
 			long stake0 = s.getPeer().getConsensusState().getPeer(myKey).getPeerStake();
 			assertTrue(stake0 > 0);
 
-			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
-			// The peer's first block registers its hostname at the start instant
-			s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
+			try (Convex convex = Convex.connect(s, GENESIS, PEER_KP)) {
+				// The peer's first block registers its hostname at the start instant
+				s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
 
-			// Confirm a transaction deep in the withdrawal window (past any randomised instant,
-			// before the boundary). The peer decides whether to withdraw before filling the
-			// block, so any withdrawal would be in the same block as this transaction.
-			Result r=transactAt(s, convex, clock, activation - 60*1000, "(def a 1)");
-			assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
+				// Confirm a transaction deep in the withdrawal window (past any randomised instant,
+				// before the boundary). The peer decides whether to withdraw before filling the
+				// block, so any withdrawal would be in the same block as this transaction.
+				Result r=transactAt(s, convex, clock, activation - 60*1000, "(def a 1)");
+				assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
 
-			// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
-			// zero the stake; peer rewards may only increase it), and still operating.
-			assertTrue(s.getPeer().getConsensusState().getPeer(myKey).getPeerStake() >= stake0,
-					"last viable peer must not have withdrawn its stake");
-			assertFalse(s.isConsensusHalted());
+				// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
+				// zero the stake; peer rewards may only increase it), and still operating.
+				assertTrue(s.getPeer().getConsensusState().getPeer(myKey).getPeerStake() >= stake0,
+						"last viable peer must not have withdrawn its stake");
+				assertFalse(s.isConsensusHalted());
 
-			// It still freezes at the boundary
-			clock.set(activation + 1);
-			convex.transact("(def b 2)");
-			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
-			assertEquals(unsupported, halt.getVersion());
-		} finally {
-			s.close();
+				// It still freezes at the boundary
+				clock.set(activation + 1);
+				convex.transact("(def b 2)");
+				UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
+				assertEquals(unsupported, halt.getVersion());
+			}
 		}
+		assertHaltLogged(alerts);
 	}
 
 	@Test
 	public void testHaltedPeerFreezesButServesQueries() throws Exception {
 		Server s = launchIsolatedPeer();
-		try {
-			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
-
+		// The client closes before the finally closes the peer
+		try (Convex convex = Convex.connect(s, GENESIS, PEER_KP)) {
 			// Consensus works before the halt
 			Result r = convex.transactSync("(def a 1)");
 			assertFalse(r.isError(), () -> "Setup transaction failed: " + r);
 
 			// Freeze consensus exactly as the executor would on an unsupported upgrade
-			s.haltConsensus(UpgradeError.missing(2));
+			halt(s, UpgradeError.missing(2));
 			assertTrue(s.isConsensusHalted());
 
 			// Server stays alive: queries still resolve against the frozen state
@@ -258,12 +316,21 @@ public class UpgradeWithdrawalTest {
 			assertFalse(q.isError());
 			assertEquals(CVMLong.create(1), q.getValue());
 
-			// Consensus is frozen: a transaction submitted after the halt never
-			// confirms. The freeze is a hard latch (both executor and propagator
-			// gate on it), so this is deterministic, not a race — the future never
-			// completes and the bounded wait always times out.
+			// Consensus is frozen: a transaction submitted after the halt is taken in,
+			// but no round of the Belief propagator proposes it. Run one round here, on
+			// a queued Belief so that it does not wait: it leaves the transaction queued.
+			TransactionHandler handler = s.getTransactionHandler();
+			CompletableFuture<SignedData<ATransaction>> queued = new CompletableFuture<>();
+			handler.setRequestObserver(queued::complete);
 			CompletableFuture<Result> f = convex.transact("(def b 2)");
-			assertThrows(TimeoutException.class, () -> f.get(2, TimeUnit.SECONDS));
+			SignedData<ATransaction> tx = queued.get(5, TimeUnit.SECONDS);
+			// Not started: this test thread runs it
+			BeliefPropagator round = new BeliefPropagator(s);
+			round.belief = s.getBelief();
+			assertTrue(round.queueBelief(s.getBelief()));
+			round.loop();
+			assertTrue(handler.transactionQueue.contains(tx), "the transaction is not proposed");
+			assertFalse(f.isDone());
 
 			// State did not advance: b was never defined
 			Result q2 = convex.querySync("b");
@@ -271,5 +338,40 @@ public class UpgradeWithdrawalTest {
 		} finally {
 			s.close();
 		}
+	}
+
+	/**
+	 * An upgrade that finds data missing from the peer's store withdraws the peer like
+	 * any other failed upgrade, and is not retried.
+	 */
+	@Test
+	public void testMissingDataAtUpgradeWithdraws() throws Exception {
+		Server s = launchIsolatedPeer();
+		ExpectedLogs alerts = upgradeAlerts(s);
+		// The peer stops before the scope closes
+		try (alerts; AutoCloseable stopping = () -> stop(s); MemoryStore hollowStore = new MemoryStore()) {
+			// Stop Belief updates, so the executor computes only the Belief given here
+			BeliefPropagator propagator = s.getBeliefPropagator();
+			propagator.close();
+			propagator.awaitStopped();
+
+			// v1 is due, but the core account's environment it upgrades is not held
+			State genesis = GenesisStates.of(PEER_KP);
+			long activation = genesis.getTimestamp().longValue() + 1000;
+			AccountStatus core = genesis.getAccount(Core.CORE_ADDRESS);
+			AccountStatus hollowCore = hollowStore.decode(core.getEncoding());
+			State pending = genesis.withProtocolGlobals(0, Vectors.of(CVMLong.create(activation)))
+					.putAccount(Core.CORE_ADDRESS, hollowCore);
+			s.getCVMExecutor().setPeer(Peer.create(PEER_KP, pending));
+
+			SignedData<Block> block = PEER_KP.signData(Block.of(activation));
+			Order order = Order.create().append(block).withConsensusPoints(new long[] {1,1,1,1}).withTimestamp(1);
+			s.getCVMExecutor().queueUpdate(Belief.create(PEER_KP.signData(order)));
+
+			UpgradeError halt = s.awaitConsensusHalt().get(10, TimeUnit.SECONDS);
+			assertEquals(1L, halt.getVersion());
+			assertInstanceOf(MissingDataException.class, halt.getCause());
+		}
+		assertHaltLogged(alerts);
 	}
 }

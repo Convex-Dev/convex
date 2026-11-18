@@ -71,6 +71,7 @@ public abstract class ASignature extends AArrayBlob {
 	
 	@Override
 	public boolean equals(ABlob b) {
+		if (b == null) return false;
 		return b.equalsBytes(this);
 	}
 

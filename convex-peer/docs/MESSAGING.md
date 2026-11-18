@@ -47,7 +47,9 @@ server-initiated protocol exchange (e.g. challenge/response).
 
 Additional state and lifecycle:
 - `isTrusted()` / `getTrustedKey()` / `setTrustedKey(AccountKey)` — this end's
-  verified trust in the remote participant
+  trust in the remote participant, which has proved its key
+- `isVerified()` / `getVerifiedKey()` / `setVerifiedKey(AccountKey)` — the key the
+  remote participant, which opened the connection, has proved to this end
 - `getRemoteAddress()` — remote socket address if applicable
 - `isClosed()` / `close()` — lifecycle
 - `getReceivedCount()` — statistics
@@ -85,21 +87,27 @@ time via the `acceptsMessages` flag on each end of a `LocalConnection` pair.
 ### 2.4 Trust
 
 Trust is **per-end**. Each end of a connection independently tracks whether it
-has verified the remote participant's identity:
+has verified the remote participant's identity, in one of two keys:
 
-- `endA.setTrustedKey(keyB)` — A has verified B
-- `endB.setTrustedKey(keyA)` — B has verified A
+- `endA.setTrustedKey(keyB)` — A has verified B and trusts it as B
+- `endB.setVerifiedKey(keyA)` — B has verified A, which opened the connection to B
 - These are independent
 
-Trust is established by the [challenge/response verification protocol](PEER_PRIORITY.md)
+A consensus peer trusts only connections it opened
+([CAD015](https://docs.convex.world/docs/cad/peercomms)), and at most verifies a
+connection opened to it. A lattice node also trusts a connection opened to it once it
+admits it as a route ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md)).
+
+Both are established by the [challenge/response verification protocol](PEER_PRIORITY.md)
 (Ed25519 signatures over random tokens). The verification protocol is universal
 — any participant with an Ed25519 keypair can verify any other, regardless of
 application.
 
-What trust **means** is application-specific policy, separate from the
-connection layer:
-- Consensus peer: prioritise beliefs, exempt from backpressure
-- Lattice node: accept merge data from verified sources
+What trust and verification **mean** is application-specific policy, separate from
+the connection layer:
+- Consensus peer: polls the peers it trusts first; keeps DATA from, and serves first,
+  a connection it has verified as a staked peer's own link
+- Lattice node: accept merge data from trusted sources
 - AI agent: authorise privileged operations
 - Generic: "I have cryptographically verified who you are"
 
@@ -135,6 +143,7 @@ connection is indistinguishable from a network connection.
         │  paired: endB ────────────────── paired: endA    │
         │  acceptsMsgs    │              │  acceptsMsgs    │
         │  trustedKey     │              │  trustedKey     │
+        │  verifiedKey    │              │  verifiedKey    │
         └─────────────────┘              └─────────────────┘
 
 A calls endA.sendMessage(msg):
@@ -213,11 +222,12 @@ AConnection connectWithDelivery(URI endpoint, Function<Message, Predicate<Messag
 ```
 
 `connectWithDelivery` takes a delivery that may ask to wait by returning a retry,
-as a server's delivery does when a queue is full. The built-in Netty transports
-then stop reading that connection until the retry accepts the message or gives
-up ([BACKPRESSURE.md](BACKPRESSURE.md)). The default, used by a factory that
-implements only `connect` and by the NIO client, cannot pause: it answers a request
-it is asked to wait for with `:LOAD` at once and drops anything else.
+as a server's delivery does when a queue is full. The built-in transports (Netty
+and NIO) decode and deliver on the shared client ingress, and stop reading that
+connection until the retry accepts the message or gives up
+([BACKPRESSURE.md](BACKPRESSURE.md)). The default, used by a factory that
+implements only `connect`, cannot pause: it answers a request it is asked to wait
+for with `:LOAD` at once and drops anything else.
 
 The factory installs the receive limit before delivery starts and returns a
 ready connection, including any transport handshake. `AConnection` continues
@@ -289,7 +299,8 @@ that communicate via an `AConnection`:
   applies transaction bookkeeping.
 - **Protocol handling** — incoming protocol messages (e.g. server-initiated
   CHALLENGE) are handled automatically (auto-response with the client's
-  keypair). Reverse DATA_REQUESTs and other unsolicited messages go to the
+  keypair, in the bound form naming the dialled peer if one is set,
+  [PEER_PRIORITY.md](PEER_PRIORITY.md#protocol)). Reverse DATA_REQUESTs and other unsolicited messages go to the
   deliveries set with `setDataRequestDelivery` and `setUnsolicitedMessageDelivery`,
   which may ask to wait; `ConvexRemote` passes that request on to its transport.
   `returnMessageHandler`, for paths that cannot pause such as `ConvexLocal`,
@@ -325,17 +336,17 @@ An added `orTimeout` on the returned owned future also releases its request.
 In contrast, `get(timeout)` only stops that wait: cancel explicitly to abandon it.
 Neither cancellation nor expiry implies that a submitted transaction did not run.
 
-A reply completes the client's future on the thread that delivers it: a network
-event loop for a remote client, or for `ConvexLocal` the local peer's thread that
+A reply completes the client's future on the thread that delivers it: a client
+ingress worker for a remote client, or for `ConvexLocal` the local peer's thread that
 produced the reply. That is the thread delivering the results of the transaction's
 block, the transaction handler for a transaction refused on arrival, the query
 handler for a raw QUERY message, and the calling thread itself for a status or ping
 request; a `ConvexLocal` query takes no peer thread (§4.4). A timeout or close
 completes it on the timeout scheduler or the closing thread. Stages attached with
 `thenApply`, `thenCompose`, `whenComplete` and the other non-async methods run on
-that thread without a hand-off, so they must not block: an event loop serves many
-connections, and a local peer's threads serve every client, or every client with a
-transaction in the same block. A stage may send a
+that thread without a hand-off, so they must not block: an ingress worker serves
+every connection the process opens, and a local peer's threads serve every client,
+or every client with a transaction in the same block. A stage may send a
 further request: where its thread would wait for queue space that only it frees,
 the send fails at once with `FULL_CLIENT_BUFFER` instead
 ([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md)). A stage that needs another
@@ -419,6 +430,11 @@ The server sees `AConnection` on incoming messages and uses capabilities
 uniformly. It does not know or care about the transport — a local paired
 connection, a Netty socket, and a future WebSocket connection all look the same.
 
+A message from a network connection is framed on the network thread and decoded
+and routed on one of the peer's ingress workers, in the order its connection sent
+it; a local client's message is delivered on the client's own thread
+([BACKPRESSURE.md](BACKPRESSURE.md)).
+
 ### 5.1 Result Delivery
 
 ```java
@@ -441,24 +457,26 @@ if (conn.supportsMessage()) {
 Used by lattice nodes for protocol exchange (challenge/response verification),
 data push, and other server-initiated communication. Only works on bidirectional
 connections. `supportsMessage()` returns false on return-only connections — check
-before attempting. A consensus peer's server sends only results, and requests for data
-missing from an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
+before attempting. A consensus peer's server sends only results, a challenge to an
+unverified connection that sends it a Belief or DATA, and requests for data missing from
+an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
 
 ### 5.3 Trust Checks
 
 ```java
 AConnection conn = msg.getConnection();
 if (conn != null && conn.isTrusted()) {
-    // verified sender — e.g. a lattice node accepts its merge data
+    // trusted sender — e.g. a lattice node accepts its merge data
 } else {
-    // unverified sender
+    // untrusted sender
 }
 ```
 
-Messages on return-only connections are always untrusted (`supportsMessage()`
+Messages on return-only connections are never trusted or verified (`supportsMessage()`
 returns false so verification cannot be initiated). Persistent bidirectional
-connections can accumulate trust via verification. A consensus peer makes no such
-check: it judges a Belief by its signed Orders, whoever sent it.
+connections can accumulate trust via verification. A consensus peer judges a Belief by
+its signed Orders, whoever sent it, but stores DATA only from a verified connection
+(`conn.isVerified()`).
 
 ### 5.4 Verification
 
@@ -472,8 +490,10 @@ A lattice node verifies an inbound connection that claims a key it wants to trus
 5. Verification succeeds → `conn.setTrustedKey(remoteKey)`
 6. Subsequent messages on this connection are trusted
 
-A consensus peer verifies only connections it opens; see
-[PEER_PRIORITY.md](PEER_PRIORITY.md).
+A consensus peer verifies a connection opened to it in the same way, with an answer
+that only a staked peer's own outbound link can give (`InboundVerifier`), and sets
+`conn.setVerifiedKey(remoteKey)`: the connection is verified, not trusted; see
+[PEER_PRIORITY.md](PEER_PRIORITY.md#verifying-an-inbound-connection).
 
 Application-specific policy (e.g. "is this key a registered peer in consensus
 state") is separate from the connection-layer verification. The connection
@@ -484,7 +504,7 @@ identity means.
 
 | Actor | Connection type | Mode | Trust | Verification |
 |---|---|---|---|---|
-| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client initiated; a lattice node's server may also verify |
+| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client initiated; the consensus peer or lattice node it opened the connection to may also verify it |
 | In-memory peer/agent (`ConvexLocal` + keypair) | Local pair (persistent) | bidirectional | yes | client initiated |
 | Shared REST gateway (`ConvexLocal`, no keypair) | Local pair (persistent) | return-only | no | not possible |
 | HTTP endpoint (`ChainAPI`) | Via shared `ConvexLocal` | return-only | no | not possible |

@@ -18,7 +18,7 @@ public class ChallengeSignerTest {
 
 	private static final ACell CONTEXT=Message.LATTICE_PEER_CHALLENGE_CONTEXT;
 
-	@Test public void testChallengeAndAnswerInItsContext() {
+	@Test public void testChallengeAndAnswerInItsContext() throws Exception {
 		AKeyPair challengerKey=AKeyPair.generate();
 		AKeyPair responderKey=AKeyPair.generate();
 		ChallengeSigner challenger=ChallengeSigner.create(challengerKey,CONTEXT);

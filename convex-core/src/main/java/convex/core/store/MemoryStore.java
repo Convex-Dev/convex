@@ -1,14 +1,15 @@
 package convex.core.store;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -33,11 +34,13 @@ public class MemoryStore extends AStore {
 	protected final CVMEncoder encoder=new CVMEncoder(this);
 
 	/**
-	 * Storage of persisted Refs for each hash value
+	 * Storage of persisted Refs for each hash value. Peers' threads read and write
+	 * it concurrently.
 	 */
-	private final HashMap<Hash, Ref<ACell>> hashRefs = new HashMap<Hash, Ref<ACell>>();
+	private final ConcurrentHashMap<Hash, Ref<ACell>> hashRefs = new ConcurrentHashMap<>();
 
-	private ACell rootData;
+	// Set and read on different peer threads
+	private volatile ACell rootData;
 
 	@Override
 	@SuppressWarnings("unchecked")
@@ -77,8 +80,16 @@ public class MemoryStore extends AStore {
 		return encoder;
 	}
 	
-	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel) {
+		return persistRef(ref,noveltyHandler,requiredStatus,topLevel,false,0);
+	}
+
+	/**
+	 * @param checked True if the cell is inside a tree already recorded as persisted
+	 *        in this store, so its structure has been checked
+	 */
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel, boolean checked, int depth) {
 		// Convert to direct Ref if possible
 		try {
 			ref = ref.toDirect();
@@ -101,13 +112,15 @@ public class MemoryStore extends AStore {
 			if ((existing != null)) {
 				if (existing.getStatus()>=requiredStatus) return existing;
 				ref=existing;
+				if (existing.getStatus()>=Ref.PERSISTED) checked=true;
 			}
 		}
 
 		// Recursively persist children, tracking if all were fully resolved
 		final int[] minChildStatus = {requiredStatus};
+		final boolean childrenChecked=checked;
 		cell  = cell.updateRefs(r -> {
-			Ref<ACell> result = persistRef(r,noveltyHandler,requiredStatus,false);
+			Ref<ACell> result = persistChild(r,noveltyHandler,requiredStatus,childrenChecked,depth+1);
 			if (result.getStatus()<requiredStatus) {
 				minChildStatus[0]=Math.min(minChildStatus[0], result.getStatus());
 			}
@@ -119,19 +132,73 @@ public class MemoryStore extends AStore {
 		// Only claim full status if all children achieved it;
 		// otherwise cap at STORED (this cell is stored but descendants may be incomplete)
 		int achievedStatus = (minChildStatus[0]>=requiredStatus) ? requiredStatus : Math.max(Ref.STORED, minChildStatus[0]);
-		ref=ref.withMinimumStatus(achievedStatus);
-		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
-		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore
-		// does, so the cell's hash and status are known without another walk.
-		cell.attachRef(ref);
+		// Children are now persisted: check this cell against them before it is
+		// recorded as persisted for the first time
+		if (!checked && (achievedStatus>=Ref.PERSISTED) && (cell.getRefCount()>0)) Cells.checkStructure(cell);
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
 
-			hashRefs.put(fHash, (Ref<ACell>) ref);
-			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
+			// Only what this write achieved: a status carried in on the ref is another store's
+			ref=ref.withStatus(achievedStatus);
+			// Another write of this value may have recorded it since the check above
+			ref=(Ref<T>) hashRefs.merge(fHash, (Ref<ACell>) ref, MemoryStore::higher);
+		} else {
+			ref=ref.withMinimumStatus(achievedStatus);
 		}
+		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
+		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore
+		// does, so the cell's hash and status are known without another walk.
+		cell.attachRef(ref);
+		// Outside the merge: a handler may write to this store
+		if ((topLevel||!embedded) && (noveltyHandler != null)) noveltyHandler.accept((Ref<ACell>) ref);
 		return ref;
+	}
+
+	/**
+	 * Merges a write into the entry held for its hash, so that the entry's status
+	 * never falls.
+	 *
+	 * @param held Ref the store holds for the hash
+	 * @param written Ref the write achieved for the same value
+	 * @return Ref carrying the flags of both
+	 */
+	private static Ref<ACell> higher(Ref<ACell> held, Ref<ACell> written) {
+		int flags=Ref.mergeFlags(held.getFlags(), written.getFlags());
+		return (held.getFlags()==flags) ? held : written.withFlags(flags);
+	}
+
+	/**
+	 * Persists a child Ref at the given nesting depth, persisting what lies beneath it
+	 * bottom up first if that depth is too deep to recurse further.
+	 */
+	@SuppressWarnings("unchecked")
+	private Ref<ACell> persistChild(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean checked, int depth) {
+		if (depth>=MAX_PERSIST_DEPTH) {
+			ACell cell;
+			try {
+				cell=ref.getValue();
+			} catch (MissingDataException e) {
+				cell=null; // persistRef handles missing data
+			}
+			if (cell!=null) {
+				// Everything beneath a checked cell lies in the same persisted tree
+				persistBeneath(cell,r->isPersisted(r,requiredStatus),r->persistRef(r,noveltyHandler,requiredStatus,false,checked,0));
+			}
+			depth=0;
+		}
+		return persistRef(ref,noveltyHandler,requiredStatus,false,checked,depth);
+	}
+
+	/**
+	 * Tests whether this store holds a branch Ref at the given status or above, as
+	 * persistRef checks before recursing.
+	 */
+	private boolean isPersisted(Ref<ACell> ref, int requiredStatus) {
+		// The Ref's own status may come from another store, so look in this one
+		if (ref.isEmbedded()) return false;
+		Ref<ACell> existing=refForHash(ref.getHash());
+		return (existing!=null)&&(existing.getStatus()>=requiredStatus);
 	}
 
 	@Override
@@ -146,6 +213,10 @@ public class MemoryStore extends AStore {
 		return (T) rootData;
 	}
 
+	/**
+	 * Sets the root data, held in memory. Unlike {@link AStore#setRootData}, this
+	 * does not persist the root's tree in this store.
+	 */
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) {
 		rootData=data;

@@ -43,9 +43,17 @@ class LatestUpdateQueueTest {
 			}
 		});
 
-		started.await();
-		queue.offer(13);
-		consumer.join();
+		try {
+			started.await();
+			queue.offer(13);
+			consumer.join();
+		} finally {
+			// After a failed step the consumer is still in take, which only an interrupt ends
+			if (consumer.isAlive()) {
+				consumer.interrupt();
+				consumer.join();
+			}
+		}
 
 		assertEquals(13,result.get());
 	}

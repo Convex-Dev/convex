@@ -32,28 +32,47 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	protected Ref<ACell> cachedRef=null;
 
+	/**
+	 * Validates this cell and every cell below it that is not already validated or
+	 * persisted: this cell's own data first, then each child, then this cell against
+	 * its children. A cell already validated or persisted is trusted with its whole
+	 * tree. Subclasses may add rules beyond structure after calling this.
+	 *
+	 * @throws InvalidDataException If a cell checked is invalid
+	 */
 	@Override
 	public void validate() throws InvalidDataException {
-		Cells.validate(this);
+		if (getRef().isValidated()) return;
+		try {
+			validateCell();
+			int n=getRefCount();
+			for (int i=0; i<n; i++) {
+				getRef(i).validate();
+			}
+			validateStructure();
+		} catch (InvalidDataException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),this);
+		}
 	}
 	
 	/**
-	 * Validates the local structure and invariants of this cell.
-	 * 
-	 * Should validate directly contained data, but should not validate all other structure of this cell. 
-	 * 
-	 * In particular, should not traverse potentially missing child Refs.
-	 * 
-	 * @throws InvalidDataException  If the Cell is invalid
+	 * Validates this cell's own data, using nothing outside its encoding. It may check
+	 * objects the cell holds directly, the hash of any ref {@link #getRef(int)} returns
+	 * and the value of an embedded one, but never the value of a branch ref: a rule that
+	 * needs a child's value belongs in {@link #validateStructure()}.
+	 *
+	 * @throws InvalidDataException If the cell is invalid
 	 */
 	protected abstract void validateCell() throws InvalidDataException;
 	
 	/**
-	 * Validates the structure and invariants of this cell.
-	 * 
-	 * May visit child refs. Should complete in O(1) time.
-	 * 
-	 * @throws InvalidDataException  If the Cell is invalid
+	 * Checks this cell against each of its direct children, as structural correctness
+	 * requires, and no rule beyond structure. A store runs this check when it first
+	 * persists the cell, after persisting its children.
+	 *
+	 * @throws InvalidDataException  If the cell is inconsistent with a direct child
 	 */
 	public void validateStructure() throws InvalidDataException {
 		// nothing by default
@@ -143,7 +162,54 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	public final Blob getEncoding() {
 		if (encoding!=null) return encoding;
-		encoding=createEncoding();
+		try {
+			encoding=createEncoding();
+		} catch (StackOverflowError e) {
+			// Encoding a branch hashes its children first, so a deep enough value
+			// overflows the stack: encode it children first with an explicit stack
+			return encodeIterative();
+		}
+		return encoding;
+	}
+
+	/**
+	 * Encodes this Cell, first encoding each Cell beneath it that its encoding needs,
+	 * children before parents, without recursion.
+	 *
+	 * @return Encoding of this Cell
+	 */
+	private Blob encodeIterative() {
+		// Each Cell is encoded by createEncoding, as on the recursive path, so the
+		// encodings are the same; only the order differs, and each Cell then finds its
+		// children already encoded and does not recurse into them
+		ArrayList<ACell> stack=new ArrayList<>();
+		stack.add(this);
+		while (!stack.isEmpty()) {
+			ACell cell=stack.removeLast();
+			if (cell==null) {
+				// A null marker means everything beneath the preceding Cell is encoded
+				cell=stack.removeLast();
+				if (cell.encoding==null) cell.encoding=cell.createEncoding();
+				continue;
+			}
+			if (cell.encoding!=null) continue;
+			stack.add(cell);
+			stack.add(null);
+			if (!cell.isCanonical()) {
+				// A non-canonical Cell encodes as its canonical form
+				stack.add(cell.getCanonical());
+				continue;
+			}
+			// Reverse push order preserves the recursive visitation order
+			for (int i=cell.getRefCount()-1; i>=0; i--) {
+				Ref<ACell> ref=cell.getRef(i);
+				// A soft Ref is left to createEncoding, as on the recursive path: it holds
+				// the hash a branch needs, and an embedded value is too small to recurse far
+				if (!ref.isDirect()) continue;
+				ACell child=ref.getValue();
+				if ((child!=null)&&(child.encoding==null)) stack.add(child);
+			}
+		}
 		return encoding;
 	}
 	
@@ -335,6 +401,24 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			return (result>limit)?0:result;
 		}
 		if (!isCanonical()) return getCanonical().getEncodingLength(limit);
+		try {
+			return measureEncodingLength(limit);
+		} catch (StackOverflowError e) {
+			// Measuring a child measures its own children first, so a deep enough value
+			// overflows the stack: encode it children first and use that length
+			int result=encodeIterative().size();
+			return (result>limit)?0:result;
+		}
+	}
+
+	/**
+	 * Measures the encoding length of this canonical Cell from its header and child
+	 * Refs, as {@link #getEncodingLength(int)} defines.
+	 *
+	 * @param limit Maximum encoding length of interest
+	 * @return Exact encoding length, or 0 if beyond limit
+	 */
+	private int measureEncodingLength(int limit) {
 		int length=calcHeaderLength();
 		if (length>limit) return 0;
 		int n=getRefCount();

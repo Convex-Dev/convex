@@ -2,6 +2,7 @@ package convex.restapi.api;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +17,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
+import convex.core.util.Cleanup;
 import convex.core.util.StateWatcher;
 import convex.restapi.RESTServer;
 import convex.restapi.api.QueryWatch.Event;
@@ -46,6 +48,8 @@ public final class QueryWatchAPI extends ABaseAPI {
 	private volatile long generation;
 	private StateWatcher<Peer> updates;
 	private Consumer<Peer> updateObserver;
+	/** Set by shutdown under lifecycleLock, which subscribing also holds */
+	private boolean shutDown;
 
 	public QueryWatchAPI(RESTServer restServer) {
 		super(restServer);
@@ -85,7 +89,7 @@ public final class QueryWatchAPI extends ABaseAPI {
 			// to bounded staleness rather than losing the connection
 			connection=new SseConnection(writer,EVENT_QUEUE_CAPACITY,SseConnection.OverflowPolicy.DROP_OLDEST);
 			connection.sendComment("connected");
-			subscribe(connection,query,format);
+			if (!subscribe(connection,query,format)) return;
 
 			while (!connection.awaitClosed(KEEPALIVE_MS,TimeUnit.MILLISECONDS)) {
 				connection.sendComment("keepalive");
@@ -139,8 +143,10 @@ public final class QueryWatchAPI extends ABaseAPI {
 		};
 	}
 
-	private void subscribe(SseConnection connection, QueryWatch query, WatchFormat format) {
+	/** Subscribes a stream, or returns false if this API has shut down. */
+	private boolean subscribe(SseConnection connection, QueryWatch query, WatchFormat format) {
 		synchronized (lifecycleLock) {
+			if (shutDown) return false;
 			boolean start=(updates==null);
 			if (start) {
 				long currentGeneration=++generation;
@@ -153,19 +159,31 @@ public final class QueryWatchAPI extends ABaseAPI {
 			} else {
 				updates.update(server.getPeer());
 			}
+			return true;
 		}
 	}
 
 	private void unsubscribe(SseConnection connection) {
+		Consumer<Peer> observer;
+		StateWatcher<Peer> watcher;
 		synchronized (lifecycleLock) {
 			subscriptions.remove(connection);
 			if (!subscriptions.isEmpty()||(updates==null)) return;
 			generation++;
-			server.removeStateUpdateObserver(updateObserver);
-			updates.close();
+			observer=updateObserver;
+			watcher=updates;
 			updates=null;
 			updateObserver=null;
 		}
+		Cleanup cleanup=new Cleanup();
+		stopWatching(observer,watcher,cleanup);
+		cleanup.finish();
+	}
+
+	/** Stops a detached observer and watcher. Outside lifecycleLock: closing waits for the watcher's thread. */
+	private void stopWatching(Consumer<Peer> observer, StateWatcher<Peer> watcher, Cleanup cleanup) {
+		if (observer!=null) cleanup.run(() -> server.removeStateUpdateObserver(observer));
+		if (watcher!=null) cleanup.run(watcher::close);
 	}
 
 	private void evaluateAll(long sourceGeneration, Peer peer) {
@@ -192,14 +210,23 @@ public final class QueryWatchAPI extends ABaseAPI {
 
 	/** Stops observation and closes all active query streams. */
 	public void shutdown() {
-		for (SseConnection connection:subscriptions.keySet()) connection.close();
+		List<SseConnection> open;
+		Consumer<Peer> observer;
+		StateWatcher<Peer> watcher;
 		synchronized (lifecycleLock) {
+			// Under the lock subscribing holds, so no stream subscribes after the snapshot
+			shutDown=true;
 			generation++;
-			if (updateObserver!=null) server.removeStateUpdateObserver(updateObserver);
-			if (updates!=null) updates.close();
+			open=new ArrayList<>(subscriptions.keySet());
+			subscriptions.clear();
+			observer=updateObserver;
+			watcher=updates;
 			updates=null;
 			updateObserver=null;
-			subscriptions.clear();
 		}
+		Cleanup cleanup=new Cleanup();
+		for (SseConnection connection:open) cleanup.run(connection::close);
+		stopWatching(observer,watcher,cleanup);
+		cleanup.finish();
 	}
 }

@@ -145,57 +145,54 @@ public class StoreTransferTest {
 
 		AVector<ACell> parent = Vectors.of(nonEmbedded(60), CVMLong.create(1));
 		Hash ph = parent.getHash();
-		{
-			EtchStore store = EtchStore.create(f);
+		try (EtchStore store = EtchStore.create(f)) {
 			store.storeTopRef(parent.getRef(), Ref.STORED, null);
 			store.flush();
-			store.close();
 		}
 
-		EtchStore source = EtchStore.create(f);
-		Ref<ACell> lazy = RefSoft.createForHash(ph, source);
+		try (EtchStore source = EtchStore.create(f)) {
+			Ref<ACell> lazy = RefSoft.createForHash(ph, source);
 
-		// Etch destination is strict: missing source data propagates
-		assertThrows(MissingDataException.class,
-				() -> StoreTransfer.transfer(Samples.TEST_STORE2, lazy));
+			// Etch destination is strict: missing source data propagates
+			assertThrows(MissingDataException.class,
+					() -> StoreTransfer.transfer(Samples.TEST_STORE2, lazy));
 
-		// MemoryStore destination is lenient by design (remote-acquisition
-		// semantics): it stores what it can and caps the achieved status
-		Ref<ACell> lazy2 = RefSoft.createForHash(ph, source);
-		Ref<ACell> partial = StoreTransfer.transfer(new MemoryStore(), lazy2);
-		assertTrue(partial.getStatus() < Ref.PERSISTED,
-				"Partial transfer must not claim PERSISTED");
-		source.close();
+			// MemoryStore destination is lenient by design (remote-acquisition
+			// semantics): it stores what it can and caps the achieved status
+			Ref<ACell> lazy2 = RefSoft.createForHash(ph, source);
+			Ref<ACell> partial = StoreTransfer.transfer(new MemoryStore(), lazy2);
+			assertTrue(partial.getStatus() < Ref.PERSISTED,
+					"Partial transfer must not claim PERSISTED");
+		}
 	}
 
 	@Test
 	public void testMigrateEverything() throws IOException {
 		// Dedicated source store: migrate coverage is about exact store contents
-		EtchStore source = EtchStore.createTemp("migrate-src");
+		try (EtchStore source = EtchStore.createTemp("migrate-src")) {
+			// Mixed contents: a persisted tree, an announced value, a STORED-only
+			// parent (child deliberately absent), and an unreachable value
+			AVector<ACell> persisted = Cells.persist(tree(70), source);
+			AString announced = nonEmbedded(74);
+			Cells.announce(announced, null, source);
+			AVector<ACell> storedOnly = Vectors.of(nonEmbedded(75), CVMLong.create(2));
+			source.storeTopRef(storedOnly.getRef(), Ref.STORED, null);
+			AString unreachable = nonEmbedded(76);
+			Cells.persist(unreachable, source);
 
-		// Mixed contents: a persisted tree, an announced value, a STORED-only
-		// parent (child deliberately absent), and an unreachable value
-		AVector<ACell> persisted = Cells.persist(tree(70), source);
-		AString announced = nonEmbedded(74);
-		Cells.announce(announced, null, source);
-		AVector<ACell> storedOnly = Vectors.of(nonEmbedded(75), CVMLong.create(2));
-		source.storeTopRef(storedOnly.getRef(), Ref.STORED, null);
-		AString unreachable = nonEmbedded(76);
-		Cells.persist(unreachable, source);
+			AStore dest = new MemoryStore();
+			ACell destRoot = dest.getRootData();
+			long count = EtchUtils.migrate(source, dest);
+			assertTrue(count >= 6, "Expected all source entries processed, got " + count);
 
-		AStore dest = new MemoryStore();
-		ACell destRoot = dest.getRootData();
-		long count = EtchUtils.migrate(source, dest);
-		assertTrue(count >= 6, "Expected all source entries processed, got " + count);
+			// Everything from source is persisted in dest, at commensurate status
+			assertTrue(StoreTransfer.verify(dest, persisted.getHash()).isEmpty());
+			assertTrue(dest.refForHash(announced.getHash()).getStatus() >= Ref.ANNOUNCED);
+			assertNotNull(dest.refForHash(storedOnly.getHash()));
+			assertTrue(dest.refForHash(unreachable.getHash()).getStatus() >= Ref.PERSISTED);
 
-		// Everything from source is persisted in dest, at commensurate status
-		assertTrue(StoreTransfer.verify(dest, persisted.getHash()).isEmpty());
-		assertTrue(dest.refForHash(announced.getHash()).getStatus() >= Ref.ANNOUNCED);
-		assertNotNull(dest.refForHash(storedOnly.getHash()));
-		assertTrue(dest.refForHash(unreachable.getHash()).getStatus() >= Ref.PERSISTED);
-
-		// Destination root untouched
-		assertEquals(destRoot, dest.getRootData());
-		source.close();
+			// Destination root untouched
+			assertEquals(destRoot, dest.getRootData());
+		}
 	}
 }

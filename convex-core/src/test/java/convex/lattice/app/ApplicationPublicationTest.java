@@ -17,6 +17,7 @@ import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.lattice.LatticeHost;
 import convex.lattice.SignedComponent;
+import convex.lattice.SignedSetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.SetComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -50,7 +51,8 @@ class ApplicationPublicationTest {
 	/** Routes complete envelopes at {@code :notebook} and publishes only that component. */
 	static final class NotebookApp extends SingleRegion<Notebook> {
 		NotebookApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair owner) {
-			super(host.cursor(),NOTEBOOK,new Notebook(host.cursor().path(NOTEBOOK),owner));
+			// The notebook is the host index's entry, created by its first publication
+			super(host.cursor(),NOTEBOOK,(AForkableCursor<SignedData<ASet<ACell>>> region) -> new Notebook(region,owner));
 		}
 
 		Notebook notebook() { return component(); }
@@ -79,10 +81,15 @@ class ApplicationPublicationTest {
 			notes=new SetComponent<>(cursor());
 		}
 
-		@Override protected Notebook rebind(AForkableCursor<ASet<ACell>> cursor) {
+		@Override public Notebook rebind(AForkableCursor<ASet<ACell>> cursor) {
 			return new Notebook(owner,cursor);
 		}
 		@Override public Notebook fork() { return rebind(storage.fork()); }
+
+		/** Notes only accumulate, so local changes on both sides combine. */
+		@Override protected ASet<ACell> reconcile(ASet<ACell> own,ASet<ACell> other) {
+			return SignedSetComponent.union(own,other);
+		}
 
 		void add(String text) { notes.add(Strings.create(text)); }
 		ASet<ACell> all() { return notes.get(); }

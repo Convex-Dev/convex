@@ -25,6 +25,26 @@ public class ConvexExpressionEvaluatorTest {
 	private RelDataTypeFactory typeFactory;
 	private RexBuilder rexBuilder;
 
+	@Test
+	void integerDivisionUsesSqlTypeAndIntegerValue() {
+		var integer = typeFactory.createSqlType(SqlTypeName.BIGINT);
+		var decimal = typeFactory.createSqlType(SqlTypeName.DECIMAL, 20, 2);
+		for (var type : new RelDataType[] {integer, decimal}) {
+			RexNode division = rexBuilder.makeCall(org.apache.calcite.sql.fun.SqlStdOperatorTable.DIVIDE,
+					rexBuilder.makeInputRef(type, 0), rexBuilder.makeInputRef(type, 1));
+			for (long numerator : new long[] {7, -7}) {
+				var big = java.math.BigInteger.valueOf(numerator);
+				for (ACell value : new ACell[] {CVMLong.create(numerator),
+						convex.core.data.prim.CVMBigInteger.wrap(big),
+						convex.core.data.prim.CVMBigInteger.wrap(big.toByteArray())}) {
+					ACell result = ConvexExpressionEvaluator.evaluate(division, new ACell[] {value, CVMLong.create(2)}, null);
+					assertEquals(type == integer ? CVMLong.create(numerator / 2) : CVMDouble.create(numerator / 2.0), result);
+				}
+			}
+			assertNull(ConvexExpressionEvaluator.evaluate(division, new ACell[] {null, CVMLong.create(2)}, null));
+		}
+	}
+
 	@BeforeEach
 	void setUp() {
 		typeFactory = new SqlTypeFactoryImpl(org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT);

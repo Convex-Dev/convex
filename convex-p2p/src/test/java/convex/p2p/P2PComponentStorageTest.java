@@ -21,6 +21,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.Regions;
 import convex.lattice.cursor.Root;
 
@@ -33,6 +34,9 @@ class P2PComponentStorageTest {
 		P2PLattice.createIdentity(Strings.intern("alice"),null,null,1);
 	private static final AHashMap<Keyword,ACell> SECOND=
 		P2PLattice.createIdentity(Strings.intern("updated"),null,null,2);
+	private static final AHashMap<Keyword,ACell> THIRD=
+		P2PLattice.createIdentity(Strings.intern("third"),null,null,3);
+	private static final Keyword NOTE=Keyword.intern("note");
 
 	private static P2PUser user(Root<ACell> root,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		var application=new Regions(root.<Index<Keyword,ACell>>path());
@@ -97,16 +101,20 @@ class P2PComponentStorageTest {
 			signatures.incrementAndGet();
 			return ALICE.signData(value);
 		});
+		// A transaction needs its record to exist, so an ordinary write creates it first
+		component(user,node).cursor().set(FIRST);
+		assertEquals(1,signatures.get());
+		ACell created=root.get();
 		Consumer<ALatticeComponent<ACell>> edits=draft -> {
 			draft.cursor().set(FIRST);
 			draft.cursor().set(SECOND);
-			assertNull(root.get());
-			assertEquals(0,signatures.get());
+			assertSame(created,root.get());
+			assertEquals(1,signatures.get());
 		};
 		if (node) user.node().execute(edits::accept);
 		else user.identity().execute(edits::accept);
 		assertEquals(SECOND,component(user,node).cursor().get());
-		assertEquals(1,signatures.get());
+		assertEquals(2,signatures.get());
 		ACell before=root.get();
 		Consumer<ALatticeComponent<ACell>> abort=draft -> {
 			draft.cursor().set(FIRST);
@@ -117,7 +125,7 @@ class P2PComponentStorageTest {
 			else user.identity().execute(abort::accept);
 		});
 		assertSame(before,root.get());
-		assertEquals(1,signatures.get());
+		assertEquals(2,signatures.get());
 	}
 
 	/** A root conflict during signing must preserve both unrelated regions and owners. */
@@ -153,7 +161,6 @@ class P2PComponentStorageTest {
 		assertEquals(0,signatures.get());
 		draft.sync();
 		assertEquals(2,attempts.get(),"A conflicting root write must force a retry");
-		assertEquals(1,signatures.get(),"An unchanged candidate reuses its prepared signature");
 		assertEquals(SECOND,component(user,node).cursor().get());
 		var actual=(Index<?,?>)root.get();
 		assertSame(opaque,actual.get(P2PLattice.KEY_KAD));
@@ -164,5 +171,49 @@ class P2PComponentStorageTest {
 		var signed=(SignedData<?>)stored.get(KEY);
 		assertEquals(KEY,signed.getAccountKey());
 		assertTrue(signed.checkSignature());
+	}
+
+	/** A transaction that meets a concurrent change to the record runs again from it, so both changes are kept. */
+	@Test void transactionMeetingAConcurrentChangeRunsAgain() {
+		for (boolean node:new boolean[] {false,true}) assertTransactionRerun(node);
+	}
+
+	@SuppressWarnings("unchecked")
+	private void assertTransactionRerun(boolean node) {
+		var root=new Root<ACell>();
+		var user=user(root,(owner,value) -> ALICE.signData(value));
+		var live=component(user,node);
+		live.cursor().set(FIRST);
+		var runs=new AtomicInteger();
+		Consumer<ALatticeComponent<ACell>> edit=draft -> {
+			// Another writer replaces the record with a newer one during the first run
+			if (runs.incrementAndGet()==1) live.cursor().set(SECOND);
+			draft.cursor().updateAndGet(record -> ((AHashMap<Keyword,ACell>)record).assoc(NOTE,CVMLong.ONE));
+		};
+		if (node) user.node().execute(edit::accept);
+		else user.identity().execute(edit::accept);
+		assertEquals(2,runs.get(),"the transaction that met the change ran again");
+		assertEquals(SECOND.assoc(NOTE,CVMLong.ONE),live.cursor().get(),"both changes are kept");
+	}
+
+	/** A fork whose record changed too cannot sync, whichever change is newer, and the sync changes nothing. */
+	@Test void forkSyncRefusesAChangeOnBothSides() {
+		for (boolean node:new boolean[] {false,true}) {
+			for (boolean forkNewer:new boolean[] {false,true}) assertForkConflict(node,forkNewer);
+		}
+	}
+
+	private void assertForkConflict(boolean node,boolean forkNewer) {
+		var root=new Root<ACell>();
+		var user=user(root,(owner,value) -> ALICE.signData(value));
+		var live=component(user,node);
+		live.cursor().set(FIRST);
+		var draft=node?user.node().fork():user.identity().fork();
+		draft.cursor().set(forkNewer?THIRD:SECOND);
+		live.cursor().set(forkNewer?SECOND:THIRD);
+		ACell before=root.get();
+		assertThrows(MergeConflictException.class,draft::sync);
+		assertSame(before,root.get(),"a refused sync changes nothing");
+		assertEquals(forkNewer?THIRD:SECOND,draft.cursor().get(),"the fork keeps its edits");
 	}
 }

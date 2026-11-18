@@ -19,6 +19,8 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
@@ -46,6 +48,7 @@ import convex.test.Samples;
 import convex.test.Testing;
 
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class EncodingTest {
 
 	@Test public void testVLQLongLength() throws BadFormatException, BufferUnderflowException {
@@ -87,8 +90,8 @@ public class EncodingTest {
 		doVLQLongTest(Long.MIN_VALUE);
 	}
 	
-	byte[] buf=new byte[50];
 	private void doVLQCountTest(long x) throws BadFormatException {
+		byte[] buf=new byte[50];
 		int n=Format.getVLQCountLength(x);
 		int offset=(int) (x%10); // variable offset, somewhat pseudorandom
 		
@@ -111,6 +114,7 @@ public class EncodingTest {
 	}
 	
 	private void doVLQLongTest(long x) throws BadFormatException {
+		byte[] buf=new byte[50];
 		int n=Format.getVLQLongLength(x);
 		int offset=(int) ((x+n)&0x0f); // variable offset, somewhat pseudorandom
 		
@@ -187,7 +191,7 @@ public class EncodingTest {
 		ACell a=Reader.read(s);
 		
 		// Should b invalid
-		assertThrows(InvalidDataException.class,()->Cells.validate(a));
+		assertThrows(InvalidDataException.class,()->a.validate());
 		
 		// Should still print
 		String p=RT.print(a).toString(); 
@@ -207,13 +211,6 @@ public class EncodingTest {
 		List<ACell> l2=Samples.TEST_STORE.decode(b);
 		
 		assertEquals(l,l2);
-	}
-	
-	@Test public void testMalformedStrings() {
-		// TODO: confirm we are OK with bad UTF-8 bytes?
-		// bad examples constructed using info from https://www.w3.org/2001/06/utf-8-wrong/UTF-8-test.html
-		// assertThrows(BadFormatException.class,()->Format.read("300180")); // continuation only
-		//assertThrows(BadFormatException.class,()->Format.read("3001FF")); 
 	}
 	
 	@Test public void testCanonical() {
@@ -280,14 +277,6 @@ public class EncodingTest {
 		
 		Format.writeHexDigits(bs, 3, src, 0, 3);
 		assertEquals(Blobs.fromHex("0000020003caf000"),Blob.wrap(bs));
-	}
-	
-	@Test 
-	public void testWriteRef() {
-		// TODO: consider whether this is valid
-		// shouldn't be allowed to write a Ref directly as a top-level message
-		// ByteBuffer b=ByteBuffer.allocate(10);
-		// assertThrows(IllegalArgumentException.class,()->Format.write(b, Ref.create("foo")));
 	}
 	
 	@Test
@@ -368,13 +357,6 @@ public class EncodingTest {
 
 		SignedData<ATransaction> dtrans = doMultiEncodingTest(strans);
 		assertEquals(strans.getValue(),dtrans.getValue());
-	}
-	
-	@SuppressWarnings("unused")
-	@Test 
-	public void testFailedMissingEncoding() throws BadFormatException {
-		ABlob bigBlob=Blob.createRandom(new Random(123), 5000).toCanonical();
-		
 	}
 	
 	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException, IOException {

@@ -106,16 +106,25 @@ bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the stor
 decision, not the data layer's.
 
 A delta leaves out every cell its sender has announced before, to anyone: the
-record of what has been announced is per store, not per receiver. A receiver can
-therefore lack cells an update refers to. It may not have been connected when
-they were first sent (a peer broadcasts as soon as it starts, while its
-connections are still opening). A queue may have refused the update that carried
-them. Or the receiver may have dropped that update because something else was
-missing, since decoding an update never stores the cells it carries.
+record of what has been announced is per store, not per receiver. A receiver
+therefore keeps every cell an update from a verified link carries as it takes
+the update off its queue, before merging and whatever the merge takes from it. A
+merge takes only the Orders it uses, yet the sender's later updates leave out all
+the rest too: an Order older than one the receiver holds, the receiver's own
+Order as the sender saw it, and the Belief's own cells, which an unchanged
+Belief repeated as a keepalive refers to. Keeping them is staging, as for DATA
+([PEER_PRIORITY.md](PEER_PRIORITY.md)); a failure to keep them is logged and the
+merge goes ahead.
 
-Such an update ends in a request rather than a timer. `BeliefPropagator` stores
-the update's own cells, fetches what they lack from the connection the update
-arrived on, and queues the update again to merge once that has arrived. The
+A receiver can still lack cells an update refers to. It may not have been
+connected when they were first sent (a peer broadcasts as soon as it starts,
+while its connections are still opening), a queue may have refused the update
+that carried them, or the update or its DATA may have come on a link the
+receiver had not yet verified, and not been kept.
+
+Such an update ends in a request rather than a timer. `BeliefPropagator` fetches
+what the update lacks from the connection it arrived on, and queues the update
+again to merge once that has arrived. The
 sender holds everything it refers to, and a peer's own connections to other
 peers answer these requests from its store, as its server answers any
 connection. A peer has at most one fetch outstanding: a miss while one is under
@@ -124,11 +133,12 @@ A fetch that fails, or takes longer than the poll delay, is dropped.
 
 Periodic status polling remains the recovery of last resort, including for idle
 peers which have outbound connections but receive no inbound propagation. One
-random outbound peer is probed per interval; an unchanged Belief hash costs no
-acquisition.
+outbound peer is probed per interval, chosen as
+[PEER_PRIORITY.md](PEER_PRIORITY.md#polling-and-back-off) describes; an unchanged
+Belief hash costs no acquisition.
 
-Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
-queue off the Netty event loop. This preserves the DATA-before-root order for a
+Inbound CPoS BELIEF messages, and DATA from verified connections, share one ordered,
+byte-bounded processing queue off the Netty event loop. This preserves the DATA-before-root order for a
 connection while keeping decoding and store work away from network I/O. The
 queue admits one message over its byte bound, so any legal frame can enter when
 capacity is available. If either bound is already full, the incoming DATA or
@@ -142,11 +152,9 @@ would make queue byte accounting encode the complete value as one wire frame,
 which is both unnecessary and invalid when the value exceeds the 50 MB frame
 limit. The propagator drains every retained acquired Belief alongside wire
 updates and compares all signed Orders before performing one merge; values from
-different peers never overwrite each other in a shared pending slot. Polling is
-deferred only while this queue is full, and capacity is checked again before
-acquisition: pushes filling the wire queue never defer it. A STATUS timeout is initially only a missed health probe; a
-connection is retired if it remains unresponsive for a full minute, while any
-non-connectivity result resets that period.
+different peers never overwrite each other in a shared pending slot. Polling
+waits for room in this queue, checked again before acquisition, and never for the
+wire queue: pushes filling the wire queue never defer it.
 
 ## Memory budgets
 
@@ -159,6 +167,7 @@ protocol limits:
 | One eager lattice propagation | 16 MiB | `LatticePropagatorConfig.maxDeltaBroadcastSize` |
 | Node inbound processing queue | 1,024 messages and 16 MiB | `inboundQueueSize`, `maxInboundQueueBytes` |
 | Concurrent lattice acquisitions | 1,024 | `inboundQueueSize` |
+| Keys in a received lattice path | 1,024 | `maxPathLength` |
 | DATA_REQUESTs served at once over routes the node opened | 16, a quarter per route | `maxDataRequests` |
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
@@ -183,9 +192,10 @@ independent encoded-byte limit.
 
 ## Receiver policy and recovery
 
-Unsolicited DATA is staging only. It is accepted only after the connection has
-been assigned an authorised propagator/store capability, and it does not merge
-or publish a lattice value. The acquiror and its storage policy belong to the
+Unsolicited DATA is staging only, and is accepted only from an authorised
+connection: on a lattice node, one assigned an authorised propagator/store
+capability; on a consensus peer, one verified as a staked peer's own link
+([PEER_PRIORITY.md](PEER_PRIORITY.md)). It does not merge or publish a value. The acquiror and its storage policy belong to the
 receiving side. A later LATTICE_VALUE or BELIEF root activates normal processing
 and requests any missing cells.
 

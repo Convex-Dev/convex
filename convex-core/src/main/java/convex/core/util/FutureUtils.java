@@ -4,6 +4,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -11,6 +14,30 @@ import java.util.function.Function;
 /** Completion stages that own their upstream operation, including cancellation. */
 public final class FutureUtils {
 	private FutureUtils() {}
+
+	/**
+	 * Waits at most the given time for an exclusively owned future's value, and cancels
+	 * the future if it has none by then or the wait is interrupted.
+	 *
+	 * @param <T> Type of the value
+	 * @param future Future to wait for
+	 * @param timeout Longest wait
+	 * @param unit Unit of the timeout
+	 * @return The future's value
+	 * @throws TimeoutException if the future has no value in time; it is then cancelled
+	 * @throws InterruptedException if the wait is interrupted; the future is then cancelled
+	 * @throws ExecutionException if the future failed
+	 * @throws CancellationException if the future was cancelled
+	 */
+	public static <T> T getOrCancel(CompletableFuture<T> future,long timeout,TimeUnit unit)
+			throws InterruptedException, ExecutionException, TimeoutException {
+		try {
+			return future.get(timeout,unit);
+		} finally {
+			// Does nothing once the future has completed
+			future.cancel(true);
+		}
+	}
 
 	/** Like thenApply, with cancellation forwarded to the owned source. */
 	public static <S,T> CompletableFuture<T> map(CompletableFuture<S> source,Function<? super S,? extends T> mapper) {

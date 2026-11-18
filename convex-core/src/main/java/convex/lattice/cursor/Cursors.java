@@ -44,18 +44,6 @@ public class Cursors {
 	}
 
 	/**
-	 * Creates an opt-in transactional root, whose writes coordinate through one lock
-	 * so that {@link Transactions#transactExclusively} and contention fallback are available.
-	 *
-	 * @param <V> Type of cursor value
-	 * @param value Initial value
-	 * @return New transactional root
-	 */
-	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value) {
-		return new TransactionalRootCursor<>(value);
-	}
-
-	/**
 	 * Creates a cached transformation cursor that combines a TimeCache with a Transformer.
 	 *
 	 * This is useful if you have an expensive transformation that you don't want to run repeatedly and a small delay is acceptable.

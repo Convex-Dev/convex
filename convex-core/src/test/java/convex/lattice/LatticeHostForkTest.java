@@ -13,7 +13,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
-import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
 
@@ -143,14 +142,5 @@ class LatticeHostForkTest {
 		assertNull(items(origin),"the origin sees nothing until the fork itself syncs");
 		fork.sync();
 		assertEquals(Sets.of(1),items(origin));
-	}
-
-	@Test void forkRootMirrorsTheOriginsTransactionalKind() {
-		var plain=LatticeHost.create();
-		assertFalse(plain.cursor().supportsExclusiveTransactions());
-		assertFalse(plain.fork().cursor().supportsExclusiveTransactions());
-		var transactional=new LatticeHost<>(new TransactionalRootCursor<>(LATTICE.zero()),null);
-		assertTrue(transactional.cursor().supportsExclusiveTransactions());
-		assertTrue(transactional.fork().cursor().supportsExclusiveTransactions());
 	}
 }

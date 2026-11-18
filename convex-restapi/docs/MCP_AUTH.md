@@ -1001,7 +1001,7 @@ The `convex-core` primitives are shared with Covia's authentication system:
 
 | Convex Peer | Covia Venue | Shared `convex-core` Class |
 |---|---|---|
-| Self-issued JWT verification | `AuthMiddleware.tryVerifySelfIssued()` | `JWT.verifyPublic(jwt)` |
+| Self-issued JWT verification | `VenueAuthenticator` self-issued verification | `JWT.verifyPublic(jwt)` |
 | Peer-signed JWT issuance | Venue-signed JWT issuance | `JWT.signPublic(claims, keyPair)` |
 | `did:key` identity encoding | `KeyPairAuth.didKey` | `Multikey.encodePublicKey(ak)` |
 

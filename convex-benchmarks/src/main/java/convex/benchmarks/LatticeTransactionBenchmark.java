@@ -19,9 +19,8 @@ import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 
-/** Isolates the cost of root write coordination, without signing or persistence. */
+/** Isolates the cost of root writes, without signing or persistence. */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -31,10 +30,8 @@ import convex.lattice.cursor.TransactionalRootCursor;
 public class LatticeTransactionBenchmark {
 
 	private final Root<CVMLong> plain=new Root<>(CVMLong.ZERO);
-	private final TransactionalRootCursor<CVMLong> coordinated=new TransactionalRootCursor<>(CVMLong.ZERO);
 	private static final Keyword REGION=Keyword.intern("region"), OWNER=Keyword.intern("owner"), VALUE=Keyword.intern("value");
 	private final ACursor<CVMLong> plainPath=new Root<>(initial()).path(REGION,OWNER,VALUE);
-	private final ACursor<CVMLong> coordinatedPath=new TransactionalRootCursor<>(initial()).path(REGION,OWNER,VALUE);
 
 	private static AHashMap<ACell,ACell> initial() {
 		AHashMap<ACell,ACell> entries=Maps.empty();
@@ -48,7 +45,5 @@ public class LatticeTransactionBenchmark {
 	}
 
 	@Benchmark public CVMLong plainRootUpdate() { return plain.updateAndGet(LatticeTransactionBenchmark::toggle); }
-	@Benchmark public CVMLong coordinatedRootUpdate() { return coordinated.updateAndGet(LatticeTransactionBenchmark::toggle); }
 	@Benchmark public CVMLong plainPathUpdate() { return plainPath.updateAndGet(LatticeTransactionBenchmark::toggle); }
-	@Benchmark public CVMLong coordinatedPathUpdate() { return coordinatedPath.updateAndGet(LatticeTransactionBenchmark::toggle); }
 }

@@ -13,7 +13,6 @@ import java.util.function.Function;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.RT;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -235,6 +234,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 				newMask = (short) (newMask & ~(1 << digitForIndex(i, mask))); // remove from mask
 				sel = sel & ~(1 << i); // remove from selection
 			}
+		}
+		// A tree has at least two children: a lone child holds every entry, so it is the map
+		if (Integer.bitCount(newMask & 0xFFFF) == 1) {
+			return children[Integer.numberOfTrailingZeros(sel)].getValue();
 		}
 		if (mask != newMask) {
 			return new MapTree<K, V>(Refs.filterSmallArray(children, sel), shift, newMask, count);
@@ -552,18 +555,104 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func) {
-		return mergeWith(b, func, this.shift);
+		return mergeWith(b, func, 0);
 	}
 
 	@Override
-	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
+	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int prefix) {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
-			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
-			return mergeWith(bt, func, shift);
+			// Usual case first: both branch at the digit after the known prefix, so share it
+			if ((shift == bt.shift) && (shift == prefix)) return mergeWith(bt, func, shift);
+			return mergeTrees(bt, func, false);
 		}
-		if ((b instanceof MapLeaf)) return mergeWith((MapLeaf<K, V>) b, func, shift);
+		if ((b instanceof MapLeaf)) {
+			MapLeaf<K, V> bl = (MapLeaf<K, V>) b;
+			// Usual case first: every key of b is known to share this tree's prefix
+			if ((shift == prefix) || bl.isEmpty()) return mergeWith(bl, func, shift);
+			Hash h = getFirstHash();
+			AHashMap<K, V> result = mergeWith(bl.filterPrefix(h, shift, true), func, shift);
+			// Keys under another prefix lie outside this tree, like those under an absent digit
+			return assocAlone(result, bl.filterPrefix(h, shift, false), func);
+		}
 		throw new Panic("Unrecognised map type: " + b.getClass());
+	}
+
+	/**
+	 * Merges with a tree whose shift or prefix differs from this one's, or which is not known
+	 * to share it, as mergeWith or, with differences, as mergeDifferences
+	 */
+	private AHashMap<K, V> mergeTrees(MapTree<K, V> b, MergeFunction<V> func, boolean differences) {
+		int bshift = b.shift;
+		int least = Math.min(shift, bshift);
+		int common = getFirstHash().commonHexPrefixLength(b.getFirstHash(), least);
+		if (common < least) {
+			// No key in common: each is merged with nothing, then joined at the digit where they part
+			AHashMap<K, V> empty = Maps.empty();
+			AHashMap<K, V> ra = differences ? mergeDifferences(empty, func, shift) : mergeWith(empty, func, shift);
+			AHashMap<K, V> rb = differences ? empty.mergeDifferences(b, func, bshift) : empty.mergeWith(b, func, bshift);
+			return join(common, ra, rb);
+		}
+		if (shift == bshift) return differences ? mergeDifferences(b, func, shift) : mergeWith(b, func, shift);
+		// One lies under a single digit of the other
+		if (shift < bshift) return mergeUnder(this, b.getFirstHash().getHexDigit(shift), b, true, func, differences);
+		return mergeUnder(b, getFirstHash().getHexDigit(bshift), this, false, func, differences);
+	}
+
+	/**
+	 * Merges tree t with map x, all of whose keys lie under digit d of t: x with the child of t
+	 * at d, and each other child of t with nothing.
+	 *
+	 * @param tFirst True if t is the receiver of the merge, false if x is
+	 * @param differences True to merge as mergeDifferences, false as mergeWith
+	 */
+	@SuppressWarnings("unchecked")
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> mergeUnder(MapTree<K, V> t, int d, AHashMap<K, V> x, boolean tFirst, MergeFunction<V> func, boolean differences) {
+		int s = t.shift;
+		AHashMap<K, V> empty = Maps.empty();
+		Ref<AHashMap<K, V>>[] newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[FANOUT];
+		boolean changed = false;
+		for (int digit = 0; digit < FANOUT; digit++) {
+			Ref<AHashMap<K, V>> tref = t.childForDigit(digit);
+			AHashMap<K, V> tc = tref.getValue();
+			AHashMap<K, V> xc = (digit == d) ? x : empty;
+			if (tc.isEmpty() && xc.isEmpty()) continue;
+			AHashMap<K, V> first = tFirst ? tc : xc;
+			AHashMap<K, V> second = tFirst ? xc : tc;
+			AHashMap<K, V> rc = differences ? first.mergeDifferences(second, func, s + 1) : first.mergeWith(second, func, s + 1);
+			if (rc != tc) changed = true;
+			newChildren[digit] = (rc == tc) ? tref : rc.getRef();
+		}
+		if (tFirst && !changed) return t;
+		// A lone child left is the result itself, so a receiver x left unchanged is returned as x
+		return createFull(newChildren, s);
+	}
+
+	/**
+	 * Joins two maps whose keys share their first c hex digits and part at the next
+	 */
+	@SuppressWarnings("unchecked")
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> join(int c, AHashMap<K, V> a, AHashMap<K, V> b) {
+		if (b.isEmpty()) return a;
+		if (a.isEmpty()) return b;
+		Ref<AHashMap<K, V>>[] children = (Ref<AHashMap<K, V>>[]) new Ref<?>[FANOUT];
+		children[a.getFirstHash().getHexDigit(c)] = a.getRef();
+		children[b.getFirstHash().getHexDigit(c)] = b.getRef();
+		return createFull(children, c);
+	}
+
+	/**
+	 * Adds the entries of a leaf whose keys the result lacks, with the values the function gives
+	 * each alone
+	 */
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> assocAlone(AHashMap<K, V> result, MapLeaf<K, V> b, MergeFunction<V> func) {
+		int n = b.size();
+		for (int i = 0; i < n; i++) {
+			MapEntry<K, V> e = b.entryAt(i);
+			V value = func.merge(e.getKey(), null, e.getValue());
+			if (value != null) result = result.assocEntry(e.withValue(value));
+		}
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -637,15 +726,21 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 	
 	@Override
-	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func,int shift) {
+	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int prefix) {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
-			// this is OK, top levels should both have shift 0 and be aligned down the tree.
-			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
-			return mergeDifferences(bt, func,shift);
+			// Usual case first: both branch at the digit after the known prefix, so share it
+			if ((shift == bt.shift) && (shift == prefix)) return mergeDifferences(bt, func, shift);
+			return mergeTrees(bt, func, true);
 		} else {
 			// must be ListMap
-			return mergeDifferences((MapLeaf<K, V>) b, func,shift);
+			MapLeaf<K, V> bl = (MapLeaf<K, V>) b;
+			// Usual case first: every key of b is known to share this tree's prefix
+			if ((shift == prefix) || bl.isEmpty()) return mergeDifferences(bl, func, shift);
+			Hash h = getFirstHash();
+			AHashMap<K, V> result = mergeDifferences(bl.filterPrefix(h, shift, true), func, shift);
+			// Keys under another prefix lie outside this tree, like those under an absent digit
+			return assocAlone(result, bl.filterPrefix(h, shift, false), func);
 		}
 	}
 
@@ -805,72 +900,51 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return create(newChildren, shift, mask, computeCount(newChildren));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		
-		try {
-			Hash firstHash=getFirstHash();
-			// Perform child validation
-			validateWithPrefix(firstHash,shift);
-		} catch (ClassCastException e) {
-			throw new InvalidDataException("Can't get first hash of map: "+e.getMessage(),this,e);
-		}
-	}
-
-	@Override
-	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
-		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		int bsize = children.length;
-		if (bsize<2) {
-			throw new InvalidDataException("Non-canonical MapTree with child count "+bsize,this);
-		}
-
-		long childCount=0;;
-		for (int i = 0; i < bsize; i++) {
-			if (children[i] == null)
-				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
+	public void validateStructure() throws InvalidDataException {
+		Hash firstHash=getFirstHash();
+		long childCount=0;
+		for (int i = 0; i < children.length; i++) {
 			ACell o = children[i].getValue();
-			if (!(o instanceof AHashMap)) {
-				throw new InvalidDataException(
-						"Expected AHashMap child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
-			}
-			AHashMap<K, V> child = RT.ensureHashMap(o);
-			if (child==null) {
-				throw new InvalidDataException("Non-hashmap child at position "+i,this);
-			}
-			if (child.isEmpty())
-				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
+			if (!(o instanceof AHashMap)) throw new InvalidDataException("Child "+i+" is not a hash map",this);
+			AHashMap<K, V> child=(AHashMap<K, V>) o;
+			if (child.isEmpty()) throw new InvalidDataException("Empty child "+i,this);
 			int d = digitForIndex(i, mask);
-			Hash ch=child.getFirstHash();
-			if (ch.getHexDigit(shift)!=d) {
-				throw new InvalidDataException("Wrong child digit at position "+i,this);
+			if (child instanceof MapTree<K, V> tree) {
+				if (tree.shift<=shift) throw new InvalidDataException("Child "+i+" shift not greater than "+shift,this);
+				checkChildHash(tree.getFirstHash(),firstHash,d,i);
+			} else {
+				MapLeaf<K, V> leaf=(MapLeaf<K, V>) child;
+				long n=leaf.count();
+				for (long j=0; j<n; j++) {
+					checkChildHash(leaf.entryAt(j).getKeyHash(),firstHash,d,i);
+				}
 			}
-			if (prefix.commonHexPrefixLength(ch, Hash.HEX_LENGTH)<shift) {
-				throw new InvalidDataException("Inconsistent child at position "+i,this);
-			}
-			// TODO: remove recursion here?
-			if (child instanceof MapLeaf) {
-				child.validateWithPrefix(ch, shift+1);
-			}
-			
 			childCount += child.count();
 		}
-		
 		if (count != childCount) {
 			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
 	}
 
 	/**
+	 * Checks that a key hash in child i shares this tree's prefix and has the child's digit
+	 */
+	private void checkChildHash(Hash h, Hash firstHash, int digit, int i) throws InvalidDataException {
+		if ((h.commonHexPrefixLength(firstHash, shift) < shift) || (h.getHexDigit(shift) != digit)) {
+			throw new InvalidDataException("Child "+i+" holds a key outside its digit",this);
+		}
+	}
+
+	/**
 	 * Check for top level structural integrity. Does not traverse branch refs.
-	 * @return
+	 * @return true if valid, false otherwise
 	 */
 	boolean isValidStructure() {
-		if (shift<0) return false;
+		if ((shift<0)||(shift>=Hash.HEX_LENGTH)) return false;
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
+		if (children.length<2) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			Ref<AHashMap<K,V>> cref=children[i];
@@ -888,7 +962,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public boolean containsAllKeys(AHashMap<K, V> map) {
 		if (map instanceof MapTree) {
-			return containsAllKeys((MapTree<K,V>)map);
+			return containsAllKeys((MapTree<K,V>)map, 0);
 		}
 		// must be a MapLeaf
 		long n=map.count;
@@ -899,20 +973,44 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 	
-	protected boolean containsAllKeys(MapTree<K, V> map) {
+	/**
+	 * Tests whether this tree holds every key of another, given a number of leading hex digits
+	 * that every key hash of both is known to share
+	 */
+	protected boolean containsAllKeys(MapTree<K, V> map, int prefix) {
+		// Usual case first: both branch at the digit after the known prefix, so share it
+		if ((shift != map.shift) || (shift != prefix)) {
+			int least = Math.min(shift, map.shift);
+			// Trees that part before either branches have no key in common
+			if (getFirstHash().commonHexPrefixLength(map.getFirstHash(), least) < least) return false;
+			// A tree branching at an earlier digit has keys under digits this one lacks
+			if (map.shift < shift) return false;
+			// A tree branching at a later digit lies under one digit of this one
+			if (map.shift > shift) return childContainsAllKeys(childForDigit(map.getFirstHash().getHexDigit(shift)).getValue(), map, shift + 1);
+		}
+
 		// fist check this mask contains all of target mask
 		if ((this.mask|map.mask)!=this.mask) return false;
-		
+
 		for (int i=0; i<FANOUT; i++) {
 			Ref<AHashMap<K,V>> child=this.childForDigit(i);
 			if (child==null) continue;
-			
+
 			Ref<AHashMap<K,V>> mchild=map.childForDigit(i);
 			if (mchild==null) continue;
-			
-			if (!(child.getValue().containsAllKeys(mchild.getValue()))) return false; 
+
+			if (!childContainsAllKeys(child.getValue(), mchild.getValue(), shift + 1)) return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Tests whether a child map holds every key of another map, given a number of leading hex
+	 * digits that every key hash of both is known to share
+	 */
+	private static <K extends ACell, V extends ACell> boolean childContainsAllKeys(AHashMap<K, V> child, AHashMap<K, V> map, int prefix) {
+		if ((child instanceof MapTree<K, V> ct) && (map instanceof MapTree<K, V> mt)) return ct.containsAllKeys(mt, prefix);
+		return child.containsAllKeys(map);
 	}
 
 	@Override

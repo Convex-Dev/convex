@@ -1,15 +1,19 @@
 package convex.restapi.mcp;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,20 +30,25 @@ class SseConnectionTest {
 			new BlockingWriter(slowWriteStarted,releaseSlowWrite)));
 		SseConnection fast=new SseConnection(new PrintWriter(new LatchingWriter(fastWriteSeen)));
 
-		Thread distributor=Thread.ofVirtual().start(()-> {
-			slow.sendEvent("message","slow");
-			fast.sendEvent("message","fast");
-		});
+		var executor=Executors.newVirtualThreadPerTaskExecutor();
 		try {
+			var distributor=executor.submit(()-> {
+				slow.sendEvent("message","slow");
+				fast.sendEvent("message","fast");
+			});
+			distributor.get(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
 			assertTrue(slowWriteStarted.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
 			assertTrue(fastWriteSeen.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
 		} finally {
 			releaseSlowWrite.countDown();
-			slow.close();
-			fast.close();
-			distributor.join(TIMEOUT.toMillis());
+			assertAll("Close the connections, then stop the distributor",
+				slow::close,
+				fast::close,
+				()-> {
+					executor.shutdownNow();
+					assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"distributor did not stop");
+				});
 		}
-		assertFalse(distributor.isAlive());
 	}
 
 	@Test
@@ -89,6 +98,7 @@ class SseConnectionTest {
 			assertTrue(written.contains("data: queued-2"));
 			assertFalse(connection.isClosed());
 		} finally {
+			release.countDown();
 			connection.close();
 		}
 	}
@@ -124,9 +134,79 @@ class SseConnectionTest {
 	@Test
 	void closeWakesWaiter() throws Exception {
 		SseConnection connection=new SseConnection(new PrintWriter(Writer.nullWriter()));
-		Thread closer=Thread.ofVirtual().start(connection::close);
-		assertTrue(connection.awaitClosed(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
-		closer.join(TIMEOUT.toMillis());
+		var executor=Executors.newVirtualThreadPerTaskExecutor();
+		try {
+			var closer=executor.submit(connection::close);
+			assertTrue(connection.awaitClosed(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			closer.get(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
+		} finally {
+			try {
+				connection.close();
+			} finally {
+				executor.shutdownNow();
+				assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"closer did not stop");
+			}
+		}
+	}
+
+	@Test
+	void closeWaitsForAWriteUnderWay() throws Exception {
+		CountDownLatch writing=new CountDownLatch(1);
+		AtomicBoolean closeReturned=new AtomicBoolean();
+		InterruptibleWriter output=new InterruptibleWriter(writing,Thread.currentThread(),closeReturned);
+		SseConnection connection=new SseConnection(new PrintWriter(output));
+		try {
+			connection.sendEvent("message","stuck");
+			assertTrue(writing.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			connection.close();
+			boolean stillWriting=output.writer.isAlive();
+			closeReturned.set(true);
+			assertFalse(stillWriting,"close returned while an event was being written");
+		} finally {
+			closeReturned.set(true);
+			connection.close();
+		}
+	}
+
+	/**
+	 * Blocks a write until interrupted, as a servlet container's blocking write does,
+	 * then fails it once the closing thread waits for it, or once that close has
+	 * returned, so a close that does not wait finds the write still under way. Every
+	 * write blocks so, so a connection that writes again after its close never stops.
+	 */
+	private static final class InterruptibleWriter extends Writer {
+		private final CountDownLatch writing;
+		private final Thread closer;
+		private final AtomicBoolean closeReturned;
+		volatile Thread writer;
+
+		private InterruptibleWriter(CountDownLatch writing, Thread closer, AtomicBoolean closeReturned) {
+			this.writing=writing;
+			this.closer=closer;
+			this.closeReturned=closeReturned;
+		}
+
+		@Override
+		public void write(char[] chars, int offset, int length) throws IOException {
+			writer=Thread.currentThread();
+			writing.countDown();
+			try {
+				new CountDownLatch(1).await();
+			} catch (InterruptedException e) {
+				while (!closerWaits() && !closeReturned.get()) {
+					Thread.onSpinWait();
+				}
+				throw new InterruptedIOException();
+			}
+		}
+
+		private boolean closerWaits() {
+			Thread.State state=closer.getState();
+			return (state==Thread.State.WAITING)||(state==Thread.State.TIMED_WAITING);
+		}
+
+		@Override public void flush() {}
+		@Override public void close() {}
 	}
 
 	private static final class BlockingWriter extends Writer {

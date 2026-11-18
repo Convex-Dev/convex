@@ -12,6 +12,8 @@ import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.ResourceLockTarget;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
@@ -22,6 +24,8 @@ import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.util.FileUtils;
 
+// Each class reuses one keystore; concurrent rewrites would lose keys.
+@ResourceLock(value="KeyExportTest.keystore", target=ResourceLockTarget.CHILDREN)
 public class KeyExportTest {
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
 	private static final char[] KEY_PASSWORD = "testKeyPassword".toCharArray();

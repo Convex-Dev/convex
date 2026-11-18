@@ -160,13 +160,13 @@ public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	}
 
 	@Override
-	protected LatticeTopic rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+	public LatticeTopic rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new LatticeTopic(cursor,clock);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+	protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
 		return TopicLattice.INSTANCE.merge(own,other);
 	}
 }

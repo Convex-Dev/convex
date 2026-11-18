@@ -15,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.ResourceLockTarget;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
@@ -22,6 +24,8 @@ import convex.core.crypto.BIP39;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
 
+// Each class reuses one keystore; concurrent rewrites would lose keys.
+@ResourceLock(value="KeyTest.keystore", target=ResourceLockTarget.CHILDREN)
 public class KeyTest {
 
 	private static final File TEMP_FILE;

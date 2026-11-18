@@ -6,13 +6,15 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ThreeWayMerge;
 import convex.lattice.cursor.Transactions;
 
 /**
  * Exclusive transactions on a component's live state, made by
  * {@link TransactionalComponent#exclusive()}. Each callback runs once, on a private
- * draft, while holding the write lock of the component's root, and commits before the
- * lock is released. Use it for operations which must not repeat.
+ * draft, under the claim beneath this component's storage, and commits before the
+ * claim is released. Use it for operations too expensive to repeat, or with side
+ * effects.
  *
  * <p>Like a fork, this is built from the component's bound storage. A fork derives
  * private working storage and rebinds the domain component to it; this derives a
@@ -25,13 +27,29 @@ import convex.lattice.cursor.Transactions;
  * Commits go to the source's bound storage, which this component holds privately
  * because the read-only view deliberately carries no write access.</p>
  *
- * <p>The lock belongs to the source's root. For a staged component it covers only
- * that component's working copy, so the fork's sync waits for a running transaction;
- * for a live component it covers every writer of the host. A fork's working storage
- * always has such a lock, so {@code fork().exclusive()} is available over any root.
+ * <p>The claim is that of the nearest transactional boundary beneath the source's
+ * bound storage ({@link convex.lattice.cursor.ACursor#claim}): a
+ * {@link convex.lattice.cursor.BoundaryCursor}, or else the root, which is the
+ * outermost boundary. It covers everything under that boundary: writes through it from
+ * other threads wait, including incoming merges, and exclusive transactions under the
+ * same boundary run one after another whatever they touch, while those under separate
+ * boundaries run at the same time. A write reaching the value without passing
+ * through the boundary, or made by the claiming thread outside the draft, is
+ * reconciled with the callback's run by the source component's
+ * {@link ALatticeComponent#reconcile(ACell,ACell,ACell)}, as {@link TransactionalComponent}
+ * describes, or makes the transaction fail if it cannot reconcile changes on both sides. For a
+ * staged component the root is that component's working copy, so a sync of the fork
+ * from another thread waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
- * separate sync. Keep callbacks short: they must not wait for another operation on
- * the same state, sync it, or write through a captured live component.</p>
+ * separate sync, and a sync from the callback publishes the fork's working value,
+ * without this transaction's draft.</p>
+ *
+ * <p>Callbacks must not wait for another thread's operation on the same state. A write
+ * a callback makes outside its draft, through a captured component or by a fork's sync,
+ * lands at once and stays if the callback or the commit fails. Such a write waits for any
+ * claim it passes that another thread holds, so the callback's thread must hold each
+ * such claim, taken before this one: a fork's claim before its destination's, a
+ * region's before its container's. A thread may take a claim it already holds.</p>
  *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
@@ -42,28 +60,37 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	private final AForkableCursor<V> target;
 
 	/** Binds the source's domain operations to each draft. */
-	private final Function<? super AForkableCursor<V>,? extends C> withCursor;
+	private final Function<? super AForkableCursor<V>,? extends C> binder;
 
-	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> withCursor) {
+	/** Reconciles a change under the claim made outside the draft, or null to fail instead. */
+	private final ThreeWayMerge<V> merge;
+
+	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> binder,ThreeWayMerge<V> merge) {
 		super(target.readOnly());
-		if (!target.supportsExclusiveTransactions()) {
-			throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
-		}
 		this.target=target;
-		this.withCursor=Objects.requireNonNull(withCursor);
+		this.binder=Objects.requireNonNull(binder);
+		this.merge=merge;
 	}
 
 	/**
-	 * Runs domain operations once on a private view under the root's write lock,
-	 * commits them, and returns their result.
+	 * Runs domain operations once on a private view under the claim beneath its storage,
+	 * commits the transaction value after any reconciliation, and returns the
+	 * callback's result.
+	 * Reconciliation does not recompute that result or guarantee that the transaction's
+	 * changes survive; see {@link TransactionalComponent}.
 	 *
 	 * @param <R> Result type
 	 * @param action Domain operations on a private view, returning their result
-	 * @return Result of the callback
+	 * @return Result of the callback, computed before any merge at commit
 	 */
 	public <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transactExclusively(target,draft -> action.apply(withCursor.apply(draft)));
+		return Transactions.transactExclusively(target,draft -> {
+			C view=binder.apply(draft);
+			R result=action.apply(view);
+			completeDraft(view);
+			return result;
+		},merge);
 	}
 
 	/**
@@ -73,6 +100,10 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	 */
 	public void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.executeExclusively(target,draft -> action.accept(withCursor.apply(draft)));
+		Transactions.executeExclusively(target,draft -> {
+			C view=binder.apply(draft);
+			action.accept(view);
+			completeDraft(view);
+		},merge);
 	}
 }

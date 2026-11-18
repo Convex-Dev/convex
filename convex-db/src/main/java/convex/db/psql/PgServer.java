@@ -12,10 +12,14 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import javax.net.ssl.SSLContext;
+
+import convex.core.util.Cleanup;
+import convex.core.util.Shutdown;
 
 /**
  * PostgreSQL wire protocol server backed by Convex SQL.
@@ -64,11 +68,10 @@ public class PgServer {
 		this.sslContext = builder.sslContext;
 		this.allowPlaintext = builder.allowPlaintext;
 
-		if (builder.connectionSupplier != null) {
-			this.connectionSupplier = builder.connectionSupplier;
-		} else {
+		Supplier<Connection> source = builder.connectionSupplier;
+		if (source == null) {
 			// Default: connect via Convex JDBC driver
-			this.connectionSupplier = () -> {
+			source = () -> {
 				try {
 					return DriverManager.getConnection("jdbc:convex:database=" + database);
 				} catch (SQLException e) {
@@ -76,6 +79,17 @@ public class PgServer {
 				}
 			};
 		}
+		Supplier<Connection> connections = source;
+		this.connectionSupplier = builder.readOnly ? () -> {
+			Connection connection = connections.get();
+			try {
+				connection.setReadOnly(true);
+				return connection;
+			} catch (SQLException | RuntimeException e) {
+				try { connection.close(); } catch (SQLException close) { e.addSuppressed(close); }
+				throw new RuntimeException("Cannot open read-only database connection", e);
+			}
+		} : source;
 	}
 
 	/**
@@ -180,31 +194,26 @@ public class PgServer {
 	}
 
 	private void shutdown() {
-		if (serverChannel != null) {
-			try {
-				serverChannel.close().await(5, java.util.concurrent.TimeUnit.SECONDS);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-			serverChannel = null;
-		}
-		if (workerGroup != null) {
-			try {
-				workerGroup.shutdownGracefully(0, 2, java.util.concurrent.TimeUnit.SECONDS)
-					.await(3, java.util.concurrent.TimeUnit.SECONDS);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-			workerGroup = null;
-		}
-		if (bossGroup != null) {
-			try {
-				bossGroup.shutdownGracefully(0, 2, java.util.concurrent.TimeUnit.SECONDS)
-					.await(3, java.util.concurrent.TimeUnit.SECONDS);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-			bossGroup = null;
+		Channel channel = serverChannel;
+		EventLoopGroup workers = workerGroup;
+		EventLoopGroup boss = bossGroup;
+		serverChannel = null;
+		workerGroup = null;
+		bossGroup = null;
+		// A failure closing the listening socket still leaves both thread groups to stop
+		Cleanup cleanup = new Cleanup();
+		if (channel != null) cleanup.run(() -> await(channel.close(), 5));
+		if (workers != null) cleanup.run(() -> await(workers.shutdownGracefully(0, 2, TimeUnit.SECONDS), 3));
+		if (boss != null) cleanup.run(() -> await(boss.shutdownGracefully(0, 2, TimeUnit.SECONDS), 3));
+		cleanup.finish();
+	}
+
+	/** Waits up to the given time for a shutdown step; an interrupt ends the wait and is kept. */
+	private static void await(io.netty.util.concurrent.Future<?> step, long seconds) {
+		try {
+			step.await(seconds, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 	}
 
@@ -239,6 +248,20 @@ public class PgServer {
 		private SSLContext sslContext = null;
 		private boolean allowPlaintext = false;
 		private Supplier<Connection> connectionSupplier = null;
+		private boolean readOnly = false;
+
+		/**
+		 * Serves queries through read-only JDBC connections. Convex JDBC rejects writes
+		 * with SQLSTATE 25006; this does not prevent writes through other bindings.
+		 * A custom supplier must return fresh connections that enforce read-only mode.
+		 *
+		 * @param readOnly Whether this server refuses SQL writes (default false)
+		 * @return This builder
+		 */
+		public Builder readOnly(boolean readOnly) {
+			this.readOnly = readOnly;
+			return this;
+		}
 
 		/**
 		 * Sets the port to listen on. Default is 5432.
@@ -327,8 +350,8 @@ public class PgServer {
 			.database(database)
 			.build();
 
-		// Add shutdown hook
-		Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
+		// Before the stores close, rather than concurrently as a JVM hook of its own would run
+		Shutdown.addHook(Shutdown.SERVICE,server::stop);
 
 		server.startAndWait();
 	}

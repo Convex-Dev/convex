@@ -17,6 +17,7 @@ import convex.core.util.Utils;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -110,7 +111,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Cursor of the table's entry, which may be absent
 	 */
 	public AForkableCursor<AVector<ACell>> path(AString name) {
-		return cursor().withDefault(Index.none()).path(name);
+		return new IndexComponent<>(cursor()).path(name);
 	}
 
 	/**

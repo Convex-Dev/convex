@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -20,7 +21,9 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
+import convex.core.util.Cleanup;
 import convex.lattice.LatticeHost;
+import convex.net.PeerConnectionException;
 import convex.net.PeerName;
 import convex.net.PeerResolver;
 import convex.net.PeerTarget;
@@ -31,7 +34,7 @@ import convex.net.PeerTarget;
  * Inbound connections are denied unless
  * the caller selects a policy through {@link #getListener()} or explicitly calls
  * {@link #serveAllInbound(LatticePropagator)}. Further listeners, from
- * {@link #addListener(NodeConfig)}, deny until given a selector of their own.
+ * {@link #addListener(NodeConfig)}, deny until given a selector or connection handler.
  *
  * <p>The node takes no lock of its own. Its identity, serving policy and peer
  * methods never wait, so network callbacks such as a listener's selector may call
@@ -284,7 +287,15 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 				return due;
 			});
 		keptPeers.put(keeper.kept,propagator);
-		keeper.kept.whenComplete((value,error) -> keptPeers.remove(keeper.kept));
+		keeper.kept.whenComplete((value,error) -> {
+			keptPeers.remove(keeper.kept);
+			if (error==null) return;
+			Throwable cause=PeerConnectionException.unwrap(error);
+			if (!(cause instanceof CancellationException) && !(cause instanceof PeerConnectionException)) {
+				org.slf4j.LoggerFactory.getLogger(LatticeNode.class)
+					.warn("Stopped keeping peer {} after an unexpected failure",name,cause);
+			}
+		});
 		keeper.start(admitted);
 		return keeper.kept;
 	}
@@ -303,8 +314,11 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 * group; established sockets keep their existing assignment. Private deployments
 	 * can configure the listener's selector instead.
 	 *
+	 * @param propagator group whose view will be served
+	 * @return this node
 	 * @throws IllegalArgumentException if the group was not created by this node, or
 	 *         has been removed
+	 * @see LatticeListener#setConnectionHandler(java.util.function.Function)
 	 */
 	public LatticeNode<V> serveAllInbound(LatticePropagator propagator) {
 		if (propagator==null || !groups.contains(propagator)) {
@@ -340,19 +354,6 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	public InetSocketAddress getHostAddress() { return listener.getHostAddress(); }
 
 	/** Closes every listener, each even if another fails, and returns the first failure, with any later one suppressed. */
-	private Throwable closeListeners() {
-		Throwable failure=null;
-		for (LatticeListener each:listeners) {
-			try {
-				each.close();
-			} catch (RuntimeException | Error e) {
-				if (failure==null) failure=e;
-				else failure.addSuppressed(e);
-			}
-		}
-		return failure;
-	}
-
 	/**
 	 * Closes every listener for good, then the server, which sends what the host has
 	 * published and detaches from the host. Both steps always run; the first failure
@@ -361,16 +362,10 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 */
 	@Override
 	public void close() throws IOException {
-		stopKeeping(null);
-		Throwable failure=closeListeners();
-		try {
-			server.close();
-		} catch (IOException | RuntimeException | Error e) {
-			// Report the first failure; a later one must not hide it
-			if (failure==null) throw e;
-			failure.addSuppressed(e);
-		}
-		if (failure instanceof RuntimeException e) throw e;
-		if (failure instanceof Error e) throw e;
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(() -> stopKeeping(null));
+		for (LatticeListener each:listeners) cleanup.run(each::close);
+		cleanup.run(server::close);
+		cleanup.finish(IOException.class);
 	}
 }

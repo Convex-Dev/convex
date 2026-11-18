@@ -20,6 +20,7 @@ import convex.core.util.Utils;
 import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -43,7 +44,9 @@ import convex.lattice.cursor.Cursors;
  * constructed, with no default. A database is the unit of merging: the ConvexDB
  * passes its policy to each database through {@link #database(AString)}, and merges
  * the database map by name, each database with that policy. Incoming merges, delivery
- * to a path, publication of forks and replica merges all use it.
+ * to a path, publication of a database's forks and replica merges all use it. A
+ * ConvexDB has a single writer, so a fork of the ConvexDB itself has no publication
+ * merge: its sync fails if the destination changed since the fork last synced.
  * {@link convex.db.lattice.RowLWW#merge} is the per-row last-write-wins policy that
  * Convex DB provides; an application that serialises its updates supplies its own.
  *
@@ -200,7 +203,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	/** Subclasses override this to return their own type, so forks keep their databases, policy and clock. */
 	@Override
-	protected ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+	public ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
 		return new ConvexDB(cursor, policy, clock);
 	}
 
@@ -227,7 +230,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return Cursor of the database's state, which may be absent
 	 */
 	public AForkableCursor<Index<Keyword, ACell>> path(AString name) {
-		return cursor().withDefault(EMPTY).path(name);
+		return new MapComponent<>(cursor()).path(name);
 	}
 
 	/**
@@ -293,12 +296,6 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 		return cursor().updateAndGet(own -> mergeValues(own, incoming));
 	}
 
-	@Override
-	protected AHashMap<AString, Index<Keyword, ACell>> mergePublication(AHashMap<AString, Index<Keyword, ACell>> own,
-			AHashMap<AString, Index<Keyword, ACell>> other) {
-		return mergeValues(own, other);
-	}
-
 	/** Each database name resolves to its {@link #database(AString)} component. */
 	@SuppressWarnings("unchecked")
 	@Override
@@ -357,5 +354,18 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 */
 	public Connection getConnection(String dbName) throws SQLException {
 		return ConvexDriver.connect(this, dbName);
+	}
+
+	/**
+	 * Opens a live read-only connection to one database, without publishing a name.
+	 * The caller cannot remove the restriction with {@code setReadOnly(false)}.
+	 * Explicit transactions read snapshots; other connections may continue writing.
+	 *
+	 * @param dbName Database name
+	 * @return Permanently read-only JDBC connection
+	 * @throws SQLException if connection creation fails
+	 */
+	public Connection getReadOnlyConnection(String dbName) throws SQLException {
+		return ConvexDriver.connect(database(dbName).readOnly());
 	}
 }

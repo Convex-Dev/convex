@@ -167,18 +167,13 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	}
 
 	@Override
-	public Mailbox withCursor(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected Mailbox rebind(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
+	public Mailbox rebind(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
 		return new Mailbox(cursor,lattice,signer);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<ABlob,SignedData<ACell>> mergePublication(
+	protected Index<ABlob,SignedData<ACell>> reconcile(
 			Index<ABlob,SignedData<ACell>> own,
 			Index<ABlob,SignedData<ACell>> other) {
 		return lattice.merge(own,other);

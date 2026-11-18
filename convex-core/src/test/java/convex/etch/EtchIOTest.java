@@ -63,9 +63,12 @@ public class EtchIOTest {
 		File file=File.createTempFile("etch-access-length", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			assertThrows(EtchCorruptionError.class,
-					()->new MBBFileMapper(data.getChannel(),false,1L,file.getName()));
-			mapper.close();
+			try {
+				assertThrows(EtchCorruptionError.class,
+						()->new MBBFileMapper(data.getChannel(),false,1L,file.getName()));
+			} finally {
+				mapper.close();
+			}
 		}
 		if (!file.delete()) file.deleteOnExit();
 	}
@@ -188,9 +191,9 @@ public class EtchIOTest {
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			mapper.appendZeros(Long.BYTES,Long.BYTES,null);
-			mapper.writeLongRelease(0L,0x0123456789abcdefL,null);
 			try {
+				mapper.appendZeros(Long.BYTES,Long.BYTES,null);
+				mapper.writeLongRelease(0L,0x0123456789abcdefL,null);
 				cipher.reset();
 				assertEquals(0x0123456789abcdefL,mapper.readLongAcquire(0L,null));
 				mapper.writeLongRelease(0L,0x1020304050607080L,null);

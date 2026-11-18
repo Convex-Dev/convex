@@ -1,5 +1,6 @@
 package convex.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -19,7 +20,6 @@ import convex.core.data.Maps;
 import convex.core.init.Init;
 import convex.etch.Etch;
 import convex.etch.EtchConfig;
-import convex.etch.EtchConstants;
 import convex.etch.EtchStore;
 
 /** Tests the consensus Peer's storage durability boundaries. */
@@ -30,13 +30,9 @@ public class ServerPersistenceTest {
 
 	@Test
 	public void testOnlyOrderlyShutdownFlushes() throws Exception {
-		testOnlyOrderlyShutdownFlushes("v1",EtchConfig.create(EtchConstants.VERSION_1));
-		testOnlyOrderlyShutdownFlushes("v2",EtchConfig.create(EtchConstants.VERSION_2));
-		testOnlyOrderlyShutdownFlushes("v3",EtchConfig.create(EtchConstants.VERSION_3));
-	}
-
-	private void testOnlyOrderlyShutdownFlushes(String name, EtchConfig etchConfig) throws Exception {
-		File file=File.createTempFile("peer-checkpoint-"+name,".etch");
+		// When the Server flushes does not depend on the file format, so one format shows it
+		EtchConfig etchConfig=EtchConfig.create();
+		File file=File.createTempFile("peer-checkpoint",".etch");
 		file.deleteOnExit();
 
 		CountingEtchStore store=new CountingEtchStore(Etch.create(file,etchConfig));
@@ -60,8 +56,10 @@ public class ServerPersistenceTest {
 			server=null;
 			assertEquals(1,store.flushCount);
 		} finally {
-			if (server!=null) server.close();
-			store.close();
+			Server launched=server;
+			assertAll("Close the peer and its store",
+				() -> { if (launched!=null) launched.close(); },
+				store::close);
 		}
 
 		try (EtchStore reopened=EtchStore.create(file,etchConfig)) {

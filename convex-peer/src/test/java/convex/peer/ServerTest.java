@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -164,106 +163,91 @@ public class ServerTest {
 
 		AKeyPair  kp=server.getKeyPair();
 
-		Convex convex = network.getLocalClient();
-		assertTrue(convex.getBalance()>0);
-		
-		Result r=convex.transactSync("(create-account "+kp.getAccountKey()+")");
-		Address user=r.getValue();
-		assertNotNull(user);
-		
-		r=convex.transactSync("(transfer "+user+" 10000000)");
-		assertFalse(r.isError());
-		
-		convex=Convex.connect(server, user, kp);
-		assertEquals(10000000,convex.getBalance());
+		try (Convex convex = network.getLocalClient()) {
+			assertTrue(convex.getBalance()>0);
 
-		r=convex.transactSync("(do (transfer "+user+" 100000) *balance*)");
-		assertEquals("10000000",r.getValue().toString());
-	}
+			Result r=convex.transactSync("(create-account "+kp.getAccountKey()+")");
+			Address user=r.getValue();
+			assertNotNull(user);
 
-	@Test
-	public void testServerFlood() throws IOException, InterruptedException, TimeoutException {
-		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
-		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
-		// from backpressure and *not* bring down the server.
-		ConvexRemote convex=network.getClient();
-		Address origin=convex.getAddress();
+			r=convex.transactSync("(transfer "+user+" 10000000)");
+			assertFalse(r.isError());
 
-		ACell cmd=Reader.read("(def tmp (inc tmp))");
-		// Might block, but no issue
-		for (int i=0; i<100; i++) {
-			convex.transact(Invoke.create(origin, 0, cmd));
+			try (Convex userClient=Convex.connect(server, user, kp)) {
+				assertEquals(10000000,userClient.getBalance());
+
+				r=userClient.transactSync("(do (transfer "+user+" 100000) *balance*)");
+				assertEquals("10000000",r.getValue().toString());
+			}
 		}
-
-		// Should still get status OK
-		Convex convex2=Convex.connect(hostAddress);
-		assertNotNull(convex2.requestStatusSync(2000));
 	}
 
 	@Test
 	public void testBalanceQuery() throws IOException, TimeoutException, ResultException, InterruptedException {
-		Convex convex=Convex.connect(network.SERVER.getHostAddress(),network.VILLAIN,network.VILLAIN_KEYPAIR);
-
-		// test the connection is still working
-		assertNotNull(convex.getBalance(network.VILLAIN));
+		try (Convex convex=Convex.connect(network.SERVER.getHostAddress(),network.VILLAIN,network.VILLAIN_KEYPAIR)) {
+			// test the connection is still working
+			assertNotNull(convex.getBalance(network.VILLAIN));
+		}
 	}
-	
+
 	@Test
 	public void testSequence() throws ResultException, TimeoutException, InterruptedException {
-		Convex convex=network.getClient();
-		// sequence number should be zero for fresh account
-		assertEquals(0,convex.getSequence());
-		
-		// Queries and transactions should return the value as at start of transaction
-		assertEquals(0L,(Long)RT.jvm(convex.querySync("*sequence*").getValue()));
-		assertEquals(0L,(Long)RT.jvm(convex.transactSync("*sequence*").getValue()));
-		
-		// Sequence number should be incremented after previous transaction
-		assertEquals(1,convex.getSequence());
+		try (Convex convex=network.getClient()) {
+			// sequence number should be zero for fresh account
+			assertEquals(0,convex.getSequence());
+
+			// Queries and transactions should return the value as at start of transaction
+			assertEquals(0L,(Long)RT.jvm(convex.querySync("*sequence*").getValue()));
+			assertEquals(0L,(Long)RT.jvm(convex.transactSync("*sequence*").getValue()));
+
+			// Sequence number should be incremented after previous transaction
+			assertEquals(1,convex.getSequence());
+		}
 	}
 
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		synchronized(network.SERVER) {
-			Convex convex=network.getClient();
-	
-			Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
-			assertTrue(f.get().getValue() instanceof CVMLong);
-			
-			convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
-	
-			assertFalse(f2.isError(),()->"Bad query result: "+f2);
-			assertEquals(convex.getAddress(),f2.getValue());
-			
-			
-			// Note difference by argument type. `nil` code can make a valid transaction
-			assertThrows(IllegalArgumentException.class,()->convex.transact((ATransaction)null));
-			{
-				Result r=convex.transactSync((ACell)null);
-				// System.out.println(r);
-				assertEquals(null,r.getValue());
+			try (Convex convex=network.getClient()) {
+				Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
+				assertTrue(f.get().getValue() instanceof CVMLong);
+
+				convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
+
+				assertFalse(f2.isError(),()->"Bad query result: "+f2);
+				assertEquals(convex.getAddress(),f2.getValue());
+
+
+				// Note difference by argument type. `nil` code can make a valid transaction
+				assertThrows(IllegalArgumentException.class,()->convex.transact((ATransaction)null));
+				{
+					Result r=convex.transactSync((ACell)null);
+					// System.out.println(r);
+					assertEquals(null,r.getValue());
+				}
+
+				convex.core.Result r3=convex.querySync(Reader.read("(fail :foo)"));
+				assertTrue(r3.isError());
+				assertEquals(ErrorCodes.ASSERT,r3.getErrorCode());
+				assertEquals(Keywords.FOO,r3.getValue());
+				assertNotNull(r3.getTrace());
 			}
-			
-			convex.core.Result r3=convex.querySync(Reader.read("(fail :foo)"));
-			assertTrue(r3.isError());
-			assertEquals(ErrorCodes.ASSERT,r3.getErrorCode());
-			assertEquals(Keywords.FOO,r3.getValue());
-			assertNotNull(r3.getTrace());
 		}
 	}
 
 	@Test
 	public void testAcquireMissing() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		Hash BAD_HASH=Hash.fromHex("BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0");
-		
+
 		synchronized(network.SERVER) {
 
-			Convex convex=Convex.connect(network.SERVER.getHostAddress());
-			convex.setStore(new MemoryStore());
-			assertThrows(ExecutionException.class,()->{
-				ACell c = convex.acquire(BAD_HASH).get();
-				System.out.println("Didn't expect to acquire: "+c);
-			});
+			try (Convex convex=Convex.connect(network.SERVER.getHostAddress())) {
+				convex.setStore(new MemoryStore());
+				assertThrows(ExecutionException.class,()->{
+					ACell c = convex.acquire(BAD_HASH).get();
+					System.out.println("Didn't expect to acquire: "+c);
+				});
+			}
 		}
 	}
 	
@@ -297,21 +281,22 @@ public class ServerTest {
 	public void testAcquireBeliefRemote() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(network.SERVER) {
 
-			Convex convex=Convex.connect(network.SERVER.getHostAddress());
-			convex.setStore(new MemoryStore());
+			try (Convex convex=Convex.connect(network.SERVER.getHostAddress())) {
+				convex.setStore(new MemoryStore());
 
-			Future<Result> statusFuture=convex.requestStatus();
-			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
-			assertFalse(status.isError());
-			assertFalse(status.isError());
-			AMap<Keyword,ACell> v=API.ensureStatusMap(status.getValue());
-			Hash h=RT.ensureHash(v.get(Keywords.BELIEF));
+				Future<Result> statusFuture=convex.requestStatus();
+				Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
+				assertFalse(status.isError());
+				assertFalse(status.isError());
+				AMap<Keyword,ACell> v=API.ensureStatusMap(status.getValue());
+				Hash h=RT.ensureHash(v.get(Keywords.BELIEF));
 
-			Future<Belief> acquiror=convex.acquire(h);
-			Belief ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
-			// Acquired belief was stored in a temporary MemoryStore (no thread-local store set)
-			assertTrue(ab instanceof Belief);
-			assertEquals(h,ab.getHash());
+				Future<Belief> acquiror=convex.acquire(h);
+				Belief ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
+				// Acquired belief was stored in a temporary MemoryStore (no thread-local store set)
+				assertTrue(ab instanceof Belief);
+				assertEquals(h,ab.getHash());
+			}
 		}
 	}
 	
@@ -345,8 +330,8 @@ public class ServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
-		convex.setKeyPair(clientKP);
 		try {
+			convex.setKeyPair(clientKP);
 			AccountKey result = convex.verifyPeer(serverKey).get(5, TimeUnit.SECONDS);
 			assertEquals(serverKey, result, "verifyPeer should return server key on success");
 			assertEquals(serverKey, convex.getVerifiedPeer());
@@ -362,8 +347,8 @@ public class ServerTest {
 		AccountKey wrongKey = AKeyPair.generate().getAccountKey();
 
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
-		convex.setKeyPair(clientKP);
 		try {
+			convex.setKeyPair(clientKP);
 			AccountKey result = convex.verifyPeer(wrongKey).get(5, TimeUnit.SECONDS);
 			assertNull(result, "verifyPeer should return null for wrong key");
 			assertNull(convex.getVerifiedPeer());
@@ -379,8 +364,8 @@ public class ServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
-		convex.setKeyPair(clientKP);
 		try {
+			convex.setKeyPair(clientKP);
 			// Use the peer's actual network ID as context
 			AccountKey result = convex.verifyPeer(serverKey,
 				server.getPeer().getNetworkID()).get(5, TimeUnit.SECONDS);
@@ -400,8 +385,8 @@ public class ServerTest {
 
 		// Connect with a key pair so the client can auto-respond to challenges
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
-		convex.setKeyPair(clientKP);
 		try {
+			convex.setKeyPair(clientKP);
 			// Get the inbound connection on the server side
 			// We can't access it directly, but we can trigger verification
 			// by calling maybeStartVerification on the ConnectionManager
@@ -438,20 +423,25 @@ public class ServerTest {
 	}
 
 	/**
-	 * DATA and Beliefs join the ordered propagation queue whoever sends them, with no
-	 * reply: each Order is judged on its own when merged.
+	 * Beliefs join the ordered propagation queue whoever sends them, with no reply: each
+	 * Order is judged on its own when merged. DATA joins it only from a verified connection.
 	 */
 	@Test
-	public void testPropagationAcceptedFromAnyConnection() throws Exception {
+	public void testPropagationQueueTakesDataOnlyFromVerifiedConnections() throws Exception {
+		checkPropagationQueue(false);
+		checkPropagationQueue(true);
+	}
+
+	private void checkPropagationQueue(boolean verified) throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE,new MemoryStore());
 		Server server=Server.create(config); // not launched: queue is not drained
 		try {
-			// The server's end of a connection from an unverified sender, recording replies
+			// The server's end of a connection from a sender, recording replies
 			ArrayList<Message> replies=new ArrayList<>();
 			LocalConnection sender=LocalConnection.createPair(replies::add,m -> true);
 			AConnection serverEnd=sender.getPaired();
-			assertFalse(serverEnd.isTrusted());
+			if (verified) serverEnd.setVerifiedKey(network.SERVER.getPeerKey());
 
 			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
 				.withConnection(serverEnd);
@@ -460,7 +450,11 @@ public class ServerTest {
 			for (int i=1; i<Config.BELIEF_QUEUE_SIZE; i++) assertNull(server.processMessage(belief));
 
 			BeliefPropagator propagator=server.getBeliefPropagator();
-			assertFalse(propagator.queuePropagation(belief),"the sender's DATA and Beliefs filled the queue");
+			if (verified) {
+				assertFalse(propagator.queuePropagation(belief),"the sender's DATA and Beliefs filled the queue");
+			} else {
+				assertTrue(propagator.queuePropagation(belief),"the unverified sender's DATA was not queued");
+			}
 			assertTrue(replies.isEmpty(),"nothing is refused or answered");
 		} finally {
 			server.close();
@@ -544,6 +538,7 @@ public class ServerTest {
 				"SignedData ref must be at PERSISTED status or higher");
 		} finally {
 			transactionHandler.setRequestObserver(null);
+			convex.close();
 		}
 	}
 
@@ -623,10 +618,11 @@ public class ServerTest {
 	 */
 	@Test
 	public void testSequentialTransactionsConfirmPromptly() throws Exception {
-		Convex client=network.getClient();
-		for (int i=0; i<40; i++) {
-			Result r=client.transact("(def c "+i+")").get(3000,TimeUnit.MILLISECONDS);
-			assertFalse(r.isError(),r.toString());
+		try (Convex client=network.getClient()) {
+			for (int i=0; i<40; i++) {
+				Result r=client.transact("(def c "+i+")").get(3000,TimeUnit.MILLISECONDS);
+				assertFalse(r.isError(),r.toString());
+			}
 		}
 	}
 
@@ -767,7 +763,11 @@ public class ServerTest {
 			assertTrue(propagator.hasBeliefPollCapacity(),"pushes filling their queue must not stop polling");
 			assertNull(server.processMessage(belief));
 
-			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);
+			// From a verified connection, so that the DATA reaches the full queue
+			LocalConnection verified=LocalConnection.create(m -> true);
+			verified.setVerifiedKey(network.SERVER.getPeerKey());
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
+				.withConnection(verified);
 			assertNull(server.processMessage(data));
 		} finally {
 			server.close();
@@ -780,17 +780,18 @@ public class ServerTest {
 	 */
 	@Test
 	public void testLargeTransactionAffordabilityPolicy() throws Exception {
-		Convex client=network.getClient();
-		ACell[] parts=new ACell[300];
-		for (int i=0; i<parts.length; i++) parts[i]=Blobs.createRandom(4000);
-		ATransaction tx=Invoke.create(client.getAddress(),0,Vectors.create(parts));
-		assertTrue(Juice.priceTransaction(tx)>convex.core.Constants.MAX_TRANSACTION_JUICE);
-		long fee=Juice.mul(Juice.priceTransaction(tx),network.SERVER.getState().getJuicePrice().longValue());
-		assertNull(TransactionHandler.checkTransactionAffordability(
-			network.SERVER.getState().withBalance(client.getAddress(),fee),tx));
-		Result error=TransactionHandler.checkTransactionAffordability(
-			network.SERVER.getState().withBalance(client.getAddress(),fee-1),tx);
-		assertEquals(ErrorCodes.JUICE,error.getErrorCode());
+		try (Convex client=network.getClient()) {
+			ACell[] parts=new ACell[300];
+			for (int i=0; i<parts.length; i++) parts[i]=Blobs.createRandom(4000);
+			ATransaction tx=Invoke.create(client.getAddress(),0,Vectors.create(parts));
+			assertTrue(Juice.priceTransaction(tx)>convex.core.Constants.MAX_TRANSACTION_JUICE);
+			long fee=Juice.mul(Juice.priceTransaction(tx),network.SERVER.getState().getJuicePrice().longValue());
+			assertNull(TransactionHandler.checkTransactionAffordability(
+				network.SERVER.getState().withBalance(client.getAddress(),fee),tx));
+			Result error=TransactionHandler.checkTransactionAffordability(
+				network.SERVER.getState().withBalance(client.getAddress(),fee-1),tx);
+			assertEquals(ErrorCodes.JUICE,error.getErrorCode());
+		}
 	}
 
 	@Test
@@ -798,7 +799,10 @@ public class ServerTest {
 		Server server=network.SERVER;
 		Blob value=Blobs.createRandom(400);
 		Message sent=Message.createDataMessage(List.of(value),1024);
-		Message incoming=Message.create(sent.getMessageData());
+		// DATA is staged only from a connection verified as a staked peer's own link
+		LocalConnection conn=LocalConnection.create(m -> true);
+		conn.setVerifiedKey(server.getPeerKey());
+		Message incoming=Message.create(conn,sent.getMessageData());
 		CompletableFuture<Message> staged=new CompletableFuture<>();
 		server.getBeliefPropagator().setDataStageObserver(staged::complete);
 

@@ -63,8 +63,9 @@ class LogWatchAPITest extends ARESTTest {
 				.GET().build();
 
 			HttpResponse<InputStream> response=httpClient.send(request,HttpResponse.BodyHandlers.ofInputStream());
-			assertEquals(200,response.statusCode());
 			try (InputStream input=response.body()) {
+				// Inside the block, so a failed check still closes the stream
+				assertEquals(200,response.statusCode());
 				CompletableFuture<SseEvent> received=CompletableFuture.supplyAsync(()->readLogEvent(input));
 				Result result=convex.transactSync("(call ["+actor+" :USD] (emit))");
 				assertSucceeded(result);

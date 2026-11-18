@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -12,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -23,7 +25,6 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
@@ -53,6 +54,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.SetLattice;
+import convex.peer.ExpectedLogs;
 
 /**
  * Tests for automatic lattice propagation using LatticePropagator.
@@ -69,8 +71,11 @@ public class LatticePropagatorTest {
 	private AStore store1;
 	private AStore store2;
 
-	@BeforeEach
-	public void setUp() throws IOException, InterruptedException {
+	/**
+	 * Launches two connected nodes, for the tests that propagate between them;
+	 * {@link #tearDown()} closes them.
+	 */
+	private void launchNetwork() throws IOException, InterruptedException {
 		// Use the base lattice
 		lattice = Lattice.ROOT;
 
@@ -135,20 +140,25 @@ public class LatticePropagatorTest {
 	}
 
 	@AfterEach
-	public void tearDown() throws IOException {
-		if (transport1!=null) transport1.close();
-		if (transport2!=null) transport2.close();
-		if (server1 != null) {
-			server1.close();
-		}
-		if (server2 != null) {
-			server2.close();
-		}
-		if (store1 != null) {
-			store1.close();
-		}
-		if (store2 != null) {
-			store2.close();
+	public void tearDown() {
+		try {
+			assertAll("Close the network",
+				() -> { if (transport1!=null) transport1.close(); },
+				() -> { if (transport2!=null) transport2.close(); },
+				() -> { if (server1!=null) server1.close(); },
+				() -> { if (server2!=null) server2.close(); },
+				() -> { if (store1!=null) store1.close(); },
+				() -> { if (store2!=null) store2.close(); });
+		} finally {
+			// One instance serves every test, so a test without the network must not close this one again
+			transport1=null;
+			transport2=null;
+			server1=null;
+			server2=null;
+			propagator1=null;
+			propagator2=null;
+			store1=null;
+			store2=null;
 		}
 	}
 
@@ -156,7 +166,8 @@ public class LatticePropagatorTest {
 	 * Tests that the propagator is automatically started when NodeServer launches.
 	 */
 	@Test
-	public void testPropagatorAutoStart() {
+	public void testPropagatorAutoStart() throws Exception {
+		launchNetwork();
 		assertSame(propagator1,server1.getPropagators().get(0),
 			"Node should retain the application-supplied propagator");
 		assertTrue(propagator1.isRunning(), "Propagator should be running");
@@ -178,25 +189,33 @@ public class LatticePropagatorTest {
 
 		LatticePropagator group=new LatticePropagator(new MemoryStore());
 		group.start();
-		group.start();
-		assertTrue(group.isRunning());
-		assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
-		assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
-		group.close();
-		group.close();
-		assertFalse(group.isRunning());
-		assertEquals(LatticePropagator.State.STOPPED,group.getStatus().state());
-		assertEquals(0L,group.getStatus().failureCount(),"closing again is no failure");
+		try {
+			// Starting again warns of the redundant call
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				group.start();
+			}
+			assertTrue(group.isRunning());
+			assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
+			assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
+			group.close();
+			group.close();
+			assertFalse(group.isRunning());
+			assertEquals(LatticePropagator.State.STOPPED,group.getStatus().state());
+			assertEquals(0L,group.getStatus().failureCount(),"closing again is no failure");
+		} finally {
+			group.close();
+		}
 	}
 
 	@Test
 	public void testAddPeerReportsIdentityFailure() throws Exception {
+		launchNetwork();
 		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
-		Convex peer=ConvexRemote.connect(transport2.getHostAddress());
-
-		assertThrows(ExecutionException.class,
-			()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));
-		assertFalse(propagator1.getConnectionManager().isConnected(wrongKey));
+		try (Convex peer=ConvexRemote.connect(transport2.getHostAddress())) {
+			assertThrows(ExecutionException.class,
+				()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));
+			assertFalse(propagator1.getConnectionManager().isConnected(wrongKey));
+		}
 	}
 
 	/**
@@ -210,6 +229,7 @@ public class LatticePropagatorTest {
 	 */
 	@Test
 	public void testAutomaticPropagation() throws Exception {
+		launchNetwork();
 		// Get the :data keyword
 		Keyword dataKeyword = Keyword.intern("data");
 
@@ -242,9 +262,36 @@ public class LatticePropagatorTest {
 			"Server1 should have received the value broadcast from server2");
 	}
 
+	/**
+	 * A pulled value has not been through this node's merge, so it reaches the store
+	 * persisted, never announced.
+	 */
+	@Test
+	public void testPulledValueIsPersistedNotAnnounced() throws Exception {
+		launchNetwork();
+		// Server2 must not push to server1, so server1 only ever holds the value by pulling
+		propagator2.removePeer(propagator1.getTransportKey());
+
+		Keyword dataKeyword = Keyword.intern("data");
+		ACell testValue = CVMLong.create(424242);
+		Hash valueHash = Hash.get(testValue);
+		server2.getCursor().assoc(dataKeyword, Index.of(valueHash, testValue));
+		CompletableFuture<ACell> published=propagator2.whenAnnounced(
+			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
+		server2.getHost().sync();
+		published.get(5,TimeUnit.SECONDS);
+
+		List<ACell> pulled=propagator1.pullAll().get(5,TimeUnit.SECONDS);
+		assertEquals(1,pulled.size());
+		ACell value=pulled.get(0);
+		assertEquals(testValue,RT.getIn(value,dataKeyword,valueHash));
+		assertEquals(Ref.PERSISTED,store1.refForHash(Hash.get(value)).getStatus());
+	}
+
 	/** Delta broadcast retains the protocol envelope and drives a real push merge. */
 	@Test
 	public void testDeltaPushUsesLatticeValueEnvelope() throws Exception {
+		launchNetwork();
 		Keyword dataKeyword = Keyword.intern("data");
 		ACell expected = CVMLong.create(4242);
 		Hash expectedHash = expected.getHash();
@@ -269,6 +316,7 @@ public class LatticePropagatorTest {
 	/** Oversized novelty is staged as bounded DATA messages before one root merge. */
 	@Test
 	public void testOversizedDeltaIsChunkedWithoutBlockingOtherMessages() throws Exception {
+		launchNetwork();
 		Keyword dataKeyword=Keyword.intern("data");
 		@SuppressWarnings("unchecked")
 		Index<Hash,ACell> values=(Index<Hash,ACell>)Index.EMPTY;
@@ -294,6 +342,7 @@ public class LatticePropagatorTest {
 	/** A delta encoding failure must not hide the newly announced root from recovery. */
 	@Test
 	public void testFailedDeltaStillAdvancesRootAnnouncementAndAnnounceFuture() throws Exception {
+		launchNetwork();
 		Blob value=Blobs.createRandom(400);
 		server1.getCursor().assoc(Keyword.intern("failed-delta"),value);
 		ACell expected=server1.getLocalValue();
@@ -308,7 +357,11 @@ public class LatticePropagatorTest {
 			LatticePropagator isolated=new LatticePropagator(isolatedStore,manager);
 			isolated.setMaxDeltaMessageSize(1);
 			CompletableFuture<ACell> announced=isolated.nextAnnounce();
-			ACell published=isolated.processSnapshot(expected);
+			ACell published;
+			// The group warns that the root exceeds its delta limit
+			try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+				published=isolated.processSnapshot(expected);
+			}
 
 			assertEquals(published,announced.get(5,TimeUnit.SECONDS));
 			assertEquals(published.getHash(),
@@ -319,6 +372,7 @@ public class LatticePropagatorTest {
 	/** Consecutive explicit syncs may coalesce, but the latest value must converge. */
 	@Test
 	public void testConsecutiveSyncsEachBroadcast() throws Exception {
+		launchNetwork();
 		Keyword dataKeyword = Keyword.intern("data");
 		ACell first = CVMLong.create(4301);
 		ACell second = CVMLong.create(4302);
@@ -627,25 +681,28 @@ public class LatticePropagatorTest {
 	public void testTriggerAndCloseDrainsAfterLoopExit() throws Exception {
 		LatticePropagator propagator = new LatticePropagator(new MemoryStore());
 		propagator.start();
+		try {
+			// Force the propagation loop to terminate while triggerAndClose still
+			// sees a propagator to shut down (running false, thread field non-null)
+			Field runningField = LatticePropagator.class.getDeclaredField("running");
+			runningField.setAccessible(true);
+			runningField.setBoolean(propagator, false);
+			Field threadField = LatticePropagator.class.getDeclaredField("propagationThread");
+			threadField.setAccessible(true);
+			Thread worker = (Thread) threadField.get(propagator);
+			worker.interrupt(); // wake from poll; loop drains (empty queue) and exits
+			worker.join(10_000);
+			assertFalse(worker.isAlive(), "Propagation loop should have exited");
 
-		// Force the propagation loop to terminate while triggerAndClose still
-		// sees a propagator to shut down (running false, thread field non-null)
-		Field runningField = LatticePropagator.class.getDeclaredField("running");
-		runningField.setAccessible(true);
-		runningField.setBoolean(propagator, false);
-		Field threadField = LatticePropagator.class.getDeclaredField("propagationThread");
-		threadField.setAccessible(true);
-		Thread worker = (Thread) threadField.get(propagator);
-		worker.interrupt(); // wake from poll; loop drains (empty queue) and exits
-		worker.join(10_000);
-		assertFalse(worker.isAlive(), "Propagation loop should have exited");
-
-		// The final value is offered to a queue no thread will ever read;
-		// only the closing thread's drain can process it
-		ACell finalValue = CVMLong.create(424242);
-		propagator.triggerAndClose(finalValue);
-		assertEquals(finalValue, propagator.getLastAnnouncedValue(),
-			"Final value must be announced even when the loop exited before the offer");
+			// The final value is offered to a queue no thread will ever read;
+			// only the closing thread's drain can process it
+			ACell finalValue = CVMLong.create(424242);
+			propagator.triggerAndClose(finalValue);
+			assertEquals(finalValue, propagator.getLastAnnouncedValue(),
+				"Final value must be announced even when the loop exited before the offer");
+		} finally {
+			propagator.close();
+		}
 	}
 
 	/**
@@ -663,10 +720,47 @@ public class LatticePropagatorTest {
 				propagator.triggerBroadcast(CVMLong.create(776));
 				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
 					"the publication worker should enter the controlled store write");
-				propagator.close();
+				// The group warns that its worker did not drain in time
+				try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+					propagator.close();
+				}
 				assertEquals(LatticePropagator.State.STOPPED, propagator.getStatus().state());
 			} finally {
 				store.release();
+				// After the release, so a close the test did not reach finds the worker free
+				propagator.close();
+			}
+			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
+		}
+	}
+
+	/**
+	 * A close whose caller is interrupted still waits out the drain for a publication
+	 * worker held in a store write, and keeps the interrupt.
+	 */
+	@Test
+	public void testInterruptedCloseStillWaitsForThePublicationWorker() throws Exception {
+		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
+			LatticePropagator propagator = new LatticePropagator(store, LatticePropagatorConfig.create(
+				Maps.of(LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100))));
+			propagator.start();
+			try {
+				propagator.triggerBroadcast(CVMLong.create(776));
+				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
+					"the publication worker should enter the controlled store write");
+				// Having waited out the drain, the group warns that its worker did not drain
+				// in time; a wait the interrupt cut short warns of nothing
+				try (ExpectedLogs logs=ExpectedLogs.onThreads(LatticePropagator.class.getName(),Thread.currentThread()).open()) {
+					Thread.currentThread().interrupt();
+					propagator.close();
+					assertTrue(Thread.interrupted(), "close keeps the interrupt");
+				}
+			} finally {
+				Thread.interrupted();
+				store.release();
+				// After the release, so a close the test did not reach finds the worker free
+				propagator.close();
 			}
 			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
 			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
@@ -680,13 +774,17 @@ public class LatticePropagatorTest {
 			store.release();
 			LatticePropagator propagator = new LatticePropagator(store);
 			propagator.start();
-			propagator.triggerBroadcast(CVMLong.create(776));
-			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
-			Thread worker = store.heldThread();
+			try {
+				propagator.triggerBroadcast(CVMLong.create(776));
+				assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+				Thread worker = store.heldThread();
 
-			propagator.close();
-			assertFalse(worker.isAlive(), "close must end an idle worker within the drain timeout");
-			assertFalse(store.wasInterrupted());
+				propagator.close();
+				assertFalse(worker.isAlive(), "close must end an idle worker within the drain timeout");
+				assertFalse(store.wasInterrupted());
+			} finally {
+				propagator.close();
+			}
 		}
 	}
 
@@ -713,6 +811,7 @@ public class LatticePropagatorTest {
 	 */
 	@Test
 	public void testMultipleUpdates() throws Exception {
+		launchNetwork();
 		// Perform multiple local updates on server1
 		Keyword dataKeyword = Keyword.intern("data");
 

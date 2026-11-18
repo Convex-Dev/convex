@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
@@ -24,6 +25,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 
@@ -38,6 +40,11 @@ import convex.core.util.Utils;
  *
  */
 public class BeliefMerge {
+	private static final System.Logger log=System.getLogger(BeliefMerge.class.getName());
+
+	/** Static: each merge is short-lived, so a probable defect is warned of once per JVM */
+	private static final AtomicBoolean warnedDefect=new AtomicBoolean();
+
 	private final Belief initialBelief;
 	private final AccountKey publicKey;
 	private final State state;
@@ -112,38 +119,83 @@ public class BeliefMerge {
 		// Iterate over each Peer's ordering conveyed in this Belief
 		long bcount=bOrders.count();
 		for (long i=0; i<bcount; i++) {
-			MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
-			ABlob key=be.getKey();
-			
-			if (!isValidPeer(key)) continue;
-			
-			SignedData<Order> b=be.getValue();
-			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
-			Order bc = RT.ensureCVM(b.getValue(),Order.class);
-			if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
-			
-			SignedData<Order> a=result.get(key);
-			if (a == null) {
-				// This is a new order to us, so include if valid
-				result=result.assocEntry(be); 
-				continue;
-			}
-			
-			if (a.equals(b)) continue; // PERF: fast path for no changes
+			try {
+				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
+				ABlob key=be.getKey();
 
-			Order ac = RT.ensureCVM(a.getValue(),Order.class);
+				if (!isValidPeer(key)) continue;
 
-			boolean shouldReplace=compareOrders(ac,bc);
-			if (shouldReplace) {
-				result=result.assocEntry(be);
-				continue;
+				SignedData<Order> b=be.getValue();
+				if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
+				Order bc = RT.ensureCVM(b.getValue(),Order.class);
+				if (bc == null) continue; // a signed value that is not an Order
+				if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
+
+				SignedData<Order> a=result.get(key);
+				if (b.equals(a)) continue; // PERF: fast path for no changes
+				if (!hasReadableBlocks(bc)) continue; // an Order the merge cannot read
+
+				if (a == null) {
+					// This is a new order to us, so include if valid
+					result=result.assocEntry(be);
+					continue;
+				}
+
+				Order ac = RT.ensureCVM(a.getValue(),Order.class);
+
+				boolean shouldReplace=compareOrders(ac,bc);
+				if (shouldReplace) {
+					result=result.assocEntry(be);
+					continue;
+				}
+			} catch (MissingDataException e) {
+				// Missing data is the caller's to fetch, as before
+				throw e;
+			} catch (Throwable e) {
+				// A failure of the JVM itself is not this Order's: let it through
+				Utils.checkRequestFailure(e);
+				// Any other failure processing a received Order: ignore that Order, as for
+				// any other the merge does not adopt
+				logIgnored(e);
 			}
 		}
 		return result;
 	}
+
+	private static void logIgnored(Throwable e) {
+		if (Utils.isProbableDefect(e)&&warnedDefect.compareAndSet(false,true)) {
+			log.log(System.Logger.Level.WARNING,"Order ignored after a probable defect in the merge (logged at warning the first time only)",e);
+		} else {
+			log.log(System.Logger.Level.DEBUG,"Order ignored after a failure in the merge",e);
+		}
+	}
 	
 	/**
-	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for 
+	 * Checks that the merge can read an Order's Blocks: they are a vector, and each Block
+	 * beyond those it shares with this peer's Order is a signed Block whose transactions
+	 * are a vector.
+	 *
+	 * @param order Order to check
+	 * @return true if the merge can read the Order's Blocks, false otherwise
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	private boolean hasReadableBlocks(Order order) {
+		if (!(order.values().get(Order.IX_BLOCKS) instanceof AVector blocks)) return false;
+		// The merge reads Blocks only from this peer's consensus point on, and Blocks
+		// shared with this peer's Order were read when that Order took them
+		Order myOrder=getMyOrder();
+		long start=(myOrder==null)?0:blocks.commonPrefixLength(myOrder.getBlocks());
+		long n=blocks.count();
+		for (long i=start; i<n; i++) {
+			if (!(blocks.get(i) instanceof SignedData signed)) return false;
+			Block block=RT.ensureCVM(signed.getValue(),Block.class);
+			if ((block==null)||(block.getTransactions()==null)) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for
 	 * minimum effective stake.
 	 * 
 	 * @param key Peer Key to test
@@ -221,12 +273,16 @@ public class BeliefMerge {
 		// Get the winning chain for this peer, including new blocks encountered
 		AVector<SignedData<Block>> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
 		if (winningBlocks == null) return null; // if no voting stake on any order
-		
-		winningBlocks=filterBlocks(winningBlocks,consensusPoint);
+
+		// What the network has agreed, judged on the winning ordering as it stands, is taken
+		// as it is: this peer checks every Block after it and after its own consensus point
+		long agreed=updateConsensus(myOrder.withBlocks(winningBlocks),stakedOrders,totalStake).getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS);
+		long checkFrom=Math.max(agreed,consensusPoint);
+		AVector<SignedData<Block>> myNewBlocks=filterBlocks(winningBlocks,checkFrom,consensusPoint);
 
 		// Take winning blocks into my Order
 		// winning chain should have same consensus as my initial chain
-		Order winningOrder = myOrder.withBlocks(winningBlocks);
+		Order winningOrder = myOrder.withBlocks(myNewBlocks);
 
 		Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
@@ -436,8 +492,10 @@ public class BeliefMerge {
 	}
 	
 	/**
-	 * #595 stage (ii): reorders the winning Block vector so a far-future Block does not
-	 * wedge later in-horizon Blocks behind it (see {@link #demoteFutureBlocks}). Applied
+	 * Gives the Blocks this peer's Order takes from the winning ordering: the winning
+	 * Blocks without any, from the given position on, whose signature does not verify,
+	 * then reordered so a far-future Block does not wedge later in-horizon Blocks behind
+	 * it (#595 stage (ii), see {@link #demoteFutureBlocks}). Applied
 	 * to the winning order before consensus is computed, so the reordering feeds
 	 * {@code updateConsensus} and the stage (i) clamp: with the future Block moved to the
 	 * back, the clamp confirms up to it, and the in-horizon Blocks ahead of it finalise.
@@ -450,12 +508,37 @@ public class BeliefMerge {
 	 * assumption breaks.</p>
 	 *
 	 * @param blks winning Block vector
+	 * @param checkFrom position from which Block signatures are checked
 	 * @param cp   consensus point: floor below which Blocks are not reordered
-	 * @return reordered Blocks, or the same vector if unchanged
+	 * @return Blocks for this peer's Order, or the same vector if unchanged
 	 */
 	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
-			long cp) {
-		return demoteFutureBlocks(blks, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
+			long checkFrom, long cp) {
+		// Which Blocks join first, then where far-future ones sit
+		AVector<SignedData<Block>> good=keepGoodBlocks(blks,checkFrom);
+		return demoteFutureBlocks(good, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
+	}
+
+	/**
+	 * Removes, from a given position on, the Blocks whose signature does not verify.
+	 *
+	 * @param blocks ordered Blocks
+	 * @param from first position checked
+	 * @return the Blocks without those that do not verify, or the same vector if all verify
+	 */
+	static AVector<SignedData<Block>> keepGoodBlocks(AVector<SignedData<Block>> blocks, long from) {
+		long n=blocks.count();
+		AVector<SignedData<Block>> result=null;
+		for (long i=from; i<n; i++) {
+			SignedData<Block> b=blocks.get(i);
+			if (b.checkSignature()) {
+				if (result!=null) result=result.conj(b);
+			} else if (result==null) {
+				// Shares every complete subtree before the first bad Block
+				result=blocks.slice(0,i);
+			}
+		}
+		return (result==null)?blocks:result;
 	}
 
 	/**
@@ -591,12 +674,10 @@ public class BeliefMerge {
 			newBlocks.remove(it.next());
 		}
 		newBlocksOrdered.removeIf(sb -> {
+			// Membership first: only Blocks to be appended are checked
+			if (!newBlocks.contains(sb)) return true;
 			// We ignore blocks that don't look valid for current state
-			BlockResult br=state.checkBlock(sb);
-			if (br!=null) {
-				return true;
-			}
-			return !newBlocks.contains(sb);
+			return state.checkBlock(sb)!=null;
 		});
 
 		// sort new blocks by timestamp and append to winning Order

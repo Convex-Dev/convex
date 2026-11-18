@@ -25,7 +25,6 @@ import convex.etch.EtchStore;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.LatticeOps;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.mail.Mail;
 import convex.lattice.mail.MailEnvelope;
@@ -34,6 +33,7 @@ import convex.lattice.mail.Mailbox;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
+import convex.lattice.LatticeComponent;
 
 /**
  * Mail delivered between two nodes: Alice deposits on her node, Bob's node pulls only
@@ -65,11 +65,11 @@ class MailDeliveryTest {
 		}
 		/** A pulled mailbox arrives at its path and is reduced to a root by the lattice. */
 		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
-			Index<Keyword,ACell> reduced=LatticeOps.reduce(ROOT,value,path);
+			Index<Keyword,ACell> reduced=LatticeComponent.reduce(ROOT,value,path);
 			return reduced==null?cursor().get():merge(reduced);
 		}
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.mergePublication(ROOT,LatticeContext.EMPTY,own,other);
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeComponent.reconcile(ROOT,LatticeContext.EMPTY,own,other);
 		}
 	}
 

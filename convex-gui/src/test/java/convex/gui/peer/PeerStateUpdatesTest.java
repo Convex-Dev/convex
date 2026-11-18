@@ -1,5 +1,6 @@
 package convex.gui.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.awt.EventQueue;
@@ -9,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -23,11 +26,17 @@ import convex.peer.Server;
 
 /**
  * Tests for UI updates following a local server's peer state. Needs no display.
+ * The tests share one peer: each only registers and closes its own observer.
  */
 public class PeerStateUpdatesTest {
 
+	private static MemoryStore store;
+	private static Server server;
+
 	/** Launches a peer on a fresh network of its own, in memory, on a random port */
-	private static Server launchPeer(MemoryStore store) throws Exception {
+	@BeforeAll
+	static void launchPeer() throws Exception {
+		store=new MemoryStore();
 		AKeyPair kp=AKeyPair.generate();
 		State genesis=Migrations.applyAll(Init.createState(List.of(kp.getAccountKey())));
 		Map<Keyword,Object> config=new HashMap<>();
@@ -37,7 +46,15 @@ public class PeerStateUpdatesTest {
 		config.put(Keywords.PORT, 0);
 		config.put(Keywords.AUTO_MANAGE, false);
 		config.put(Keywords.OUTGOING_CONNECTIONS, 0);
-		return API.launchPeer(config);
+		server=API.launchPeer(config);
+	}
+
+	@AfterAll
+	static void closePeer() {
+		// The server borrows the store, so it closes first
+		assertAll("Close the shared peer and its store",
+			() -> { if (server!=null) server.close(); },
+			() -> { if (store!=null) store.close(); });
 	}
 
 	/** Waits until the EDT has run everything posted so far */
@@ -47,28 +64,23 @@ public class PeerStateUpdatesTest {
 
 	@Test
 	public void testUpdatesOnEDT() throws Exception {
-		try (MemoryStore store=new MemoryStore(); Server server=launchPeer(store)) {
-			List<Boolean> runs=Collections.synchronizedList(new ArrayList<>());
-			PeerStateUpdates updates=new PeerStateUpdates(server, ()->runs.add(EventQueue.isDispatchThread()));
-
+		List<Boolean> runs=Collections.synchronizedList(new ArrayList<>());
+		try (PeerStateUpdates updates=new PeerStateUpdates(server, ()->runs.add(EventQueue.isDispatchThread()))) {
 			// Registering delivers the current state, so one update runs straight away
 			flushEDT();
 			assertEquals(List.of(true), runs);
-			updates.close();
 		}
 	}
 
 	@Test
 	public void testNoUpdatesAfterClose() throws Exception {
-		try (MemoryStore store=new MemoryStore(); Server server=launchPeer(store)) {
-			List<Boolean> runs=Collections.synchronizedList(new ArrayList<>());
-			// Hold the EDT so the first update is still queued when we close
-			EventQueue.invokeAndWait(()->{
-				PeerStateUpdates updates=new PeerStateUpdates(server, ()->runs.add(true));
-				updates.close();
-			});
-			flushEDT();
-			assertEquals(List.of(), runs);
-		}
+		List<Boolean> runs=Collections.synchronizedList(new ArrayList<>());
+		// Hold the EDT so the first update is still queued when we close
+		EventQueue.invokeAndWait(()->{
+			PeerStateUpdates updates=new PeerStateUpdates(server, ()->runs.add(true));
+			updates.close();
+		});
+		flushEDT();
+		assertEquals(List.of(), runs);
 	}
 }

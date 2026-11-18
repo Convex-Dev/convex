@@ -17,6 +17,7 @@ import convex.core.util.Utils;
 import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
 import convex.lattice.LatticeHost;
+import convex.lattice.MapComponent;
 import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
@@ -45,7 +46,9 @@ import convex.lattice.generic.SignedLattice;
  * atomic storage operation. Repeated user handles share that signed working state.
  * A user handle can fork the same domain API for a batch: edits then stamp private
  * unsigned state, and sync signs the reconciled record into the region. A nested
- * draft sync stops at its enclosing draft, without signing early.
+ * draft sync stops at its enclosing draft, without signing early. Local changes on
+ * both sides conflict, at a draft's sync or a transaction's commit, since keeping one
+ * whole record would lose the other's edits.
  * Incoming envelopes are verified and compared by their signed timestamps; a selected
  * envelope keeps its signature and is never stamped with the receiver's clock.
  * The newer record replaces the entire older record, so removed items stay removed.
@@ -125,10 +128,16 @@ public final class FavouritesExample {
 		private final Supplier<CVMLong> getTimestamp;
 
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			this(host,new KeyOwnedIndex<>(host.cursor().path(FAVOURITES),Timestamped.lattice()).fork(),getTimestamp);
+			// The region is the host index's entry, created by its first publication
+			super(host.cursor(),FAVOURITES,(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> region) ->
+				new KeyOwnedIndex<>(region,Timestamped.lattice()).fork());
+			this.getTimestamp=getTimestamp;
 		}
 
-		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */
+		/**
+		 * Shares the supplied region's pending state and destination; the clock is
+		 * authoring policy. The application that made the region publishes it.
+		 */
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,
 				KeyOwnedIndex<AHashMap<Keyword,ACell>> shared,Supplier<CVMLong> getTimestamp) {
 			super(host.cursor(),FAVOURITES,shared);
@@ -173,7 +182,8 @@ public final class FavouritesExample {
 			this.getTimestamp=getTimestamp;
 			// Wrap the base signing view once; every domain edit uses cursor().
 			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
-			itemSet=new SetComponent<>(cursor().path(ITEMS));
+			// The items are the record's entry, created by the first add
+			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
 		}
 
 		private Favourites(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
@@ -181,16 +191,13 @@ public final class FavouritesExample {
 			super(rule,cursor);
 			this.getTimestamp=getTimestamp;
 			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
-			itemSet=new SetComponent<>(cursor().path(ITEMS));
+			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
 		}
 
-		@Override protected Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+		@Override public Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Favourites(cursor,lattice,getTimestamp);
 		}
 		@Override public Favourites fork() { return rebind(storage.fork()); }
-		@Override public Favourites withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
-			return rebind(cursor);
-		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }

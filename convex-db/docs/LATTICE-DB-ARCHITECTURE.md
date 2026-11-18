@@ -2,8 +2,9 @@
 
 ## Cursor Chain
 
-A SQL database is a tree of lattice cursors. Each component navigates to its
-section of the tree via `cursor.path(key)`, which creates a descended cursor.
+A SQL database is a tree of lattice cursors. Each component is bound to its
+section of the tree through its parent's entry view (`MapComponent.path(key)` or
+`IndexComponent.path(key)`), which creates the entry on the first changed write.
 
 ```
 LatticeHost                     ← persistence and publication policy
@@ -43,7 +44,7 @@ LatticeHost   cursor: AHashMap<AString, Index>    hosted root
 ```
 
 `database()`, `tables()` and `table()` each construct the child component over
-`cursor.path(key)`, one level down, passing on the merge policy and clock. This is the same pattern as
+its entry view, one level down, passing on the merge policy and clock. This is the same pattern as
 `SocialUser.feed()` and `SocialUser.follows()` in convex-social.
 
 Components hold no link to their parent. Constructing one reads and writes nothing:
@@ -125,6 +126,20 @@ tx2.sync();  // merge into db cursor (both rows now visible)
 server.getHost().checkpoint();
 ```
 
+## Read-only bindings
+
+`SQLDatabase.readOnly()` binds the database to a live read-only cursor and removes
+its signing key. The restriction belongs to this binding, not the stored schema:
+writers using other bindings and incoming replication can continue updating the
+database. Child table views share the restriction, and `fork()` returns a
+read-only snapshot. `rebind()` preserves it on replacement storage.
+
+JDBC binds directly to that component through `ConvexDriver.connect(database)`.
+SQL checks refuse writes before execution; the cursor supplies the underlying
+write boundary. Read-only JDBC transactions finish without publishing their
+snapshot. The connection contracts and examples are in
+[read-only access](JDBC.md#read-only-access).
+
 ## Merge Policy
 
 How a database merges is not built into Convex DB: whatever constructs a database
@@ -153,7 +168,9 @@ Every route by which state arrives reaches the policy:
   are refused.
 - **Fork publication**: `sync()` reconciles a fork with its destination through the
   policy. `SQLDatabase` publishes only its tables: the destination's other sections
-  stay as they are.
+  stay as they are. `ConvexDB` has a single writer and cannot reconcile changes on both sides: a fork of
+  it publishes only if the destination is unchanged since the fork's last sync, and
+  otherwise its sync fails.
 - **Replicas**: `SQLDatabase.mergeReplicas` verifies each signed replica with
   `acceptsReplica`, then merges its state with the policy.
 

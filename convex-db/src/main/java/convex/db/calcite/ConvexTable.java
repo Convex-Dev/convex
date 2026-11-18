@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.calcite.adapter.java.AbstractQueryableTable;
+import org.apache.calcite.DataContext;
 import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Linq4j;
 import org.apache.calcite.linq4j.QueryProvider;
@@ -119,6 +120,11 @@ public class ConvexTable extends AbstractQueryableTable
 		return table;
 	}
 
+	/** Resolves a captured table against the executing connection's active transaction. */
+	public ConvexTable executingTable(DataContext context) {
+		return context == null ? this : ConvexSchemaFactory.getTable(context, schema.getName(), tableName);
+	}
+
 	/**
 	 * This table, provided it still has the binding a plan over it was built for. Called
 	 * from the generated code of a plan that writes the table, before any row is written.
@@ -209,6 +215,7 @@ public class ConvexTable extends AbstractQueryableTable
 	 * Either way nothing is written.
 	 */
 	public long executeInsert(Enumerable<?> input) {
+		schema.requireWritable();
 		try {
 			List<AVector<ACell>> rows = new java.util.ArrayList<>();
 			for (Object value : input) {
@@ -224,6 +231,7 @@ public class ConvexTable extends AbstractQueryableTable
 	}
 
 	public long executeUpdate(Enumerable<?> input, int columnCount, int[] updateIndices) {
+		schema.requireWritable();
 		try {
 			boolean pkBeingUpdated = false;
 			for (int idx : updateIndices) {
@@ -278,6 +286,7 @@ public class ConvexTable extends AbstractQueryableTable
 	}
 
 	public long executeDelete(Enumerable<?> input) {
+		schema.requireWritable();
 		try {
 			long count = 0;
 			for (Object value : input) {

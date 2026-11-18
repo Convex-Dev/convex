@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.19</version>
+		<version>0.8.20-SNAPSHOT</version>
 	</parent>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -28,11 +28,13 @@
 			<version>${convex.version}</version>
         	<scope>compile</scope>
 		</dependency>		
+		<!-- Test logging backend: tests capture the records they cause on purpose
+		     (convex.peer.ExpectedLogs), which needs logback's turbo filters -->
 		<dependency>
-		    <groupId>org.slf4j</groupId>
-		    <artifactId>slf4j-simple</artifactId>
-		    <version>${slf4j.version}</version>
-		    <scope>test</scope>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>${logback.version}</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>

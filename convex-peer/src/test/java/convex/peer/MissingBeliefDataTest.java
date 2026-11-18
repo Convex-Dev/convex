@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,11 +32,12 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
+import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
-import convex.core.init.Init;
 import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
@@ -44,9 +46,10 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 
 /**
- * A peer that cannot decode a Belief or Order update, because the sender left out
- * cells it had already announced, fetches them from the sender rather than waiting
- * for its next poll.
+ * A peer keeps every cell a Belief or Order update from a verified link carries, so later
+ * updates that leave them out as already announced need no fetch. One that still cannot be decoded,
+ * because the sender left out cells it announced before, is completed by a fetch from
+ * the sender rather than waiting for the peer's next poll.
  */
 public class MissingBeliefDataTest {
 	static final AKeyPair LOCAL=AKeyPair.createSeeded(130);
@@ -63,7 +66,7 @@ public class MissingBeliefDataTest {
 	 * update lacks.
 	 */
 	static Server launchPeer(AKeyPair kp) throws Exception {
-		State genesis=Init.createState(List.of(LOCAL.getAccountKey(),REMOTE_A.getAccountKey(),REMOTE_B.getAccountKey()));
+		State genesis=GenesisStates.of(LOCAL,REMOTE_A,REMOTE_B);
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.STATE,genesis);
@@ -85,11 +88,27 @@ public class MissingBeliefDataTest {
 		return signed;
 	}
 
+	/** A signed Order holding one empty Block, timestamped to rank it against the peer's other Orders. */
+	static SignedData<Order> signedOrderAt(AKeyPair kp, long timestamp) {
+		Order order=Order.create().withTimestamp(timestamp).append(kp.signData(Block.create(timestamp,List.<SignedData<ATransaction>>of())));
+		return kp.signData(order);
+	}
+
+	/** A sender's end of a connection that answers nothing the peer sends. */
+	static final Predicate<Message> SILENT=m -> true;
+
 	/** Announces a value in the sender's store and shapes its update as the propagator does. */
 	static List<Message> update(ACell value, AStore senderStore) throws IOException {
 		UpdateAccumulator update=new UpdateAccumulator(LIMIT,LIMIT,value.getHash());
 		value=Cells.announce(value,update,senderStore);
 		return update.toMessages(value);
+	}
+
+	/** A cell an update leaves out, which a receiver holding nothing else must fetch. */
+	static Hash leftOut(List<Message> update) throws BadFormatException {
+		MemoryStore store=new MemoryStore();
+		ACell root=wire(update.get(update.size()-1)).getPayload(store);
+		return assertThrows(MissingDataException.class,() -> Cells.persist(root,store)).getMissingHash();
 	}
 
 	/** The message as it arrives off the wire: its encoding only, sharing no cells with the sender. */
@@ -159,6 +178,90 @@ public class MissingBeliefDataTest {
 	}
 
 	/**
+	 * A peer that already holds a newer Order from A, relayed by another peer, does not
+	 * merge A's own update, from A's verified link, for an older one, but keeps it: A
+	 * counts that Order as announced and leaves it out of the Belief it sends next.
+	 */
+	@Test
+	public void anOrderNotMergedIsKeptForTheUpdatesThatReferToIt() throws Exception {
+		SignedData<Order> older=signedOrderAt(REMOTE_A,1000);
+		SignedData<Order> newer=signedOrderAt(REMOTE_A,1001);
+		SignedData<Order> orderB=signedOrderAt(REMOTE_B,1000);
+		List<Message> relayed=update(Belief.create(newer),new MemoryStore());
+		MemoryStore senderStore=new MemoryStore();
+		List<Message> own=update(older,senderStore);
+		List<Message> belief=update(Belief.create(older,orderB),senderStore);
+
+		// The Belief leaves out the Order announced just before it
+		ACell payload=wire(belief.get(belief.size()-1)).getPayload(new MemoryStore());
+		assertThrows(MissingDataException.class,() -> Belief.extractOrders(payload));
+
+		Server peer=launchPeer(LOCAL);
+		try {
+			BeliefPropagator propagator=peer.getBeliefPropagator();
+			LinkedBlockingQueue<SignedData<Order>> merged=new LinkedBlockingQueue<>();
+			propagator.setOrderUpdateObserver(merged::add);
+			LocalConnection relayEnd=connect(peer,SILENT);
+			LocalConnection senderEnd=connect(peer,SILENT);
+			// Verified as A's own link, so that what it sends is kept
+			senderEnd.getPaired().setVerifiedKey(REMOTE_A.getAccountKey());
+			for (Message m: relayed) relayEnd.sendMessage(wire(m));
+			for (Message m: own) senderEnd.sendMessage(wire(m));
+			for (Message m: belief) senderEnd.sendMessage(wire(m));
+
+			assertEquals(newer,merged.poll(10,TimeUnit.SECONDS));
+			assertEquals(orderB,merged.poll(10,TimeUnit.SECONDS),"B's Order merged from the Belief");
+			assertNull(propagator.getMissingDataFetch(),"nothing fetched");
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * A peer keeps a Belief's own cells and the Orders in it that it does not merge, here
+	 * its own Order as the sender last saw it, not only the Orders it merges: the sender
+	 * repeats an unchanged Belief as a keepalive carrying only its top cell.
+	 */
+	@Test
+	public void aBeliefIsKeptForTheKeepalivesThatRepeatIt() throws Exception {
+		List<SignedData<Order>> orders=List.of(signedOrderAt(REMOTE_A,1000),signedOrderAt(REMOTE_B,1000),
+			signedOrderAt(LOCAL,1000));
+		Belief belief=Belief.create(orders.toArray(SignedData[]::new));
+		MemoryStore senderStore=new MemoryStore();
+		List<Message> first=update(belief,senderStore);
+		List<Message> keepalive=update(belief,senderStore);
+
+		// Even with every Order held, the keepalive lacks a cell of the Belief's own
+		MemoryStore holdingOrders=new MemoryStore();
+		for (SignedData<Order> so: orders) Cells.persist(so,holdingOrders);
+		ACell payload=wire(keepalive.get(keepalive.size()-1)).getPayload(holdingOrders);
+		MissingDataException missing=assertThrows(MissingDataException.class,() -> Belief.extractOrders(payload));
+		assertTrue(senderStore.refForHash(missing.getMissingHash()).getValue() instanceof Index);
+		Message marker=wire(Message.createDataMessage(List.of(Blobs.createRandom(400)),1024));
+
+		Server peer=launchPeer(LOCAL);
+		try {
+			BeliefPropagator propagator=peer.getBeliefPropagator();
+			LocalConnection senderEnd=connect(peer,SILENT);
+			// Verified as a staked peer's, so that its DATA is staged
+			senderEnd.getPaired().setVerifiedKey(REMOTE_A.getAccountKey());
+			CompletableFuture<Message> staged=new CompletableFuture<>();
+			propagator.setDataStageObserver(m -> {
+				if (marker.getMessageData().equals(m.getMessageData())) staged.complete(m);
+			});
+
+			for (Message m: first) senderEnd.sendMessage(wire(m));
+			for (Message m: keepalive) senderEnd.sendMessage(wire(m));
+			// Staging DATA sent after the keepalive shows the keepalive has been handled
+			senderEnd.sendMessage(marker);
+			staged.get(10,TimeUnit.SECONDS);
+			assertNull(propagator.getMissingDataFetch(),"nothing fetched");
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
 	 * A peer fetches for one update at a time. A second update that misses data while the
 	 * first fetch is outstanding starts no request. A fetch that fails is dropped and frees
 	 * the peer to fetch again.
@@ -183,6 +286,8 @@ public class MissingBeliefDataTest {
 				if (m.getType()==MessageType.DATA_REQUEST) requests.add(m);
 				return true;
 			});
+			// Verified as a staked peer's, so that its DATA is staged
+			senderEnd.getPaired().setVerifiedKey(REMOTE_A.getAccountKey());
 			CompletableFuture<Message> staged=new CompletableFuture<>();
 			propagator.setDataStageObserver(m -> {
 				if (data.getMessageData().equals(m.getMessageData())) staged.complete(m);
@@ -211,14 +316,43 @@ public class MissingBeliefDataTest {
 	}
 
 	/**
+	 * Closing the peer stops a fetch still outstanding, rather than leaving it to write
+	 * to the store after the peer has closed it.
+	 */
+	@Test
+	public void closingThePeerStopsAnOutstandingFetch() throws Exception {
+		MemoryStore senderStore=new MemoryStore();
+		SignedData<Order> orderA=signedOrder(REMOTE_A,1000);
+		update(Belief.create(orderA),senderStore);
+		List<Message> sent=update(Belief.create(orderA,signedOrder(REMOTE_B,1001)),senderStore);
+
+		Server peer=launchPeer(LOCAL);
+		CompletableFuture<?> fetch;
+		try {
+			// The sender holds every request unanswered
+			LinkedBlockingQueue<Message> requests=new LinkedBlockingQueue<>();
+			LocalConnection senderEnd=connect(peer,m -> {
+				if (m.getType()==MessageType.DATA_REQUEST) requests.add(m);
+				return true;
+			});
+			for (Message m: sent) senderEnd.sendMessage(wire(m));
+			assertNotNull(requests.poll(10,TimeUnit.SECONDS),"the miss is fetched");
+			fetch=peer.getBeliefPropagator().getMissingDataFetch();
+			assertFalse(fetch.isDone());
+		} finally {
+			peer.close();
+		}
+		assertTrue(fetch.isDone(),"closing the peer stops the fetch");
+	}
+
+	/**
 	 * A peer's connection to another peer serves its store to requests sent back along it,
 	 * and the receiving peer takes the reply as the answer to its request.
 	 */
 	@Test
 	public void anOutboundPeerConnectionServesDataRequests() throws Exception {
-		Server receiver=launchPeer(LOCAL);
-		Server sender=launchPeer(REMOTE_A);
-		try {
+		try (Server receiver=launchPeer(LOCAL);
+				Server sender=launchPeer(REMOTE_A)) {
 			Blob held=Blobs.createRandom(300);
 			Cells.persist(held,sender.getStore());
 
@@ -235,9 +369,6 @@ public class MissingBeliefDataTest {
 			Result result=reply.toResult();
 			assertFalse(result.isError(),result.toString());
 			assertEquals(held,((AVector<?>)result.getValue()).get(0));
-		} finally {
-			sender.close();
-			receiver.close();
 		}
 	}
 }

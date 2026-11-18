@@ -46,15 +46,17 @@ class TimestampedTest {
 		assertInstanceOf(StampedCursor.class,component.cursor());
 		assertTrue(component.cursor().get().isEmpty());
 		component.cursor().set(Maps.empty());
-		component.cursor().path(A).set(null);
+		// The field is the record's entry, which its first changed write creates
+		AForkableCursor<ACell> field=new MapComponent<>(component.cursor()).path(A);
+		field.set(null);
 		component.sync();
 		component.merge(null);
 		assertNull(root.get());
 		assertEquals(0,calls.get());
-		component.cursor().path(A).set(CVMLong.ONE);
+		field.set(CVMLong.ONE);
 		assertEquals(record(1,1),root.get());
 		var stored=root.get();
-		component.cursor().path(A).set(CVMLong.ONE);
+		field.set(CVMLong.ONE);
 		component.sync();
 		assertSame(stored,root.get());
 		assertEquals(1,calls.get());
@@ -85,8 +87,8 @@ class TimestampedTest {
 
 	@Test void partialDeliveriesAreIgnoredWhetherOrNotARecordIsHeld() {
 		// The record's slot is a key its parent does not hold yet, so it is absent
-		Root<ACell> parent=Root.create(Maps.empty());
-		AForkableCursor<AHashMap<Keyword,ACell>> slot=parent.path(B);
+		Root<AHashMap<Keyword,ACell>> parent=Root.create(Maps.empty());
+		AForkableCursor<AHashMap<Keyword,ACell>> slot=new MapComponent<>(parent).path(B);
 		var component=Timestamped.create(slot,() -> {
 			throw new AssertionError("Incoming merges must not read the clock");
 		});
@@ -167,17 +169,16 @@ class TimestampedTest {
 		}
 	}
 
-	@Test void retriesKeepOneTimestampAndPreserveConcurrentFields() {
+	@Test void retriesStampFromALaterClockReadAndPreserveConcurrentFields() {
 		var root=Root.create(record(1,0));
-		var calls=new AtomicInteger();
+		var time=new AtomicInteger(1);
 		var component=Timestamped.create(root,() -> {
-			calls.incrementAndGet();
-			root.set(root.get().assoc(B,CVMLong.ONE)); // Force the first candidate to lose its CAS.
-			return CVMLong.create(2);
+			int now=time.incrementAndGet();
+			if (now==2) root.set(root.get().assoc(B,CVMLong.ONE)); // Force the first candidate to lose its CAS.
+			return CVMLong.create(now);
 		});
 		component.cursor().path(A).set(CVMLong.ONE);
-		assertEquals(record(2,1).assoc(B,CVMLong.ONE),root.get());
-		assertEquals(1,calls.get());
+		assertEquals(record(3,1).assoc(B,CVMLong.ONE),root.get());
 	}
 
 	@Test void customRecordRepresentationSuppliesItsStampAndOrderingRule() {
@@ -186,7 +187,7 @@ class TimestampedTest {
 			value -> ((CVMLong)value.get(TS)).longValue());
 		var component=new Timestamped<>(root.withDefault(Index.none()),ordering,
 			() -> CVMLong.ONE,(value,time) -> value.assoc(TS,time));
-		component.cursor().path(A).set(CVMLong.ONE);
+		component.cursor().assoc(A,CVMLong.ONE);
 		assertEquals(Index.of(TS,CVMLong.ONE,A,CVMLong.ONE),root.get());
 		var remote=Index.<Keyword,ACell>of(TS,CVMLong.TWO,B,CVMLong.ONE);
 		component.merge(remote);
@@ -223,7 +224,7 @@ class TimestampedTest {
 			return key.signData(value);
 		}) {};
 		var component=Timestamped.create(signed.cursor().withDefault(Maps.empty()),() -> CVMLong.ONE);
-		component.cursor().path(A).set(CVMLong.ONE);
+		component.cursor().assoc(A,CVMLong.ONE);
 		assertEquals(record(1,1),root.get().getValue());
 		assertTrue(root.get().checkSignature());
 		var remote=key.signData(record(2,2));

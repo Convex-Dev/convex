@@ -1,11 +1,14 @@
 package convex.core.cvm;
 
+import convex.core.Constants;
 import convex.core.Result;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
@@ -70,7 +73,9 @@ final class PeerIndex {
 	boolean agrees(AVector<SignedData<Block>> blocks, long limit) {
 		long last=Math.min(position,limit)-1;
 		if (last<0) return true;
-		CVMLong indexed=blockLocations.get(blocks.get(last).getHash());
+		ACell entry=Peer.readEntry(blocks,last);
+		if (entry==null) return false;
+		CVMLong indexed=blockLocations.get(entry.getHash());
 		return (indexed!=null)&&(indexed.longValue()==last);
 	}
 
@@ -85,12 +90,18 @@ final class PeerIndex {
 		Index<Hash,AVector<AVector<CVMLong>>> repeatLocs=repeatLocations;
 		Index<Hash,CVMLong> blockLocs=blockLocations;
 		for (long b=position; b<limit; b++) {
-			SignedData<Block> signedBlock=blocks.get(b);
-			blockLocs=blockLocs.assoc(signedBlock.getHash(),CVMLong.create(b));
-			AVector<SignedData<ATransaction>> txs=RT.ensureCVM(signedBlock.getValue(),Block.class).getTransactions();
-			long n=txs.count();
+			ACell entry=Peer.readEntry(blocks,b);
+			if (entry==null) continue; // not held by the Order's structure
+			blockLocs=blockLocs.assoc(entry.getHash(),CVMLong.create(b));
+			AVector<SignedData<ATransaction>> txs=Peer.readTransactions(entry);
+			if (txs==null) continue; // not a signed Block with transactions
+			// A Block claiming more than it may hold is invalid, and its claim can be
+			// billions of entries: index no more than a Block may hold
+			long n=Math.min(txs.count(),Constants.MAX_TRANSACTIONS_PER_BLOCK);
 			for (long i=0; i<n; i++) {
-				Hash txID=txs.get(i).getHash();
+				// Read as any cell: an invalid Block's entries need not be signed transactions
+				ACell tx=Peer.readEntry(txs,i);
+				Hash txID=Cells.getHash(tx);
 				AVector<CVMLong> loc=Vectors.createLongs(b,i);
 				AVector<CVMLong> first=txLocs.get(txID);
 				if (first==null) {

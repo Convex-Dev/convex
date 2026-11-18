@@ -11,12 +11,16 @@ Client                          Peer Server
   │  conn.sendMessage(m)
   ▼
 ┌──────────────────┐
-│ Netty I/O Thread  │  decode bytes → Message
-│                   │  server.deliverMessage(m)
-│                   │  processMessage(m) → txMessageQueue.offer()
+│ Netty I/O Thread  │  frame bytes → Message
+│                   │  admit to the peer's ingress
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│ Ingress worker    │  server.receiveMessage(m): decode
+│                   │  processMessage(m) → txMessageQueue.tryOffer()
 └────────┬─────────┘
          │                              txMessageQueue
-         │                         ArrayBlockingQueue (10,000)
+         │                         QueueDestination (10,000)
          ▼
 ┌──────────────────┐
 │ TransactionHandler│  poll(10ms) + sleep(1ms) + drainTo
@@ -62,14 +66,15 @@ Client receives Result
 
 ## Stage 1: Network Ingress
 
-**Thread:** Netty worker event loop
+**Threads:** Netty event loop, then an ingress worker
 
-1. Decode bytes → `Message`
-2. `server.deliverMessage(m)` — decode payload, observe
-3. `processMessage(m)` — route by type, TRANSACT → `txMessageQueue.offer()`
-4. If queue full: return `txnRetry` predicate → backpressure (virtual thread blocks)
+1. The event loop frames bytes into a `Message` and admits it to the peer's ingress
+2. An ingress worker: `server.receiveMessage(m)` — decode payload, observe
+3. `processMessage(m)` — route by type, TRANSACT → `txMessageQueue.tryOffer()`
+4. If queue full: the queue is returned as a `Destination`; the message waits at the
+   head of its connection, which stops being read, until the queue signals room
 
-**Queue:** `txMessageQueue` — `ArrayBlockingQueue(10,000)`
+**Queue:** `txMessageQueue` — a `QueueDestination` of 10,000
 
 ## Stage 2: TransactionHandler
 
@@ -502,18 +507,17 @@ these policies:
   down to a quarter ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
 - **A stalled reader loses only its own replies.** Bytes handed to Netty but not
   yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
-  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a connection a lattice node has
-  verified). Over that cap
+  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified connection). Over that cap
   the connection's results are refused and logged at debug. The client sees a
   `:TIMEOUT`.
 - **Shedding load.** A client result that finds the shared bound full is refused.
   The writer only hands messages to Netty, so this takes a server too short of CPU
   for the writer to keep up.
-- **Verified lattice peers first.** Replies to connections a lattice node has
-  verified go into a lane the writer drains first and that is exempt from the
-  shared bound, so they never queue behind client results. A consensus peer
-  verifies no connection opened to it, so its replies to other peers' requests
-  share the client lane.
+- **Verified peers first.** Replies to verified connections go into a lane the
+  writer drains first and that is exempt from the shared bound, so they never queue
+  behind client results. A lattice node verifies the connections it admits; a
+  consensus peer verifies a staked peer's own link to it
+  ([PEER_PRIORITY.md](PEER_PRIORITY.md#verifying-an-inbound-connection)).
 
 ### Test Tool
 

@@ -1,5 +1,6 @@
 package convex.core.util;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -156,8 +157,9 @@ public final class StateWatcher<V> implements AutoCloseable {
 
 	/**
 	 * Closes this distributor, discards any pending update and interrupts its
-	 * dispatcher. A consumer invocation already in progress may finish. This
-	 * operation is idempotent.
+	 * dispatcher, then waits up to {@link #CLOSE_TIMEOUT} for a consumer invocation
+	 * already in progress to return, logging a warning if it does not. Called from the
+	 * consumer, it does not wait. This operation is idempotent.
 	 */
 	@Override
 	public void close() {
@@ -174,8 +176,16 @@ public final class StateWatcher<V> implements AutoCloseable {
 		synchronized (completionMonitor) {
 			completionMonitor.notifyAll();
 		}
-		if (thread!=null) thread.interrupt();
+		if (thread==null) return;
+		thread.interrupt();
+		// Bounded: the consumer is the caller's code, which may not return promptly
+		if (!ThreadUtils.joinUninterruptibly(thread,CLOSE_TIMEOUT) && (thread!=Thread.currentThread())) {
+			log.log(System.Logger.Level.WARNING,"StateWatcher consumer did not return within {0}; leaving it to finish",CLOSE_TIMEOUT);
+		}
 	}
+
+	/** Longest time {@link #close()} waits for a consumer invocation in progress. */
+	public static final Duration CLOSE_TIMEOUT=Duration.ofSeconds(5);
 
 	boolean isDispatcherRunning() {
 		Thread thread=dispatcher;

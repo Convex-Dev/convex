@@ -1144,10 +1144,12 @@ public class DLFSTest {
 		Files.write(fs.getPath("/"+longName),new byte[] {7});
 		Files.write(fs.getPath("/short"),new byte[] {8});
 
-		EtchStore store=EtchStore.createTemp("dlfs-reload");
-		File file=store.getFile();
-		Hash hash=Cells.persist(fs.getNode(fs.getRoot()),store).getHash();
-		store.close();
+		File file;
+		Hash hash;
+		try (EtchStore store=EtchStore.createTemp("dlfs-reload")) {
+			file=store.getFile();
+			hash=Cells.persist(fs.getNode(fs.getRoot()),store).getHash();
+		}
 		EtchStore reopened=EtchStore.create(file);
 		try {
 			AVector<ACell> root=reopened.<AVector<ACell>>refForHash(hash).getValue();

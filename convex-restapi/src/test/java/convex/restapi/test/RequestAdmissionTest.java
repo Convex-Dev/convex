@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.AfterAll;
@@ -16,11 +14,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.api.ContentTypes;
-import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
-import convex.core.util.Utils;
-import convex.peer.API;
-import convex.peer.Server;
 import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
@@ -28,36 +21,27 @@ import convex.restapi.RESTServer;
  * Integration test for the global request-admission cap, in particular that a request
  * holding an admission permit releases it even when a before-handler rejects the request.
  * The cap is set to 1 so a leaked permit would immediately turn later requests into 503s.
+ * The cap belongs to the REST server, so this one serves the shared test peer.
  */
-public class RequestAdmissionTest {
+public class RequestAdmissionTest extends ARESTTest {
 
-	private static RESTServer server;
+	private static RESTServer admissionServer;
 	private static String hostPath;
-	private static final HttpClient httpClient=HttpClient.newBuilder()
-			.connectTimeout(Duration.ofSeconds(10)).build();
 
 	private static final byte[] MCP_PING="{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}"
 			.getBytes(StandardCharsets.UTF_8);
 
 	@BeforeAll
 	public static void launch() {
-		try {
-			RESTConfig config=RESTConfig.parse("{\"rest\":{\"maxConcurrentRequests\":1}}");
-			var launchConfig=config.toLegacy();
-			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
-			Server s=API.launchPeer(launchConfig);
-			RESTServer rs=RESTServer.create(s);
-			rs.start(0);
-			server=rs;
-			hostPath="http://localhost:"+rs.getPort();
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
+		RESTConfig config=RESTConfig.parse("{\"rest\":{\"maxConcurrentRequests\":1}}");
+		admissionServer=RESTServer.create(server.getServer(),config);
+		admissionServer.start(0);
+		hostPath="http://localhost:"+admissionServer.getPort();
 	}
 
 	@AfterAll
 	public static void close() {
-		if (server!=null) server.close();
+		if (admissionServer!=null) admissionServer.close();
 	}
 
 	@Test

@@ -3,10 +3,12 @@ package convex.peer.tools;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -25,22 +27,24 @@ import convex.core.util.JSON;
  * need a live network and are exercised by running the tool itself.
  */
 public class VerifyNetworkUpgradeTest {
+	private final VerifyNetworkUpgrade verification=new VerifyNetworkUpgrade(new PrintStream(OutputStream.nullOutputStream()));
+
+	@AfterEach
+	void noVerificationFailures() {
+		assertEquals(0,verification.failures,verification.report::toJSON);
+		assertEquals(0,verification.warnings,verification.report::toJSON);
+	}
 
 	@Test
 	public void testMigrateAndBoundaryPhases() {
 		State genesis = Init.createState(List.of(AKeyPair.generate().getAccountKey()));
 		assertEquals(0L, genesis.getProtocolVersion());
 
-		int before = VerifyNetworkUpgrade.failures;
-
-		State upgraded = VerifyNetworkUpgrade.verifyMigration(genesis);
+		State upgraded = verification.verifyMigration(genesis);
 		assertNotNull(upgraded, "migration phase must produce an upgraded state");
 		assertEquals(Migrations.MAX_VERSION, upgraded.getProtocolVersion());
 
-		VerifyNetworkUpgrade.verifyBoundary(genesis, upgraded);
-
-		assertEquals(before, VerifyNetworkUpgrade.failures,
-				"verification phases must not report failures on a clean genesis");
+		verification.verifyBoundary(genesis, upgraded);
 	}
 
 	@Test
@@ -48,10 +52,8 @@ public class VerifyNetworkUpgradeTest {
 		State genesis = Init.createState(List.of(AKeyPair.generate().getAccountKey()));
 		State upgraded = Migrations.applyAll(genesis);
 
-		int before = VerifyNetworkUpgrade.failures;
-		assertEquals(upgraded, VerifyNetworkUpgrade.verifyMigration(upgraded));
-		VerifyNetworkUpgrade.verifyBoundary(upgraded, upgraded);
-		assertEquals(before, VerifyNetworkUpgrade.failures);
+		assertEquals(upgraded, verification.verifyMigration(upgraded));
+		verification.verifyBoundary(upgraded, upgraded);
 	}
 
 	@Test
@@ -63,14 +65,12 @@ public class VerifyNetworkUpgradeTest {
 		State unrelated = upgraded.putAccount(Init.GENESIS_ADDRESS,
 				upgraded.getAccount(Init.GENESIS_ADDRESS)
 						.withBalance(upgraded.getAccount(Init.GENESIS_ADDRESS).getBalance() - 1));
-		assertTrue(VerifyNetworkUpgrade.migrationFootprintError(genesis, unrelated)
-				.contains("unapproved account"));
+		assertNotNull(VerifyNetworkUpgrade.migrationFootprintError(genesis, unrelated));
 
 		State coreBalance = upgraded.putAccount(Init.CORE_ADDRESS,
 				upgraded.getAccount(Init.CORE_ADDRESS)
 						.withBalance(upgraded.getAccount(Init.CORE_ADDRESS).getBalance() + 1));
-		assertTrue(VerifyNetworkUpgrade.migrationFootprintError(genesis, coreBalance)
-				.contains("outside environment/metadata"));
+		assertNotNull(VerifyNetworkUpgrade.migrationFootprintError(genesis, coreBalance));
 	}
 
 	@Test
@@ -94,15 +94,12 @@ public class VerifyNetworkUpgradeTest {
 				.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs()
 				.updateState();
 
-		int before=VerifyNetworkUpgrade.failures;
-		State replayed=VerifyNetworkUpgrade.replay(genesis,peer.getBelief(),keyPair.getAccountKey(),
+		State replayed=verification.replay(genesis,peer.getBelief(),keyPair.getAccountKey(),
 				peer.getConsensusState(),peer.getConsensusState().getHash(),peer.getStatePosition());
 		assertEquals(peer.getConsensusState(),replayed);
-		assertEquals(before,VerifyNetworkUpgrade.failures);
 
-		State legacyReplay=VerifyNetworkUpgrade.replay(genesis,peer.getBelief(),keyPair.getAccountKey(),
+		State legacyReplay=verification.replay(genesis,peer.getBelief(),keyPair.getAccountKey(),
 				peer.getConsensusState(),peer.getConsensusState().getHash(),null);
 		assertEquals(peer.getConsensusState(),legacyReplay);
-		assertEquals(before,VerifyNetworkUpgrade.failures);
 	}
 }

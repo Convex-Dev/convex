@@ -57,8 +57,16 @@ cd convex
 java -jar convex-integration/target/convex.jar desktop
 ```
 
+## Resource cleanup
+
+`AbstractGUI` closes registered resources even when one reports an exception.
+Subclasses may override `reportReleaseFailure(resource, failure)` to receive the
+original exception instead of the default warning log. The handler must not
+throw or assume it runs on the Swing event dispatch thread.
+
 ## Documentation
 
+- [Lattice views](docs/LATTICE_VIEWS.md) — Swing views bound to domain components, with a runnable example
 - [Convex Documentation](https://docs.convex.world)
 - [CLI Reference](../convex-cli/README.md)
 - [GitHub Repository](https://github.com/Convex-Dev/convex)

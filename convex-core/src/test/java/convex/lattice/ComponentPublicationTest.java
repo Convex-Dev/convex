@@ -20,7 +20,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -31,15 +30,15 @@ public class ComponentPublicationTest {
 	private static final SetLattice<CVMLong> SETS=SetLattice.create();
 
 
-	/** Transactional roots route atomic updates through CAS, where the race is injected. */
-	private static class InterleavingRoot<V extends ACell> extends TransactionalRootCursor<V> {
+	/** Roots route atomic updates through CAS, where the race is injected. */
+	private static class InterleavingRoot<V extends ACell> extends Root<V> {
 		Runnable beforeCAS;
 		InterleavingRoot(V value) { super(value); }
-		@Override public boolean compareAndSet(V expected,V value) {
+		@Override protected boolean install(V held,V value) {
 			Runnable action=beforeCAS;
 			beforeCAS=null;
 			if (action!=null) action.run();
-			return super.compareAndSet(expected,value);
+			return super.install(held,value);
 		}
 	}
 
@@ -204,8 +203,8 @@ public class ComponentPublicationTest {
 		CountDownLatch resume=new CountDownLatch(1);
 		List<ASet<CVMLong>> installed=new ArrayList<>();
 		var destination=new InterleavingRoot<>(SETS.zero()) {
-			@Override public boolean compareAndSet(ASet<CVMLong> expected,ASet<CVMLong> value) {
-				boolean success=super.compareAndSet(expected,value);
+			@Override protected boolean install(ASet<CVMLong> held,ASet<CVMLong> value) {
+				boolean success=super.install(held,value);
 				if (success) installed.add(value);
 				return success;
 			}

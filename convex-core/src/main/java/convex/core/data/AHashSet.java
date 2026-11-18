@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.data.prim.CVMBool;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 
 public abstract class AHashSet<T extends ACell> extends ASet<T> {
@@ -19,7 +18,16 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 
 	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp);
 
-	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int shift);
+	/**
+	 * Merges as {@link #mergeWith(AHashSet, int)} does, given a number of leading hex digits
+	 * that every element hash of both sets is known to share.
+	 *
+	 * @param b Other set
+	 * @param setOp Set operation
+	 * @param prefix Number of leading hex digits shared by every element hash of both sets
+	 * @return Merged set
+	 */
+	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int prefix);
 
 	@SuppressWarnings("unchecked")
 	public AHashSet<T> includeAll(ASet<? extends T> elements) {
@@ -106,16 +114,6 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		return includeRef((Ref<T>) Ref.get(a));
 	}
 
-	/**
-	 * Validates the set with a given hex prefix. This is necessary to ensure that
-	 * child maps are valid, in particular have the correct shift level and that all
-	 * hashes start with the correct prefix of hex characters.
-	 * 
-	 * @param prefix Hash for earlier prefix values
-	 * @param digit Hex digit expected at position [shift]
-	 * @throws InvalidDataException
-	 */
-	protected abstract void validateWithPrefix(Hash prefix, int digit, int position) throws InvalidDataException;
 	
 	@Override
 	public Object[] toArray() {

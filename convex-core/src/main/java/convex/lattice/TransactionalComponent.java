@@ -17,63 +17,92 @@ import convex.lattice.cursor.Transactions;
  * <p>Callbacks receive an isolated component view. They may run more than once,
  * must use that view for all lattice changes, and must not perform external side
  * effects. Descendants share the private working state. Exceptions discard the
- * attempt. Successful completion means committed locally, not published or durable.
+ * attempt. Successful completion means committed into this component's bound
+ * storage. Live storage publishes into its enclosing state directly; a fork keeps
+ * the commit in its working state until sync reconciles it with its publication
+ * destination. Neither implies replication or durability.
  * Complete all draft work before returning from the callback. Retained views and
  * their forks remain independent storage; later edits do not change live state.</p>
  *
- * <p>{@link #transact} returns the callback's result from the run that committed;
+ * <p>Execution produces a transaction value and a return value. Commit applies any
+ * required reconciliation and authoring, then atomically installs the resulting
+ * state. {@link #transact} returns the callback's result from the execution whose
+ * transaction value was used for the successful commit. These additional
+ * transformations do not change the execution's return value. The result
+ * records what the execution produced; it does not promise that its changes
+ * survive reconciliation or later updates. The component's merge policy determines
+ * which changes survive and must preserve any invariants it promises across merges.
  * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
- * callbacks run once under the root's write lock.</p>
+ * callbacks run once under the claim beneath this component's storage.</p>
  *
- * <p>Implementations need only provide their bound storage and a factory which binds the
- * same domain operations and configuration to a supplied cursor. This interface
- * can also be implemented by application subclasses without changing their base
- * class or introducing a component registry. The engine is
+ * <p>An {@link ALatticeComponent} opts in by declaring this interface and refining
+ * {@link ALatticeComponent#rebind} to return its own type; its bound storage comes
+ * from the base class, and any root will do. Application subclasses can opt in without changing their base class or introducing a component
+ * registry. The engine is
  * {@link Transactions}; this interface adds the typed component view. Rebinding
  * rebuilds the component's editing views over the draft, so a stamp the component
  * builds over its storage applies within the draft. Authoring within bound storage,
- * such as a signing view or a stamp bound there, applies once at commit. Commit uses
+ * such as a signing view or a stamp bound there, applies at each commit attempt. Commit uses
  * bound storage so editing views are not applied twice.</p>
  *
- * <p>Transactions rerun domain operations on conflict; they do not invoke incoming
- * merge or fork reconciliation. No lattice definition or publication merge is
- * required. Choose a component containing every value the operation reads or
+ * <p>Transactions do not invoke incoming merge. A run commits by this component's
+ * {@link ALatticeComponent#reconcile(ACell,ACell,ACell)}, with the value it started
+ * from as {@code base}, its value as {@code own} and the value as held as
+ * {@code other}, as described in {@link Transactions}. A run commits with a
+ * concurrent change wherever that merge reconciles them, so its result is valid by the
+ * component's own rules. Where the merge throws a
+ * {@link MergeConflictException}, as by default for a change on both sides, the
+ * transaction reruns once under the claim. A write that changes the component's value
+ * under its claim without passing through the claimed boundary, such as a
+ * whole-container commit over a region, goes through the same merge, and a conflict
+ * there fails the transaction. No lattice definition is required. Choose a component containing every value the operation reads or
  * writes, and obtain children from the callback's view. A transaction on an
  * existing fork commits only to that fork; publishing it remains a separate sync.</p>
+ *
+ * <p>A transaction on a child is isolated to that child's storage. A transaction on
+ * a parent spans its children: those made on the callback's view write into the
+ * draft, and a parent that manages children in forks of their own has them synced
+ * into the draft, through {@link ALatticeComponent#syncChildren()}, after the
+ * callback returns and before the transaction value commits.</p>
  *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
  */
 public interface TransactionalComponent<V extends ACell,C> {
 
-	/** Returns bound working storage, before editing policies reinstalled by withCursor. */
+	/** Returns bound working storage, before editing policies reinstalled by rebind. */
 	AForkableCursor<V> storage();
 
 	/**
-	 * Creates a fresh component over the supplied cursor, retaining domain metadata
-	 * and any explicitly owned configuration such as a DLFS store. All mutable child
-	 * views must use the supplied cursor; never reuse children bound to the original
-	 * live cursor. Do not fork the supplied cursor: the transaction engine reads its
-	 * completed value directly. An {@link ALatticeComponent} subclass normally
-	 * delegates to its protected {@code rebind(cursor)} hook, sharing construction
-	 * with {@code fork()}. Retain configuration, not the source component's working views.
+	 * Makes this component's counterpart over one attempt's private draft. See
+	 * {@link ALatticeComponent#rebind} for what it does with state outside the cursor.
+	 * Do not fork the supplied cursor: the transaction engine reads its completed
+	 * value directly.
 	 */
-	C withCursor(AForkableCursor<V> cursor);
+	C rebind(AForkableCursor<V> cursor);
 
 	/**
-	 * Applies domain operations atomically, retrying conflicts, and returns the result
-	 * of the run that committed. A transactional root falls back to serial execution
-	 * after three failed attempts; an ordinary root continues optimistically. Equality,
+	 * Applies domain operations atomically and returns the result of the run that
+	 * committed. Runs optimistically and commits by this component's merge; if that merge
+	 * finds a conflict with a change made meanwhile, the transaction takes the claim
+	 * beneath its storage and finishes under it, so the callback runs at most twice.
+	 * Changes elsewhere under the root never rerun it. Equality,
 	 * rather than Java object identity, determines whether an input has changed or an
 	 * operation leaves that input unchanged.
 	 *
 	 * @param <R> Result type
 	 * @param action Domain operations on a private view, returning their result
-	 * @return Result of the run that committed
+	 * @return Result of the run that committed, computed before any merge at commit
+	 * @throws convex.lattice.cursor.MissingValueException If this component's storage does not exist, before the callback runs
 	 */
 	default <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transact(storage(),draft -> action.apply(withCursor(draft)));
+		return Transactions.transact(storage(),draft -> {
+			C view=rebind(draft);
+			R result=action.apply(view);
+			ALatticeComponent.completeDraft(view);
+			return result;
+		},ALatticeComponent.reconciler(this));
 	}
 
 	/**
@@ -83,24 +112,28 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.execute(storage(),draft -> action.accept(withCursor(draft)));
+		Transactions.execute(storage(),draft -> {
+			C view=rebind(draft);
+			action.accept(view);
+			ALatticeComponent.completeDraft(view);
+		},ALatticeComponent.reconciler(this));
 	}
 
 	/**
 	 * Returns a read-only component over this one's bound storage whose transactions
-	 * each run once while holding the root's write lock.
+	 * each run once under the claim beneath that storage.
 	 *
 	 * @return Exclusive transactions on this component's state
-	 * @throws UnsupportedOperationException if the bound storage is in an ordinary optimistic root
 	 */
 	default ExclusiveComponent<V,C> exclusive() {
-		return new ExclusiveComponent<>(storage(),this::withCursor);
+		return new ExclusiveComponent<>(storage(),this::rebind,ALatticeComponent.reconciler(this));
 	}
 
 	/**
 	 * Schedules {@link #transact} on the shared virtual executor. The future completes
-	 * with the result after local commit, or exceptionally on failure. Cancellation does
-	 * not undo a commit or guarantee that a running callback stops. No component owns a thread.
+	 * with the result after commit into bound storage, or exceptionally on failure.
+	 * Cancellation does not undo a commit or guarantee that a running callback stops.
+	 * No component owns a thread.
 	 */
 	default <R> CompletableFuture<R> transactAsync(Function<? super C,? extends R> action) {
 		return transactAsync(action,ThreadUtils.getVirtualExecutor());

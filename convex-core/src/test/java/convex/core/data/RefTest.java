@@ -30,6 +30,7 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
+import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class RefTest {
@@ -253,7 +254,31 @@ public class RefTest {
 		assertThrows(MissingDataException.class, () -> Ref.forHash(bh, store).getValue());
 	}
 	
-	@Test 
+	/**
+	 * Persisting a value with a branch that is not available fails on every store, naming
+	 * the missing branch, while storing only the value itself succeeds.
+	 */
+	@Test
+	public void testPersistMissingData() throws IOException {
+		checkPersistMissingData(new MemoryStore());
+		try (EtchStore etch=EtchStore.createTemp()) {
+			checkPersistMissingData(etch);
+		}
+	}
+
+	private static void checkPersistMissingData(AStore store) throws IOException {
+		Blob branch=Blob.createRandom(new Random(), 200); // never stored
+		assertFalse(branch.isEmbedded());
+		AVector<ACell> partial=Vectors.of(branch).updateRefs(r->Ref.forHash(r.getHash(),store).markEmbedded(false));
+		Hash hash=partial.getHash(); // known without the branch
+
+		MissingDataException e=assertThrows(MissingDataException.class,()->Cells.persist(partial,store));
+		assertEquals(branch.getHash(),e.getMissingHash());
+
+		assertEquals(hash,Cells.store(partial,store).getHash());
+	}
+
+	@Test
 	public void testNonStored() throws BadFormatException {
 		ABlob r=Blob.createRandom(new Random(), 2*Blob.CHUNK_LENGTH+100).toCanonical(); // 2 chunks + an embedded Blob of length 100
 		assertEquals(4,Refs.totalRefCount(r));

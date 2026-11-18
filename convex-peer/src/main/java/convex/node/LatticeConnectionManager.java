@@ -2,6 +2,7 @@ package convex.node;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -42,9 +44,12 @@ import convex.core.data.Vectors;
 import convex.core.store.AStore;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.ValidationException;
 import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
+import convex.core.util.Cleanup;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.PeerConnectionException;
 import convex.net.PeerRefusedException;
@@ -154,6 +159,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Attempts to reach a node known only by its endpoint and learn its key, before giving up. */
 	static final int MAX_ENDPOINT_ATTEMPTS = 3;
 
+	private static final ThreadFactory WORKER_THREADS=Thread.ofVirtual().name("Lattice connection worker").factory();
+	private static final ThreadFactory DATA_REQUEST_THREADS=Thread.ofVirtual().name("Lattice data request").factory();
+
 	/** Initial reconnection delay (milliseconds). */
 	static final long INITIAL_BACKOFF_MS = 1_000L;
 
@@ -221,7 +229,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private final Map<AccountKey,CompletableFuture<Void>> disconnectWaiters=new HashMap<>();
 	private final Map<AccountKey,HealthCheck> health=new HashMap<>();
 	private final LongSupplier clock;
-	private ExecutorService workers=Executors.newVirtualThreadPerTaskExecutor();
+	/** Threads of {@link #workers}, which closing interrupts and waits for. */
+	private final Set<Thread> workerThreads=ConcurrentHashMap.newKeySet();
+	private final ThreadFactory workerFactory=task -> tracked(workerThreads,WORKER_THREADS,task);
+	/** Dials, and probes of routes, which may block. */
+	private ExecutorService workers=Executors.newThreadPerTaskExecutor(workerFactory);
+	/**
+	 * Threads serving data requests, which closing waits for. They read the store, so
+	 * are never interrupted: NIO closes an interrupted thread's file channel for every
+	 * user of the store (#776).
+	 */
+	private final Set<Thread> dataRequests=ConcurrentHashMap.newKeySet();
+	/** Clients opened to a node not yet identified, which closing closes. Lock held. */
+	private final Set<Convex> identifying=new HashSet<>();
 	private Function<AConnection,CompletableFuture<?>> inboundProbe;
 	private Consumer<AConnection> inboundFailure;
 
@@ -661,7 +681,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void start() {
 		if (running) return;
-		if (workers.isShutdown()) workers=Executors.newVirtualThreadPerTaskExecutor();
+		if (workers.isShutdown()) workers=Executors.newThreadPerTaskExecutor(workerFactory);
 		accepting = true;
 		running = true;
 		maintenanceThread = Thread.ofVirtual().name("Lattice connection maintenance").start(this::maintenanceLoop);
@@ -674,10 +694,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	@Override
 	public void close() {
-		stopMaintenance();
-		closeAllConnections();
-		workers.shutdownNow();
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(this::stopMaintenance);
+		cleanup.run(this::closeAllConnections);
+		cleanup.run(this::stopWorkers);
 		log.debug("LatticeConnectionManager closed");
+		cleanup.finish();
 	}
 
 	/**
@@ -705,18 +727,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 		if (maintenanceThread != null) {
 			maintenanceThread.interrupt();
-			if (maintenanceThread != Thread.currentThread()) {
-				boolean interrupted=false;
-				while (maintenanceThread.isAlive()) {
-					try {
-						maintenanceThread.join();
-					} catch (InterruptedException e) {
-						interrupted=true;
-						maintenanceThread.interrupt();
-					}
-				}
-				if (interrupted) Thread.currentThread().interrupt();
-			}
+			ThreadUtils.joinUninterruptibly(maintenanceThread);
 			maintenanceThread = null;
 		}
 	}
@@ -750,6 +761,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<CompletableFuture<AConnection>> routeWaiters;
 		List<CompletableFuture<Void>> stateWaiters;
 		List<EndpointIntent> unidentified;
+		List<Convex> challenged;
 		List<CompletableFuture<Void>> disconnected;
 		synchronized (connectionLock) {
 			active = new ArrayList<>(connections.values());
@@ -759,6 +771,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			// Attempts in flight find their intent gone and close what they opened
 			unidentified = new ArrayList<>(endpointIntents.values());
 			endpointIntents.clear();
+			// Closed now rather than when their challenge is answered or times out
+			challenged = new ArrayList<>(identifying);
+			identifying.clear();
 			waiters = new ArrayList<>(connectionWaiters.values());
 			connectionWaiters.clear();
 			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
@@ -777,10 +792,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 			dialling.clear();
 			health.clear();
 		}
-		for (Convex connection : active) closeSilently(connection);
+		// An Error closing one connection leaves the rest to close and every waiter to complete
+		Cleanup cleanup=new Cleanup();
+		for (Convex connection : active) cleanup.run(() -> closeSilently(connection));
+		for (Convex connection : challenged) cleanup.run(() -> closeSilently(connection));
 		for (PendingConnection pc : pending) {
 			pc.admission.completeExceptionally(new CancellationException("Connection manager closed"));
-			closeSilently(pc.connection);
+			cleanup.run(() -> closeSilently(pc.connection));
 		}
 		for (CompletableFuture<Convex> waiter : waiters) {
 			waiter.completeExceptionally(new CancellationException("Connection manager closed"));
@@ -796,6 +814,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		// Every route this manager opened is now closed
 		for (CompletableFuture<Void> waiter : disconnected) waiter.complete(null);
+		cleanup.finish();
 	}
 
 	// ========== Desired Peer Intent ==========
@@ -1346,8 +1365,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			verification.whenComplete((result, ex) -> {
 				try {
 					if (ex != null) {
-						rejectPendingAdmission(peerKey, pending,
-							PeerConnectionException.wrap("Could not verify peer "+peerKey,ex));
+						PeerRefusedException refused=refusalFor(ex,"Peer "+peerKey);
+						rejectPendingAdmission(peerKey, pending, (refused!=null) ? refused
+							: PeerConnectionException.wrap("Could not verify peer "+peerKey,ex));
 					} else if (result==null || !peerKey.equals(result)
 							|| convex.getVerifiedPeer()==null
 							|| !peerKey.equals(convex.getVerifiedPeer())) {
@@ -1524,13 +1544,73 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
+	/**
+	 * Serves a data request on a thread of its own, which returns the permits taken for
+	 * it. Once closing, drops the request and returns them at once: the store may be
+	 * closed by the time a thread would read it.
+	 */
 	private void startDataRequest(Message message,Semaphore route,Semaphore pool) {
 		try {
-			Thread.ofVirtual().name("Lattice data request").start(() -> serveDataRequest(message,route,pool));
+			Thread request=tracked(dataRequests,DATA_REQUEST_THREADS,() -> serveDataRequest(message,route,pool));
+			// After tracking: closing stops admission before it waits for data requests,
+			// so it either waits for this one or this sees admission stopped
+			if (!accepting) {
+				dataRequests.remove(request);
+				pool.release();
+				route.release();
+				return;
+			}
+			try {
+				request.start();
+			} catch (Throwable t) {
+				dataRequests.remove(request);
+				throw t;
+			}
 		} catch (Throwable t) {
 			pool.release();
 			route.release();
 			throw t;
+		}
+	}
+
+	/** Data requests being served, for tests */
+	int getDataRequestCount() {
+		return dataRequests.size();
+	}
+
+	/** An unstarted thread that runs a task, in the given set from now until the task ends. */
+	private static Thread tracked(Set<Thread> threads,ThreadFactory factory,Runnable task) {
+		Thread thread=factory.newThread(() -> {
+			try {
+				task.run();
+			} finally {
+				threads.remove(Thread.currentThread());
+			}
+		});
+		// Tracked before it starts, so closing cannot miss it
+		threads.add(thread);
+		return thread;
+	}
+
+	/**
+	 * Stops the dial and probe workers, interrupting them, then waits at most the
+	 * admission timeout in all for them and for data requests being served. A caller on
+	 * one of these threads does not wait for itself.
+	 */
+	private void stopWorkers() {
+		workers.shutdownNow();
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(ADMISSION_TIMEOUT_MS);
+		awaitThreads(workerThreads,deadline,"Lattice connection workers");
+		awaitThreads(dataRequests,deadline,"Lattice data requests");
+	}
+
+	private static void awaitThreads(Set<Thread> threads,long deadline,String what) {
+		for (Thread thread:List.copyOf(threads)) {
+			Duration left=Duration.ofNanos(Math.max(0,deadline-System.nanoTime()));
+			if (!ThreadUtils.joinUninterruptibly(thread,left) && (thread!=Thread.currentThread())) {
+				log.warn("{} still running after {} ms",what,ADMISSION_TIMEOUT_MS);
+				return;
+			}
 		}
 	}
 
@@ -2157,13 +2237,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 				identified=CompletableFuture.failedFuture(e);
 			}
 			identified.whenComplete((key,failure) -> {
+				synchronized (connectionLock) { identifying.remove(peer); }
 				try {
 					if (failure==null && key!=null && intent.admits(key)) {
 						admitIdentified(intent,key,peer);
 						return;
 					}
 					closeSilently(peer);
-					failIdentification(intent,(failure!=null) ? failure
+					PeerRefusedException refused=(failure!=null) ? refusalFor(failure,"The node at "+endpoint) : null;
+					failIdentification(intent,(refused!=null) ? refused
+						: (failure!=null) ? failure
 						: (key==null) ? new PeerRefusedException("The node at "+endpoint+" proved no key")
 						: new PeerRefusedException("The node at "+endpoint+" proved key "+key+", which "
 							+intent.target+" does not list"));
@@ -2185,7 +2268,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private CompletableFuture<AccountKey> identify(Convex peer,AccountKey expected) {
 		ChallengeSigner signer=challengeSigner;
 		if (signer==null) throw new IllegalStateException("Identifying a node by its endpoint needs this node's key");
-		if (!accepting) throw new CancellationException("Connection manager is closed");
+		synchronized (connectionLock) {
+			// Under the lock closing takes: a close either finds this client or stops it here
+			if (!accepting) throw new CancellationException("Connection manager is closed");
+			identifying.add(peer);
+		}
 		restrictOutboundToLimbo(peer);
 		peer.setChallengeSigner(signer);
 		if (expected!=null) {
@@ -2507,6 +2594,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 		notifyPeerAdmitted(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
 		log.debug("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
+	}
+
+	/**
+	 * Returns the refusal for a peer whose challenge reply proves it misbehaved, as a
+	 * forged signature does, or null for any other failure.
+	 */
+	private static PeerRefusedException refusalFor(Throwable failure,String peer) {
+		Throwable cause=PeerConnectionException.unwrap(failure);
+		if (!(cause instanceof ValidationException)) return null;
+		return new PeerRefusedException(peer+" failed identity challenge: "+cause.getMessage(),cause);
 	}
 
 	/** Rejects one still-current limbo client and schedules its desired peer retry. */

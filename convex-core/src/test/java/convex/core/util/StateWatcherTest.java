@@ -59,14 +59,18 @@ class StateWatcherTest {
 			latest.set(v);
 			if (v==3) latestSeen.countDown();
 		})) {
-			watcher.update(0);
-			initialStarted.await();
-			// The consumer is held until after these updates, so an update that
-			// waited for it would deadlock here
-			watcher.update(1);
-			watcher.update(2);
-			watcher.update(3);
-			releaseInitial.countDown();
+			try {
+				watcher.update(0);
+				initialStarted.await();
+				// The consumer is held until after these updates, so an update that
+				// waited for it would deadlock here
+				watcher.update(1);
+				watcher.update(2);
+				watcher.update(3);
+			} finally {
+				// Close cannot stop a consumer held on this latch
+				releaseInitial.countDown();
+			}
 
 			latestSeen.await();
 			assertEquals(3,latest.get());
@@ -77,16 +81,17 @@ class StateWatcherTest {
 	void closeStopsDelivery() throws Exception {
 		// The consumer runs on the dispatcher thread, so it can report which thread that is
 		CompletableFuture<Thread> dispatcher=new CompletableFuture<>();
-		StateWatcher<Integer> watcher=new StateWatcher<>(v->dispatcher.complete(Thread.currentThread()));
-		watcher.update(1);
-		Thread thread=dispatcher.get();
+		try (StateWatcher<Integer> watcher=new StateWatcher<>(v->dispatcher.complete(Thread.currentThread()))) {
+			watcher.update(1);
+			Thread thread=dispatcher.get();
 
-		watcher.close();
-		watcher.close();
-		assertTrue(watcher.isClosed());
-		assertThrows(IllegalStateException.class,()->watcher.update(2));
-		thread.join();
-		assertFalse(watcher.isDispatcherRunning());
+			watcher.close();
+			watcher.close();
+			assertTrue(watcher.isClosed());
+			assertThrows(IllegalStateException.class,()->watcher.update(2));
+			thread.join();
+			assertFalse(watcher.isDispatcherRunning());
+		}
 	}
 
 	@Test
@@ -109,9 +114,13 @@ class StateWatcherTest {
 				}
 			});
 
-			consumerStarted.await();
-			assertFalse(returned.get());
-			releaseConsumer.countDown();
+			try {
+				consumerStarted.await();
+				assertFalse(returned.get());
+			} finally {
+				// Close cannot stop a consumer held on this latch
+				releaseConsumer.countDown();
+			}
 			caller.join();
 
 			assertNull(failure.get());
@@ -138,12 +147,45 @@ class StateWatcherTest {
 
 		try {
 			consumerStarted.await();
-			watcher.close();
+			// Close waits for the consumer, held until after the assertion, so it runs elsewhere
+			Thread closer=Thread.ofVirtual().start(watcher::close);
 			caller.join();
 			assertTrue(failure.get() instanceof IllegalStateException);
+			releaseConsumer.countDown();
+			closer.join();
 		} finally {
 			releaseConsumer.countDown();
 			watcher.close();
+		}
+	}
+
+	@Test
+	void closeWaitsForAConsumerCallInProgress() throws Exception {
+		CountDownLatch consumerStarted=new CountDownLatch(1);
+		CountDownLatch releaseConsumer=new CountDownLatch(1);
+		AtomicBoolean consumerReturned=new AtomicBoolean();
+		AtomicBoolean returnedAfterConsumer=new AtomicBoolean();
+		// The closer thread closes the watcher; this close matters only when an earlier step fails
+		try (StateWatcher<Integer> watcher=new StateWatcher<>(v-> {
+			consumerStarted.countDown();
+			awaitUninterruptibly(releaseConsumer);
+			consumerReturned.set(true);
+		})) {
+			Thread closer=null;
+			try {
+				watcher.update(1);
+				consumerStarted.await();
+				closer=Thread.ofVirtual().start(() -> {
+					watcher.close();
+					returnedAfterConsumer.set(consumerReturned.get());
+				});
+				// Releases the consumer only once close is waiting for it
+				while ((closer.getState()!=Thread.State.TIMED_WAITING) && closer.isAlive()) Thread.onSpinWait();
+			} finally {
+				releaseConsumer.countDown();
+			}
+			closer.join();
+			assertTrue(returnedAfterConsumer.get(),"close returns only after the consumer call");
 		}
 	}
 

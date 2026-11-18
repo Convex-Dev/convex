@@ -22,7 +22,7 @@ import convex.net.PeerTarget;
  * so a moved endpoint or a changed DID document is picked up. A peer that stays
  * unreachable for a whole period is given up and reported; each lost route starts a
  * new period. Only a {@link PeerConnectionException} is retried: an abandoned attempt
- * stops keeping the peer, and so does a fault, which is logged as a warning.
+ * stops keeping the peer, and so does a fault, reported through {@link #kept}.
  *
  * <p>A peer named by a transport URI without an expected key is held to the key it
  * first proves, as the manager holds desired intent to its key.</p>
@@ -158,7 +158,6 @@ final class PeerKeeper {
 		}
 		if (!(cause instanceof PeerConnectionException)) {
 			// A fault, which trying again would not mend
-			log.warn("Stopped keeping peer {} after an unexpected failure",name,cause);
 			kept.completeExceptionally(cause);
 			return;
 		}

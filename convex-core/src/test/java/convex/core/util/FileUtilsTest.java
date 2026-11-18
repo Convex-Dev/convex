@@ -9,28 +9,22 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.data.Blob;
 import convex.core.data.Strings;
 
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class FileUtilsTest {
 
-	Path TEMP;
-	
-	@BeforeAll 
-	public void setup() throws IOException {
-		TEMP=Files.createTempDirectory("fileTest");
-	}
-	
-	@BeforeAll 
-	public void cleanup() throws IOException {
-		Files.deleteIfExists(TEMP);
-	}
+	@TempDir
+	static Path TEMP;
 	
 	@Test public void testGetHomePath() {
 		String home=System.getProperty("user.home");

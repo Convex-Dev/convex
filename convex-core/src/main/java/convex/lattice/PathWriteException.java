@@ -7,7 +7,7 @@ import convex.core.data.Vectors;
 /**
  * A write through a cursor whose keys do not fit the data: the container for a key
  * is absent, or cannot hold it. Every cursor path write refuses this way, through
- * {@link LatticeOps#assocExisting} or {@link LatticeOps#assocIn}, as does a write
+ * {@link convex.lattice.cursor.PathCursor#assocExisting} or {@link LatticeComponent#assocIn}, as does a write
  * through a JSON value component whose key no longer fits its container's kind.
  *
  * <p>It carries the cursor's keys from the first that does not fit, and that key's

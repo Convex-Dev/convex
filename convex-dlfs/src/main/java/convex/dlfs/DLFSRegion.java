@@ -13,7 +13,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.OwnedMap;
 import convex.lattice.TransactionalComponent;
@@ -34,7 +34,7 @@ import convex.lattice.generic.OwnerMapLattice;
  *
  * <p>Policy is bound at construction and retained by forks and transaction views.
  * Callbacks must support concurrent use and retries inside atomic updates.
- * The optional store is passed to drives for incremental blob checkpoints.</p>
+ * The optional persister is passed to drives for incremental blob checkpoints.</p>
  */
 public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<ACell>>> implements TransactionalComponent<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>,DLFSRegion> {
 
@@ -45,25 +45,25 @@ public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<AC
 	public static final OwnerMapLattice<ACell,AHashMap<AString,AVector<ACell>>> LATTICE=
 		OwnerMapLattice.create(DLFSDrives.LATTICE,KEY_OWNER);
 
-	private final AStore store;
+	private final Persister persister;
 	private final DLFSLocation location;
 	private final Supplier<CVMLong> clock;
 	private final DLFSLattice files;
 	private final BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer;
 
 	DLFSRegion(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
-			AStore store,DLFSLocation location,BiPredicate<ACell,AccountKey> verifier,
+			Persister persister,DLFSLocation location,BiPredicate<ACell,AccountKey> verifier,
 			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew) {
-		this(cursor,store,location,verifier,signer,clock,DLFSLattice.withClock(clock,maxFutureSkew));
+		this(cursor,persister,location,verifier,signer,clock,DLFSLattice.withClock(clock,maxFutureSkew));
 	}
 
 	private DLFSRegion(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
-			AStore store,DLFSLocation location,BiPredicate<ACell,AccountKey> verifier,
+			Persister persister,DLFSLocation location,BiPredicate<ACell,AccountKey> verifier,
 			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,DLFSLattice files) {
 		super(OwnerMapLattice.create(MapLattice.create(files),verifier),cursor);
-		this.store=store;
+		this.persister=persister;
 		this.location=Objects.requireNonNull(location);
 		this.clock=Objects.requireNonNull(clock);
 		this.files=files;
@@ -72,15 +72,15 @@ public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<AC
 
 	/** Connects a direct-key relay with a wall clock and no authoring capability. */
 	public static DLFSRegion connect(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
-			AStore store) {
-		return connect(cursor,store,null,Utils::getCurrentTimestampCell);
+			Persister persister) {
+		return connect(cursor,persister,null,Utils::getCurrentTimestampCell);
 	}
 
 	/** Connects direct-key ownership with a candidate signer, such as {@code keyPair::signData}. */
 	public static DLFSRegion connect(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
-			AStore store,Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Persister persister,Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock) {
-		return connect(cursor,store,KEY_OWNER,
+		return connect(cursor,persister,KEY_OWNER,
 			signer==null?null:(owner,value) -> signer.apply(value),clock,DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
 	}
 
@@ -90,16 +90,16 @@ public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<AC
 	 * use locally available authority data, without network work inside an update.
 	 */
 	public static DLFSRegion connect(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
-			AStore store,BiPredicate<ACell,AccountKey> verifier,
+			Persister persister,BiPredicate<ACell,AccountKey> verifier,
 			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew) {
-		return new DLFSRegion(cursor,store,DLFSLocation.at(cursor),verifier,signer,clock,maxFutureSkew);
+		return new DLFSRegion(cursor,persister,DLFSLocation.at(cursor),verifier,signer,clock,maxFutureSkew);
 	}
 
 	/** Opens an unsigned drive-map view through this region's one signing boundary. */
 	public DLFSDrives drives(ACell owner) {
 		var drivesCursor=authoringCursor(owner,value -> signer==null?null:signer.apply(owner,value));
-		return new DLFSDrives(drivesCursor,store,location.child(owner),clock,files);
+		return new DLFSDrives(drivesCursor,persister,location.child(owner),clock,files);
 	}
 
 	/** Creates isolated working state with the same ownership and authoring policy. */
@@ -110,7 +110,7 @@ public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<AC
 	private DLFSRegion(DLFSRegion source,
 			AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
 		super(source.getLattice(),cursor);
-		store=source.store;
+		persister=source.persister;
 		location=DLFSLocation.at(cursor);
 		clock=source.clock;
 		files=source.files;
@@ -118,12 +118,7 @@ public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<AC
 	}
 
 	@Override
-	public DLFSRegion withCursor(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected DLFSRegion rebind(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
+	public DLFSRegion rebind(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
 		return new DLFSRegion(this,cursor);
 	}
 

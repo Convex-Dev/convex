@@ -1,12 +1,12 @@
 package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.function.BinaryOperator;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,8 +38,8 @@ public class ForkedCursorTest {
 		second.updateAndGet(s -> s.include(CVMLong.TWO));
 		assertEquals(Sets.empty(),root.get(),"edits stay private until sync");
 
-		assertEquals(Sets.of(1),first.sync(ForkedCursorTest::union));
-		assertEquals(Sets.of(1,2),second.sync(ForkedCursorTest::union),"the second sync merges rather than overwrites");
+		assertEquals(Sets.of(1),first.reconcile((base,own,other) -> union(own,other)));
+		assertEquals(Sets.of(1,2),second.reconcile((base,own,other) -> union(own,other)),"the second sync merges rather than overwrites");
 		assertEquals(Sets.of(1,2),root.get());
 		assertEquals(Sets.of(1,2),second.get(),"a fork adopts what it published");
 	}
@@ -47,17 +47,30 @@ public class ForkedCursorTest {
 	@Test public void unchangedForkAdoptsMovedParent() {
 		Root<ASet<CVMLong>> root=Root.create(Sets.of(CVMLong.ONE));
 		AtomicInteger merges=new AtomicInteger();
-		BinaryOperator<ASet<CVMLong>> merge=(own,other) -> {
+		ThreeWayMerge<ASet<CVMLong>> merge=(base,own,other) -> {
 			merges.incrementAndGet();
 			return union(own,other);
 		};
 		var fork=root.fork();
 		root.set(Sets.of(CVMLong.TWO));
 
-		assertEquals(Sets.of(2),fork.sync(merge));
+		assertEquals(Sets.of(2),fork.reconcile(merge));
 		assertEquals(Sets.of(2),root.get(),"an unchanged fork never writes");
 		assertEquals(Sets.of(2),fork.get());
 		assertEquals(0,merges.get(),"adopting a moved parent needs no merge");
+	}
+
+	@Test public void aMergeEqualToTheDestinationKeepsItsCells() {
+		Root<ASet<CVMLong>> root=Root.create(Sets.<CVMLong>empty());
+		var fork=root.fork();
+		fork.updateAndGet(s -> s.include(CVMLong.ONE));
+		ASet<CVMLong> written=Sets.of(1,2);
+		root.set(written);
+		assertNotSame(written,union(fork.get(),written),"the test needs a merge that builds an equal copy");
+
+		assertSame(written,fork.reconcile((base,own,other) -> union(own,other)),"a union equal to the destination is a write of an equal value");
+		assertSame(written,root.get());
+		assertSame(written,fork.get(),"the fork adopts the destination's cells");
 	}
 
 	/** A competing edit must never require a second, fallible merge after publication. */
@@ -65,7 +78,7 @@ public class ForkedCursorTest {
 		var root=Root.<ASet<CVMLong>>create(Sets.empty());
 		CountDownLatch merging=new CountDownLatch(1), editing=new CountDownLatch(1);
 		AtomicInteger merges=new AtomicInteger();
-		BinaryOperator<ASet<CVMLong>> merge=(own,other) -> {
+		ThreeWayMerge<ASet<CVMLong>> merge=(base,own,other) -> {
 			if (merges.incrementAndGet()>1) throw new IllegalStateException("Unexpected post-publication merge");
 			merging.countDown();
 			await(editing);
@@ -82,13 +95,13 @@ public class ForkedCursorTest {
 					return value.include(CVMLong.create(3));
 				});
 			});
-			assertEquals(Sets.of(1,2),fork.sync(merge));
+			assertEquals(Sets.of(1,2),fork.reconcile(merge));
 			writer.get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(Sets.of(1,2),root.get());
 		assertEquals(Sets.of(1,2,3),fork.get());
 		assertEquals(1,merges.get());
-		assertEquals(Sets.of(1,2,3),fork.sync(merge));
+		assertEquals(Sets.of(1,2,3),fork.reconcile(merge));
 		assertEquals(1,merges.get(),"The next sync sees an unchanged destination");
 	}
 
@@ -101,7 +114,7 @@ public class ForkedCursorTest {
 		var seen=new AtomicReference<ASet<CVMLong>>();
 		var nested=new AtomicBoolean();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
-			assertEquals(Sets.of(1,2),fork.sync((own,other) -> {
+			assertEquals(Sets.of(1,2),fork.reconcile((base,own,other) -> {
 				var read=executor.submit(() -> {
 					seen.set(fork.get());
 					nested.set(fork.path(CVMLong.ONE).exists());
@@ -141,7 +154,7 @@ public class ForkedCursorTest {
 				draft.updateAndGet(value -> value.include(CVMLong.create(3)));
 			}));
 			await(drafted);
-			assertEquals(Sets.of(1,2),fork.sync((own,other) -> {
+			assertEquals(Sets.of(1,2),fork.reconcile((base,own,other) -> {
 				merges.incrementAndGet();
 				return union(own,other);
 			}));
@@ -158,23 +171,24 @@ public class ForkedCursorTest {
 		var root=Root.<ASet<CVMLong>>create(Sets.empty());
 		AtomicBoolean reject=new AtomicBoolean(true);
 		AtomicInteger merges=new AtomicInteger();
-		var destination=new AUpdateCursor<ASet<CVMLong>,ASet<CVMLong>>(root) {
-			@Override protected ASet<CVMLong> prepareWrite(ASet<CVMLong> value) {
+		var destination=new ATransformCursor<ASet<CVMLong>,ASet<CVMLong>>(root) {
+			@Override protected ASet<CVMLong> view(ASet<CVMLong> stored) { return stored; }
+			@Override protected ASet<CVMLong> write(ASet<CVMLong> current,ASet<CVMLong> value) {
 				if (reject.get()) throw new IllegalArgumentException("Preparation failed");
 				return value;
 			}
 		};
-		BinaryOperator<ASet<CVMLong>> merge=(own,other) -> { merges.incrementAndGet(); return union(own,other); };
+		ThreeWayMerge<ASet<CVMLong>> merge=(base,own,other) -> { merges.incrementAndGet(); return union(own,other); };
 		var fork=destination.fork();
 		var local=Sets.<CVMLong>of(CVMLong.ONE);
 		var remote=Sets.<CVMLong>of(CVMLong.TWO);
 		fork.set(local);
 		root.set(remote);
-		assertThrows(IllegalArgumentException.class,() -> fork.sync(merge));
+		assertThrows(IllegalArgumentException.class,() -> fork.reconcile(merge));
 		assertSame(local,fork.get());
 		assertSame(remote,root.get());
 		reject.set(false);
-		assertEquals(Sets.of(1,2),fork.sync(merge));
+		assertEquals(Sets.of(1,2),fork.reconcile(merge));
 		assertEquals(2,merges.get(),"Failure must not advance the baseline");
 		assertSame(root.get(),fork.get());
 	}
@@ -193,15 +207,15 @@ public class ForkedCursorTest {
 				});
 			}
 		};
-		BinaryOperator<ASet<CVMLong>> merge=(own,other) -> { throw new IllegalArgumentException("Conflict rejected"); };
+		ThreeWayMerge<ASet<CVMLong>> merge=(base,own,other) -> { throw new IllegalArgumentException("Conflict rejected"); };
 		var fork=root.fork();
 		var local=Sets.<CVMLong>of(CVMLong.ONE);
 		fork.set(local);
-		assertThrows(IllegalArgumentException.class,() -> fork.sync(merge));
+		assertThrows(IllegalArgumentException.class,() -> fork.reconcile(merge));
 		assertSame(local,fork.get());
 		assertEquals(Sets.of(2),root.get(),"Only the competing writer changed the destination");
 		root.set(Sets.empty());
-		assertSame(local,fork.sync(merge),"Returning to the original baseline needs no reconciliation");
+		assertSame(local,fork.reconcile(merge),"Returning to the original baseline needs no reconciliation");
 	}
 
 	private static void await(CountDownLatch latch) {
@@ -211,7 +225,7 @@ public class ForkedCursorTest {
 
 	@Test public void syncRequiresAMergeFunction() {
 		Root<ASet<CVMLong>> root=Root.create(Sets.<CVMLong>empty());
-		assertThrows(NullPointerException.class,() -> root.fork().sync(null));
+		assertThrows(NullPointerException.class,() -> root.fork().reconcile(null));
 	}
 
 	@Test public void reconciliationPolicyBelongsToEachSync() {
@@ -219,17 +233,10 @@ public class ForkedCursorTest {
 		var fork=root.fork();
 		fork.set(CVMLong.ONE);
 		root.set(CVMLong.TWO);
-		assertSame(CVMLong.ONE,fork.sync((own,other) -> own));
+		assertSame(CVMLong.ONE,fork.reconcile((base,own,other) -> own));
 		fork.set(CVMLong.create(3));
 		root.set(CVMLong.create(4));
-		assertEquals(CVMLong.create(4),fork.sync((own,other) -> other));
+		assertEquals(CVMLong.create(4),fork.reconcile((base,own,other) -> other));
 		assertSame(root.get(),fork.get());
-	}
-
-	@Test public void workingStorageAlwaysSupportsExclusiveTransactions() {
-		assertTrue(Root.<ASet<CVMLong>>create(Sets.empty()).fork()
-			.supportsExclusiveTransactions());
-		assertTrue(new TransactionalRootCursor<ASet<CVMLong>>(Sets.empty()).fork()
-			.supportsExclusiveTransactions());
 	}
 }

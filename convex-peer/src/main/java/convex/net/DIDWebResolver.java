@@ -67,10 +67,21 @@ public class DIDWebResolver implements DIDResolver {
 
 	private final Fetcher fetcher;
 
-	/** Creates a resolver with the JVM's TLS defaults and the default bounds. */
+	/**
+	 * The client of every resolver made with the default constructor, created on first
+	 * use. One for the process, so no node owns one it would have to close.
+	 */
+	private static final class DefaultClient {
+		static final HttpClient INSTANCE=HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER)
+			.connectTimeout(DEFAULT_TIMEOUT).build();
+	}
+
+	/**
+	 * Creates a resolver with the JVM's TLS defaults and the default bounds. Every
+	 * resolver made this way shares one HTTP client, which is never closed.
+	 */
 	public DIDWebResolver() {
-		this(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER)
-			.connectTimeout(DEFAULT_TIMEOUT).build(),DEFAULT_TIMEOUT,DEFAULT_MAX_BYTES);
+		this(DefaultClient.INSTANCE,DEFAULT_TIMEOUT,DEFAULT_MAX_BYTES);
 	}
 
 	/**

@@ -136,8 +136,14 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 	}
 
 	@Override
-	public Feed withCursor(AForkableCursor<Index<Blob, ACell>> cursor) {
+	public Feed rebind(AForkableCursor<Index<Blob, ACell>> cursor) {
 		return new Feed(cursor,author,clock);
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Blob, ACell> reconcile(Index<Blob, ACell> own,Index<Blob, ACell> other) {
+		return SocialLattice.FEED_LATTICE.merge(own,other);
 	}
 
 }

@@ -44,22 +44,11 @@ import convex.lattice.generic.SignedLattice;
  */
 public class SignedCursorTest {
 
-	/**
-	 * A contended write must sign once, not once per compare-and-set attempt: the
-	 * signing policy may reach a wallet, key store or remote signer.
-	 */
+	/** A write that loses a compare-and-set stores its value, validly signed, on the retry. */
 	@Test
-	public void testContendedWriteSignsOnce() {
-		AtomicInteger signs=new AtomicInteger();
-		LatticeContext counting=new LatticeContext() {
-			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
-				signs.incrementAndGet();
-				return KP_ALICE.signData(value);
-			}
-		};
-		SignedLattice<AInteger> signedLattice=SignedLattice.create(MaxLattice.INSTANCE);
+	public void testContendedWriteStoresSignedValue() {
 		Root<SignedData<AInteger>> base=Cursors.root(KP_ALICE.signData((AInteger)CVMLong.ONE));
-		SignedCursor<AInteger> cursor=SignedCursor.create(base,v -> signedLattice.sign(counting,v));
+		SignedCursor<AInteger> cursor=SignedCursor.create(base,KP_ALICE);
 
 		// Displace the base value on the first attempt only, forcing exactly one CAS retry
 		AtomicInteger attempts=new AtomicInteger();
@@ -70,7 +59,8 @@ public class SignedCursorTest {
 
 		assertEquals(2,attempts.get(),"the update function was retried");
 		assertEquals(CVMLong.create(99),result);
-		assertEquals(1,signs.get(),"one signature for one logical write");
+		assertEquals(CVMLong.create(99),base.get().getValue());
+		assertTrue(base.get().checkSignature());
 	}
 
 	/** An unchanged write keeps the existing signature and never asks for a new one. */

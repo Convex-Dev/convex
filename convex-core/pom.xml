@@ -5,13 +5,13 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.19</version>
+		<version>0.8.20-SNAPSHOT</version>
 	</parent>
 
 	<properties>
 		<antlr.version>4.13.2</antlr.version>
 		<!-- Keep all Bouncy Castle modules on the same coordinated release. -->
-		<bc.version>1.86</bc.version>
+		<bc.version>1.87</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<!-- Tests run on the module path, patched into convex.core. JUnit lives in the
 		     unnamed module and instantiates helpers in convex.test reflectively, but
@@ -71,8 +71,10 @@
 								</goals>
 								<configuration>
 									<release>22</release>
+									<!-- The FFM backend, and tests that need the JDK 22 API -->
 									<compileSourceRoots>
 										<compileSourceRoot>${project.basedir}/src/main/java22</compileSourceRoot>
+										<compileSourceRoot>${project.basedir}/src/test/java22</compileSourceRoot>
 									</compileSourceRoots>
 								</configuration>
 							</execution>
@@ -126,7 +128,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
-				<version>3.6.2</version>
+				<version>3.8.0</version>
 				<executions>
 					<execution>
 						<id>add-source</id>

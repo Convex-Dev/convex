@@ -10,6 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -36,9 +38,9 @@ class DLFSLifecycleExampleTest {
 	@Test void customPathAndDidOwnershipReopenWithoutPrivateKeys() throws Exception {
 		var owner=DID.forKey(OWNER.getAccountKey());
 		File file;
-		try (var store=EtchStore.createTemp("dlfs-did-lifecycle")) {
+		// The host closes first: its final checkpoint, before the store closes.
+		try (var store=EtchStore.createTemp("dlfs-did-lifecycle"); var host=LatticeHost.open(store)) {
 			file=store.getFile();
-			var host=LatticeHost.open(store);
 			var files=host.addApplication(new DLFSApplication(host,
 				(subject,key) -> owner.equals(subject) && OWNER.getAccountKey().equals(key),
 				(subject,value) -> owner.equals(subject)?OWNER.signData(value):null,
@@ -47,10 +49,8 @@ class DLFSLifecycleExampleTest {
 			assertNotNull(drive);
 			Files.writeString(drive.fileSystem().getPath("/hello.txt"),"Hello");
 			files.sync();
-			host.close(); // Final checkpoint, before the store closes.
 		}
-		try (var store=EtchStore.create(file)) {
-			var host=LatticeHost.open(store);
+		try (var store=EtchStore.create(file); var host=LatticeHost.open(store)) {
 			// Reopening a reader requires verification policy but no private signer.
 			var files=host.addApplication(new DLFSApplication(host,
 				(subject,key) -> owner.equals(subject) && OWNER.getAccountKey().equals(key),
@@ -62,13 +62,14 @@ class DLFSLifecycleExampleTest {
 
 	@Test void webdavDurableCompletionFailsWhenFlushFailsAndCanBeRetried() throws Exception {
 		var flushes=new AtomicInteger();
+		var expected=new IOException("disk unavailable");
+		var failures=new LinkedBlockingQueue<Exception>();
 		try (var store=new EtchStore(Etch.createTempEtch("dlfs-durable-http")) {
 			@Override public void flush() throws IOException {
-				if (flushes.getAndIncrement()==0) throw new IOException("disk unavailable");
+				if (flushes.getAndIncrement()==0) throw expected;
 				super.flush();
 			}
-		}; var client=HttpClient.newHttpClient()) {
-			var host=LatticeHost.open(store);
+		}; var client=HttpClient.newHttpClient(); var host=LatticeHost.open(store)) {
 			var app=host.addApplication(new DLFSApplication(host,OWNER::signData));
 			var drives=app.drives(OWNER.getAccountKey());
 			assertNotNull(drives.getOrCreateDrive("home"));
@@ -77,7 +78,7 @@ class DLFSLifecycleExampleTest {
 				try { host.checkpoint(); }
 				catch (IOException e) { throw new UncheckedIOException(e); }
 			});
-			try (var server=DLFSServer.create(routes)) {
+			try (var server=DLFSServer.create(routes).onFailure(failures::add)) {
 				server.start(0);
 				var request=HttpRequest.newBuilder(URI.create("http://localhost:"+server.getPort()+"/dlfs/home/hello.txt"))
 					.PUT(HttpRequest.BodyPublishers.ofString("Hello")).build();
@@ -87,11 +88,16 @@ class DLFSLifecycleExampleTest {
 				int status=client.send(request,HttpResponse.BodyHandlers.ofString()).statusCode();
 				assertTrue(status>=200 && status<300);
 				assertEquals(2,flushes.get());
+				var failure=assertInstanceOf(UncheckedIOException.class,failures.poll(5,TimeUnit.SECONDS));
+				assertSame(expected,failure.getCause());
+				server.close();
+				assertTrue(failures.isEmpty(),"No additional request failures");
 			}
-			var restored=LatticeHost.open(store);
-			var reader=restored.addApplication(new DLFSApplication(restored));
-			assertEquals("Hello",Files.readString(reader.drives(OWNER.getAccountKey()).drive("home")
-				.fileSystem().getPath("/hello.txt")));
+			try (var restored=LatticeHost.open(store)) {
+				var reader=restored.addApplication(new DLFSApplication(restored));
+				assertEquals("Hello",Files.readString(reader.drives(OWNER.getAccountKey()).drive("home")
+					.fileSystem().getPath("/hello.txt")));
+			}
 		}
 	}
 }

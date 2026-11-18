@@ -106,8 +106,14 @@ public class Follows extends MapComponent<ACell, ACell> implements Transactional
 	}
 
 	@Override
-	public Follows withCursor(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
+	public Follows rebind(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
 		return new Follows(cursor,clock);
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<ACell, ACell> reconcile(AHashMap<ACell, ACell> own,AHashMap<ACell, ACell> other) {
+		return SocialLattice.FOLLOWS_LATTICE.merge(own,other);
 	}
 
 }

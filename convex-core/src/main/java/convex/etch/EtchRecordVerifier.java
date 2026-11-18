@@ -12,7 +12,6 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 
@@ -106,11 +105,14 @@ final class EtchRecordVerifier {
 		// may be a view over a reusable maintenance buffer.
 		storedHash=actualHash;
 
+		// A record is checked on its own: hash, CAD3 decoding and canonical form, as CAD047
+		// specifies for repair. Cell validation is deliberately not part of it:
+		// validateStructure reads child cells, which repair may not have copied yet and
+		// validation never loads, so the verdict would depend on record order.
 		ACell cell;
 		try {
 			cell=decoder.decode(encoding);
-			if (cell!=null) cell.validateStructure();
-		} catch (BadFormatException | InvalidDataException | RuntimeException | Error e) {
+		} catch (BadFormatException | RuntimeException | Error e) {
 			if (e instanceof VirtualMachineError fatal) throw fatal;
 			return Result.failure(FailureKind.ENCODING,"invalid CAD3 encoding at "+position+": "+e.getMessage());
 		}

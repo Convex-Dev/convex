@@ -36,7 +36,7 @@ of how it got there is in the branch's git log. See
 - Cursors carry no lattice, context, merge rule or container-construction policy.
   Components supply read/write functions and explicit signing and stamping functions.
 - Roots hold only current atomic state. A fork is a working copy with a baseline;
-  `sync(merge)` publishes it with the merge its owning component supplies, and on any
+  `reconcile(merge)` publishes it with the merge its owning component supplies, and on any
   other cursor publishes nothing. `LatticeHost.sync()` publishes host storage under
   its own lock.
 - Transactions retain their attempt input; component publication retains its own
@@ -127,7 +127,7 @@ CAD text affected:
 Proposed wording: cursors know a lattice only through the shape, merge, signing,
 ownership and stamping interfaces, each supplied by the component that owns the level.
 The hierarchy becomes root (with the publication seam), path cursor (optionally
-shaped), forked cursor, transaction draft and the update cursors.
+shaped), forked cursor, transaction draft and the signed, stamped and default views.
 
 ## 4. Declared children replace lattice-walk auto-initialisation
 
@@ -162,16 +162,15 @@ write unless its shape is structural.
 
 A fork is a private working copy of a destination cursor together with the
 destination value it was last reconciled against. `AForkableCursor.fork()` creates
-one and `sync(merge)` publishes it. On sync the fork adopts whichever side changed
-alone, calls the supplied merge only when both the copy and the destination moved
-since the baseline, and installs the result by compare-and-set, retrying while the
-destination moves. The fork holds no lattice, no merge rule and no context. Every
-forkable cursor accepts `sync(merge)`; on a cursor that is not a fork it returns the
-current value and publishes nothing, so a live view and a staged component share one
-sync.
+one and `reconcile(merge)` publishes it. The fork gives the supplied three-way merge
+the baseline, its working value and the destination's value, and installs the result
+in one atomic destination update, retrying while the destination moves. The fork
+holds no lattice, no merge rule and no context. Every forkable cursor accepts
+`reconcile(merge)`; on a cursor that is not a fork it returns the current value and
+publishes nothing, so a live view and a staged component share one sync.
 
 The merge is the component's. `ALatticeComponent.sync()` hands its own
-`mergePublication(own, other)` to its storage, closed over whatever policy that
+`reconcile(base, own, other)` to its storage, closed over whatever policy that
 component holds: its lattice, signer, clock or authoriser. A component fork,
 `rebind(storage.fork())`, is a new component of the same class over a forked cursor,
 so a fork reconciles with the policy of the component that owns it, resolved when it
@@ -252,8 +251,8 @@ CAD text affected: CAD036 (*Lattice Node*), how pull-path merges are described.
 **Status:** Implemented (0.8.18 work, engine moved in `c1bfed931`).
 
 `Transactions.transact` and `transactExclusively` run a callback against a private draft
-of a cursor's value and commit by compare-and-set, with locked fallback on a
-`TransactionalRootCursor`. `TransactionalComponent` builds typed domain drafts on
+of a cursor's value and commit by compare-and-set, finishing under the root's claim
+after repeated conflicts. `TransactionalComponent` builds typed domain drafts on
 it. Neither CAD035 nor CAD045 describes transactions; this is an addition to specify,
 not a contradiction.
 
@@ -298,8 +297,9 @@ CAD045 *Connecting to Node Infrastructure* and CAD024 *Cursor Sync Guarantees*
 `RootComponent` became `LatticeHost`. The host holds the published root value, an
 optional store, the publication policy that runs on its sync, and an immutable list
 of applications that receive incoming values. It has no lattice: it never merges on
-its own, an unconfigured host ignores incoming values, and its sync is a plain
-compare-and-set that leaves a racing write pending for the next sync (entry 6).
+its own, an unconfigured host ignores incoming values, and its sync switches the
+root to the published cells only while it still holds that snapshot, leaving a
+racing write pending for the next sync (entry 6).
 Without a store, persist returns its input and flush is a no-op; a networked node
 still requires a store. Persistence is the host's: a host with a store writes its
 root on every sync, attached to a node or not, and the node's `persist` setting
@@ -591,7 +591,7 @@ plus a merge function, and every component's level has one; how that rule is
 implemented is left to the application or implementer.
 
 `ALatticeComponent` no longer accepts or exposes
-`ALattice`. It supplies storage, child routing and a `mergePublication(own, other)`
+`ALattice`. It supplies storage, child routing and a `reconcile(own, other)`
 hook. Unsupported descendant paths are rejected by `mergeAtPath` unless a
 component defines their handling. A staged component can reconcile directly over
 immutable values without constructing a lattice definition.
@@ -640,7 +640,7 @@ follow the same rule: one holding a private copy of the root is built over
 a host.
 
 `sync()` publishes the bound storage with the component's own reconciliation,
-`storage.sync(this::mergePublication)`. On a fork that reconciles and publishes into
+`storage.reconcile` given its `reconcile(base, own, other)`. On a fork that reconciles and publishes into
 the fork's destination; on any other cursor it returns the current value and
 publishes nothing, so a live view has no publication work. Sync never publishes a
 caller-owned fork through a view, nor signs, stamps or creates default state. Nested
@@ -650,10 +650,10 @@ boundaries and no-op identity through authoring views.
 
 ## 27. Fork reconciliation completes before publication commits
 
-Implemented 21 October 2026. Forks always use `TransactionalRootCursor` for private
-working storage. Sync holds that root's existing write lock while reconciling and
+Implemented 21 October 2026. Forks use a private `Root` for working storage. Sync
+holds the claim on all of it while reconciling and
 preparing the destination CAS, then installs the result without any further merge.
-Fork reads take no lock; working writes are ordered before or after sync. The
+Fork reads never wait; working writes are ordered before or after sync. The
 post-publication reconciliation loop and separate sync lock are removed.
 
 A failed merge or preparation leaves the fork value and baseline unchanged and
@@ -697,7 +697,7 @@ construction. Wrappers sharing a fork share publication; ordinary cursor views n
 publish enclosing state (entries 5 and 26).
 
 A cursor fork holds only its destination, working state and baseline. The merge
-function is supplied to each `sync(merge)`; atomic reconciliation, failure handling
+function is supplied to each `reconcile(merge)`; atomic reconciliation, failure handling
 and working-state coordination are as entry 27 describes. `AForkableCursor` remains
 distinct from the read-only view hierarchy. The lattice adapter's constructors bind;
 callers explicitly choose a fork when staging is intended.
@@ -717,9 +717,9 @@ storage directly. Nested signed drafts reconcile unsigned state and sign only wh
 the original envelope boundary publishes.
 
 Transactions use bound `storage()`, with editing policies reinstalled on their
-private component view by `withCursor`/`rebind`. Committing a prepared timestamped
-record no longer stamps it twice. The public interface bridge remains a small
-adapter to the protected construction hook; no self-type hierarchy is introduced.
+private component view by `rebind`. Committing a prepared timestamped record no
+longer stamps it twice. `rebind` is public, so the interface binds it directly; no
+self-type hierarchy is introduced.
 
 `UnionSet` supplies standard union merging for set domain components. Reading List
 and Shared Regions use it; Notebook embeds ordinary set operations behind its own
@@ -785,6 +785,53 @@ stored. A decoded blob owner key becomes an `AccountKey` through `AccountKey.cre
 
 CAD text affected: CAD035 *Lattice Integration*; CAD036 *JSON Key Compatibility*;
 CAD037 owner key representation.
+
+## 34. Children sync themselves; a container may manage its own in forks
+
+**Status:** Implemented; agreed 11 November 2026.
+
+A component's sync reconciles its own working state with its destination and
+leaves its children alone: a child over a live path writes straight into its
+parent, and a child with a fork of its own is synced by whoever owns it. Managing
+children in forks is an opt-in through `ALatticeComponent.syncChildren()`, which
+does nothing by default. Sync calls it before reconciling, and `TransactionalComponent`
+and `ExclusiveComponent` call it on each attempt's view before the draft commits,
+so a transaction can be isolated to one child or span several.
+
+`AKeyedRegions` is the reference opt-in. It syncs the regions it made from
+factories, never a child registered as an instance, and then reconciles its own
+storage like any component. It can be forked, since any component that rebinds
+can; its fork reconciles region by region. This replaces entry 25's container
+with no publication of its own boundary, and the hook moves from
+`ALatticeApplication` to the base component.
+
+A region's committed work is whatever reaches the cursor the container gives it,
+and that cursor is a `BoundaryCursor` over the region's place in the container.
+Writes through it land in the container at once, so a transaction on the container
+works on everything regions have committed and retries when a region commit lands
+mid-attempt; nothing needs syncing first. A claim locks the nearest transactional
+boundary wherever in a cursor tree it is taken, and a root is the outermost
+boundary, so its claim covers the whole root rather than the part a transaction
+reads. Claims stop at the boundary, so exclusive
+transactions in separate regions run at the same time, while the container's claim
+lies beneath every boundary and stops all region writes. A region's claim holds only
+against writes through its boundary: a transaction on the container that changes the
+same region meanwhile is another lattice value arriving, so the region's claimed
+commit merges it with its own run by the region's `reconcile`, as a forked region
+does when it syncs, with the run's value as `own` and the change as `other`. A
+region whose `reconcile` refuses the change, as the default does for a change on both
+sides, fails rather than overwrite it. That applies to exclusive transactions and to
+ordinary ones that took the claim after a conflict.
+Applications sharing one root make independent updates in any case, which their
+lattice merges reconcile. Making the container fork its regions itself was tried and
+rejected: a region with its own signing view must reconcile above that view, which a
+container fork cannot.
+
+CAD text affected: none yet. CAD045 says publishing an enclosing collection must
+not publish outstanding drafts. That holds for every component that keeps the
+default. A container that opts in does publish its regions' drafts, each through
+the region's own sync and signing boundary, as `AKeyedRegions` already did before
+this entry.
 
 ## CAD-by-CAD summary
 

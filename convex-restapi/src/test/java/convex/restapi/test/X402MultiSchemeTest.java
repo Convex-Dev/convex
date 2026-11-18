@@ -1,15 +1,14 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -20,11 +19,8 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.cvm.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
-import convex.core.init.Init;
-import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.handler.X402Decision;
 import convex.restapi.handler.X402Gate;
@@ -45,9 +41,10 @@ import io.javalin.Javalin;
  * Tests accepting foreign payment kinds via a remote facilitator: a gate
  * offering both CVM-on-Convex and USDC-on-Base options, with the Base option
  * settled through a stub external facilitator speaking the standard x402
- * facilitator API.
+ * facilitator API. Convex payments settle on the shared test peer, from one
+ * account of this class's own.
  */
-public class X402MultiSchemeTest {
+public class X402MultiSchemeTest extends ARESTTest {
 
 	static final String BASE_NETWORK = "eip155:8453";
 	static final String USDC_ASSET = "erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -63,27 +60,26 @@ public class X402MultiSchemeTest {
 	static RemoteFacilitator remote;
 	static final AtomicInteger stubSettleCalls = new AtomicInteger();
 
-	static final HttpClient httpClient = HttpClient.newBuilder()
-			.connectTimeout(Duration.ofSeconds(10)).build();
-
 	@BeforeAll
 	static void setup() throws Exception {
-		var launchConfig = new java.util.HashMap<convex.core.data.Keyword, Object>();
-		launchConfig.put(Keywords.KEYPAIR, AKeyPair.generate());
-		launchConfig.put(Keywords.PORT, 0);
-		peerServer = API.launchPeer(launchConfig);
-		kp = peerServer.getKeyPair();
+		peerServer = server.getServer();
+		kp = CLIENT_KP;
 		convex = Convex.connect(peerServer);
-		convex.setAddress(Init.GENESIS_ADDRESS, kp);
+		convex.setAddress(newAccount(), kp);
 
-		// Stub external facilitator speaking the standard /verify /settle /supported API
+		// Stub external facilitator speaking the standard /verify /settle /supported API.
+		// It reads each request body, as a real facilitator does: Jetty resets a connection
+		// whose body is unread at the response, and the reset can discard the response.
 		stubFacilitator = Javalin.create(config -> {
 			config.routes.get("/facilitator/supported", ctx -> ctx.contentType("application/json").result(
 					"{\"kinds\":[{\"x402Version\":2,\"scheme\":\"exact\",\"network\":\"" + BASE_NETWORK
 							+ "\"}],\"extensions\":[],\"signers\":{}}"));
-			config.routes.post("/facilitator/verify", ctx -> ctx.contentType("application/json")
-					.result("{\"isValid\":true,\"payer\":\"0xPayer\"}"));
+			config.routes.post("/facilitator/verify", ctx -> {
+				ctx.body();
+				ctx.contentType("application/json").result("{\"isValid\":true,\"payer\":\"0xPayer\"}");
+			});
 			config.routes.post("/facilitator/settle", ctx -> {
+				ctx.body();
 				stubSettleCalls.incrementAndGet();
 				ctx.contentType("application/json").result("{\"success\":true,\"payer\":\"0xPayer\","
 						+ "\"transaction\":\"" + EVM_TX + "\",\"network\":\"" + BASE_NETWORK + "\"}");
@@ -112,9 +108,11 @@ public class X402MultiSchemeTest {
 
 	@AfterAll
 	static void tearDown() {
-		if (app != null) app.stop();
-		if (stubFacilitator != null) stubFacilitator.stop();
-		if (peerServer != null) peerServer.close();
+		// The gate's facilitator pays through the client, so the client closes last
+		assertAll("Close the gate, the stub facilitator and the client",
+				() -> { if (app != null) app.stop(); },
+				() -> { if (stubFacilitator != null) stubFacilitator.stop(); },
+				() -> { if (convex != null) convex.close(); });
 	}
 
 	static PaymentRequired fetchDemand() throws Exception {

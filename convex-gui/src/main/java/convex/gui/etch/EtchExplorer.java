@@ -79,9 +79,17 @@ public class EtchExplorer extends AbstractGUI {
 		return etchState.getValue();
 	}
 	
+	/**
+	 * Shows a store this explorer has opened. The explorer closes it once it shows
+	 * another store or itself closes; a store it did not open is left open.
+	 *
+	 * @param newEtch Store to show
+	 */
 	public void setStore(EtchStore newEtch) {
-		EtchStore e=etchState.getValue();
-		e.close();
+		EtchStore previous=etchState.getValue();
+		own(newEtch);
 		etchState.setValue(newEtch);
+		// Only the stores passed here are owned, so the store first shown is never closed
+		if (disown(previous)) previous.close();
 	}
 }

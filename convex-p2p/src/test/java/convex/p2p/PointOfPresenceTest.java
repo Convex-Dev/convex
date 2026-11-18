@@ -1,15 +1,19 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -28,7 +32,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.node.NodeConfig;
 
 /** End-to-end point messaging through one public PoP and two NAT leaves. */
@@ -38,28 +42,29 @@ public class PointOfPresenceTest {
 	private final AKeyPair bobKey=AKeyPair.generate();
 	private final AKeyPair daveKey=AKeyPair.generate();
 
-	private EtchStore aliceStore;
-	private EtchStore bobStore;
-	private EtchStore daveStore;
+	private MemoryStore aliceStore;
+	private MemoryStore bobStore;
+	private MemoryStore daveStore;
 	private P2PNode alice;
 	private P2PNode bob;
 	private P2PNode dave;
 
 	@AfterEach
-	public void tearDown() throws Exception {
-		if (alice!=null) alice.close();
-		if (dave!=null) dave.close();
-		if (bob!=null) bob.close();
-		if (aliceStore!=null) aliceStore.close();
-		if (daveStore!=null) daveStore.close();
-		if (bobStore!=null) bobStore.close();
+	public void tearDown() {
+		List<Executable> closes=new ArrayList<>();
+		P2PNode[] nodes={alice,dave,bob};
+		for (P2PNode node:nodes) if (node!=null) closes.add(node::close);
+		// Each node leaves open the host it opened
+		for (P2PNode node:nodes) if (node!=null) closes.add(node.getNodeServer().getHost()::close);
+		for (MemoryStore store:new MemoryStore[] {aliceStore,daveStore,bobStore}) if (store!=null) closes.add(store::close);
+		assertAll("Close the nodes, their hosts and their stores",closes);
 	}
 
 	@Test
 	public void testPublicAndPrivateMessagesThroughPop() throws Exception {
-		aliceStore=EtchStore.createTemp("pop-alice");
-		bobStore=EtchStore.createTemp("pop-bob");
-		daveStore=EtchStore.createTemp("pop-dave");
+		aliceStore=new MemoryStore();
+		bobStore=new MemoryStore();
+		daveStore=new MemoryStore();
 
 		AccountKey bobNodeKey=bobKey.getAccountKey();
 		alice=P2PNode.create(aliceStore,NodeConfig.port(-1),aliceKey)

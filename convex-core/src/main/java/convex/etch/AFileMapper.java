@@ -22,7 +22,7 @@ import convex.core.util.Utils;
  * Mapped reads and writes never use the channel, so only growth and checkpoint
  * forces take the hand-off. These calls use only the channel, never the mapper.</p>
  */
-abstract class AFileMapper implements AutoCloseable {
+abstract class AFileMapper implements AutoCloseable, EtchHeaderSource {
 	private static final int ZERO_BUFFER_SIZE=16_384;
 	private static final byte[] ZERO_BUFFER=new byte[ZERO_BUFFER_SIZE];
 
@@ -39,7 +39,8 @@ abstract class AFileMapper implements AutoCloseable {
 		}
 	}
 
-	final long length() {
+	@Override
+	public final long length() {
 		return length;
 	}
 
@@ -50,6 +51,12 @@ abstract class AFileMapper implements AutoCloseable {
 			throw corruption("Invalid stored data length",storedLength,physicalLength);
 		}
 		length=storedLength;
+	}
+
+	@Override
+	public final void read(long position, byte[] destination, int offset, int count)
+			throws IOException {
+		read(position,destination,offset,count,null);
 	}
 
 	final void read(long position, byte[] destination, int offset, int count,

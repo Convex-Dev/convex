@@ -54,11 +54,11 @@ class ProjectionCursorTest {
 		});
 		var fork=view.fork();
 		fork.set(CVMLong.ONE);
-		assertThrows(IllegalArgumentException.class,() -> fork.sync((own,other) -> own));
+		assertThrows(IllegalArgumentException.class,() -> fork.reconcile((base,own,other) -> own));
 		assertSame(CVMLong.ZERO,root.get());
 		assertSame(CVMLong.ONE,fork.get());
 		reject.set(false);
-		assertSame(CVMLong.ONE,fork.sync((own,other) -> own));
+		assertSame(CVMLong.ONE,fork.reconcile((base,own,other) -> own));
 		assertSame(CVMLong.ONE,root.get());
 	}
 
@@ -79,12 +79,12 @@ class ProjectionCursorTest {
 		var fork=projected.fork();
 		fork.set(CVMLong.ONE);
 		assertEquals(0,signatures.get());
-		assertEquals(CVMLong.ONE,fork.sync((own,other) -> own));
+		assertEquals(CVMLong.ONE,fork.reconcile((base,own,other) -> own));
 		assertEquals(CVMLong.ONE,root.get().getValue().get(VALUE));
 		assertEquals(CVMLong.TWO,root.get().getValue().get(OTHER));
 		assertTrue(root.get().checkSignature());
 		assertEquals(2,signatures.get(),"Changed payload must be rebuilt and signed again");
-		fork.sync((own,other) -> own);
+		fork.reconcile((base,own,other) -> own);
 		assertEquals(2,signatures.get(),"Unchanged publication preserves the envelope");
 	}
 
@@ -95,9 +95,9 @@ class ProjectionCursorTest {
 		var view=ProjectionCursor.create(stamped,value -> value,(current,value) -> value);
 		var fork=view.fork();
 		fork.updateAndGet(value -> value.assoc(VALUE,CVMLong.ONE));
-		var published=fork.sync((own,other) -> own);
+		var published=fork.reconcile((base,own,other) -> own);
 		assertSame(root.get(),published);
 		assertEquals(CVMLong.TWO,fork.get().get(OTHER));
-		assertSame(root.get(),fork.sync((own,other) -> own));
+		assertSame(root.get(),fork.reconcile((base,own,other) -> own));
 	}
 }

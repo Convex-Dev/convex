@@ -13,6 +13,7 @@ import java.util.List;
 
 import javax.swing.JPanel;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,11 +21,22 @@ import org.junit.jupiter.api.Test;
  * never been shown closes through the same path as one whose window is closed.
  */
 public class AbstractGUITest {
+	private final List<Exception> releaseFailures=Collections.synchronizedList(new ArrayList<>());
+
+	@AfterEach
+	void noUnexpectedReleaseFailures() {
+		assertEquals(List.of(),releaseFailures,"Unexpected resource cleanup failure");
+	}
 
 	@SuppressWarnings("serial")
-	static class TestGUI extends AbstractGUI {
+	class TestGUI extends AbstractGUI {
 		TestGUI() {
 			super("Test GUI");
+		}
+
+		@Override
+		protected void reportReleaseFailure(AutoCloseable resource,Exception failure) {
+			releaseFailures.add(failure);
 		}
 	}
 
@@ -96,12 +108,15 @@ public class AbstractGUITest {
 		Events events=new Events();
 		TestGUI gui=new TestGUI();
 		gui.own(events.resource("first"));
-		gui.own(()->{throw new IllegalStateException("Deliberate test failure");});
+		IllegalStateException expected=new IllegalStateException("Deliberate test failure");
+		gui.own(()->{throw expected;});
 		gui.own(events.resource("last"));
 
 		gui.close();
 
 		assertEquals(List.of("last","first"),events.list);
+		assertEquals(List.of(expected),releaseFailures);
+		releaseFailures.clear();
 	}
 
 	@Test

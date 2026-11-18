@@ -670,38 +670,25 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		return slice(1, count);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public void validate() throws InvalidDataException {
-		// TODO: Needs to ensure children are validated?
-		super.validate();
-		if (prefix != null) {
-			// if we have a prefix, should be 1..15 elements only
-			if (count == Vectors.CHUNK_SIZE) {
-				throw new InvalidDataException("Full VectorLeaf with prefix? This is not right...", this);
-			}
-
-			if (count == 0) {
-				throw new InvalidDataException("Empty VectorLeaf with prefix? This is not right...", this);
-			}
-
-			ACell ccell=prefix.getValue();
-			if (!(ccell instanceof AVector)) {
-				throw new InvalidDataException("Prefix is not a vector", this);			
-			}
-			
-			AVector<T> tv = (AVector<T>)ccell;
-			if (prefixLength() != tv.count()) {
-				throw new InvalidDataException("Expected prefix length: " + prefixLength() + " but found " + tv.count(),
-						this);
-			}
-			tv.validate();
+	public void validateStructure() throws InvalidDataException {
+		if (prefix == null) return;
+		ACell p=prefix.getValue();
+		if (!(p instanceof AVector)) throw new InvalidDataException("Prefix is not a vector", this);
+		long n=((AVector<?>)p).count();
+		if (n != prefixLength()) {
+			throw new InvalidDataException("Expected prefix length: " + prefixLength() + " but found " + n, this);
 		}
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((count > 0) && (items.length == 0)) throw new InvalidDataException("Should be items present!", this);
+		if (prefix != null) {
+			// With a prefix, a leaf holds 1 to 15 elements of its own
+			if (count == Vectors.CHUNK_SIZE) throw new InvalidDataException("Full VectorLeaf with prefix", this);
+			if (count == 0) throw new InvalidDataException("Empty VectorLeaf with prefix", this);
+		}
 	}
 
 

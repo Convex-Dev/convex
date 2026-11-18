@@ -131,8 +131,14 @@ the component creates a missing container only when a changed write needs it.
 
 ## Composition and sharing
 
-An application is a component assembled at the host root. It usually groups
-named regions, each handled by a child component. Region paths belong to this
+An application is a component assembled at the host root. The root's keys are
+regions: facilities that many applications use, such as `:fs`, listed in
+[CAD053](https://docs.convex.world/docs/cad/lattice_regions), and `:app`, under
+which each application keeps its own state at `[:app <name>]`
+([CAD045](https://docs.convex.world/docs/cad/lattice_apps)). A root application
+registers the regions it serves: `:app`, holding each application's domain
+component under its name, and beside it any facilities used. A transaction on a
+transactional root application spans them all. Region paths belong to this
 assembly; domain components receive storage at their own position. The same
 component can therefore live at a default region, a custom path, or inside
 another application. Nodes can participate in different sets of regions while
@@ -163,18 +169,31 @@ their publication boundaries.
 
 Several applications can share a host without sharing private working state.
 They publish only the regions they own and preserve unrelated regions. Sharing
-the same component instance also shares its pending changes; either application
-can publish them. Separate staged components at the same path reconcile their
-independent copies when publishing.
+the same component instance also shares its pending changes; whoever made the
+component publishes them. Separate staged components at the same path reconcile
+their independent copies when publishing.
 
 A region container (`Regions` or `SingleRegion`) is a component, at the root or
-nested, that routes incoming values to its children and publishes them. It has
-no separate aggregate copy to overwrite the container afterwards. Publishing
-children is sequential, not atomic across regions: earlier successful work
-remains if a later child fails. An operation needing an atomic aggregate belongs
-at a common ancestor that owns that aggregate.
+nested, that routes incoming values to its children. It manages the regions it
+makes from factories: a factory gives its region either a fork of the cursor it
+is given, so that the region edits and transacts in isolation, or a live view
+that writes straight into the container. The container's sync syncs each region
+it made, in registration order, then reconciles its own storage as any component
+does. It never syncs a child registered as an existing instance, which belongs to
+whoever made it. Syncing regions is sequential, not atomic: earlier successful
+work remains if a later region fails.
 
-An application made only of regions extends a region container and is registered
+Within its place, a domain component makes its parts on its own cursor when they
+are needed, such as `new Stock(path(STOCK))` from an `IndexComponent`, rather than
+registering them as regions. Such a part holds nothing but that cursor, so it is
+cheap to make and works alike on live storage, a fork or a transaction's draft. It
+shares its component's publication and claim boundary, and the component's merge
+rule covers it. A child needs to be a region only for a boundary of its own:
+separate publication, staging or exclusive transactions. A transaction reads its
+component's value, so whoever makes a component at a place that may still be
+absent gives it a default there, such as `cursor.withDefault(Index.none())`.
+
+A root application made only of regions extends a region container and is registered
 with the host as it is. One with root-level behaviour of its own, such as a merge
 across its regions or a private copy of the whole root, extends
 `ALatticeApplication`, holding a region container where that helps. The host
@@ -246,8 +265,9 @@ containers and key types:
   nil, from: the string itself; the keyword, then the symbol, with that name; then
   the blob, address and integer that `Blobs.parse`, `Address.parse` and
   `AInteger.parse` read from it. Blob keys therefore take hex with or without `0x`.
-- A segment naming no existing key keeps its string key, so a write creates a
-  string field, as parsing JSON would.
+- A segment naming no existing key keeps its string key, as parsing JSON would.
+  The component there is absent, and is written only once its container holds
+  that key.
 - Sets and other values have no addressable children.
 
 Selecting this variant declares the intended addressing policy; it does not
@@ -257,19 +277,21 @@ JSON resolution selects keys from one snapshot. A returned component keeps those
 keys: resolve again to interpret a later container shape. A resolved position
 becomes absent if its container becomes a map, as does an integer map key if its
 container becomes a sequence, and writes through such a handle refuse the
-incompatible container. Neither variant creates missing intermediate containers or
+incompatible container. Neither variant creates a missing entry or container, or
 supplies a merge rule. A parent needing those behaviours provides them explicitly.
 
 A resolved value component keeps only its keys, in its cursor: the literal
 segments, or the keys JSON resolution selected. A write through it that cannot be
 made throws `PathWriteException` with those keys from the first that cannot be
-written, and that key's depth among them, as any cursor path write does. Its
-container is either absent, or cannot hold its key: a scalar, a set, a position
-past the end of a sequence (appending included), or a key of the wrong kind. For
-an absent container, the container is the value the keys before it reach, or the
-component's own value when nothing precedes it. A write through a signed envelope
-is refused with `IllegalArgumentException`, as for any cursor, and a write that
-changes nothing is never refused.
+written, and that key's depth among them, as any cursor path write does. Either
+its entry does not exist, or its container is absent or cannot hold its key: a
+scalar, a set, a position past the end of a sequence (appending included), or a
+key of the wrong kind. For an absent container, the container is the value the
+keys before it reach, or the component's own value when nothing precedes it. A
+write through a signed envelope is refused with `IllegalArgumentException`, as for
+any cursor. A write that changes nothing is refused in the same places: the
+refusal depends on where the write would go, not on its value. A new entry is
+made by writing its container.
 
 `value()` uses the strict cursor read contract from
 [CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable
@@ -324,6 +346,19 @@ Absence in a partial view is not evidence that the corresponding data was delete
 
 ## Forks and transactions
 
+**Commit** atomically publishes a transaction's value, after any required
+reconciliation and authoring, into the state on which the transaction was started.
+For a component, that destination is its bound storage. A live child's storage is
+a view into its enclosing component, so its transaction commits there directly.
+A transaction on a fork commits into the fork's working state.
+
+**Sync** reconciles a fork's working state with its publication destination.
+A commit into a fork does not also sync it. A nested transaction commits into
+the enclosing transaction's working state when bound there; that state reaches
+the enclosing transaction's destination only when the enclosing transaction
+commits. Name the destination when distinguishing these steps: "committed into
+the fork" or "published into the container".
+
 A component fork is a reusable private working copy. Publication compares it
 with its destination and their last reconciled value. If only one side changed,
 that side is adopted. If both changed, the component's merge rule reconciles
@@ -335,11 +370,28 @@ or preparing a signed batch. The domain operations should remain the same on a
 live view and a private view. Their storage and publication boundaries differ,
 not the meaning of actions such as adding a favourite or editing a file.
 
-A transaction instead groups operations into one local atomic change. If the
-live value changes before commit, the operations run again against current
-state. This matters when both operations must survive: two independent edits to
-a whole-value register may select one result, while retrying transactions can
-apply both operations in sequence.
+A transaction executes operations on a private draft, then commits one local
+atomic change by the component's `reconcile`, given the value it started from,
+its own value and the current value. A concurrent change the component can
+reconcile commits with the run; a conflict, which by default is any change on both
+sides, makes the operations run once more, under a claim, against current state.
+Under a claim, a change that bypasses the claimed boundary goes through the same
+`reconcile`, and a conflict there refuses the commit. These are different ways of
+handling a concurrent change: merging resolves the resulting versions according to
+component policy, while retrying repeats the operations.
+
+Execution produces a transaction value and a return value. Commit applies any
+required reconciliation and authoring, then atomically installs the resulting
+state. These additional transformations do not change the execution's return
+value. The transaction value need not be separately visible in storage before
+these transformations. Successful completion means that the commit into the
+component's bound storage succeeded. A component's merge determines which changes
+survive and must preserve any invariants that component promises across merges. A check made
+only during callback execution does not constrain subsequent merge decisions.
+
+A transaction reads the component's stored value first, so on a component that
+nothing has written yet it throws `MissingValueException` before the callback
+runs. An ordinary edit creates the record; transactions follow.
 
 Transaction callbacks operate only on their private view and must be safe to
 retry. External effects happen after commit. Decisions spanning several paths
@@ -347,14 +399,39 @@ belong in a transaction at their common ancestor. Separate component calls and
 separate publications are not one transaction. Local commit does not promise
 replication or durability.
 
+A component normally leaves its children alone, at sync and in transactions. A
+child over a live path writes straight into its parent, and a child with a fork
+of its own is synced by whoever owns that fork. A component may instead manage
+children in forks of their own, by overriding `syncChildren()`. Sync calls it
+before reconciling, and a transaction calls it on its view before the draft
+commits, so a transaction on a child is isolated to that child and a transaction
+on the parent spans its children. A region container does this for its regions.
+
 A transaction can return a result computed on its private view (`transact`), such
 as the identifier it allocated; `execute` returns nothing. The result comes from
-the run that committed, so it describes that change exactly. It is a local fact,
-not a statement about what replicas will hold after merging. An operation that
+the execution whose transaction value was used for the successful commit.
+Reconciliation does not recompute that result: it records what the execution
+produced, without promising that its changes survive a merge at commit or later updates.
+For example, an allocation result identifies what the execution allocated even
+if a merge subsequently selects a conflicting version. An operation that
 must not repeat uses the component's `exclusive()` form, whose callback runs once
-while holding its root's write lock. That lock covers a staged component's working
-copy, or every writer of a live host, so keep such callbacks short. A plain root
-has no lock; a fork always has one.
+while holding the claim of its nearest transactional boundary: a `BoundaryCursor`
+its storage is built over, such as a region of a region container, or else the
+root, which is a staged component's working copy or the live host. Writes through
+that boundary wait, so keep such callbacks short.
+
+A change to a staged copy can commit together with other changes at its destination.
+Take the copy's claim first, through its `exclusive()` form, then the claim of each
+region the destination lies in, innermost first, then run an exclusive transaction
+on the component holding the destination. In that callback, change the
+draft, transact on the copy itself rather than through the draft of its exclusive
+form, and sync it. The sync lands at once and the commit reconciles it with the
+draft. It is not undone if the callback then fails, so make it the last step. If
+that component is bound to a private copy of the host root, the host sees nothing
+until that component publishes, and its publication carries both changes. Claims
+taken in another order, or a region claim left out, can deadlock with another
+thread syncing the copy or transacting on that region; see
+[claims](LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
 
 Even a single local edit must atomically transform the latest enclosing value.
 Two live views editing different fields of one register should preserve both
@@ -405,8 +482,9 @@ merging does not re-stamp them. Resolve authority data outside atomic operations
 so verification uses locally available information. Updating that information
 affects later checks, without retroactively deleting previously accepted state.
 
-One logical write uses its chosen timestamp through atomic retries. Reusing a
-timestamp creates a tie rather than an implicit increment. This keeps time
+An operation that chooses its own timestamp keeps it through atomic retries,
+while a `StampedCursor` reads its clock on each attempt. Reusing a timestamp
+creates a tie rather than an implicit increment. This keeps time
 policy explicit and reproducible; applications needing ordered delete and
 recreate operations must supply timestamps that express that order.
 
@@ -430,13 +508,19 @@ barrier. It excludes private application drafts and writes arriving after that
 snapshot. A failed barrier does not roll back publication already performed.
 
 A component with working state of its own, given a persistence function when
-built, persists it with `persist()`. An application holding a private copy of the
-root is built as `super(host.cursor().fork(), host::persist)`. Its cells go to the
-store and need not stay in memory, but nothing is published, signed or retained as
-the root, so it survives a restart only once synced and checkpointed. The component
-never holds a store: it persists through the function it was built with. A component without one refuses,
-since its state is its parent's. Which components persist, and when, is the
-application's policy.
+built, persists it at each `sync()`, straight after publishing, and on demand with
+`persist()`. An application holding a private copy of the root is built as
+`super(host.cursor().fork(), host::persist)`. Persisting puts its cells in the store
+and switches the copy to them, so they can leave memory. On its own it publishes,
+signs and retains nothing as the root, so the copy survives a restart only once
+synced and checkpointed. A host save does not do this for the copy: without a
+persistence function, a copy keeps in memory what has been written to it, however
+much of that the host has saved
+([cursor persistence](LATTICE_CURSOR_DESIGN.md#persistence)). The component
+never holds a store: it persists through the function it was built with. A component without one refuses `persist()`,
+since its state is its parent's. Which components are given one is the
+application's policy; a long-lived working copy needs one, so that its memory follows
+what it is working on.
 
 State that is not meant to be shared externally, such as configuration or what
 a node has seen of others, lives in the owner's slot in `:local`, one record per
@@ -669,6 +753,8 @@ These executable assemblies and tests exercise the design boundaries.
 | Signed user records, local edits and private drafts | [FavouritesExample](../src/test/java/convex/lattice/app/FavouritesExample.java) |
 | Atomic edits versus mergeable drafts | [FavouritesTransactionTest](../src/test/java/convex/lattice/app/FavouritesTransactionTest.java) and [TaskBoardApplicationTest](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java) |
 | Shared regions and independent publication | [SharedRegionsTest](../src/test/java/convex/lattice/app/SharedRegionsTest.java) |
+| An application in its `:app` region, making its parts when needed, with transactions over them | [ShopExample](../src/test/java/convex/lattice/app/ShopExample.java) and [ShopApplicationTest](../src/test/java/convex/lattice/app/ShopApplicationTest.java) |
+| A file and application state committed in one transaction across `:fs` and `:app` | [FileCountTest](../../convex-integration/src/test/java/convex/lattice/FileCountTest.java) |
 | DID ownership and several authorised keys | [OwnedScoresApplicationTest](../src/test/java/convex/lattice/app/OwnedScoresApplicationTest.java) |
 | Saving, reopening, batched durability and private host storage | [FavouritesLifecycleTest](../src/test/java/convex/lattice/app/FavouritesLifecycleTest.java) |
 | Replication and staged receipt | [ReadingListApplicationTest](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java) |

@@ -1,25 +1,30 @@
 package convex.db.jdbc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -39,9 +44,35 @@ import convex.node.NodeServer;
  */
 public class ConvexDriverTest {
 
+	private final Set<String> ownedInstances=new HashSet<>();
+
 	@AfterEach
 	public void tearDown() {
-		ConvexDriver.closeAll();
+		List<Executable> cleanup=new ArrayList<>();
+		for (String key:ownedInstances) cleanup.add(() -> {
+			var instance=ConvexDriver.instances.remove(key);
+			if (instance!=null) instance.close();
+		});
+		assertAll("Close this test's managed databases",cleanup);
+	}
+
+	private Connection connect(String url) throws SQLException {
+		return connect(url,new Properties());
+	}
+
+	private Connection connect(String url,Properties properties) throws SQLException {
+		Connection connection=DriverManager.getConnection(url,properties);
+		var parsed=new ConvexDriver().parseURL(url,properties);
+		if (parsed.mode==ConvexDriver.ParsedURL.Mode.MEM) {
+			ownedInstances.add("mem:"+parsed.identifier);
+		} else if (parsed.mode==ConvexDriver.ParsedURL.Mode.FILE) {
+			File file=new File(parsed.identifier);
+			String path;
+			try { path=file.getCanonicalPath(); }
+			catch (IOException e) { path=file.getAbsolutePath(); }
+			ownedInstances.add("file:"+path);
+		}
+		return connection;
 	}
 
 	// ========== URL Parsing ==========
@@ -110,7 +141,7 @@ public class ConvexDriverTest {
 	public void testUrlRefusesOtherParameters() {
 		for (String param : new String[] {"schemaFactory=" + CANARY, "parserFactory=" + CANARY,
 				"model=" + CANARY, "lex=JAVA", "database", "caseSensitive=maybe"}) {
-			assertThrows(SQLException.class, () -> DriverManager.getConnection("jdbc:convex:params_test;" + param), param);
+			assertThrows(SQLException.class, () -> connect("jdbc:convex:params_test;" + param), param);
 		}
 		assertFalse(CANARY_LOADED.get());
 	}
@@ -122,7 +153,7 @@ public class ConvexDriverTest {
 		props.setProperty("schemaFactory", CANARY);
 		props.setProperty("parserFactory", "org.apache.calcite.sql.parser.impl.SqlParserImpl#FACTORY");
 		props.setProperty("database", "props_db");
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:mem:props_test", props);
+		try (Connection conn = connect("jdbc:convex:mem:props_test", props);
 				Statement stmt = conn.createStatement()) {
 			assertEquals("props_db", conn.getSchema());
 			// Parsed by the driver's own DDL parser, not the one the properties named
@@ -137,13 +168,13 @@ public class ConvexDriverTest {
 	 */
 	@Test
 	public void testIdentifiersFollowTheDatabase() throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:case_test");
+		try (Connection conn = connect("jdbc:convex:case_test");
 				Statement stmt = conn.createStatement()) {
 			stmt.executeUpdate("CREATE TABLE t (id INTEGER)");
 			assertFalse(stmt.executeQuery("SELECT * FROM \"T\"").next());
 			assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT * FROM \"t\""));
 		}
-		assertThrows(SQLException.class, () -> DriverManager.getConnection("jdbc:convex:case_test;caseSensitive=false"));
+		assertThrows(SQLException.class, () -> connect("jdbc:convex:case_test;caseSensitive=false"));
 	}
 
 	/**
@@ -152,7 +183,7 @@ public class ConvexDriverTest {
 	 */
 	@Test
 	public void testSqlCannotNameClasses() throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:ddl_test");
+		try (Connection conn = connect("jdbc:convex:ddl_test");
 				Statement stmt = conn.createStatement()) {
 			stmt.executeUpdate("CREATE TABLE t (id INTEGER)");
 			for (String sql : new String[] {"CREATE FUNCTION f AS '" + CANARY + "'",
@@ -170,7 +201,7 @@ public class ConvexDriverTest {
 
 	@Test
 	public void testMemConnection() throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:mem:driver_test")) {
+		try (Connection conn = connect("jdbc:convex:mem:driver_test")) {
 			assertNotNull(conn);
 			try (Statement stmt = conn.createStatement()) {
 				stmt.executeUpdate("CREATE TABLE t (id INTEGER, name VARCHAR)");
@@ -184,7 +215,7 @@ public class ConvexDriverTest {
 
 	@Test
 	public void testMemShorthandConnection() throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:shorthand_test")) {
+		try (Connection conn = connect("jdbc:convex:shorthand_test")) {
 			assertNotNull(conn);
 			try (Statement stmt = conn.createStatement()) {
 				stmt.executeUpdate("CREATE TABLE t (id INTEGER, val VARCHAR)");
@@ -199,7 +230,7 @@ public class ConvexDriverTest {
 	@Test
 	public void testMemSharedAcrossConnections() throws Exception {
 		// First connection creates table and inserts
-		try (Connection conn1 = DriverManager.getConnection("jdbc:convex:mem:shared_test")) {
+		try (Connection conn1 = connect("jdbc:convex:mem:shared_test")) {
 			try (Statement stmt = conn1.createStatement()) {
 				stmt.executeUpdate("CREATE TABLE t (id INTEGER, name VARCHAR)");
 				stmt.executeUpdate("INSERT INTO t VALUES (1, 'Alice')");
@@ -207,7 +238,7 @@ public class ConvexDriverTest {
 		}
 
 		// Second connection to same name sees the data
-		try (Connection conn2 = DriverManager.getConnection("jdbc:convex:mem:shared_test")) {
+		try (Connection conn2 = connect("jdbc:convex:mem:shared_test")) {
 			try (Statement stmt = conn2.createStatement()) {
 				ResultSet rs = stmt.executeQuery("SELECT name FROM t WHERE id = 1");
 				assertTrue(rs.next());
@@ -255,16 +286,16 @@ public class ConvexDriverTest {
 		assertTrue(queryStrings(url,"SELECT k FROM s").isEmpty());
 	}
 
-	private static int executeUpdate(String url, String sql) throws Exception {
-		try (Connection connection=DriverManager.getConnection(url);
+	private int executeUpdate(String url, String sql) throws Exception {
+		try (Connection connection=connect(url);
 				Statement statement=connection.createStatement()) {
 			return statement.executeUpdate(sql);
 		}
 	}
 
-	private static List<String> queryStrings(String url, String sql) throws Exception {
+	private List<String> queryStrings(String url, String sql) throws Exception {
 		ArrayList<String> result=new ArrayList<>();
-		try (Connection connection=DriverManager.getConnection(url);
+		try (Connection connection=connect(url);
 				Statement statement=connection.createStatement();
 				ResultSet rs=statement.executeQuery(sql)) {
 			while (rs.next()) result.add(rs.getString(1));
@@ -282,7 +313,7 @@ public class ConvexDriverTest {
 
 		String url = "jdbc:convex:file:" + tempFile.getAbsolutePath().replace('\\', '/');
 
-		try (Connection conn = DriverManager.getConnection(url)) {
+		try (Connection conn = connect(url)) {
 			assertNotNull(conn);
 			try (Statement stmt = conn.createStatement()) {
 				stmt.executeUpdate("CREATE TABLE t (id INTEGER, name VARCHAR)");
@@ -300,8 +331,8 @@ public class ConvexDriverTest {
 		assertEquals(inst.server.getHost().cursor().get(), inst.store.getRootData());
 
 		// Data survives closing and reopening the store
-		ConvexDriver.closeAll();
-		try (Connection conn = DriverManager.getConnection(url);
+		ConvexDriver.instances.remove("file:"+tempFile.getCanonicalPath()).close();
+		try (Connection conn = connect(url);
 				Statement stmt = conn.createStatement()) {
 			ResultSet rs = stmt.executeQuery("SELECT name FROM t WHERE id = 1");
 			assertTrue(rs.next());
@@ -317,17 +348,17 @@ public class ConvexDriverTest {
 		tempFile.deleteOnExit();
 		// A root stored without the cell it refers to: the store opens and locks its
 		// file, then the node cannot save the root it starts from
-		EtchStore broken = EtchStore.create(tempFile);
-		AVector<ACell> root = Vectors.of(Blobs.createRandom(new Random(1), 1000));
-		broken.storeTopRef(root.getRef(), Ref.STORED, null);
-		broken.getEtch().setRootHash(root.getHash());
-		broken.close();
+		try (EtchStore broken = EtchStore.create(tempFile)) {
+			AVector<ACell> root = Vectors.of(Blobs.createRandom(new Random(1), 1000));
+			broken.storeTopRef(root.getRef(), Ref.STORED, null);
+			broken.getEtch().setRootHash(root.getHash());
+		}
 		String url = "jdbc:convex:file:" + tempFile.getAbsolutePath().replace('\\', '/');
 
-		SQLException first = assertThrows(SQLException.class, () -> DriverManager.getConnection(url));
+		SQLException first = assertThrows(SQLException.class, () -> connect(url));
 		assertTrue(first.getCause() instanceof MissingDataException, String.valueOf(first.getCause()));
 		// Refused the same way again, not by the lock the first attempt left behind
-		SQLException second = assertThrows(SQLException.class, () -> DriverManager.getConnection(url));
+		SQLException second = assertThrows(SQLException.class, () -> connect(url));
 		assertTrue(second.getCause() instanceof MissingDataException, String.valueOf(second.getCause()));
 		assertFalse(ConvexDriver.instances.containsKey("file:" + tempFile.getCanonicalPath()));
 
@@ -342,7 +373,7 @@ public class ConvexDriverTest {
 		tempFile.deleteOnExit();
 		String url = "jdbc:convex:file:" + tempFile.getAbsolutePath().replace('\\', '/');
 
-		try (Connection conn = DriverManager.getConnection(url)) {
+		try (Connection conn = connect(url)) {
 			try (Statement stmt = conn.createStatement()) {
 				stmt.executeUpdate("CREATE TABLE t (id INTEGER, name VARCHAR)");
 			}
@@ -356,6 +387,47 @@ public class ConvexDriverTest {
 			ConvexDriver.ManagedInstance inst = ConvexDriver.instances.get("file:" + tempFile.getCanonicalPath());
 			assertEquals(inst.server.getHost().cursor().get(), inst.store.getRootData());
 		}
+	}
+
+	@Test
+	public void readOnlyCommitAndCloseDoNotCheckpointOtherWriters() throws Exception {
+		File file = File.createTempFile("convex-read-only", ".etch");
+		file.deleteOnExit();
+		String url = "jdbc:convex:file:" + file.getAbsolutePath().replace('\\', '/');
+		try (Connection writer = connect(url); Statement write = writer.createStatement()) {
+			write.execute("CREATE TABLE t (id INTEGER)");
+			writer.commit();
+			var instance = ConvexDriver.instances.get("file:" + file.getCanonicalPath());
+			var saved = instance.store.getRootData();
+			write.execute("INSERT INTO t VALUES (1)");
+			try (Connection reader = connect(url); Statement read = reader.createStatement()) {
+				reader.setReadOnly(true);
+				reader.setAutoCommit(false);
+				try (ResultSet rows = read.executeQuery("SELECT COUNT(*) FROM t")) {
+					assertTrue(rows.next()); assertEquals(1, rows.getLong(1));
+				}
+				reader.commit();
+				reader.setAutoCommit(true);
+				assertEquals(saved, instance.store.getRootData());
+			}
+			assertEquals(saved, instance.store.getRootData());
+			writer.commit();
+			assertFalse(saved.equals(instance.store.getRootData()));
+		}
+	}
+
+	@Test
+	public void switchingToReadOnlyKeepsEarlierWritesDurableOnClose() throws Exception {
+		File file = File.createTempFile("convex-read-only-save", ".etch");
+		file.deleteOnExit();
+		String url = "jdbc:convex:file:" + file.getAbsolutePath().replace('\\', '/');
+		try (Connection c = connect(url); Statement s = c.createStatement()) {
+			s.execute("CREATE TABLE t (id INTEGER)");
+			s.execute("INSERT INTO t VALUES (1)");
+			c.setReadOnly(true);
+		}
+		var instance = ConvexDriver.instances.get("file:" + file.getCanonicalPath());
+		assertEquals(instance.cdb.cursor().get(), instance.store.getRootData());
 	}
 
 	// ========== Direct API ==========
@@ -382,7 +454,7 @@ public class ConvexDriverTest {
 	/** A direct connection leaves the driver's in-memory database of the same name in place (#789). */
 	@Test
 	public void testDirectConnectionLeavesDriverDatabase() throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:direct_shared");
+		try (Connection conn = connect("jdbc:convex:direct_shared");
 				Statement stmt = conn.createStatement()) {
 			stmt.executeUpdate("CREATE TABLE driver_t (id INTEGER)");
 		}
@@ -392,7 +464,7 @@ public class ConvexDriverTest {
 		try (Connection conn = cdb.getConnection("direct_shared")) {
 			assertEquals(List.of("APP_T"), tableNames(conn));
 		}
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:direct_shared")) {
+		try (Connection conn = connect("jdbc:convex:direct_shared")) {
 			assertEquals(List.of("DRIVER_T"), tableNames(conn), "the URL still reaches the driver's database");
 		}
 	}
@@ -422,7 +494,7 @@ public class ConvexDriverTest {
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR});
 		cdb.register("legacy_test");
 
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=legacy_test")) {
+		try (Connection conn = connect("jdbc:convex:database=legacy_test")) {
 			assertNotNull(conn);
 			try (Statement stmt = conn.createStatement()) {
 				stmt.executeUpdate("INSERT INTO t VALUES (1, 'Legacy')");

@@ -1,5 +1,6 @@
 package convex.cli.peer;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,7 +14,7 @@ import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.beust.jcommander.Strings;
@@ -42,10 +45,9 @@ import convex.core.crypto.SLIP10;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.util.Utils;
-import convex.peer.ConfigException;
-import convex.peer.LaunchException;
 
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class LocalTest {
 	@TempDir
 	static Path processTempDirectory;
@@ -79,9 +81,10 @@ public class LocalTest {
 	}
 
 	static Process process = null;
+	static Thread checker;
 
 	@BeforeAll
-	public static void setupLocalNet() throws IOException, InterruptedException {
+	public static void setupLocalNet() throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		CLTester importTester = CLTester.run("key", "import", 
 				"--type", "bip39", 
 				"--storepass", new String(KEYSTORE_PASSWORD), 
@@ -128,29 +131,27 @@ public class LocalTest {
 		ProcessBuilder builder = new ProcessBuilder(cmd);
 		process = builder.start();
 
-		ArrayList<String> outputList=new ArrayList<>();
-		
-		// We need to wait until the peer started message is seen
-		Thread checker = new Thread(() -> {
+		CompletableFuture<List<String>> started=new CompletableFuture<>();
+		checker = new Thread(() -> {
+			ArrayList<String> lines=new ArrayList<>();
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-				try (Scanner s = new Scanner(reader)) {
-					while (true) {
-						String output = s.nextLine();
-						outputList.add(output);
-						// System.err.println(output);
-						if (output.contains("Started: 1")) break;
+				String line;
+				while ((line=reader.readLine())!=null) {
+					if (!started.isDone()) {
+						lines.add(line);
+						if (line.contains("Started: 1")) started.complete(List.copyOf(lines));
 					}
+					// Keep draining stderr after startup so the child cannot block on a full pipe.
 				}
-			} catch (Exception e) {
+				started.completeExceptionally(new IOException("Local network exited before startup: "+lines));
+			} catch (Throwable e) {
+				started.completeExceptionally(e);
 			}
-			return;
-		});
+		},"local-peer-startup");
 		checker.setDaemon(true);
 		checker.start();
-		checker.join(10000);
-		if (!process.isAlive()) {
-			fail("Local network did not start, with output:\n"+Strings.join("\n", outputList));
-		}
+		List<String> outputList=started.get(10,TimeUnit.SECONDS);
+		assertTrue(process.isAlive(),"Local network exited after startup");
 
 		// Parse the actual auto-assigned port from the "Peer ports:" line
 		// (printed before "Started: 1", so already collected by the checker)
@@ -179,7 +180,7 @@ public class LocalTest {
 				"--text", seed.toString(), "--passphrase", bipPassphrase,"-v0");
 		newKeyTester.assertExitCode(ExitCodes.SUCCESS);
 		
-		CLTester syncTester =  CLTester.runAsync(
+		try (CLTester syncTester = CLTester.runAsync(
 				"peer", 
 				"start",
 				"--peer-key",nkp.getAccountKey().toHexString(),
@@ -192,10 +193,11 @@ public class LocalTest {
 				"--host", "localhost",
 				"--port",Integer.toString(actualPort)
 				// no --peer-port: the syncing peer takes a random port (default 0)
-			);
-		syncTester.waitForStart(5000);
-		syncTester.interrupt();
-		syncTester.assertExitCode(ExitCodes.INTERRUPT);
+			)) {
+			syncTester.waitForStart(5000);
+			syncTester.interrupt();
+			syncTester.assertExitCode(ExitCodes.INTERRUPT);
+		}
 	}
 
 	@Test
@@ -203,36 +205,29 @@ public class LocalTest {
 		assertTrue(process.isAlive());
 
 		InetSocketAddress sa=new InetSocketAddress("localhost",actualPort);
-		Convex convex = ConvexRemote.connect(sa);
-		Result r=convex.requestStatusSync();
-		assertFalse(r.isError());
-	}
-
-	@Test
-	public void testGenesisPeer()
-			throws TimeoutException, InterruptedException, IOException, LaunchException, ConfigException {
-
-//		tester =  CLTester.run(
-//				"peer", "start", "-n",
-//              "-v2",		
-//				"--peer-key", expectedKey,
-//				"--keystore", KEYSTORE_FILENAME, 
-//				"--peer-keypass", new String(KEY_PASSWORD),
-//				"--etch", TEMP_ETCH.getCanonicalPath()
-//		);
-//		tester.assertExitCode(ExitCodes.SUCCESS);
-	}
-	
-	@AfterAll
-	public static void tearDown() {
-		process.destroy();
-		try {
-			process.waitFor(5000, TimeUnit.MILLISECONDS);
-			assertFalse(process.isAlive());
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		try (Convex convex = ConvexRemote.connect(sa)) {
+			Result r=convex.requestStatusSync();
+			assertFalse(r.isError());
 		}
 	}
 
+	@AfterAll
+	public static void tearDown() {
+		assertAll("Stop the local network and its reader",
+			() -> {
+				if (process!=null) {
+					process.destroy();
+					if (!process.waitFor(5,TimeUnit.SECONDS)) {
+						process.destroyForcibly();
+						assertTrue(process.waitFor(5,TimeUnit.SECONDS),"Local peer process did not stop");
+					}
+				}
+			},
+			() -> {
+				if (checker!=null) {
+					checker.join(5000);
+					assertFalse(checker.isAlive(),"Startup reader did not stop");
+				}
+			});
+	}
 }

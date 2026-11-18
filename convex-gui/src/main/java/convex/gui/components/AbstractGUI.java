@@ -19,6 +19,7 @@ import javax.swing.JPanel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.util.Cleanup;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.MainGUI;
@@ -286,9 +287,11 @@ public abstract class AbstractGUI extends JPanel implements Runnable, AutoClosea
 	}
 
 	private void releaseAll(List<AutoCloseable> components) {
+		// An Error releasing one resource still leaves the rest to release; it is thrown last
+		Cleanup cleanup=new Cleanup();
 		try {
 			for (AutoCloseable c: components) {
-				release(c);
+				cleanup.run(() -> release(c));
 			}
 			List<AutoCloseable> resources;
 			synchronized (owned) {
@@ -297,15 +300,17 @@ public abstract class AbstractGUI extends JPanel implements Runnable, AutoClosea
 				owned.clear();
 			}
 			for (int i=resources.size()-1; i>=0; i--) {
-				release(resources.get(i));
+				AutoCloseable resource=resources.get(i);
+				cleanup.run(() -> release(resource));
 			}
 			log.debug("GUI closed: "+Utils.getClassName(this));
 		} finally {
 			closed.complete(null);
 		}
+		cleanup.finish();
 	}
 
-	private static void release(AutoCloseable resource) {
+	private void release(AutoCloseable resource) {
 		if ((resource instanceof AbstractGUI gui) && EventQueue.isDispatchThread()) {
 			// Can't wait for a GUI to close on the EDT, so just request it
 			gui.closeGUI();
@@ -315,10 +320,19 @@ public abstract class AbstractGUI extends JPanel implements Runnable, AutoClosea
 			resource.close();
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			log.warn("Interrupted releasing {}",resource);
+			reportReleaseFailure(resource,e);
 		} catch (Exception e) {
-			log.warn("Failed to release {}",resource,e);
+			reportReleaseFailure(resource,e);
 		}
+	}
+
+	/**
+	 * Reports a resource that failed to close, without stopping other cleanup.
+	 * Overrides receive the original exception and must not throw. May run off the EDT.
+	 */
+	protected void reportReleaseFailure(AutoCloseable resource,Exception failure) {
+		if (failure instanceof InterruptedException) log.warn("Interrupted releasing {}",resource);
+		else log.warn("Failed to release {}",resource,failure);
 	}
 
 	private static void checkNotDispatchThread() {

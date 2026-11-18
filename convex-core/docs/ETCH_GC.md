@@ -69,8 +69,8 @@ that binding; `EtchStatusIntegrityTest` pins them with regression tests.
   `PERSISTED` means the whole subtree is present, `ANNOUNCED` adds a peer-level
   commitment. The write path (`EtchStore.storeRef`, via `Ref.withStatus`) records
   exactly the status the write achieved, then merges monotonically with the store's
-  own existing flags. Status carried by an incoming ref is never evidence for another
-  store.
+  own existing flags and returns a ref carrying the merged flags. Status carried by an
+  incoming ref is never evidence for another store.
 - **S3: rebinding drops status.** `RefSoft.withStore` moves no data and is store
   plumbing, not application API: it is sound only immediately after the store's own
   write, where the data is present by construction. Applications move values between
@@ -80,7 +80,11 @@ that binding; `EtchStatusIntegrityTest` pins them with regression tests.
   (`Refs.checkConsistentStores` checks this). A store never returns, attaches or
   caches a ref bound to a foreign store; `AStore.isForeign` is the guard and the
   `RefCache` checks ownership on every insertion. Caching a decoded cell never
-  adopts an attached foreign ref or its persistence claims.
+  adopts an attached foreign ref or its persistence claims. An insertion never lowers
+  the status cached for its hash. A cached decoded cell makes no claim about the file,
+  so `refForHash` answers with one only when the file holds no entry. A stale insertion
+  into a slot another hash has just vacated can still cache a lower status than the
+  file records.
 
 The read contract follows from S1: `null` is proven absence, `MissingDataException`
 means the store looked and the value is not there, and unchecked `StoreException`
@@ -370,7 +374,11 @@ holds the last committed root.
 `completeGC()` syncs the target before writing the tombstone and marker, so a
 cycle with no writes after cutover is clean at every crash point from then on.
 A refused open changes nothing on disk; the operator then deliberately selects the
-maintenance and repair workflow described in [ETCHv3.md](ETCHv3.md). V1 and v2
+maintenance and repair workflow described in [ETCHv3.md](ETCHv3.md). Maintenance
+takes the same store filename as a normal open: `EtchUtils.currentStoreFile`
+resolves it without changing anything on disk, so validation and repair read the
+marker-named file of a completed cutover, whether adoption is pending or was
+refused, and never the superseded original. Adoption stays with recovery. V1 and v2
 files have no clean-close state and keep the best-effort rollback behaviour above.
 
 If recovery cannot identify an existing live store, it fails before changing the

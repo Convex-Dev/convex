@@ -106,18 +106,21 @@ public class ContactRecordsTest {
 	}
 
 	@Test void applicationSyncSignsOnceAndTheRecordsSurviveARestart() throws Exception {
-		var store=new MemoryStore();
-		var host=LatticeHost.create(store);
-		var application=alice(host);
-		application.contacts().contacted(BOB,Strings.create("tcp://bob.example:18888"));
-		application.contacts().failed(CAROL);
-		application.syncHost();
-		assertEquals(1,signatures.get(),"the :local slot is signed once per sync");
-		assertNotNull(host.cursor().get(LocalLattice.KEY_LOCAL,ALICE.getAccountKey()));
+		try (var store=new MemoryStore();
+				var host=LatticeHost.create(store)) {
+			var application=alice(host);
+			application.contacts().contacted(BOB,Strings.create("tcp://bob.example:18888"));
+			application.contacts().failed(CAROL);
+			application.syncHost();
+			assertEquals(1,signatures.get(),"the :local slot is signed once per sync");
+			assertNotNull(host.cursor().get(LocalLattice.KEY_LOCAL,ALICE.getAccountKey()));
 
-		var restarted=alice(LatticeHost.open(store)).contacts();
-		assertEquals(application.contacts().get(BOB),restarted.get(BOB));
-		assertEquals(application.contacts().get(CAROL),restarted.get(CAROL));
+			try (var restartedHost=LatticeHost.open(store)) {
+				var restarted=alice(restartedHost).contacts();
+				assertEquals(application.contacts().get(BOB),restarted.get(BOB));
+				assertEquals(application.contacts().get(CAROL),restarted.get(CAROL));
+			}
+		}
 	}
 
 	@Test void aNodeWithoutAKeyKeepsNoContactRecords() {
@@ -133,21 +136,21 @@ public class ContactRecordsTest {
 		try (EtchStore hubStore=EtchStore.createTemp("contacts-hub");
 				EtchStore leafStore=EtchStore.createTemp("contacts-leaf")) {
 			P2PNode hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),hubKey).serveAllInbound();
-			P2PNode leaf=P2PNode.create(leafStore,NodeConfig.port(-1),leafKey);
-			try {
-				hub.launch();
-				leaf.launch();
-				leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);
-				hub.whenInboundConnectionUpgraded(leafKey.getAccountKey()).get(5,TimeUnit.SECONDS);
-				var hubContact=leaf.getApplication().contacts().get(hubKey.getAccountKey());
-				var leafContact=hub.getApplication().contacts().get(leafKey.getAccountKey());
-				assertNotNull(leafContact);
-				assertEquals(Strings.create(Transports.endpoint(hub.getHostAddress()).toString()),
-					ContactRecords.address(hubContact),"the leaf dialled the hub and found its key there");
-				assertNull(ContactRecords.address(leafContact),"the hub was dialled, so knows no address for the leaf");
-			} finally {
-				leaf.close();
-				hub.close();
+			// Each header closes in reverse: the node, then the host it opened
+			try (var hubHost=hub.getNodeServer().getHost(); hub) {
+				P2PNode leaf=P2PNode.create(leafStore,NodeConfig.port(-1),leafKey);
+				try (var leafHost=leaf.getNodeServer().getHost(); leaf) {
+					hub.launch();
+					leaf.launch();
+					leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);
+					hub.whenInboundConnectionUpgraded(leafKey.getAccountKey()).get(5,TimeUnit.SECONDS);
+					var hubContact=leaf.getApplication().contacts().get(hubKey.getAccountKey());
+					var leafContact=hub.getApplication().contacts().get(leafKey.getAccountKey());
+					assertNotNull(leafContact);
+					assertEquals(Strings.create(Transports.endpoint(hub.getHostAddress()).toString()),
+						ContactRecords.address(hubContact),"the leaf dialled the hub and found its key there");
+					assertNull(ContactRecords.address(leafContact),"the hub was dialled, so knows no address for the leaf");
+				}
 			}
 		}
 	}

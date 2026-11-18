@@ -20,6 +20,7 @@ import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
+import convex.core.util.Cleanup;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -211,17 +212,26 @@ public class Etch {
 	/** Test-only construction around a deterministic mapper. */
 	Etch(AFileMapper mapper, String fileName, EtchFileCipher dataCipher,
 			EtchFileCipher indexCipher) {
+		this(mapper, fileName, null, dataCipher, indexCipher, false);
+	}
+
+	/**
+	 * Test-only construction around a deterministic mapper and an optional header
+	 * that the caller initialises. Without a header the index starts at byte 0.
+	 */
+	Etch(AFileMapper mapper, String fileName, AEtchHeader header, EtchFileCipher dataCipher,
+			EtchFileCipher indexCipher, boolean buildChains) {
 		this.file = null;
 		this.fileName = fileName;
 		this.data = null;
 		this.config = null;
-		this.header = null;
-		this.version = 0;
-		this.indexStart = 0L;
+		this.header = header;
+		this.version = (header == null) ? 0 : header.version();
+		this.indexStart = (header == null) ? 0L : header.indexStart();
 		this.mapper = mapper;
 		this.dataCipher = dataCipher;
 		this.indexCipher = indexCipher;
-		this.buildChains = false;
+		this.buildChains = buildChains;
 		this.shutdownHook = null;
 	}
 
@@ -383,14 +393,18 @@ public class Etch {
 	 *
 	 * @param key   A key value (typically the Hash)
 	 * @param value Value data to associate with the key
-	 * @return Ref after writing to store
+	 * @return Ref carrying the flags the store records for the key after the write
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized <T extends ACell> Ref<T> write(AArrayBlob key, Ref<T> value) throws IOException {
-		prepareMutation();
 		return write(key, 0, value, indexStart);
 	}
 
+	// Publishes the v3 OPEN marker before the first change after a clean checkpoint.
+	// Every helper that changes file bytes calls this just before its change, and the
+	// root setter calls it when the root differs, so a write or root store that changes
+	// nothing leaves a clean checkpoint clean and a kill then needs no repair. A failed
+	// transition throws before any byte has changed.
 	private void prepareMutation() throws IOException {
 		if (!requiresOpenTransition)
 			return;
@@ -437,6 +451,10 @@ public class Etch {
 				// Complete the new record before exposing any index transition.
 				long newDataPointer = appendData(key, ref);
 
+				// A continuation slot after the empty one is stale: clear it so the
+				// new chain cannot absorb it.
+				clearStaleChain(indexPosition, (nextDigit + 1) & mask, mask);
+
 				// Publish a valid one-entry chain, then its continuation. A reader
 				// may observe either the old plain slot, the one-entry chain or the
 				// completed two-entry chain, all of which are structurally valid.
@@ -471,8 +489,11 @@ public class Etch {
 				int ix = (digit + i) & mask;
 				slotValue = readSlot(indexPosition, ix);
 
-				// If we reach an empty location, write a chain continuation.
+				// If we reach an empty location, write a chain continuation. A
+				// continuation slot after it is stale: clear it so the chain cannot
+				// absorb it.
 				if (slotValue == 0L) {
+					clearStaleChain(indexPosition, (ix + 1) & mask, mask);
 					return writeNewData(indexPosition, ix, key, ref, POINTER_CHAIN);
 				}
 
@@ -509,23 +530,33 @@ public class Etch {
 			}
 
 			// publish the complete new index block BEFORE clearing the old chain:
-			// lock-free readers then see either the intact chain or the new block
+			// lock-free readers then see either the intact chain or the new block.
+			// Cut off part-way, the uncleared rest is a stale run (see below).
 			writeSlot(indexPosition, digit, newIndexPos | POINTER_INDEX);
 			for (int j = 1; j < i; j++) {
 				writeSlot(indexPosition, (digit + j) & mask, 0L); // clear the old chain
 			}
 			return ref;
 		} else if (type == POINTER_CHAIN) {
-			// need to collapse existing chain
+			// Walk back over continuation slots to the start of this chain.
 			int chainStartDigit = (digit - 1) & mask;
-			while (chainStartDigit != digit) {
-				long candidate = readSlot(indexPosition, chainStartDigit);
-				if (slotType(candidate) == POINTER_START)
-					break;
+			long startSlot = readSlot(indexPosition, chainStartDigit);
+			while (slotType(startSlot) == POINTER_CHAIN) {
 				chainStartDigit = (chainStartDigit - 1) & mask;
+				if (chainStartDigit == digit)
+					throw new Error("Infinite chain?");
+				startSlot = readSlot(indexPosition, chainStartDigit);
 			}
-			if (chainStartDigit == digit)
-				throw new Error("Infinite chain?");
+			if (slotType(startSlot) != POINTER_START) {
+				// A stale run: continuation slots with no start before them. A
+				// collapse publishes its child index before clearing the old chain,
+				// so one cut off part-way leaves the rest of the chain behind, and
+				// every entry in it is already in that child. Readers never follow
+				// a stale run, and writers never extend a chain into one, so it is
+				// safe to clear it and use the slot.
+				clearStaleChain(indexPosition, (chainStartDigit + 1) & mask, mask);
+				return writeNewData(indexPosition, digit, key, ref, POINTER_PLAIN);
+			}
 
 			int chainEndDigit = (digit + 1) & mask;
 			while (chainEndDigit != digit) {
@@ -548,7 +579,8 @@ public class Etch {
 			}
 
 			// publish the complete new index block BEFORE clearing the old chain:
-			// lock-free readers then see either the intact chain or the new block
+			// lock-free readers then see either the intact chain or the new block.
+			// Cut off part-way, the uncleared rest is a stale run.
 			writeSlot(indexPosition, chainStartDigit, newIndexPos | POINTER_INDEX);
 			for (int j = 1; j < n; j++) {
 				writeSlot(indexPosition, (chainStartDigit + j) & mask, 0L); // clear the old chain
@@ -558,6 +590,18 @@ public class Etch {
 			return writeNewData(indexPosition, digit, key, ref, POINTER_PLAIN);
 		} else {
 			throw new Error("Unexpected type: " + type);
+		}
+	}
+
+	/**
+	 * Clears the continuation slots from a digit up to the first slot that is not
+	 * one. The caller guarantees such a slot exists.
+	 */
+	private void clearStaleChain(long indexPosition, int digit, int mask) throws IOException {
+		// Clearing from the front keeps any remainder stale if this is cut off too.
+		while (slotType(readSlot(indexPosition, digit)) == POINTER_CHAIN) {
+			writeSlot(indexPosition, digit, 0L);
+			digit = (digit + 1) & mask;
 		}
 	}
 
@@ -653,30 +697,16 @@ public class Etch {
 			Runnable hook=shutdownHook;
 			shutdownHook=null;
 			if (hook!=null) Shutdown.removeHook(Shutdown.ETCH,hook);
+			// Every step runs, so an Error finalising the header still releases the file and its lock
+			Cleanup cleanup=new Cleanup();
+			if (header != null) cleanup.run(() -> header.close(this));
+			cleanup.run(mapper::close);
+			if (data != null) cleanup.run(data::close);
+			cleanup.run(() -> destroyCiphers(dataCipher,indexCipher));
 			try {
-				Exception failure = null;
-				try {
-					if (header != null)
-						header.close(this);
-				} catch (Exception e) {
-					failure = e;
-				}
-				try {
-					mapper.close();
-				} catch (Exception e) {
-					failure = combineCloseFailure(failure, e);
-				}
-				try {
-					if (data != null)
-						data.close();
-				} catch (Exception e) {
-					failure = combineCloseFailure(failure, e);
-				}
-				if (failure != null) {
-					throw new IOException("Etch close failed: " + fileName, failure);
-				}
-			} finally {
-				destroyCiphers(dataCipher,indexCipher);
+				cleanup.finish(Exception.class);
+			} catch (Exception e) {
+				throw new IOException("Etch close failed: " + fileName, e);
 			}
 		}
 	}
@@ -685,13 +715,6 @@ public class Etch {
 			EtchFileCipher indexCipher) {
 		if (dataCipher!=null) dataCipher.destroy();
 		if ((indexCipher!=null)&&(indexCipher!=dataCipher)) indexCipher.destroy();
-	}
-
-	private static Exception combineCloseFailure(Exception first, Exception next) {
-		if (first == null)
-			return next;
-		first.addSuppressed(next);
-		return first;
 	}
 
 	/**
@@ -808,6 +831,7 @@ public class Etch {
 
 		int ix = POINTER_SIZE * digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix, dataPointer); // single node
+		prepareMutation();
 		return mapper.append(temp, 0, indexBlockLength, POINTER_SIZE, indexCipher);
 	}
 
@@ -939,10 +963,11 @@ public class Etch {
 	 */
 	public synchronized void flush() throws IOException {
 		header.writeDataLength(this);
-		header.sync(this);
-		// A successful v3 sync publishes a clean checkpoint. The next mutation
+		// A v3 sync publishes a clean checkpoint, and one that fails after writing
+		// its header copy may still have published it. Either way the next mutation
 		// must first publish OPEN, even when this Etch instance created the file.
 		requiresOpenTransition = header instanceof EtchV3Header;
+		header.sync(this);
 	}
 
 	/**
@@ -978,11 +1003,11 @@ public class Etch {
 
 	/**
 	 * Updates a Ref in place at the specified position. Assumes data not changed.
-	 * 
+	 *
 	 * @param position Slot value containing position in storage file
-	 * @param ref
-	 * @return
-	 * @throws IOException
+	 * @param ref Ref whose flags are merged into the entry's
+	 * @return Ref carrying the flags the entry records after the merge
+	 * @throws IOException In case of IO error
 	 */
 	private <T extends ACell> Ref<T> updateInPlace(long position, Ref<T> ref) throws IOException {
 		// ensure we have a raw position
@@ -998,8 +1023,9 @@ public class Etch {
 
 		long currentSize = Utils.readLong(label, Byte.BYTES, Long.BYTES);
 
+		// Nothing to write, but the caller's flags may claim less than the entry records
 		if (currentFlags == newFlags)
-			return ref;
+			return (ref.getFlags() == newFlags) ? ref : ref.withFlags(newFlags);
 
 		// We have a status change, need to increase status of store
 		label[0] = (byte) newFlags;
@@ -1008,6 +1034,7 @@ public class Etch {
 		if ((currentSize == 0L) && ((newFlags & Ref.STATUS_MASK) >= Ref.PERSISTED)) {
 			Utils.writeLong(label, Byte.BYTES, ref.getValue().getMemorySize());
 		}
+		prepareMutation();
 		mapper.write(labelPosition, label, 0, LABEL_SIZE, dataCipher);
 
 		return ref.withFlags(newFlags); // reflect merged flags
@@ -1023,6 +1050,7 @@ public class Etch {
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position = indexPosition + digit * POINTER_SIZE;
+		prepareMutation();
 		mapper.writeLongRelease(position, slotValue, indexCipher);
 	}
 
@@ -1151,6 +1179,7 @@ public class Etch {
 
 		// The v1 root deliberately starts at byte 44; all child indexes are aligned.
 		int alignment = (level == 0) ? 1 : POINTER_SIZE;
+		prepareMutation();
 		return mapper.appendZeros(sizeBytes, alignment, indexCipher);
 	}
 
@@ -1190,6 +1219,7 @@ public class Etch {
 		Utils.writeLong(recordHeader, Byte.BYTES, memorySize);
 		Utils.writeShort(recordHeader, LABEL_SIZE, length);
 
+		prepareMutation();
 		return mapper.append(key, recordHeader, LABEL_SIZE + ENCODING_LENGTH_SIZE, encoding, dataCipher);
 	}
 
@@ -1206,12 +1236,14 @@ public class Etch {
 	}
 
 	/**
-	 * Writes the root data hash to the Store
-	 * 
+	 * Writes the root data hash to the Store. Writing the hash already recorded
+	 * changes nothing: a clean checkpoint stays clean.
+	 *
 	 * @param h Hash value to write
 	 * @throws IOException If IO Error occurs
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
+		if (h.equals(header.getRootHash())) return;
 		prepareMutation();
 		header.setRootHash(this, h);
 	}

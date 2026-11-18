@@ -22,7 +22,7 @@ import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.Root;
-import convex.lattice.LatticeOps;
+import convex.lattice.LatticeComponent;
 
 /** JSON navigation requires explicit component construction and an enclosing merge. */
 public class JSONLatticeTest {
@@ -89,7 +89,7 @@ public class JSONLatticeTest {
 
 	@Test public void testNullLatticeStillThrows() {
 		assertThrows(IllegalStateException.class,
-			() -> LatticeOps.assocIn(null, CVMLong.ONE, null, Keywords.FOO, Keywords.BAR));
+			() -> LatticeComponent.assocIn(null, CVMLong.ONE, null, Keywords.FOO, Keywords.BAR));
 	}
 
 	// ===== Vector constraint: replace works, growth does not =====
@@ -98,7 +98,7 @@ public class JSONLatticeTest {
 	@Test public void testVectorReplaceExisting() {
 		AString ARR = Strings.create("arr");
 		ACell root = Maps.of(ARR, Vectors.of(10, 20, 30));
-		ACell updated = LatticeOps.assocIn(root, CVMLong.create(99),
+		ACell updated = LatticeComponent.assocIn(root, CVMLong.create(99),
 			JSONLattice.INSTANCE, ARR, CVMLong.create(1));
 		assertEquals(CVMLong.create(99), RT.getIn(updated, ARR, CVMLong.create(1)));
 		assertInstanceOf(AVector.class, RT.getIn(updated, ARR));
@@ -109,7 +109,7 @@ public class JSONLatticeTest {
 		AString arr = Strings.create("arr");
 		Root<ACell> root = Root.create(Maps.empty());
 		assertThrows(IllegalStateException.class,
-			() -> root.updateAndGet(value -> LatticeOps.assocIn(value, BOB,
+			() -> root.updateAndGet(value -> LatticeComponent.assocIn(value, BOB,
 				JSONLattice.INSTANCE, arr, CVMLong.ZERO)));
 		assertEquals(Maps.empty(), root.get());
 		mapEntry(root, arr).set(Vectors.of(BOB));

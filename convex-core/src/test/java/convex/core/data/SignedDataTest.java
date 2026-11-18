@@ -9,16 +9,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.store.MemoryStore;
 import convex.test.Samples;
 
 public class SignedDataTest {
@@ -102,6 +108,43 @@ public class SignedDataTest {
 	}
 	
 	@Test
+	public void testCellChecksNeedNoSignedValue() throws Exception {
+		SignedData<?> sd=InitTest.HERO_KEYPAIR.signData(Samples.INT_VECTOR_300);
+		assertFalse(sd.getValueRef().isEmbedded());
+
+		try (MemoryStore empty=new MemoryStore()) {
+			SignedData<?> decoded=empty.decode(sd.getEncoding());
+			assertThrows(MissingDataException.class,()->decoded.getValue());
+
+			Cells.validateCell(decoded);
+			assertTrue(decoded.checkSignature());
+		}
+	}
+
+	@Test
+	public void testEmbeddedSmallVectorIsCheckedByDecoding() throws Exception {
+		AVector<CVMLong> valid=Vectors.of(1,2,3);
+		SignedData<?> sd=InitTest.HERO_KEYPAIR.signData(valid);
+		assertTrue(sd.getValueRef().isEmbedded());
+		Blob encoding=sd.getEncoding();
+		int valueStart=1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH;
+		assertEquals(valid.getEncoding(),encoding.slice(valueStart));
+
+		try (MemoryStore store=new MemoryStore()) {
+			SignedData<?> decoded=store.decode(encoding);
+			Cells.validate(decoded);
+			assertEquals(valid,decoded.getValue());
+
+			// [1 2 3] with a count of 4, then with its first element given a redundant
+			// leading zero byte
+			String header=encoding.slice(0,valueStart).toHexString();
+			for (String invalid:new String[] {"8004110111021103","800312000111021103"}) {
+				assertThrows(BadFormatException.class,()->store.decode(Blob.fromHex(header+invalid)));
+			}
+		}
+	}
+
+	@Test
 	public void testRefs() {
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		SignedData<?> sd=kp.signData(Vectors.of(1,3,5,7));
@@ -158,7 +201,30 @@ public class SignedDataTest {
 		Ref<SignedData<?>> r=sd.getRef();
 		
 		assertEquals(enc.getContentHash(),r.getHash());
-		
+
 		doSignedDataTest(sd);
+	}
+
+	/** Signed data without a public key has the short encoding 0x91 (CAD003) */
+	@Test
+	public void testShortForm() throws BadFormatException {
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		// Large enough that the short form is not embedded either
+		ABlob value=Blob.createRandom(new Random(7), 80);
+		SignedData<ABlob> sd=SignedData.create(kp.signData(value).getSignature(), value.getRef());
+
+		Blob enc=sd.getEncoding();
+		assertEquals(Tag.SIGNED_DATA_SHORT,enc.byteAt(0));
+		assertEquals(1+Ed25519Signature.SIGNATURE_LENGTH+value.getEncodingLength(),enc.count());
+		assertFalse(sd.isEmbedded());
+
+		SignedData<ABlob> decoded=Samples.TEST_STORE.decode(enc);
+		assertEquals(sd,decoded);
+		assertTrue(decoded.checkSignature(kp.getAccountKey()));
+
+		// A message re-encodes each child cell it decodes
+		Blob msg=Format.encodeMultiCell(Vectors.of(sd),true);
+		AVector<?> v=(AVector<?>)CVMEncoder.INSTANCE.decodeMultiCell(msg);
+		assertEquals(sd,v.get(0));
 	}
 }

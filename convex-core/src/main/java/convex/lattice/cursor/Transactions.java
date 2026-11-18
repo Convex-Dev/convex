@@ -1,32 +1,55 @@
 package convex.lattice.cursor;
 
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
+import convex.lattice.MergeConflictException;
 
 /**
  * Atomic subtree transactions over a cursor: run a callback against a private draft
- * of the cursor's value, then commit by compare-and-set, retrying while the live
- * value changes underneath.
+ * of the cursor's value, then commit into that cursor's storage. A commit into a
+ * fork updates its working state; syncing the fork to its destination is separate.
  *
- * <p>This is {@code updateAndGet} whose update function receives a cursor instead of
- * a bare value, so a callback can navigate, wrap boundaries and write through
- * descendants exactly as it would against the live tree. The draft uses independent,
+ * <p>The callback receives a cursor instead of a bare value, so it can navigate, wrap
+ * boundaries and write through descendants exactly as it would against the live
+ * tree. A transaction starts with a required read of the cursor, so its location
+ * must exist. The draft uses independent,
  * thread-safe root storage. Complete all work contributing to the transaction before
  * returning from the callback; later edits only change the retained draft.
  * Typed domain transactions build on this in
  * {@code TransactionalComponent}.</p>
  *
- * <p>{@code transact} returns the callback's result from the run that committed;
- * {@code execute} returns nothing.</p>
+ * <p>Execution produces a transaction value and a return value. Commit applies any
+ * required reconciliation and authoring, then atomically installs the resulting
+ * state. {@code transact} returns the callback's result from the execution whose
+ * transaction value was used for the successful commit; {@code execute} returns
+ * nothing. These additional transformations do not change the execution's return
+ * value. The transaction value need not be separately visible in storage before
+ * these transformations. The result records what the execution produced, without
+ * promising that its changes survive reconciliation or later updates.</p>
  *
- * <p>Ordinary roots retry optimistically without limit. A root supporting
- * exclusive transactions falls back to its write lock after three failed commit
- * attempts; {@link #transactExclusively} runs once under that lock from the start.</p>
+ * <p>Optimistic execution is the fast path for transactions that do not collide. A
+ * change elsewhere under the root never reruns a callback: its finished result is
+ * applied to the new root. A commit is a three-way merge of the value the run started
+ * from, the run's value and the value as held, which may be persisted since, as
+ * {@code base}, {@code own} and {@code other}. Given a {@link ThreeWayMerge}, the run
+ * commits with a concurrent change wherever that merge reconciles them. Without one the
+ * merge is strict: the run commits if the held value is unchanged, and a run that
+ * changed nothing commits whatever changed meanwhile, as of the value it read. When the merge throws {@link MergeConflictException}, the
+ * transaction takes the {@link Claim} beneath its cursor (see {@link ACursor#claim})
+ * and finishes under it. Claims on the same boundary run one at a time, and a callback
+ * runs at most twice. {@link #transactExclusively} starts with the claim, for work too
+ * expensive to repeat or with side effects: its callback runs once.</p>
+ *
+ * <p>Under a {@link BoundaryCursor}, a write that does not pass through the boundary
+ * can still change the value while it is claimed, and so can the claiming thread, as
+ * an exclusive callback may. The transaction then commits by the same merge, and
+ * fails if that merge refuses the change. Without a merge, it fails rather than
+ * overwrite the change.</p>
  */
 public final class Transactions {
 
@@ -34,122 +57,208 @@ public final class Transactions {
 
 	/**
 	 * Runs an isolated subtree transaction and returns the committed run's result. An
-	 * equal input reuses the computed run; a no-op completes without another write
-	 * after validating its input. The callback may repeat; external side effects and
+	 * equal input reuses the computed run; a no-op commits as a write that changes
+	 * nothing. The callback may repeat; external side effects and
 	 * writes outside the supplied draft are not permitted. Exceptions discard the
-	 * private state.
+	 * private state. A change under the claim that did not pass through it makes the
+	 * transaction fail.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 * @return Result of the run that committed
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
 	public static <V extends ACell,R> R transact(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
-		Objects.requireNonNull(cursor);
-		Objects.requireNonNull(action);
-		Transaction<V,R> attempt=new Transaction<>(cursor,action);
-		Lock lock=cursor.exclusiveLock();
-		for (int failures=0;;failures++) {
-			if (attempt.commit()) return attempt.output;
-			if (lock!=null && failures==2) break;
-		}
-		return commitExclusively(attempt,lock);
+		return transact(cursor,action,null);
 	}
 
 	/**
-	 * Runs an isolated subtree transaction with no result, as {@link #transact}.
+	 * Runs an isolated subtree transaction as {@link #transact(AForkableCursor,Function)},
+	 * committing its run by a merge with any concurrent change, including a change under
+	 * the claim that did not pass through it, and returns the committed run's result.
+	 *
+	 * @param <V> Value type
+	 * @param <R> Result type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other, throwing {@link MergeConflictException} where they conflict; or null for the strict merge
+	 * @return Result of the run that committed, computed before any merge at commit
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
+	 */
+	public static <V extends ACell,R> R transact(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
+		Objects.requireNonNull(cursor);
+		Objects.requireNonNull(action);
+		Transaction<V,R> attempt=new Transaction<>(cursor,action,merge);
+		if (attempt.commit()) return attempt.output;
+		return attempt.commitClaimed();
+	}
+
+	/**
+	 * Runs an isolated subtree transaction with no result, as {@link #transact(AForkableCursor,Function)}.
 	 *
 	 * @param <V> Value type
 	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 */
 	public static <V extends ACell> void execute(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
+		execute(cursor,action,null);
+	}
+
+	/**
+	 * Runs an isolated subtree transaction with no result, as {@link #transact(AForkableCursor,Function,ThreeWayMerge)}.
+	 *
+	 * @param <V> Value type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other, throwing {@link MergeConflictException} where they conflict; or null for the strict merge
+	 */
+	public static <V extends ACell> void execute(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(action);
 		transact(cursor,draft -> {
 			action.accept(draft);
 			return null;
-		});
+		},merge);
 	}
 
 	/**
-	 * Runs one isolated callback while excluding all other writes to the shared root,
-	 * and returns its result.
+	 * Runs one isolated callback, once, under the claim beneath this cursor (see
+	 * {@link ACursor#claim}), and returns its result. Writes through that boundary from
+	 * other threads wait until it commits, and so do their claims on it. A change under
+	 * the claim made outside the draft makes the transaction fail.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
-	 * @param cursor Cursor whose root supports exclusive transactions
+	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 * @return Result of the callback, which ran once
-	 * @throws UnsupportedOperationException if the cursor's root is an ordinary optimistic root
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
 	 */
 	public static <V extends ACell,R> R transactExclusively(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
-		Objects.requireNonNull(cursor);
-		Objects.requireNonNull(action);
-		Lock lock=cursor.exclusiveLock();
-		if (lock==null) throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
-		return commitExclusively(new Transaction<>(cursor,action),lock);
+		return transactExclusively(cursor,action,null);
 	}
 
 	/**
-	 * Runs one isolated callback with no result, as {@link #transactExclusively}.
+	 * Runs one isolated callback, once, as {@link #transactExclusively(AForkableCursor,Function)},
+	 * merging a change under the claim made outside the draft with the callback's run.
 	 *
 	 * @param <V> Value type
-	 * @param cursor Cursor whose root supports exclusive transactions
+	 * @param <R> Result type
+	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
-	 * @throws UnsupportedOperationException if the cursor's root is an ordinary optimistic root
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other; or null to fail instead
+	 * @return Result of the callback, which ran once, computed before any merge at commit
+	 * @throws MissingValueException If the cursor's location does not exist, before the callback runs
+	 */
+	public static <V extends ACell,R> R transactExclusively(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
+		Objects.requireNonNull(cursor);
+		Objects.requireNonNull(action);
+		return new Transaction<>(cursor,action,merge).commitClaimed();
+	}
+
+	/**
+	 * Runs one isolated callback with no result, as {@link #transactExclusively(AForkableCursor,Function)}.
+	 *
+	 * @param <V> Value type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
 	 */
 	public static <V extends ACell> void executeExclusively(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
+		executeExclusively(cursor,action,null);
+	}
+
+	/**
+	 * Runs one isolated callback with no result, as {@link #transactExclusively(AForkableCursor,Function,ThreeWayMerge)}.
+	 *
+	 * @param <V> Value type
+	 * @param cursor Cursor whose value the transaction updates
+	 * @param action Operations on a private draft, completed before the callback returns
+	 * @param merge Reconciliation of the value the run started from, its value and the changed value, as base, own and other; or null to fail instead
+	 */
+	public static <V extends ACell> void executeExclusively(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action, ThreeWayMerge<V> merge) {
 		Objects.requireNonNull(action);
 		transactExclusively(cursor,draft -> {
 			action.accept(draft);
 			return null;
-		});
+		},merge);
 	}
 
-	private static <V extends ACell,R> R commitExclusively(Transaction<V,R> attempt, Lock lock) {
-		lock.lock();
-		try {
-			if (!attempt.commit()) throw new IllegalStateException("Re-entrant write during transaction commit");
-			return attempt.output;
-		} finally {
-			lock.unlock();
-		}
+	/** Commits a run only if nothing else changed its value, because its reads hold only then. */
+	private static <V extends ACell> V strict(V base,V own,V other) {
+		if (Utils.equals(other,base)) return own;
+		throw new MergeConflictException();
 	}
 
-	private static final class Transaction<V extends ACell,R> {
+	/** As {@link #strict}, for a change under the claim that there is no merge to reconcile. */
+	private static <V extends ACell> V refuse(V base,V own,V other) {
+		if (Utils.equals(other,base)) return own;
+		throw new IllegalStateException("Value changed under a transaction's claim, by this thread or by a write that did not pass through the claimed boundary");
+	}
+
+	/** One transaction, and the update function that commits it. */
+	private static final class Transaction<V extends ACell,R> implements UnaryOperator<V> {
 		private final AForkableCursor<V> cursor;
 		private final Function<? super AForkableCursor<V>,? extends R> action;
+		/** Reconciles a concurrent change with the computed run, or null for the strict merge. */
+		private final ThreeWayMerge<V> merge;
+		/** Merge of the commit in progress. */
+		private ThreeWayMerge<V> merging;
 		private boolean computed;
-		private V input;
-		/** Value the computed run leaves in its draft. */
-		private V candidate;
+		/** Value the computed run started from, then the last value its commit merged with. */
+		private V base;
+		/** Value the computed run leaves in its draft, then the last value its commit made. */
+		private V own;
 		/** Result of the computed run, which is the committed run once commit succeeds. */
 		private R output;
 
-		Transaction(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
+		Transaction(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action, ThreeWayMerge<V> merge) {
 			this.cursor=cursor;
 			this.action=action;
+			this.merge=merge;
 		}
 
+		private void run(V value) {
+			base=value;
+			var draft=new Root<>(base);
+			output=action.apply(draft);
+			V result=draft.get();
+			// Preserve the original immutable value for a no-op.
+			own=Utils.equals(base,result)?base:result;
+			computed=true;
+		}
+
+		@Override public V apply(V other) {
+			own=Reconciler.reconcile(base,own,other,merging);
+			base=other;
+			return own;
+		}
+
+		/** The one optimistic attempt. False leaves the caller to take the claim. */
 		boolean commit() {
-			// A transaction can create a missing final entry, as an atomic update can.
-			V observed=cursor.getOrDefault(null);
-			if (!computed || !Utils.equals(observed,input)) {
-				input=observed;
-				var draft=new TransactionalRootCursor<>(input);
-				output=action.apply(draft);
-				V value=draft.get();
-				// Preserve the original immutable value for a no-op.
-				candidate=Utils.equals(input,value)?input:value;
-				computed=true;
+			run(cursor.get());
+			merging=(merge!=null)?merge:Transactions::strict;
+			try {
+				// A run that changed nothing still commits as a write, so a cursor that cannot be written refuses it
+				cursor.updateAndGet(this);
+				return true;
+			} catch (MergeConflictException e) {
+				return false;
 			}
-			// Validate against a fresh observation, including no-ops. Its reference
-			// may differ from the input while denoting exactly the same value.
-			observed=cursor.getOrDefault(null);
-			if (!Utils.equals(observed,input)) return false;
-			if (Utils.equals(observed,candidate)) return true;
-			return cursor.compareAndSet(observed,candidate);
+		}
+
+		/**
+		 * Finishes under the claim, where the value can change only through this thread
+		 * or through a write that bypasses the claimed boundary, which is merged or refused.
+		 */
+		R commitClaimed() {
+			try (Claim claim=cursor.claim()) {
+				V other=cursor.get();
+				if (!computed || !Utils.equals(other,base)) run(other);
+				merging=(merge!=null)?merge:Transactions::refuse;
+				cursor.updateAndGet(this);
+				return output;
+			}
 		}
 	}
 }

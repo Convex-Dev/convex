@@ -15,7 +15,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.LatticeHost;
@@ -36,14 +36,16 @@ import convex.lattice.fs.DLFSLocation;
  * Without a signer the application is a relay. Host and application contexts do
  * not confer signing authority or replace the region's clock and owner rule.</p>
  *
- * <p>The host's store is passed to drives for incremental blob checkpoints.
+ * <p>The host's store is the persister drives use for incremental blob checkpoints.
  * The application owns neither the host nor the store lifecycle. Host sync
  * persists and announces the root; host flush makes it durable.</p>
  */
 public class DLFSApplication extends Regions {
 
-	private final AStore store;
+	private final Persister persister;
 	private final DLFSRegion dlfs;
+	/** Builds this application over other storage; null when it was given its region. */
+	private final Function<AForkableCursor<Index<Keyword,ACell>>,DLFSApplication> rebuild;
 
 	/** Creates a live DLFS relay at {@code :fs}, or an explicit path, without signing authority. */
 	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword... path) {
@@ -82,20 +84,20 @@ public class DLFSApplication extends Regions {
 	 * created only by a changed write, and this application's {@link #createContainer()}
 	 * controls creation of an absent root.
 	 */
-	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
+	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,Persister persister,
 			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
-		this(cursor,store,DLFSRegion.KEY_OWNER,signer==null?null:(owner,value) -> signer.apply(value),
+		this(cursor,persister,DLFSRegion.KEY_OWNER,signer==null?null:(owner,value) -> signer.apply(value),
 			clock,maxFutureSkew,path);
 	}
 
 	/** Binds custom owner authority to an explicit working cursor, including a transaction draft. */
-	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
+	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,Persister persister,
 			BiPredicate<ACell,AccountKey> verifier,
 			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
 		super(cursor);
-		this.store=store;
+		this.persister=persister;
 		Keyword[] keys=path.length==0?new Keyword[]{Keywords.FS}:path.clone();
 		Regions parent=this;
 		for (int i=0;i<keys.length-1;i++) {
@@ -103,23 +105,36 @@ public class DLFSApplication extends Regions {
 		}
 		dlfs=parent.create(keys[keys.length-1],
 			(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination) ->
-				new DLFSRegion(destination,store,DLFSLocation.at(cursor,keys),verifier,
+				new DLFSRegion(destination,persister,DLFSLocation.at(cursor,keys),verifier,
 					signer,clock,maxFutureSkew));
+		rebuild=draft -> new DLFSApplication(draft,persister,verifier,signer,clock,maxFutureSkew,keys);
 	}
 
 	/**
 	 * Registers an existing region at a root key, retaining its cursor, policy and
-	 * publication boundary. The caller binds the region to its intended destination.
+	 * publication boundary. The caller binds the region to its intended destination,
+	 * and syncs it: this application's sync does not publish a region it did not make.
 	 */
 	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword key,DLFSRegion files) {
 		super(host.cursor());
-		store=host.store();
+		persister=host.store();
 		dlfs=add(key,files);
+		rebuild=null;
 	}
 
-	/** Returns the store available for new components' blob checkpoints. */
-	protected AStore store() {
-		return store;
+	/**
+	 * Rebuilds this application and its region over the supplied storage. An application
+	 * given an existing region refuses, since only the caller knows how it was bound.
+	 */
+	@Override
+	public DLFSApplication rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		if (rebuild==null) throw new UnsupportedOperationException("A DLFSApplication given an existing region cannot be rebound");
+		return rebuild.apply(cursor);
+	}
+
+	/** Returns the persister for new components' blob checkpoints. */
+	protected Persister persister() {
+		return persister;
 	}
 
 	/** Returns the exact registered region, for both domain edits and incoming merges. */

@@ -98,9 +98,9 @@ public class EtchCheckpointTest {
 	@MethodSource("leaseCases")
 	@Timeout(30)
 	public void testLeaseAcrossCancelCutoversAndClose(EtchConfig config, boolean cancel) throws Exception {
+		File destination=output();
 		EtchStore source=EtchStore.createTemp(config);
 		EtchStore current=source;
-		File destination=output();
 		CountDownLatch copied=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		AtomicBoolean first=new AtomicBoolean(true);
@@ -143,8 +143,8 @@ public class EtchCheckpointTest {
 			try (EtchStore restored=EtchStore.create(destination,config)) { assertEquals(root,restored.getRootData()); }
 		} finally {
 			resume.countDown();
-			current.close();
-			source.close();
+			EtchStore last=current;
+			assertAll("Close the stores",last::close,source::close);
 		}
 	}
 

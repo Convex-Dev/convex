@@ -27,6 +27,9 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
 import convex.core.message.AConnection;
+import convex.net.ingress.ClientIngress;
+import convex.net.ingress.Ingress;
+import convex.net.ingress.IngressChannel;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -35,6 +38,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
@@ -161,14 +165,17 @@ public class NettyConnection extends AConnection {
 
 	/**
 	 * Connects with a delivery that may ask to wait by returning a retry, as a
-	 * server connection's does: this connection then stops reading until the retry,
-	 * run on a virtual thread, accepts the message or gives up.
+	 * server connection's does: this connection then stops reading until the retry
+	 * accepts the message or gives up. The delivery is called on a worker of the
+	 * client ingress, never on the event loop, one message at a time in order.
 	 */
 	public static NettyConnection connectWithDelivery(SocketAddress sa, Function<Message, Predicate<Message>> delivery,
 			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
 		NettyInboundHandler inbound=new NettyInboundHandler(delivery,null,maxMessageLength);
 		NettyConnection client=new NettyConnection(null,inbound);
 		inbound.setConnection(client);
+		IngressChannel ingress=ClientIngress.get().register(client,delivery,inbound::resume);
+		inbound.setSink(NettyInboundHandler.sinkOf(ingress));
 		SslHandler ssl;
 		if (sslContext==null) {
 			ssl=null;
@@ -227,7 +234,11 @@ public class NettyConnection extends AConnection {
 			connected=true;
 			return client;
 		} finally {
-			if (!connected) chan.close();
+			if (!connected) {
+				chan.close();
+				// A channel that never became active reports no close to its handler
+				ingress.disconnect();
+			}
 		}
 	}
 
@@ -247,8 +258,9 @@ public class NettyConnection extends AConnection {
 	 *
 	 * <p>This is an outbound client connection, so blocking with a bounded
 	 * timeout is acceptable — the caller's virtual thread parks while the
-	 * outbound queue drains. On an event loop it does not wait: those threads
-	 * drain this queue and every other, so a full queue fails the send at once.</p>
+	 * outbound queue drains. On an event loop or an ingress worker it does not
+	 * wait: those threads serve every connection, so a full queue fails the send
+	 * at once.</p>
 	 */
 	@Override
 	public boolean sendMessage(Message m) throws IOException, InterruptedException {
@@ -256,12 +268,18 @@ public class NettyConnection extends AConnection {
 		if (ch == null || !ch.isActive()) throw new ClosedChannelException();
 		m.getMessageData(); // encodes on this thread, or throws if too large for a frame
 		boolean queued = outbound.offer(m)
-			|| (!inEventLoop(ch.eventLoop().parent())
+			|| (!inEventLoop(ch.eventLoop().parent()) && !Ingress.isWorkerThread()
 				&& outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS));
 		if (queued && afterQueue(ch, m)) return true;
 		// Closing clears the queue, which also wakes a waiting send
 		if (!ch.isActive()) throw new ClosedChannelException();
 		return false;
+	}
+
+	/** The event loop serving this connection's channel, or null before it connects. */
+	EventLoop eventLoop() {
+		Channel ch = channel;
+		return (ch == null) ? null : ch.eventLoop();
 	}
 
 	/**
@@ -300,14 +318,14 @@ public class NettyConnection extends AConnection {
 	}
 
 	/**
-	 * Encodes a message for sending and returns its length, or -1 (logged) if the
+	 * Encodes a message for sending and returns its length, or -1 if the
 	 * payload cannot fit one legal frame. Nothing is ever sent truncated.
 	 */
 	static long encodedLength(Message m) {
 		try {
 			return m.getMessageData().count();
 		} catch (IllegalArgumentException e) {
-			log.warn("Not sending {} message: {}",m.getType(),e.getMessage());
+			log.debug("Not sending {} message: {}",m.getType(),e.getMessage());
 			return -1;
 		}
 	}

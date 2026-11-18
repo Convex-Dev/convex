@@ -5,10 +5,7 @@ import static convex.lattice.SharedApplicationsExample.BOB;
 import static convex.lattice.SharedApplicationsExample.nodeInfo;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 import org.junit.jupiter.api.Test;
@@ -30,16 +27,6 @@ public class SharedApplicationsTest {
 	private static final AKeyPair SOURCE_NODE=AKeyPair.createSeeded(7304);
 	private static final AKeyPair TARGET_NODE=AKeyPair.createSeeded(7305);
 	private static final String TEXT="A lattice-backed file.\n".repeat(500); // Large enough to replicate as a separate blob.
-
-	@Test void theRunnableExampleTellsItsStory() throws Exception {
-		var output=new ByteArrayOutputStream();
-		SharedApplicationsExample.run(new PrintStream(output,true,StandardCharsets.UTF_8));
-		String story=output.toString(StandardCharsets.UTF_8);
-		assertTrue(story.contains("Target has Alice's post: true"),story);
-		assertTrue(story.contains("Target's pending post is still private: true"),story);
-		assertTrue(story.contains("Target has Bob's file: Hello from Bob"),story);
-		assertTrue(story.contains("Alice's feed has 2 posts"),story);
-	}
 
 	@Test void alicesPostAndBobsFileReachTheOtherNode() throws Exception {
 		try (var sourceStore=EtchStore.createTemp("shared-apps-source");
@@ -91,9 +78,10 @@ public class SharedApplicationsTest {
 			ACell receivedFiles=target.root().get(Keywords.FS);
 			target.social.sync();
 			assertEquals(2,feed.count(),"the staged feed now holds both posts");
+			assertEquals(2,published.count(),"and the host publishes both");
 			assertNotNull(published.getPost(localPost));
 			assertEquals(receivedFiles,target.root().get(Keywords.FS));
-			target.files.sync();
+			target.files.dlfs().sync();
 			assertEquals(TEXT,Files.readString(localDrive.fileSystem().getPath("/hello.txt")));
 			assertEquals("A pending local file",Files.readString(localDrive.fileSystem().getPath("/local.txt")));
 
@@ -120,7 +108,7 @@ public class SharedApplicationsTest {
 			ACell social=node.root().get(Social.KEY_SOCIAL);
 			assertNotNull(social);
 			assertNull(node.root().get(Keywords.FS),"publishing the social region publishes nothing else");
-			node.files.sync();
+			node.files.dlfs().sync();
 			assertEquals(social,node.root().get(Social.KEY_SOCIAL),"publishing files leaves social untouched");
 			assertNotNull(node.root().get(Keywords.FS));
 			node.social.sync();

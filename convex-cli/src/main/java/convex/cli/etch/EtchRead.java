@@ -61,8 +61,7 @@ public class EtchRead extends AEtchCommand{
 				println(s);
 			}
 		} finally {
-			store.close();
-			closeKeyContexts();
+			closeStoreAndKeys(store);
 		}
 	}
 }

@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -48,15 +50,21 @@ public class ThreadUtilsTest {
 		});
 		interrupter.start();
 
-		Thread worker=ThreadUtils.callUninterruptibly(() -> {
-			entered.countDown();
-			try {
-				release.await();
-			} catch (InterruptedException e) {
-				throw new IOException("Uninterruptible worker was interrupted");
-			}
-			return Thread.currentThread();
-		});
+		Thread worker;
+		try {
+			worker=ThreadUtils.callUninterruptibly(() -> {
+				entered.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					throw new IOException("Uninterruptible worker was interrupted");
+				}
+				return Thread.currentThread();
+			});
+		} finally {
+			// Ends an interrupter still waiting because the call failed; a released one has finished
+			interrupter.interrupt();
+		}
 		// Clear the restored interrupt before joining, which would otherwise throw
 		boolean restored=Thread.interrupted();
 		interrupter.join();
@@ -66,6 +74,62 @@ public class ThreadUtilsTest {
 		assertTrue(worker.isDaemon());
 		assertFalse(worker.isVirtual(),"Uninterruptible calls must run on platform threads");
 		assertEquals("convex-uninterruptible",worker.getName());
+	}
+
+	@Test
+	public void testJoinWaitsThroughAnInterruptAndRestoresIt() throws Exception {
+		CountDownLatch release=new CountDownLatch(1);
+		Thread target=Thread.ofVirtual().start(() -> {
+			try { release.await(); } catch (InterruptedException e) { /* ends */ }
+		});
+		Thread caller=Thread.currentThread();
+		AtomicBoolean returned=new AtomicBoolean();
+		// Releases the target only once the interrupted caller is waiting for it again
+		Thread releaser=Thread.ofVirtual().start(() -> {
+			while (caller.getState()!=Thread.State.WAITING && !returned.get()) Thread.onSpinWait();
+			release.countDown();
+		});
+		caller.interrupt();
+		boolean ended;
+		try {
+			ended=ThreadUtils.joinUninterruptibly(target);
+		} finally {
+			// Stops the releaser, which then releases the target, even if the join fails
+			returned.set(true);
+		}
+		boolean restored=Thread.interrupted();
+		releaser.join();
+
+		assertTrue(ended,"An interrupt must not end the wait");
+		assertFalse(target.isAlive());
+		assertTrue(restored,"Caller interrupt was not restored");
+	}
+
+	@Test
+	public void testJoinOnItsOwnThreadReturnsAtOnce() {
+		assertFalse(ThreadUtils.joinUninterruptibly(Thread.currentThread()));
+		assertFalse(ThreadUtils.joinUninterruptibly(Thread.currentThread(),Duration.ofDays(1)));
+	}
+
+	@Test
+	public void testTimedJoinReportsAThreadStillRunning() throws Exception {
+		CountDownLatch release=new CountDownLatch(1);
+		Thread target=Thread.ofVirtual().start(() -> {
+			try { release.await(); } catch (InterruptedException e) { /* ends */ }
+		});
+		try {
+			assertFalse(ThreadUtils.joinUninterruptibly(target,Duration.ZERO));
+		} finally {
+			release.countDown();
+		}
+		assertTrue(ThreadUtils.joinUninterruptibly(target,Duration.ofDays(1)));
+	}
+
+	@Test
+	public void testJoinOfAnUnstartedThreadReturnsAtOnce() {
+		Thread unstarted=Thread.ofVirtual().unstarted(() -> {});
+		assertTrue(ThreadUtils.joinUninterruptibly(unstarted));
+		assertTrue(ThreadUtils.joinUninterruptibly(unstarted,Duration.ofDays(1)));
 	}
 
 	@Test

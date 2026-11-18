@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStore.PasswordProtection;
@@ -19,6 +20,7 @@ import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import convex.core.Constants;
 import convex.core.data.Blob;
@@ -46,8 +48,21 @@ public class PFXTest {
 	 */
 	private record KDFParams(Blob salt, int iterations) {}
 
+	/**
+	 * Directory for this class's key store files, deleted after its tests
+	 */
+	@TempDir
+	static Path TEMP;
+
+	/**
+	 * Creates a new empty file for a key store, distinct for each concurrent test
+	 */
+	private static File newStoreFile() throws IOException {
+		return File.createTempFile("temp-keystore", ".pfx", TEMP.toFile());
+	}
+
 	@Test public void testNewStore() throws IOException, GeneralSecurityException {
-		File f=File.createTempFile("temp-keystore", "pfx");
+		File f=newStoreFile();
 		char[] PASS="test".toCharArray();
 		char[] KEYPASS="thehero".toCharArray();
 		
@@ -97,7 +112,7 @@ public class PFXTest {
 	@Test public void testLegacyZeroSaltStore() throws IOException, GeneralSecurityException {
 		// Key stores written before the salt fix used a fixed all-zero salt. The salt is
 		// stored in the file itself, so such stores must still open.
-		File f=File.createTempFile("temp-keystore", "pfx");
+		File f=newStoreFile();
 		KeyStore ks=PFXTools.createStore(f, STORE_PASS);
 
 		AKeyPair kp=InitTest.HERO_KEYPAIR;
@@ -118,7 +133,7 @@ public class PFXTest {
 	 * Creates a key store containing the hero key pair.
 	 */
 	private static File storeWithHeroKey() throws IOException, GeneralSecurityException {
-		File f=File.createTempFile("temp-keystore", "pfx");
+		File f=newStoreFile();
 		KeyStore ks=PFXTools.createStore(f, STORE_PASS);
 		PFXTools.setKeyPair(ks, InitTest.HERO_KEYPAIR, KEY_PASS);
 		PFXTools.saveStore(ks, f, STORE_PASS);

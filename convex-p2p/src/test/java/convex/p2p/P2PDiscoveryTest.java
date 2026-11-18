@@ -1,13 +1,17 @@
 package convex.p2p;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -22,7 +26,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
-import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 
@@ -39,23 +43,24 @@ public class P2PDiscoveryTest {
 	private final AKeyPair peerKey=AKeyPair.generate();
 	private final AKeyPair leafKey=AKeyPair.generate();
 
-	private EtchStore hubStore,peerStore,leafStore;
+	private MemoryStore hubStore,peerStore,leafStore;
 	private P2PNode hub,peer,leaf;
 
 	@AfterEach
-	public void tearDown() throws Exception {
-		if (leaf!=null) leaf.close();
-		if (peer!=null) peer.close();
-		if (hub!=null) hub.close();
-		if (leafStore!=null) leafStore.close();
-		if (peerStore!=null) peerStore.close();
-		if (hubStore!=null) hubStore.close();
+	public void tearDown() {
+		List<Executable> closes=new ArrayList<>();
+		P2PNode[] nodes={leaf,peer,hub};
+		for (P2PNode node:nodes) if (node!=null) closes.add(node::close);
+		// Each node leaves open the host it opened
+		for (P2PNode node:nodes) if (node!=null) closes.add(node.getNodeServer().getHost()::close);
+		for (MemoryStore store:new MemoryStore[] {leafStore,peerStore,hubStore}) if (store!=null) closes.add(store::close);
+		assertAll("Close the nodes, their hosts and their stores",closes);
 	}
 
 	@Test
 	public void testFullCandidatePoolBlocksNoConnection() throws Exception {
-		hubStore=EtchStore.createTemp("p2p-discovery-hub");
-		peerStore=EtchStore.createTemp("p2p-discovery-peer");
+		hubStore=new MemoryStore();
+		peerStore=new MemoryStore();
 		// No ambient slots: the hub keeps candidates but dials none of them
 		LatticePropagatorConfig bounded=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(CANDIDATES),
@@ -89,7 +94,7 @@ public class P2PDiscoveryTest {
 		assertEquals(peerKey.getAccountKey(),toPeer.getVerifiedPeer());
 
 		// An outbound-only node joining later still gets its return route
-		leafStore=EtchStore.createTemp("p2p-discovery-leaf");
+		leafStore=new MemoryStore();
 		leaf=P2PNode.create(leafStore,NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
 		leaf.launch();
 		leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);
@@ -105,13 +110,13 @@ public class P2PDiscoveryTest {
 	 */
 	@Test
 	public void testOutboundOnlyNodeKeepsItsRecordAtAFullHub() throws Exception {
-		hubStore=EtchStore.createTemp("p2p-discovery-hub");
+		hubStore=new MemoryStore();
 		hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey)
 			.serveAllInbound();
 		hub.getApplication().registry().setMaxRecords(0);
 		hub.launch();
 
-		leafStore=EtchStore.createTemp("p2p-discovery-leaf");
+		leafStore=new MemoryStore();
 		leaf=P2PNode.create(leafStore,NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
 		leaf.launch();
 		leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);

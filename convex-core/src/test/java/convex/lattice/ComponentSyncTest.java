@@ -20,7 +20,6 @@ import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
-import convex.lattice.cursor.TransactionalRootCursor;
 
 /** Publication follows bound storage, independently of editing views. */
 class ComponentSyncTest {
@@ -30,14 +29,14 @@ class ComponentSyncTest {
 
 	private static final class Value extends ALatticeComponent<CVMLong> {
 		Value(AForkableCursor<CVMLong> cursor) { super(cursor); }
-		@Override protected Value rebind(AForkableCursor<CVMLong> cursor) { return new Value(cursor); }
+		@Override public Value rebind(AForkableCursor<CVMLong> cursor) { return new Value(cursor); }
 		@Override public Value fork() { return rebind(storage.fork()); }
 
 		static Value staged(ACursor<CVMLong> destination) {
 			return new Value(ForkedCursor.create(destination));
 		}
 
-		@Override protected CVMLong mergePublication(CVMLong own,CVMLong other) {
+		@Override protected CVMLong reconcile(CVMLong own,CVMLong other) {
 			if (own==null) return other;
 			return other==null || own.longValue()>=other.longValue()?own:other;
 		}
@@ -54,16 +53,15 @@ class ComponentSyncTest {
 			super(cursor);
 			this.clock=clock;
 			edits=Timestamped.create(cursor.withDefault(Maps.empty()),clock);
-			items=new SetComponent<>(cursor().path(VALUE));
+			items=new SetComponent<>(new MapComponent<>(cursor()).path(VALUE));
 		}
 
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return edits.cursor(); }
-		@Override protected Record rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+		@Override public Record rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Record(cursor,clock);
 		}
-		@Override public Record withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return rebind(cursor); }
 		@Override public AHashMap<Keyword,ACell> merge(AHashMap<Keyword,ACell> incoming) { return edits.merge(incoming); }
-		@Override protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
+		@Override protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 			return Timestamped.lattice().merge(own,other);
 		}
 	}
@@ -80,7 +78,7 @@ class ComponentSyncTest {
 		assertNull(root.get(),"Recreated children must edit the new storage");
 		assertEquals(1,ticks.get());
 		draft.items.sync();
-		draft.cursor().sync((a,b) -> { throw new AssertionError("Editing views do not reconcile"); });
+		draft.cursor().reconcile((base,a,b) -> { throw new AssertionError("Editing views do not reconcile"); });
 		assertNull(root.get(),"Child and editing views must not publish the enclosing fork");
 		assertSame(root.get(),live.sync());
 		assertSame(draft.cursor().get(),draft.sync());
@@ -107,7 +105,7 @@ class ComponentSyncTest {
 
 	@Test void transactionsRetainPreparedTimestampsAndDiscardFailedEdits() {
 		for (boolean locked:new boolean[] {false,true}) {
-			var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(null);
+			var root=new Root<AHashMap<Keyword,ACell>>(null);
 			var ticks=new AtomicLong();
 			var record=new Record(root,() -> CVMLong.create(ticks.incrementAndGet()));
 			java.util.function.Consumer<Record> edit=draft -> {
@@ -167,7 +165,7 @@ class ComponentSyncTest {
 		fork.set(CVMLong.TWO);
 		assertSame(CVMLong.TWO,view.sync());
 		assertSame(CVMLong.TWO,root.get(),"The bound fork is the publication boundary");
-		assertSame(CVMLong.TWO,fork.sync((own,other) -> own));
+		assertSame(CVMLong.TWO,fork.reconcile((base,own,other) -> own));
 		assertSame(CVMLong.TWO,root.get());
 	}
 
@@ -184,7 +182,7 @@ class ComponentSyncTest {
 		assertSame(CVMLong.ONE,parent.get().get(VALUE));
 		assertSame(CVMLong.TWO,parent.get().get(SIBLING));
 		assertSame(initial,root.get(),"Child publication must not publish its destination further");
-		parent.sync((own,other) -> own);
+		parent.reconcile((base,own,other) -> own);
 		assertSame(parent.get(),root.get());
 	}
 

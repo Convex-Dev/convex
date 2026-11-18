@@ -130,6 +130,12 @@ public abstract class CoreTest extends ACVMTest {
 		super(genesis);
 	}
 
+	/**
+	 * Juice limit for running an endless loop until it fails: thousands of iterations,
+	 * far past MAX_DEPTH, so a loop that consumed depth would fail with :DEPTH first.
+	 */
+	private static final long LOOP_JUICE=1_000_000;
+
 	@Test
 	public void testAddress() {
 		Address a = HERO;
@@ -2408,7 +2414,7 @@ public abstract class CoreTest extends ACVMTest {
 		assertEquals(120L, evalL("(let [f (fn [a x] (if (> x 1) (recur (* a x) (dec x)) a))] (f 1 5))"));
 
 		assertArityError(step("(let [f (fn [x] (recur x x))] (f 1))"));
-		assertJuiceError(step("(let [f (fn [x] (recur x))] (f 1))"));
+		assertJuiceError(step(context().withJuiceLimit(LOOP_JUICE),"(let [f (fn [x] (recur x))] (f 1))"));
 
 		// should hit depth limits before running out of juice
 		// TODO: think about letrec?
@@ -2446,7 +2452,9 @@ public abstract class CoreTest extends ACVMTest {
 		assertArityError(step("(do (defn g [] :foo) (defn f [x] (tailcall (g 1))) (f 1))"));
 
 		// check we aren't consuming stack, should fail with :JUICE not :DEPTH
-		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))"));
+		Context limited=context().withJuiceLimit(LOOP_JUICE);
+		assertDepthError(step(limited,"(do (def f (fn [x] (f x))) (f 1))")); // the limit reaches MAX_DEPTH
+		assertJuiceError(step(limited,"(do (def f (fn [x] (tailcall (f x)))) (f 1))"));
 
 		// tailcall on its own is an :EXCEPTION Error
 		assertError(ErrorCodes.EXCEPTION,step("(tailcall (count 1))"));
@@ -4544,7 +4552,7 @@ public abstract class CoreTest extends ACVMTest {
 
 		assertArityError(step("((fn ([x] x) ([x y] (recur))) 1 2)"));
 
-		assertJuiceError(step("((fn ([x] (recur 3 4)) ([x y] (recur 5))) 1 2)"));
+		assertJuiceError(step(context().withJuiceLimit(LOOP_JUICE),"((fn ([x] (recur 3 4)) ([x y] (recur 5))) 1 2)"));
 	}
 
 	@Test

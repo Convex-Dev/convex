@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
@@ -14,13 +15,7 @@ import convex.cli.ExitCodes;
  */
 public class EvalTest {
 
-	@Test
-	public void testSimpleEval() {
-		CLTester tester=CLTester.run("eval","(+ 1 2)");
-		tester.assertExitCode(ExitCodes.SUCCESS);
-		assertEquals("3",tester.getOutput().trim());
-	}
-
+	/** Each form argument is evaluated in turn and its result printed */
 	@Test
 	public void testStatePersistsAcrossForms() {
 		CLTester tester=CLTester.run("eval","(def x 10)","(* x x)");
@@ -51,6 +46,7 @@ public class EvalTest {
 	}
 
 	@Test
+	@ResourceLock("java.lang.System.in")
 	public void testStdinEval() {
 		CLTester tester=CLTester.runWithInput("(def a 3) (+ a a)\n","eval","-");
 		tester.assertExitCode(ExitCodes.SUCCESS);
@@ -70,6 +66,7 @@ public class EvalTest {
 		tester.assertExitCode(ExitCodes.DATAERR);
 	}
 
+	/** Eval accepts --protocol-version and evaluates on a version 0 genesis */
 	@Test
 	public void testProtocolVersionZero() {
 		CLTester tester=CLTester.run("eval","--protocol-version","0","(+ 1 2)");

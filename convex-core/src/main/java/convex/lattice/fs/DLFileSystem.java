@@ -23,7 +23,7 @@ import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.util.BlobOutputStream;
-import convex.core.store.AStore;
+import convex.core.store.Persister;
 import convex.lattice.fs.impl.DLDirectoryStream;
 import convex.lattice.fs.impl.DLFSFileAttributes;
 
@@ -168,7 +168,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 *
 	 * <p>A new file gets a fresh entry. An existing file keeps its metadata and
 	 * any unknown trailing fields; its content and content time change. A deleted
-	 * name counts as absent. The content is saved to the drive's store, if any,
+	 * name counts as absent. The content is saved through the drive's persister, if any,
 	 * before the update, so a retry under contention redoes only the install.</p>
 	 *
 	 * @param path File to write, in this filesystem
@@ -181,10 +181,10 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public abstract AVector<ACell> install(DLPath path, ABlob content, DLFSCondition condition) throws IOException;
 
 	/**
-	 * Gets the store that file content is saved to as it is written
-	 * @return Store, or null to keep content in memory
+	 * Gets the persister that saves file content as it is written
+	 * @return Persister, or null to keep content in memory
 	 */
-	protected abstract AStore getContentStore();
+	protected abstract Persister getContentPersister();
 
 	/**
 	 * Creates a writer for a new version of a file. Nothing is visible until
@@ -198,7 +198,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public DLFileWriter newWriter(DLPath path, DLFSCondition condition) {
 		checkOpen();
 		if (path.getFileSystem()!=this) throw new IllegalArgumentException("Path belongs to another filesystem");
-		return new DLFileWriter(this,path,condition,BlobOutputStream.create(getContentStore()));
+		return new DLFileWriter(this,path,condition,BlobOutputStream.create(getContentPersister()));
 	}
 
 	/**

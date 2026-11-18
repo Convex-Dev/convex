@@ -10,6 +10,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
 import convex.core.text.Text;
+import convex.core.util.Cleanup;
 import convex.core.util.FileUtils;
 import convex.etch.EtchStore;
 import convex.etch.EtchUtils;
@@ -63,8 +64,7 @@ public class EtchGC extends AEtchCommand {
 		} catch (IOException e) {
 			throw new CLIError("IO error during Etch GC: "+e.getMessage(), e);
 		} finally {
-			store.close();
-			closeKeyContexts();
+			closeStoreAndKeys(store);
 		}
 	}
 
@@ -76,9 +76,15 @@ public class EtchGC extends AEtchCommand {
 		store.transferGC();
 		// completeGC independently verifies the target before committing.
 		EtchStore collected=store.completeGC(backupFile);
-		long after=collected.getEtch().getDataLength();
-		store.close();     // deletes the superseded original (or defers if pinned)
-		collected.close();
+		long after;
+		try {
+			after=collected.getEtch().getDataLength();
+		} finally {
+			Cleanup cleanup=new Cleanup();
+			cleanup.run(store::close);     // deletes the superseded original (or defers if pinned)
+			cleanup.run(collected::close);
+			cleanup.finish();
+		}
 
 		// Try to install the collected file under the original name now; if
 		// files are pinned by this process, the next open completes it

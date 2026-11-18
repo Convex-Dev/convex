@@ -86,7 +86,7 @@ public class ALatticeApplicationTest {
 
 	private static final class Items extends ALatticeComponent<ASet<CVMLong>> {
 		Items(ALatticeComponent<Index<Keyword,ACell>> application) {
-			super(application.cursor().withDefault(Index.none()).path(ITEMS));
+			super(new IndexComponent<>(application.cursor()).path(ITEMS));
 		}
 
 		void add(CVMLong value) {
@@ -195,14 +195,14 @@ public class ALatticeApplicationTest {
 		second.setContext(LatticeContext.create(CVMLong.create(200),null));
 		// Each author receives an explicit signer. The timestamp wrapper captures the
 		// application's current clock supplier; nested set views need neither policy.
-		var aliceRecord=new ASignedComponent<>(first.cursor().path(alice.getAccountKey()),
+		var aliceRecord=new ASignedComponent<>(new IndexComponent<>(first.cursor()).path(alice.getAccountKey()),
 			owners.signingFor(alice.getAccountKey()),alice::signData) {};
-		var bobRecord=new ASignedComponent<>(second.cursor().path(bob.getAccountKey()),
+		var bobRecord=new ASignedComponent<>(new IndexComponent<>(second.cursor()).path(bob.getAccountKey()),
 			owners.signingFor(bob.getAccountKey()),bob::signData) {};
 		var aliceEdits=Timestamped.create(aliceRecord.cursor().withDefault(Maps.empty()),first.getContext()::currentTimestamp);
 		var bobEdits=Timestamped.create(bobRecord.cursor().withDefault(Maps.empty()),second.getContext()::currentTimestamp);
-		var aliceItems=new SetComponent<CVMLong>(aliceEdits.cursor().path(ITEMS));
-		var bobItems=new SetComponent<CVMLong>(bobEdits.cursor().path(ITEMS));
+		var aliceItems=new SetComponent<CVMLong>(new MapComponent<>(aliceEdits.cursor()).path(ITEMS));
+		var bobItems=new SetComponent<CVMLong>(new MapComponent<>(bobEdits.cursor()).path(ITEMS));
 		aliceItems.add(CVMLong.ONE);
 		bobItems.add(CVMLong.TWO);
 		var state=host.cursor().get();

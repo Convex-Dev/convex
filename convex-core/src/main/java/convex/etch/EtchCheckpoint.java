@@ -11,6 +11,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
+import convex.core.util.Cleanup;
 
 /**
  * Online export of an explicit root, independent of the source's live root/GC.
@@ -86,9 +87,15 @@ final class EtchCheckpoint {
 				// resource cleanup without poisoning files, then restore cancellation.
 				boolean interrupted=Thread.interrupted();
 				try {
-					if (destinationStore!=null) destinationStore.close();
-					try { io.cleanup(stage); }
-					catch (IOException e) { stage.toFile().deleteOnExit(); }
+					// A failed close still leaves the staging file to clean up
+					Cleanup cleanup=new Cleanup();
+					EtchStore opened=destinationStore;
+					if (opened!=null) cleanup.run(opened::close);
+					cleanup.run(() -> {
+						try { io.cleanup(stage); }
+						catch (IOException e) { stage.toFile().deleteOnExit(); }
+					});
+					cleanup.finish();
 				} finally { if (interrupted) Thread.currentThread().interrupt(); }
 			}
 		} finally {

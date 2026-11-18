@@ -14,6 +14,7 @@ import java.util.Objects;
 
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.util.Cleanup;
 
 /**
  * Explicit, read-only access to an Etch file for maintenance operations.
@@ -318,30 +319,12 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	public synchronized void close() throws IOException {
 		if (closed) return;
 		closed=true;
-		IOException failure=null;
-		try {
-			try {
-				mapper.close();
-			} catch (IOException e) {
-				failure=e;
-			}
-			try {
-				lock.release();
-			} catch (IOException e) {
-				if (failure==null) failure=e; else failure.addSuppressed(e);
-			}
-			try {
-				data.close();
-			} catch (IOException e) {
-				if (failure==null) failure=e; else failure.addSuppressed(e);
-			}
-		} finally {
-			try {
-				header.destroy();
-			} finally {
-				Etch.destroyCiphers(dataCipher,indexCipher);
-			}
-		}
-		if (failure!=null) throw failure;
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(mapper::close);
+		cleanup.run(lock::release);
+		cleanup.run(data::close);
+		cleanup.run(header::destroy);
+		cleanup.run(() -> Etch.destroyCiphers(dataCipher,indexCipher));
+		cleanup.finish(IOException.class);
 	}
 }

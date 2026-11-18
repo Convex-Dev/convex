@@ -7,20 +7,26 @@ import convex.lattice.cursor.AForkableCursor;
 
 /**
  * A named region with a typed child, usable directly or as an application base.
- * Existing children retain their destination and policy; factories receive a
- * cursor bound to the named region. Only the child merges and publishes state.
+ * A factory receives a cursor bound to the named region; the child it makes is
+ * remade on each rebind and synced by this container's sync. An existing child
+ * keeps its destination and policy, and whoever made it syncs it.
  *
  * @param <C> Region component type
  */
 public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions {
 
-	private final C component;
+	private final Keyword key;
 
-	/** Wraps an existing component at a root or nested container. */
+	/**
+	 * Wraps an existing component at a root or nested container. This container
+	 * neither syncs it nor can remake it, so a rebound or forked counterpart refuses
+	 * it when it is needed.
+	 */
 	public SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,C component) {
 		super(cursor);
-		this.component=region(key,component);
+		this.key=key;
+		region(key,component);
 	}
 
 	/**
@@ -31,7 +37,14 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 	protected <V extends ACell> SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,RegionFactory<V,C> factory) {
 		super(cursor);
-		component=createRegion(key,factory);
+		this.key=key;
+		createRegion(key,factory);
+	}
+
+	/** Binds to new working storage with a source's region, for a {@link #rebind}. */
+	protected SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,SingleRegion<C> source) {
+		super(cursor,source);
+		this.key=source.key;
 	}
 
 	/** Creates a single region and its child at a root or nested container. */
@@ -41,8 +54,13 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 		return new SingleRegion<C>(cursor,key,factory);
 	}
 
+	@Override
+	public SingleRegion<C> rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		return new SingleRegion<C>(cursor,this);
+	}
+
 	/** Returns the exact registered component, including its pending edits. */
 	public final C component() {
-		return component;
+		return registered(key);
 	}
 }

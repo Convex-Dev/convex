@@ -10,6 +10,8 @@ import java.security.GeneralSecurityException;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.ResourceLockTarget;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
@@ -18,6 +20,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import convex.core.data.AccountKey; 
 
+// Each class reuses one keystore; concurrent rewrites would lose keys.
+@ResourceLock(value="KeyImportTest.keystore", target=ResourceLockTarget.CHILDREN)
 public class KeyImportTest {
 
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();

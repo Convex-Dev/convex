@@ -34,8 +34,8 @@ import net.miginfocom.swing.MigLayout;
  * Panel allowing the selection of account and query mode for a Convex connection
  */
 @SuppressWarnings("serial")
-public class AccountChooserPanel extends JPanel {
-	
+public class AccountChooserPanel extends JPanel implements AutoCloseable {
+
 	private static final Logger log = LoggerFactory.getLogger(AccountChooserPanel.class.getName());
 
 
@@ -259,5 +259,11 @@ public class AccountChooserPanel extends JPanel {
 
 	public Convex getConvex() {
 		return convex;
+	}
+
+	/** Stops following the key ring. */
+	@Override
+	public void close() {
+		keyCombo.close();
 	}
 }

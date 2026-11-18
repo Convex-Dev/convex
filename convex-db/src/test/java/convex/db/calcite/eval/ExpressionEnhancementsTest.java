@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,9 @@ import convex.db.lattice.SQLDatabase;
  */
 class ExpressionEnhancementsTest {
 
+	private static final AtomicLong DB_COUNTER=new AtomicLong();
+	private final String dbName="expr_test_"+DB_COUNTER.incrementAndGet();
+
 	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
@@ -32,9 +36,9 @@ class ExpressionEnhancementsTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		cdb = ConvexDB.create(RowLWW::merge);
-		db = cdb.database("expr_test");
+		db = cdb.database(dbName);
 		IdentifierPolicy.LOWER.applyTo(db);
-		cdb.register("expr_test");
+		cdb.register(dbName);
 
 		ConvexColumnType[] types = {
 			ConvexColumnType.of(ConvexType.INTEGER),  // id
@@ -51,13 +55,14 @@ class ExpressionEnhancementsTest {
 		db.tables().insert("data", 4L, "Dave", 78L, 4.0, "D004");
 		db.tables().insert("data", 5L, "Eve", 95L, 4.8, "E005");
 
-		conn = DriverManager.getConnection("jdbc:convex:database=expr_test");
+		conn = DriverManager.getConnection("jdbc:convex:database="+dbName);
 	}
 
 	@AfterEach
 	void tearDown() throws Exception {
-		if (conn != null) conn.close();
-		if (cdb != null) cdb.unregister("expr_test");
+		assertAll("Close this test's connection and database",
+			() -> { if (conn != null) conn.close(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	// ========== COALESCE Tests ==========

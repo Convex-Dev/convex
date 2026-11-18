@@ -13,6 +13,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -30,7 +31,9 @@ import convex.db.ConvexDB;
 import convex.db.lattice.RowLWW;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.CorruptedFrameException;
 
 /**
  * TLS on the PostgreSQL wire server (#756, CAD055), using the PostgreSQL JDBC
@@ -74,14 +77,20 @@ public class PgTLSTest {
 
 	@AfterEach
 	public void tearDown() {
-		if (server != null) server.stop();
-		cdb.unregister(dbName);
+		assertAll("Stop this test's server and close its database",
+			() -> { if (server != null) server.stop(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	private void start(SSLContext context, boolean allowPlaintext) throws InterruptedException {
+		start(context,allowPlaintext,null);
+	}
+
+	private void start(SSLContext context, boolean allowPlaintext,String password) throws InterruptedException {
 		server = PgServer.builder()
 			.port(0)
 			.database(dbName)
+			.password(password)
 			.sslContext(context)
 			.allowPlaintext(allowPlaintext)
 			.build();
@@ -103,6 +112,22 @@ public class PgTLSTest {
 			assertTrue(rs.next());
 			assertEquals(1, rs.getInt(1));
 		}
+	}
+
+	@Test
+	public void testPasswordAuthentication() throws Exception {
+		start(serverContext,false,"secret123");
+		try (Connection conn=connect("require","sslfactory",NON_VALIDATING,"password","secret123")) {
+			assertQueries(conn);
+		}
+	}
+
+	@Test
+	public void testWrongPassword() throws Exception {
+		start(serverContext,false,"secret123");
+		SQLException failure=assertThrows(SQLException.class,
+			() -> connect("require","sslfactory",NON_VALIDATING,"password","wrongpassword"));
+		assertEquals("28P01",failure.getSQLState());
 	}
 
 	@Test
@@ -152,11 +177,17 @@ public class PgTLSTest {
 	@Test
 	public void testDataAfterSSLRequestRefused() {
 		AtomicInteger connections = new AtomicInteger();
+		var failures=new ArrayList<Throwable>();
 		EmbeddedChannel channel = new EmbeddedChannel(new PgMessageDecoder(true),
 			new PgProtocolHandler(() -> {
 				connections.incrementAndGet();
 				return null;
-			}, null, serverContext, true));
+			}, null, serverContext, true) {
+				@Override public void exceptionCaught(ChannelHandlerContext ctx,Throwable cause) {
+					failures.add(cause);
+					super.exceptionCaught(ctx,cause);
+				}
+			});
 		ByteBuf bytes = Unpooled.buffer();
 		bytes.writeInt(8).writeInt(SSL_REQUEST);
 		writeStartup(bytes);
@@ -165,6 +196,9 @@ public class PgTLSTest {
 		assertFalse(channel.isOpen(), "Connection should close");
 		assertNull(channel.readOutbound(), "No reply should be sent");
 		assertEquals(0, connections.get(), "Injected startup must not be processed");
+		assertEquals(1,failures.size());
+		assertInstanceOf(CorruptedFrameException.class,failures.get(0));
+		channel.finishAndReleaseAll();
 	}
 
 	/** Without GSSAPI encryption, GSSENCRequest is declined and the client continues in plaintext. */

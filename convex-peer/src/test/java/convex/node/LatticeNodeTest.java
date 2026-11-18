@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +39,7 @@ import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 import convex.net.PeerResolver;
 import convex.net.Transports;
+import convex.peer.ExpectedLogs;
 
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
 class LatticeNodeTest {
@@ -58,8 +60,8 @@ class LatticeNodeTest {
 
 	/** Close is final: a closed node cannot be launched and opens no listener. */
 	@Test void aClosedNodeStaysClosed() throws Exception {
-		try (var store=new MemoryStore()) {
-			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0));
+		try (var store=new MemoryStore();
+				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0))) {
 			var group=node.createPropagator();
 			node.close();
 			assertThrows(IllegalStateException.class,node::launch);
@@ -78,8 +80,9 @@ class LatticeNodeTest {
 	 */
 	@Test void closeNeverWaitsForASelectorThatReadsTheNode() throws Exception {
 		try (var store=new MemoryStore();
-				var others=Executors.newVirtualThreadPerTaskExecutor()) {
-			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch();
+				var others=Executors.newVirtualThreadPerTaskExecutor();
+				// Closed before the executor, whose close waits for its task: closing the node frees the selector
+				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch()) {
 			// A node with a key keeps an unreachable peer, retrying, until it closes
 			var key=AKeyPair.createSeeded(714);
 			node.setIdentity(DID.forKey(key.getAccountKey()),key);
@@ -206,7 +209,8 @@ class LatticeNodeTest {
 
 	/** A second port serves a group of its own; a group is registered on, and removed from, every listener. */
 	@Test void aSecondListenerServesAGroupOfItsOwn() throws Exception {
-		try (var store=new MemoryStore()) {
+		try (var logs=ExpectedLogs.onThreads(LatticeListener.class.getName()).open();
+				var store=new MemoryStore()) {
 			var host=LatticeHost.create(CVMLong.create(99),store);
 			try (var network=new LatticeNode<>(host,NodeConfig.port(0))) {
 				var open=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.ONE);
@@ -227,13 +231,19 @@ class LatticeNodeTest {
 				try (var client=ConvexRemote.connect(second.getHostAddress())) {
 					assertEquals(ErrorCodes.TRUST,pingError(client),"a new listener denies until given a selector");
 				}
-				second.setSelector(connection -> trusted);
+				var removed=new AtomicBoolean();
+				second.setSelector(connection -> {
+					// The listener warns of a policy that selects a group it no longer serves
+					if (removed.get()) logs.expectOnThisThread();
+					return trusted;
+				});
 				try (var openClient=ConvexRemote.connect(network.getHostAddress());
 						var trustedClient=ConvexRemote.connect(second.getHostAddress())) {
 					assertEquals(CVMLong.ONE,queryRoot(openClient));
 					assertEquals(CVMLong.TWO,queryRoot(trustedClient));
 				}
 				assertTrue(network.removePropagator(trusted));
+				removed.set(true);
 				try (var client=ConvexRemote.connect(second.getHostAddress())) {
 					assertEquals(ErrorCodes.TRUST,pingError(client),"a removed group is unregistered from every listener");
 				}

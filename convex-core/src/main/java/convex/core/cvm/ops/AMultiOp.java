@@ -74,8 +74,19 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	}
 	
 	@Override
+	public void validateCell() throws InvalidDataException {
+		Cells.validateCell(ops);
+	}
+
+	@Override
 	public void validateStructure() throws InvalidDataException {
-		super.validateStructure();
+		// This cell's children are those of its vector of ops
+		ops.validateStructure();
+	}
+
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
 		long n=ops.count();
 		for (long i=0; i<n; i++) {
 			AOp<ACell> op =Ops.ensureOp(ops.get(i));
@@ -83,10 +94,5 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 				throw new InvalidDataException("Not an op in position "+i, this);
 			}
 		}
-	}
-
-	@Override
-	public void validateCell() throws InvalidDataException {
-		Cells.validateCell(ops);
 	}
 }

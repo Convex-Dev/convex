@@ -36,11 +36,12 @@ class SignedDomainComponentTest {
 			super(path,rule,signer);
 		}
 		private Count(SignedLattice<AInteger> rule,AForkableCursor<AInteger> cursor) { super(rule,cursor); }
-		@Override protected Count rebind(AForkableCursor<AInteger> cursor) { return new Count(lattice,cursor); }
+		@Override public Count rebind(AForkableCursor<AInteger> cursor) { return new Count(lattice,cursor); }
 		@Override public Count fork() { return rebind(storage.fork()); }
-		@Override protected AInteger mergePublication(AInteger own,AInteger other) {
+		@Override protected AInteger reconcile(AInteger own,AInteger other) {
 			reconciliations++;
-			return super.mergePublication(own,other);
+			// A count only rises, so changes on both sides keep the larger
+			return MaxLattice.INSTANCE.merge(own,other);
 		}
 		void set(long value) { cursor().set(CVMLong.create(value)); }
 	}
@@ -73,8 +74,8 @@ class SignedDomainComponentTest {
 		var root=Root.create(initial);
 		var owner=ALICE.getAccountKey();
 		Function<AInteger,SignedData<AInteger>> signer=ALICE::signData;
-		var first=new Count(root.path(owner),OWNERS.signingFor(owner),signer);
-		var second=new Count(root.path(owner),OWNERS.signingFor(owner),signer);
+		var first=new Count(new IndexComponent<>(root).path(owner),OWNERS.signingFor(owner),signer);
+		var second=new Count(new IndexComponent<>(root).path(owner),OWNERS.signingFor(owner),signer);
 		assertFalse(first.cursor().exists());
 		assertNull(first.sync());
 		assertSame(initial,root.get());

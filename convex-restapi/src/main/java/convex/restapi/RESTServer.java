@@ -17,12 +17,14 @@ import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Format;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
-import convex.lattice.LatticeHost;
+import convex.lattice.cursor.Cursors;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
@@ -45,6 +47,7 @@ import convex.restapi.auth.OAuthService;
 import convex.restapi.auth.VenueIdentity;
 import convex.restapi.handler.GracefulStop;
 import convex.restapi.handler.HttpMethodFilter;
+import convex.restapi.handler.RequestBody;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpServer;
 import convex.restapi.web.AuthPage;
@@ -84,8 +87,8 @@ public class RESTServer implements Closeable {
 	protected final AdminAuthorizer adminAuthorizer;
 	/** Configured maximum size of a structured REST request body (bytes). */
 	protected final long maxRequestBytes;
-	/** Bytes of an oversized body to drain before rejecting; see {@link #drainRejectedBody}. */
-	protected final long oversizeDrainBytes;
+	/** Most bytes of a request body read before responding: the ceiling plus {@link #DRAIN_SLACK_BYTES}. */
+	protected final long drainBytes;
 	/** Global admission control bounding concurrent short-lived requests. */
 	protected final Semaphore requestPermits;
 	protected Javalin javalin;
@@ -96,7 +99,7 @@ public class RESTServer implements Closeable {
 	protected static final Integer DEFAULT_PORT=8080;
 	/** Default hard ceiling for structured REST request bodies (see {@code rest.maxRequestBytes}). */
 	public static final long MAX_REQUEST_BODY_BYTES=RESTConfig.DEFAULT_MAX_REQUEST_BYTES;
-	/** Extra bytes drained beyond the body ceiling before a rejection is answered. */
+	/** Bytes read beyond the body ceiling before responding, so a body just over it still gets its 413. */
 	static final long DRAIN_SLACK_BYTES=65536L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
@@ -146,7 +149,7 @@ public class RESTServer implements Closeable {
 		this.convex = ConvexLocal.create(server);
 		this.publicQueryService = new PublicQueryService(server, restConfig);
 		this.maxRequestBytes = restConfig.getMaxRequestBytes();
-		this.oversizeDrainBytes = maxRequestBytes + DRAIN_SLACK_BYTES;
+		this.drainBytes = maxRequestBytes + DRAIN_SLACK_BYTES;
 		long maxRequests = restConfig.getMaxConcurrentRequests();
 		this.requestPermits = new Semaphore((int) Math.min(Integer.MAX_VALUE, Math.max(1L, maxRequests)));
 		String baseUrl=restConfig.getBaseUrl();
@@ -185,7 +188,7 @@ public class RESTServer implements Closeable {
 		AKeyPair kp = server.getKeyPair();
 		if ((kp != null) && restConfig.isMcpEnabled() && restConfig.isSigningEnabled()) {
 			// In memory only: nothing syncs or persists the record, so keys last as long as this server
-			this.signingService = new SigningService(LatticeHost.create().cursor(), kp, Utils::getCurrentTimestampCell);
+			this.signingService = new SigningService(Cursors.root(Index.none()), kp, Utils::getCurrentTimestampCell);
 		} else {
 			this.signingService = null;
 		}
@@ -262,6 +265,14 @@ public class RESTServer implements Closeable {
 
 	public RESTConfig getRESTConfig() {
 		return restConfig;
+	}
+
+	/**
+	 * Gets the most bytes a request body may have ({@code rest.maxRequestBytes}).
+	 * @return Limit in bytes
+	 */
+	public long getMaxRequestBytes() {
+		return maxRequestBytes;
 	}
 
 	/** Gets the stable configured venue DID, or null when no base URL is configured. */
@@ -352,6 +363,7 @@ public class RESTServer implements Closeable {
 				"title", "Convex MCP",
 				"version", Utils.getVersion()
 			));
+			mcpServer.setMaxRequestBytes(maxRequestBytes);
 			mcpAPI = new McpAPI(this, mcpServer);
 			mcpServer.addRoutes(routes);
 			mcpAPI.addRoutes(routes);
@@ -397,7 +409,7 @@ public class RESTServer implements Closeable {
 	private Javalin buildApp(Integer port) {
 		int bindPort = (port == null) ? DEFAULT_PORT : port;
 		Javalin app = Javalin.create(config -> {
-			// RequestBody relies on this limit to bound chunked as well as fixed-length bodies.
+			// A backstop: handlers read bodies through RequestBody, which applies the same limit
 			config.http.maxRequestSize=maxRequestBytes;
 
 			config.bundledPlugins.enableCors(cors -> {
@@ -447,41 +459,6 @@ public class RESTServer implements Closeable {
 	}
 
 	/**
-	 * Reads and discards a bounded prefix of a request body we are about to reject, so the
-	 * connection can be closed gracefully and the 413 survives.
-	 *
-	 * <p>Closing a connection that still holds unread body data resets it rather than
-	 * closing gracefully, and a reset makes the client's TCP stack discard its receive
-	 * buffer — including the 413 already written. Draining first lets the close be graceful
-	 * so the status actually arrives. Bounded (body ceiling plus {@link #DRAIN_SLACK_BYTES})
-	 * so a rejected request never costs more to read than a legal one.</p>
-	 *
-	 * <p>Does nothing when the client offered {@code Expect: 100-continue}: it is waiting
-	 * for permission and has sent no body, so there is nothing to drain — and touching the
-	 * stream would make Jetty invite it to send the very body being rejected.</p>
-	 *
-	 * @param ctx Request context for the rejected request
-	 * @param oversizeDrainBytes Maximum bytes to read and discard
-	 */
-	private static void drainRejectedBody(io.javalin.http.Context ctx, long oversizeDrainBytes) {
-		String expect=ctx.header("Expect");
-		if ((expect!=null)&&expect.toLowerCase().contains("100-continue")) return;
-		try {
-			java.io.InputStream in=ctx.req().getInputStream();
-			byte[] buffer=new byte[8192];
-			long remaining=oversizeDrainBytes;
-			while (remaining>0) {
-				int n=in.read(buffer,0,(int)Math.min(buffer.length,remaining));
-				if (n<0) break;
-				remaining-=n;
-			}
-		} catch (java.io.IOException e) {
-			// Client vanished mid-drain. Answering it is best-efforts by nature, and the
-			// 413 below still runs; nothing here should mask the rejection.
-		}
-	}
-
-	/**
 	 * Whether a request is a long-lived stream excluded from the global admission cap.
 	 * The query-watch and log-watch SSE endpoints hold their connection open, and the MCP
 	 * SSE stream (the GET on {@code /mcp}) keeps its own connection cap (#659); short-lived
@@ -511,15 +488,24 @@ public class RESTServer implements Closeable {
 			ctx.attribute(REQUEST_PERMIT_ATTR, Boolean.TRUE);
 		});
 		routes.after(ctx -> {
-			if (ctx.attribute(REQUEST_PERMIT_ATTR)!=null) requestPermits.release();
+			if (ctx.attribute(REQUEST_PERMIT_ATTR)==null) return;
+			try {
+				// Before the response is written: Jetty resets a connection whose body is
+				// still arriving, and the reset makes the client discard the response.
+				// Within the permit, as reading is part of answering; a shed request is not
+				// read. Bounded, so no request costs more to read than a legal one.
+				RequestBody.discardRest(ctx, drainBytes);
+			} finally {
+				requestPermits.release();
+			}
 		});
 
-		// Reject a known oversized body before a handler starts parsing it. Requests
-		// without Content-Length are still bounded while read by RequestBody.
+		// Reject a known oversized body before a handler starts parsing it; the after
+		// handler reads it within its bound, so the 413 arrives. Requests without
+		// Content-Length are still bounded while read by RequestBody.
 		routes.before(ctx -> {
 			long contentLength=ctx.req().getContentLengthLong();
 			if (contentLength>maxRequestBytes) {
-				drainRejectedBody(ctx, oversizeDrainBytes);
 				throw new ContentTooLargeResponse("Request body exceeds maximum size of "
 						+maxRequestBytes+" bytes");
 			}
@@ -635,10 +621,13 @@ public class RESTServer implements Closeable {
 	}
 
 	/**
-	 * Start app with specific port
+	 * Start app with specific port, stopping it first if it is running
+	 *
+	 * @throws IllegalStateException if this server has been closed
 	 */
 	public synchronized void start(Integer port) {
-		close();
+		if (closed) throw new IllegalStateException("REST server is closed");
+		stopApp();
 		if (port == null) port = restConfig.getRestPort();
 		try {
 			javalin=buildApp(port);
@@ -646,22 +635,45 @@ public class RESTServer implements Closeable {
 		} catch (JavalinBindException e) {
 			if (port!=null) throw e; // only try again if port unspecified
 			log.warn("Default port "+DEFAULT_PORT+" already in use ("+e.getMessage()+"), choosing another at random");
-			close();
+			stopApp();
 
 			javalin=buildApp(0); // use random port
 			javalin.start();
 		}
 	}
 
-	public synchronized void close() {
-		if (mcpAPI!=null) mcpAPI.shutdown();
-		if (logWatchAPI!=null) logWatchAPI.shutdown();
-		if (queryWatchAPI!=null) queryWatchAPI.shutdown();
-		if (javalin!=null) javalin.stop();
+	/** Stops the HTTP server and the APIs it serves; starting builds them again. */
+	private void stopApp() {
+		// A failing API shutdown still leaves the HTTP server to stop
+		Cleanup cleanup=new Cleanup();
+		if (mcpAPI!=null) cleanup.run(mcpAPI::shutdown);
+		if (logWatchAPI!=null) cleanup.run(logWatchAPI::shutdown);
+		if (queryWatchAPI!=null) cleanup.run(queryWatchAPI::shutdown);
+		Javalin app=javalin;
 		javalin=null;
-		
-		// we don't own the Convex server, so do nothing to it
+		if (app!=null) cleanup.run(app::stop);
+		cleanup.finish();
 	}
+
+	/**
+	 * Closes this server for good: stops the HTTP server and its APIs, then closes the
+	 * local clients it opened. Closing again does nothing. The peer is not closed.
+	 */
+	public synchronized void close() {
+		if (closed) return;
+		closed=true;
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(this::stopApp);
+		// Once requests have stopped
+		cleanup.run(convex::close);
+		if (convexFaucet!=null) cleanup.run(convexFaucet::close);
+
+		// we don't own the Convex server, so do nothing to it
+		cleanup.finish();
+	}
+
+	/** Set by the first close, under this server's lock, which start also holds */
+	private boolean closed;
 
 	/**
 	 * Shared local Convex client instance. Use for fast reads. Don't transact with this!!

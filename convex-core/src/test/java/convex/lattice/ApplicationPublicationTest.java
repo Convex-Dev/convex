@@ -17,7 +17,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
@@ -42,20 +42,20 @@ public class ApplicationPublicationTest {
 		return LATTICE.zero().assoc(OWNED,KEY.signData(Sets.of(0))).assoc(REGISTER,CVMLong.ZERO);
 	}
 
-	/** Transactional roots route atomic updates through CAS, where the race is injected. */
-	private static final class InterleavingRoot extends TransactionalRootCursor<Index<Keyword,ACell>> {
+	/** Roots route atomic updates through CAS, where the race is injected. */
+	private static final class InterleavingRoot extends Root<Index<Keyword,ACell>> {
 		Runnable beforeCAS;
 		InterleavingRoot() { super(initial()); }
-		@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
+		@Override protected boolean install(Index<Keyword,ACell> held,Index<Keyword,ACell> value) {
 			Runnable action=beforeCAS;
 			beforeCAS=null;
 			if (action!=null) action.run();
-			return super.compareAndSet(expected,value);
+			return super.install(held,value);
 		}
 	}
 
 	private static final class Application extends ALatticeApplication<Index<Keyword,ACell>> {
-		final SignedComponent<ASet<CVMLong>> owner;
+		final SignedSetComponent<CVMLong> owner;
 		final AtomicInteger signatures=new AtomicInteger();
 		Runnable onSign=() -> {};
 		volatile AKeyPair signingKey=KEY;
@@ -64,7 +64,7 @@ public class ApplicationPublicationTest {
 			super(host.cursor().fork(),host::persist);
 			// The owned subtree publishes through its own fork of the host, beside this
 			// application's staged root, so each fork reconciles only what it owns.
-			owner=new SignedComponent<>(SIGNED,
+			owner=new SignedSetComponent<>(SIGNED,
 				LatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED),
 				value -> {
 					signatures.incrementAndGet();
@@ -86,7 +86,7 @@ public class ApplicationPublicationTest {
 
 		/** Called only when both this root and the host changed: the owned subtree is
 		 *  the owner component's to publish, so it is taken from the destination. */
-		@Override protected Index<Keyword,ACell> mergePublication(
+		@Override protected Index<Keyword,ACell> reconcile(
 				Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			CVMLong local=(CVMLong)own.get(REGISTER);
 			CVMLong remote=(CVMLong)other.get(REGISTER);
@@ -119,7 +119,7 @@ public class ApplicationPublicationTest {
 	}
 
 	@Test
-	public void testCASRaceCombinesOwnersAndReusesSignatureForUnrelatedRetry() {
+	public void testCASRaceCombinesOwnersAndKeepsUnrelatedWrites() {
 		var root=new InterleavingRoot();
 		var host=new LatticeHost<>(root,null);
 		var first=new Application(host);
@@ -134,7 +134,6 @@ public class ApplicationPublicationTest {
 		assertEquals(Sets.of(0,1,2),signed(root.get()).getValue());
 		assertTrue(signed(root.get()).checkSignature());
 		assertEquals(CVMLong.ONE,root.get().get(IGNORED));
-		assertEquals(2,second.signatures.get(),"Only the changed signed payload requires re-signing");
 	}
 
 	@Test

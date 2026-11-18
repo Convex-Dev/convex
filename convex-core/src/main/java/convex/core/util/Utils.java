@@ -1023,6 +1023,46 @@ public class Utils {
 		throw (T) t;
 	}
 
+	/**
+	 * Checks a failure of one unit of work, such as one message, one connection or one
+	 * cleanup step, before the caller contains it, so that the work fails alone.
+	 * Rethrows the failure if it is a failure of the JVM itself:
+	 * a {@link VirtualMachineError} other than {@link StackOverflowError} or
+	 * {@link OutOfMemoryError}. Otherwise returns, restoring the current thread's
+	 * interrupt status if the failure is an {@link InterruptedException}.
+	 *
+	 * @param e Failure of one unit of work
+	 */
+	public static void checkRequestFailure(Throwable e) {
+		if ((e instanceof VirtualMachineError vme) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError)) {
+			throw vme;
+		}
+		if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+	}
+
+	/**
+	 * Tests whether a failure is a failure of the JVM itself: a {@link VirtualMachineError}
+	 * other than {@link StackOverflowError} or {@link OutOfMemoryError}.
+	 *
+	 * @param e Failure to test
+	 * @return True if the JVM itself has failed
+	 */
+	public static boolean isJvmFailure(Throwable e) {
+		return (e instanceof VirtualMachineError) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError);
+	}
+
+	/**
+	 * Tests whether a failure is probably a defect rather than a result of the input
+	 * or the load: an {@link Error} other than {@link StackOverflowError} or
+	 * {@link OutOfMemoryError}.
+	 *
+	 * @param e Failure to test
+	 * @return True if the failure is probably a defect
+	 */
+	public static boolean isProbableDefect(Throwable e) {
+		return (e instanceof Error) && !(e instanceof StackOverflowError || e instanceof OutOfMemoryError);
+	}
+
 	@SuppressWarnings("unchecked")
 	public static <T> T[] copyOfRangeExcludeNulls(T[] entries, int offset, int length) {
 		int newLen = length;

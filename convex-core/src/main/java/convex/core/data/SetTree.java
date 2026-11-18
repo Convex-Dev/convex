@@ -236,6 +236,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 				sel = sel & ~(1 << i); // remove from selection
 			}
 		}
+		// A tree has at least two children: a lone child holds every element, so it is the set
+		if (Integer.bitCount(newMask & 0xFFFF) == 1) {
+			return children[Integer.numberOfTrailingZeros(sel)].getValue();
+		}
 		if (mask != newMask) {
 			return new SetTree<V>(Refs.filterSmallArray(children, sel), shift, newMask, count);
 		}
@@ -468,18 +472,97 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public AHashSet<T> mergeWith(AHashSet<T> b, int setOp) {
-		return mergeWith(b, setOp, this.shift);
+		return mergeWith(b, setOp, 0);
 	}
 
 	@Override
-	protected AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int shift) {
+	protected AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int prefix) {
 		if ((b instanceof SetTree)) {
 			SetTree<T> bt = (SetTree<T>) b;
-			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
-			return mergeWith(bt, setOp, shift);
+			// Usual case first: both branch at the digit after the known prefix, so share it
+			if ((shift == bt.shift) && (shift == prefix)) return mergeWith(bt, setOp, shift);
+			return mergeTrees(bt, setOp);
 		}
-		if ((b instanceof SetLeaf)) return mergeWith((SetLeaf<T>) b, setOp, shift);
+		if ((b instanceof SetLeaf)) {
+			SetLeaf<T> bl = (SetLeaf<T>) b;
+			// Usual case first: every element of b is known to share this tree's prefix
+			if ((shift == prefix) || bl.isEmpty()) return mergeWith(bl, setOp, shift);
+			Hash h = getFirstHash();
+			AHashSet<T> result = mergeWith(bl.filterPrefix(h, shift, true), setOp, shift);
+			// Elements under another prefix lie outside this tree, like those under an absent digit
+			return includeAlone(result, bl.filterPrefix(h, shift, false), setOp);
+		}
 		throw new Panic("Unrecognised map type: " + b.getClass());
+	}
+
+	/**
+	 * Merges with a tree whose shift or prefix differs from this one's, or which is not known
+	 * to share it
+	 */
+	private AHashSet<T> mergeTrees(SetTree<T> b, int setOp) {
+		int bshift = b.shift;
+		int least = Math.min(shift, bshift);
+		int common = getFirstHash().commonHexPrefixLength(b.getFirstHash(), least);
+		if (common < least) {
+			// No element in common: each is merged with nothing, then joined at the digit where they part
+			AHashSet<T> empty = Sets.empty();
+			return join(common, mergeWith(empty, setOp, shift), empty.mergeWith(b, setOp, bshift));
+		}
+		if (shift == bshift) return mergeWith(b, setOp, shift);
+		// One lies under a single digit of the other
+		if (shift < bshift) return mergeUnder(this, b.getFirstHash().getHexDigit(shift), b, true, setOp);
+		return mergeUnder(b, getFirstHash().getHexDigit(bshift), this, false, setOp);
+	}
+
+	/**
+	 * Merges tree t with set x, all of whose elements lie under digit d of t: x with the child of
+	 * t at d, and each other child of t with nothing.
+	 *
+	 * @param tFirst True if t is the receiver of the merge, false if x is
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> AHashSet<T> mergeUnder(SetTree<T> t, int d, AHashSet<T> x, boolean tFirst, int setOp) {
+		int s = t.shift;
+		AHashSet<T> empty = Sets.empty();
+		Ref<AHashSet<T>>[] newChildren = (Ref<AHashSet<T>>[]) new Ref<?>[16];
+		boolean changed = false;
+		for (int digit = 0; digit < 16; digit++) {
+			Ref<AHashSet<T>> tref = t.childForDigit(digit);
+			AHashSet<T> tc = tref.getValue();
+			AHashSet<T> xc = (digit == d) ? x : empty;
+			if (tc.isEmpty() && xc.isEmpty()) continue;
+			AHashSet<T> rc = tFirst ? tc.mergeWith(xc, setOp, s + 1) : xc.mergeWith(tc, setOp, s + 1);
+			if (rc != tc) changed = true;
+			newChildren[digit] = (rc == tc) ? tref : rc.getRef();
+		}
+		if (tFirst && !changed) return t;
+		// A lone child left is the result itself, so a receiver x left unchanged is returned as x
+		return createFull(newChildren, s);
+	}
+
+	/**
+	 * Joins two sets whose elements share their first c hex digits and part at the next
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> AHashSet<T> join(int c, AHashSet<T> a, AHashSet<T> b) {
+		if (b.isEmpty()) return a;
+		if (a.isEmpty()) return b;
+		Ref<AHashSet<T>>[] children = (Ref<AHashSet<T>>[]) new Ref<?>[16];
+		children[a.getFirstHash().getHexDigit(c)] = a.getRef();
+		children[b.getFirstHash().getHexDigit(c)] = b.getRef();
+		return createFull(children, c);
+	}
+
+	/**
+	 * Includes the elements of a leaf that the result lacks, as the set operation gives each alone
+	 */
+	private AHashSet<T> includeAlone(AHashSet<T> result, SetLeaf<T> b, int setOp) {
+		int n = b.size();
+		for (int i = 0; i < n; i++) {
+			Ref<T> newE = applyOp(setOp, null, b.getRef(i));
+			if (newE != null) result = result.includeRef(newE);
+		}
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -599,73 +682,49 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-
-		validateWithPrefix(Hash.EMPTY_HASH,0,-1);
-	}
-	
-	@Override
-	protected void validateWithPrefix(Hash base, int digit, int position) throws InvalidDataException {
-		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		if ((shift <0)||(shift>MAX_SHIFT)) {
-			throw new InvalidDataException("Invalid shift for SetTree", this);
-		}
-		
-		if (count<=SetLeaf.MAX_ELEMENTS) {
-			throw new InvalidDataException("Count too small [" + count + "] for SetTree", this);
-		}
-
-		Hash firstHash;
-		try {
-			firstHash=getFirstHash();
-		
-		int bsize = children.length;
-
-		long childCount=0;;
-			for (int i = 0; i < bsize; i++) {
-				if (children[i] == null) {
-					throw new InvalidDataException("Null child ref at index " + i,this);
+	public void validateStructure() throws InvalidDataException {
+		Hash firstHash=getFirstHash();
+		long childCount=0;
+		for (int i = 0; i < children.length; i++) {
+			ACell o = children[i].getValue();
+			if (!(o instanceof AHashSet)) throw new InvalidDataException("Child "+i+" is not a hash set",this);
+			AHashSet<T> child=(AHashSet<T>) o;
+			if (child.isEmpty()) throw new InvalidDataException("Empty child "+i,this);
+			int d = digitForIndex(i, mask);
+			if (child instanceof SetTree<T> tree) {
+				if (tree.shift<=shift) throw new InvalidDataException("Child "+i+" shift not greater than "+shift,this);
+				checkChildHash(tree.getFirstHash(),firstHash,d,i);
+			} else {
+				SetLeaf<T> leaf=(SetLeaf<T>) child;
+				long n=leaf.count();
+				for (long j=0; j<n; j++) {
+					checkChildHash(leaf.getElementRef(j).getHash(),firstHash,d,i);
 				}
-				
-				ACell o = children[i].getValue();
-				if (!(o instanceof AHashSet)) {
-					throw new InvalidDataException(
-							"Expected AHashSet child at index " + i +" but got "+Utils.getClassName(o), this);
-				}
-				@SuppressWarnings("unchecked")
-				AHashSet<T> child = (AHashSet<T>) o;
-				if (child.isEmpty())
-					throw new InvalidDataException("Empty child at index " + i,this);
-				
-				if (child instanceof SetTree) {
-					SetTree<T> childTree=(SetTree<T>) child;
-					if (childTree.shift<=shift) {
-						throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected greater than ["+shift+"]",this);
-					}
-				}
-				
-				Hash childHash=child.getElementRef(0).getHash();
-				long pmatch=firstHash.hexMatch(childHash);
-				if (pmatch<shift) throw new InvalidDataException("Mismatched child hash [" + childHash +"] with this ["+firstHash+"]",
-						this);
-				
-				int d = digitForIndex(i, mask);
-				child.validateWithPrefix(firstHash ,d,position+1);
-				
-				childCount += child.count();
 			}
-			
-			if (count != childCount) {
-				throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
-			}
-		} catch (ClassCastException e) {
-			throw new InvalidDataException("Bad child type:" +e.getMessage(), this);
+			childCount += child.count();
+		}
+		if (count != childCount) {
+			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
 	}
 
+	/**
+	 * Checks that an element hash in child i shares this tree's prefix and has the child's digit
+	 */
+	private void checkChildHash(Hash h, Hash firstHash, int digit, int i) throws InvalidDataException {
+		if ((h.commonHexPrefixLength(firstHash, shift) < shift) || (h.getHexDigit(shift) != digit)) {
+			throw new InvalidDataException("Child "+i+" holds an element outside its digit",this);
+		}
+	}
+
+	/**
+	 * Check for top level structural integrity. Does not traverse branch refs.
+	 * @return true if valid, false otherwise
+	 */
 	boolean isValidStructure() {
+		if ((shift<0)||(shift>MAX_SHIFT)) return false;
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		int n=children.length;
 		if (n<2) return false;
@@ -686,7 +745,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public boolean containsAll(ASet<?> b) {
 		if (b instanceof SetTree) {
-			return containsAll((SetTree<?>)b);
+			return containsAll((SetTree<?>)b, 0);
 		}
 		// must be a SetLeaf
 		long n=b.count;
@@ -696,21 +755,45 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		}
 		return true;
 	}
-	
-	protected boolean containsAll(SetTree<?> other) {
+
+	/**
+	 * Tests whether this tree holds every element of another, given a number of leading hex
+	 * digits that every element hash of both is known to share
+	 */
+	protected boolean containsAll(SetTree<?> other, int prefix) {
+		// Usual case first: both branch at the digit after the known prefix, so share it
+		if ((shift != other.shift) || (shift != prefix)) {
+			int least = Math.min(shift, other.shift);
+			// Trees that part before either branches have no element in common
+			if (getFirstHash().commonHexPrefixLength(other.getFirstHash(), least) < least) return false;
+			// A tree branching at an earlier digit has elements under digits this one lacks
+			if (other.shift < shift) return false;
+			// A tree branching at a later digit lies under one digit of this one
+			if (other.shift > shift) return childContainsAll(childForDigit(other.getFirstHash().getHexDigit(shift)).getValue(), other, shift + 1);
+		}
+
 		// fist check this mask contains all of target mask
 		if ((this.mask|other.mask)!=this.mask) return false;
-		
+
 		for (int i=0; i<16; i++) {
 			Ref<AHashSet<T>> child=this.childForDigit(i);
 			if (child==null) continue;
-			
+
 			Ref<?> mchild = other.childForDigit(i);
 			if (mchild==null) continue;
-			
-			if (!(child.getValue().containsAll((ASet<?>) mchild.getValue()))) return false; 
+
+			if (!childContainsAll(child.getValue(), (AHashSet<?>) mchild.getValue(), shift + 1)) return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Tests whether a child set holds every element of another set, given a number of leading
+	 * hex digits that every element hash of both is known to share
+	 */
+	private static boolean childContainsAll(AHashSet<?> child, AHashSet<?> b, int prefix) {
+		if ((child instanceof SetTree<?> ct) && (b instanceof SetTree<?> bt)) return ct.containsAll(bt, prefix);
+		return child.containsAll(b);
 	}
 
 	@Override

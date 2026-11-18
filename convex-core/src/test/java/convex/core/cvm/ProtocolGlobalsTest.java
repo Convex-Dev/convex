@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.opentest4j.AssertionFailedError;
 
 import convex.core.data.AVector;
@@ -25,6 +27,7 @@ import convex.core.init.InitTest;
  * mechanism itself.
  */
 @TestInstance(Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 public class ProtocolGlobalsTest {
 
 	// Shared static state: immutable, so safe to share across tests

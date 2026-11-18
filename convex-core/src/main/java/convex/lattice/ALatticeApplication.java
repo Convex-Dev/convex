@@ -1,8 +1,8 @@
 package convex.lattice;
 
 import convex.core.data.ACell;
+import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Persister;
 
 /**
  * Application lifecycle over a component's working state and managed children.
@@ -13,10 +13,11 @@ import convex.lattice.cursor.Persister;
  * and one holding a private copy of the root is given a fork with the function that
  * persists it, {@code super(host.cursor().fork(), host::persist)}.
  * Children may share that state or own separate publication boundaries. Which
- * children persist, and when, is the application's policy.</p>
+ * children are given such a function is the application's policy.</p>
  *
- * <p>Sync prepares the application, syncs its managed children, then publishes its
- * own working boundary. Publication stops at the destination cursor. The host owns
+ * <p>Sync prepares the application, syncs any children it manages in forks of their
+ * own ({@link #syncChildren()}; none by default), then publishes its own working
+ * boundary. Publication stops at the destination cursor. The host owns
  * storage and replication; host sync and physical durability remain separate.
  * Failures stop later stages without rolling back completed child publications.</p>
  *
@@ -33,7 +34,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * Binds working state of its own with the function that persists it, normally a
 	 * private copy of the root, {@code host.cursor().fork()}, with {@code host::persist}.
 	 */
-	protected ALatticeApplication(AForkableCursor<V> cursor,Persister<V> persister) {
+	protected ALatticeApplication(AForkableCursor<V> cursor,Persister persister) {
 		super(cursor,persister);
 	}
 
@@ -46,19 +47,10 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	protected void beforeSync() {
 	}
 
-	/**
-	 * Publishes managed children after preparation and before this application's
-	 * own boundary. The default has none. Implementations define child order;
-	 * completed child publications stand if a later child fails.
-	 */
-	protected void syncChildren() {
-	}
-
-	/** Prepares, publishes managed children, then publishes this application's own boundary. */
+	/** Prepares, then syncs as every component does: managed children, then this application's own boundary. */
 	@Override
 	public V sync() {
 		beforeSync();
-		syncChildren();
 		return super.sync();
 	}
 

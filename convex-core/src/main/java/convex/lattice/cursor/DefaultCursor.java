@@ -11,12 +11,12 @@ import convex.core.data.ACell;
  * clears storage, after which reads again return the default.
  *
  * <p>The default is a value chosen by the caller, not an inferred container type
- * or lattice policy. Descendant paths can therefore edit an absent container
- * without creating it until an actual change occurs.</p>
+ * or lattice policy. A write goes through the source, so it lands only where the
+ * source's place exists or the source creates it.</p>
  *
  * @param <V> Value type
  */
-public final class DefaultCursor<V extends ACell> extends AUpdateCursor<V,V> {
+public final class DefaultCursor<V extends ACell> extends ATransformCursor<V,V> {
 
 	private final V defaultValue;
 
@@ -27,5 +27,5 @@ public final class DefaultCursor<V extends ACell> extends AUpdateCursor<V,V> {
 
 	@Override protected V view(V stored) { return stored==null?defaultValue:stored; }
 	@Override protected Object readValue() { return view(base.getOrDefault(null)); }
-	@Override protected V prepareWrite(V value) { return value; }
+	@Override protected V write(V current,V value) { return value; }
 }

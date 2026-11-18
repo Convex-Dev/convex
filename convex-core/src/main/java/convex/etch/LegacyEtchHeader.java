@@ -12,6 +12,7 @@ import java.util.Arrays;
 
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.util.Cleanup;
 import convex.core.util.Utils;
 
 /** Existing single-header Etch v1/v2 metadata behaviour. */
@@ -27,11 +28,11 @@ final class LegacyEtchHeader extends AEtchHeader {
 		return new LegacyEtchHeader(version,0L,Hash.UNSET_HASH);
 	}
 
-	static LegacyEtchHeader open(AFileMapper mapper, String fileName) throws IOException {
+	static LegacyEtchHeader open(EtchHeaderSource source, String fileName) throws IOException {
 		int headerLength=Math.toIntExact(ROOT_HASH_OFFSET+Hash.LENGTH);
-		if (mapper.length()<headerLength) throw new IOException("Truncated Etch header: "+fileName);
+		if (source.length()<headerLength) throw new IOException("Truncated Etch header: "+fileName);
 		byte[] header=new byte[headerLength];
-		mapper.read(0L,header,0,header.length,null);
+		source.read(0L,header,0,header.length);
 		return decode(header,fileName);
 	}
 
@@ -121,7 +122,9 @@ final class LegacyEtchHeader extends AEtchHeader {
 
 	@Override
 	void close(Etch etch) throws IOException {
-		writeDataLength(etch);
-		sync(etch);
+		Cleanup cleanup=new Cleanup();
+		cleanup.run(() -> writeDataLength(etch));
+		cleanup.run(() -> sync(etch));
+		cleanup.finish(IOException.class);
 	}
 }

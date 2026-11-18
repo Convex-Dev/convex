@@ -25,7 +25,7 @@ public class OwnedIndex<K extends ABlobLike<?>,V extends ACell> extends AOwnedMa
 		super(owners,destination);
 	}
 
-	@Override protected OwnedIndex<K,V> rebind(AForkableCursor<Index<K,SignedData<V>>> cursor) {
+	@Override public OwnedIndex<K,V> rebind(AForkableCursor<Index<K,SignedData<V>>> cursor) {
 		return new OwnedIndex<>(getLattice(),cursor);
 	}
 

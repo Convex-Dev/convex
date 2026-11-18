@@ -1,6 +1,6 @@
 # Etch v3: Header, Durability and Encryption
 
-Etch v3 is the current on-disk format for Etch, the append-only content-addressed
+Etch v3 is the latest on-disk format for Etch, the append-only content-addressed
 store behind every Convex peer and lattice node. It keeps the v2 data-record and
 index-block layout specified in [CAD047](https://docs.convex.world/docs/cad/etch)
 and changes only what sits around it: a duplicated, self-checking header that
@@ -148,10 +148,15 @@ The state must be invalidated durably before mutation:
    resource cleanup continues even if a force or header commit fails; such a close
    is dirty by definition and is logged as a warning.
 
-Each sync interval therefore costs one extra forced header transition, never one per
-record, and every completed durability boundary is directly reopenable. A crash
-during either transition selects a complete old or new generation; an `OPEN` result
-is conservative and requires backup restoration or explicit repair.
+A write that changes nothing (storing a value already held with the same status, or
+the root already recorded) is not a mutation and leaves `CLEAN_CLOSED` in place, so a
+store at rest stays directly reopenable however often its owner publishes.
+
+Each sync interval in which something changes therefore costs one extra forced header
+transition, never one per record, and every completed durability boundary is directly
+reopenable. A crash during either transition selects a complete old or new
+generation; an `OPEN` result is conservative and requires backup restoration or
+explicit repair.
 
 ### Header verification and selection
 
@@ -194,14 +199,22 @@ Index algorithms preserve a valid old view until their single publication write:
 - a new entry is appended completely before its empty slot is filled;
 - converting a plain slot into a chain appends the new record first, changes the
   original slot from `PTR_PLAIN` to `PTR_START`, then publishes the new pointer as
-  `PTR_CHAIN`, so a failed publication leaves only an unreachable record;
+  `PTR_CHAIN`, so a failed publication leaves a valid one-entry chain and an
+  unreachable record;
 - replacing a chain with a child index builds the whole child first and repoints
   the parent slot to `PTR_INDEX` last; old continuation slots are cleanup, cleared
   afterwards, and a lock-free reader that started from the old `PTR_START` re-reads
   that slot before returning a miss and retries the level if it changed.
 
-These rules keep live readers safe and improve crash recovery without adding a force
-to the hot path.
+A run of `PTR_CHAIN` slots with no `PTR_START` before it is a stale run: the
+cleanup of a collapse that stopped part-way, whose entries are all in the child
+index. Readers treat a stale slot as a miss, a write that lands on one clears the
+run and takes the slot, and a chain never grows into a slot followed by a stale
+run without clearing it first. Strict validation accepts a stale slot only when
+its record is also reached through the index proper.
+
+These rules keep live readers safe, keep the index usable after a write that stops
+part-way, and improve crash recovery without adding a force to the hot path.
 
 ### `sync`
 
@@ -218,7 +231,10 @@ durability boundary:
 The body is forced before the new header can become valid, so a completely written
 new header that reaches storage early is still safe to select. A failed body force,
 header write or header force is reported to the caller and the in-memory active
-generation advances only after the final force succeeds. After later unsynchronised
+generation advances only after the final force succeeds. A copy written but not
+forced may still reach storage, so after a commit fails past its header write the
+next mutation first publishes `OPEN` over that copy, and the next `sync` or `close`
+commits even if nothing changed. After later unsynchronised
 writes begin, a crash may preserve any mixture of them; exact rollback to the last
 generation is not guaranteed, because in-place index pages can be written back by the
 operating system before `sync`.
@@ -280,7 +296,9 @@ Repair is distinct from garbage collection: GC starts from a normally readable i
 and discards what the root does not reach; repair assumes the index may be unusable,
 rediscovers cells from immutable records and proves the selected synced root
 complete. It is offline, read-only on the source and always directed into a fresh
-file. Under the exclusive lock it:
+file. The source is the store's current file, which after a completed GC cutover is
+the file its completion marker names ([ETCH_GC.md](ETCH_GC.md#file-lifecycle-and-recovery)).
+Under the exclusive lock it:
 
 1. validates and selects a header (root, `syncedFileEnd`, cipher parameters) and
    snapshots physical EOF;
@@ -288,7 +306,8 @@ file. Under the exclusive lock it:
    valid records and reporting bad slots or subtrees;
 3. scans the whole body sequentially through physical EOF, decrypting at absolute
    offsets where necessary, accepting a candidate only after bounds, canonical CAD3
-   and content-hash validation and ignoring mutable labels;
+   and content-hash validation, none of which reads another record, and ignoring
+   mutable labels;
 4. writes every accepted hash-and-encoding pair into the new file, building a new
    index without trusting the source index, and rejects conflicting encodings for
    one hash;

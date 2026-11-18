@@ -3,9 +3,12 @@ package convex.dlfs.test;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -21,7 +24,9 @@ import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.fs.DLFSLattice;
+import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
+import convex.lattice.cursor.Root;
 
 /** Component boundaries, independent of transport or disk-store lifecycle. */
 public class DLFSApplicationTest {
@@ -29,13 +34,29 @@ public class DLFSApplicationTest {
 	private static final AKeyPair OTHER=AKeyPair.createSeeded(822);
 	private static final Keyword UNRELATED=Keyword.intern("unrelated");
 
+	/** Hosts this test created, closed after it */
+	private final List<LatticeHost<?>> hosts=new ArrayList<>();
+
+	@AfterEach
+	void closeHosts() {
+		List<Executable> cleanup=new ArrayList<>();
+		for (LatticeHost<?> host:hosts) cleanup.add(host::close);
+		assertAll("Close this test's hosts",cleanup);
+	}
+
+	/** Records a host this test created, so it closes after the test */
+	private <V extends ACell> LatticeHost<V> owned(LatticeHost<V> host) {
+		hosts.add(host);
+		return host;
+	}
+
 	private static DLFSApplication files(LatticeHost<Index<Keyword,ACell>> host) {
 		return host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
 			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW));
 	}
 
 	@Test void emptyApplicationAndUnknownDeliveriesDoNotChangeTheRoot() {
-		var host=LatticeHost.create();
+		var host=owned(LatticeHost.create());
 		var before=host.cursor().get();
 		var app=files(host);
 		assertSame(before,host.cursor().get(),"construction is read-only");
@@ -45,18 +66,36 @@ public class DLFSApplicationTest {
 		assertSame(before,host.cursor().get());
 	}
 
+	@Test void reboundApplicationWorksOnItsOwnStorage() {
+		var host=owned(LatticeHost.create());
+		var before=host.cursor().get();
+		var app=files(host);
+		var draft=new Root<>(before);
+		var rebound=app.rebind(draft);
+		assertNotSame(app.dlfs(),rebound.dlfs());
+		rebound.drives(OWNER.getAccountKey()).createDrive("home");
+		assertNotNull(draft.get().get(Keywords.FS));
+		assertSame(before,host.cursor().get());
+	}
+
+	@Test void applicationGivenAnExistingRegionCannotBeRebound() {
+		var host=owned(LatticeHost.create());
+		var app=new DLFSApplication(host,Keywords.FS,files(owned(LatticeHost.create())).dlfs());
+		assertThrows(UnsupportedOperationException.class,() -> app.rebind(new Root<>(host.cursor().get())));
+	}
+
 	@Test void applicationsOnOneHostHaveIndependentTimestampAdmission() {
 		var strictKey=Keyword.intern("strict");
 		var tolerantKey=Keyword.intern("tolerant");
 		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
-		var host=LatticeHost.create();
+		var host=owned(LatticeHost.create());
 		var strict=host.addApplication(new DLFSApplication(host,null,time::get,0,strictKey));
 		var tolerant=host.addApplication(new DLFSApplication(host,null,time::get,30,tolerantKey));
-		var source=new DLFSApplication(LatticeHost.create(),OWNER::signData,() -> CVMLong.create(90),30);
+		var source=new DLFSApplication(owned(LatticeHost.create()),OWNER::signData,() -> CVMLong.create(90),30);
 		source.drives(OWNER.getAccountKey()).createDrive("home");
 		var baseline=source.dlfs().cursor().get();
 		host.merge(Index.of(strictKey,baseline,tolerantKey,baseline));
-		var later=new DLFSApplication(LatticeHost.create(),OWNER::signData,() -> CVMLong.create(130),30);
+		var later=new DLFSApplication(owned(LatticeHost.create()),OWNER::signData,() -> CVMLong.create(130),30);
 		later.drives(OWNER.getAccountKey()).createDrive("home");
 		var region=later.dlfs().cursor().get();
 		var signed=region.get(OWNER.getAccountKey());
@@ -73,7 +112,7 @@ public class DLFSApplicationTest {
 	}
 
 	@Test void rootRegionAndOwnerDeliveryEnforceTheSameSignedBoundary() throws Exception {
-		var source=files(LatticeHost.create());
+		var source=files(owned(LatticeHost.create()));
 		Files.writeString(source.drives(OWNER.getAccountKey()).createDrive("home")
 			.fileSystem().getPath("/hello"),"hello");
 		var region=source.dlfs().cursor().get();
@@ -81,7 +120,7 @@ public class DLFSApplicationTest {
 		var forged=SignedData.create(OWNER.getAccountKey(),signed.getSignature(),Ref.get(Maps.empty()));
 
 		for (int depth=0;depth<=2;depth++) {
-			var host=LatticeHost.create();
+			var host=owned(LatticeHost.create());
 			var app=files(host);
 			host.cursor().updateAndGet(root -> root.assoc(UNRELATED,CVMLong.ONE));
 			if (depth==0) host.merge(source.cursor().get().assoc(UNRELATED,CVMLong.TWO));
@@ -105,8 +144,8 @@ public class DLFSApplicationTest {
 	}
 
 	@Test void sharedForkReconcilesIncomingFilesWithoutPublishingPendingEdits() throws Exception {
-		var host=LatticeHost.create();
-		var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),null,OWNER::signData,() -> CVMLong.create(100));
+		var host=owned(LatticeHost.create());
+		var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),null,OWNER::signData,() -> CVMLong.create(100));
 		var staged=region.fork();
 		var app=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
 		var shared=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
@@ -115,7 +154,7 @@ public class DLFSApplicationTest {
 		var local=app.drives(OWNER.getAccountKey()).createDrive("home").fileSystem();
 		Files.writeString(local.getPath("/local"),"local");
 
-		var remote=files(LatticeHost.create());
+		var remote=files(owned(LatticeHost.create()));
 		Files.writeString(remote.drives(OWNER.getAccountKey()).createDrive("home")
 			.fileSystem().getPath("/remote"),"remote");
 		host.merge(remote.cursor().get());
@@ -125,10 +164,12 @@ public class DLFSApplicationTest {
 
 		host.cursor().updateAndGet(root -> root.assoc(UNRELATED,CVMLong.ONE));
 		shared.sync();
+		assertNull(host.cursor().get().get(Keywords.FS),"an application does not publish a region it was given");
+		staged.sync();
 		assertEquals(staged.cursor().get(),host.cursor().get().get(Keywords.FS));
 		assertTrue(staged.cursor().get().get(OWNER.getAccountKey()).checkSignature());
 		Files.writeString(local.getPath("/next"),"next");
-		app.sync();
+		staged.sync();
 		assertEquals("next",Files.readString(region.drives(OWNER.getAccountKey())
 			.drive("home").fileSystem().getPath("/next")));
 		assertEquals(CVMLong.ONE,host.cursor().get().get(UNRELATED));
@@ -137,7 +178,7 @@ public class DLFSApplicationTest {
 	@Test void nestedRegionsCreateOnlyTheirOwnPathAndPreserveSiblingValues() throws Exception {
 		var projects=Keyword.intern("projects");
 		var documents=Keyword.intern("documents");
-		var host=LatticeHost.<Index<Keyword,ACell>>create(null,new MemoryStore());
+		var host=owned(LatticeHost.<Index<Keyword,ACell>>create(null,new MemoryStore()));
 		var app=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
 			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,projects,documents));
 		assertNull(host.cursor().get());
@@ -146,7 +187,7 @@ public class DLFSApplicationTest {
 			drive.location().path());
 		host.cursor().<Index<Keyword,ACell>>path(projects)
 			.updateAndGet(value -> value.assoc(UNRELATED,CVMLong.ONE));
-		var source=files(LatticeHost.create());
+		var source=files(owned(LatticeHost.create()));
 		source.drives(OWNER.getAccountKey()).createDrive("remote");
 		host.mergeAt(source.dlfs().cursor().get(),projects,documents);
 		assertNotNull(app.drives(OWNER.getAccountKey()).drive("remote"));
@@ -155,7 +196,7 @@ public class DLFSApplicationTest {
 
 	@Test void directAndNestedApplicationsHonourRootCreationPolicy() {
 		for (Keyword[] path:List.of(new Keyword[0],new Keyword[] {Keyword.intern("projects"),Keywords.FS})) {
-			var host=LatticeHost.<Index<Keyword,ACell>>create(null,null);
+			var host=owned(LatticeHost.<Index<Keyword,ACell>>create(null,null));
 			var app=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
 				DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,path) {
 				@Override protected Index<Keyword,ACell> createContainer() {
@@ -178,7 +219,7 @@ public class DLFSApplicationTest {
 	@Test void seededRootPreservesOpaqueRegionsAndMalformedNestedStorageIsNotReplaced() {
 		var projects=Keyword.intern("projects");
 		var opaque=Strings.intern("future region");
-		var host=LatticeHost.<Index<Keyword,ACell>>create(null,null);
+		var host=owned(LatticeHost.<Index<Keyword,ACell>>create(null,null));
 		var app=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
 			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,projects,Keywords.FS) {
 			@Override protected Index<Keyword,ACell> createContainer() {

@@ -14,6 +14,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
@@ -38,11 +40,13 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.core.store.Persister;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.ALattice;
+import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
@@ -59,6 +63,7 @@ import convex.p2p.P2PLattice;
 import convex.p2p.P2PNodeRecord;
 import convex.p2p.P2PUser;
 import convex.social.Social;
+import convex.social.SocialLattice;
 import convex.social.SocialPost;
 import convex.social.SocialUser;
 
@@ -92,6 +97,28 @@ public class SharedApplicationInternalsTest {
 		return new Regions(host.cursor());
 	}
 
+	/** A signed draft that reconciles local changes on both sides by its domain's merge. */
+	private static final class Draft<T extends ACell> extends SignedComponent<T> {
+		private final BinaryOperator<T> merge;
+
+		Draft(SignedLattice<T> lattice,ACursor<SignedData<T>> destination,Function<T,SignedData<T>> signer,BinaryOperator<T> merge) {
+			super(lattice,destination,signer);
+			this.merge=merge;
+		}
+
+		private Draft(SignedLattice<T> lattice,AForkableCursor<T> cursor,BinaryOperator<T> merge) {
+			super(lattice,cursor);
+			this.merge=merge;
+		}
+
+		@Override protected T reconcile(T own,T other) {
+			return (merge==null)?super.reconcile(own,other):merge.apply(own,other);
+		}
+
+		@Override public Draft<T> rebind(AForkableCursor<T> cursor) { return new Draft<>(lattice,cursor,merge); }
+		@Override public Draft<T> fork() { return rebind(storage.fork()); }
+	}
+
 	/** Applications choose working-state policy; ordinary domain views need no fork. */
 	private static final class WorkingApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		CVMLong timestamp=CVMLong.create(100);
@@ -106,46 +133,48 @@ public class SharedApplicationInternalsTest {
 			super(host.cursor().fork(),host::persist);
 			if (socialApp) {
 				var policy=context(SOCIAL_KEY,signing);
-				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-				social=Social.connect(cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
-					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
+				socialState=owned(host,policy,SocialLattice.INSTANCE::merge,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
+				social=Social.connect(new IndexComponent<>(cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).rebind(socialState.cursor());
 				files=null;
 				fileState=null;
 			} else {
-				fileState=owned(host,context(FILES_KEY,signing),Keywords.FS,FILES_KEY.getAccountKey());
+				fileState=owned(host,context(FILES_KEY,signing),null,Keywords.FS,FILES_KEY.getAccountKey());
 				files=convex.dlfs.DLFSDrives.wrap(fileState.cursor(),() -> CVMLong.create(100));
 				social=null;
 				socialState=null;
 			}
 			AccountKey nodeOwner=(socialApp?COMMON_KEY:FILES_KEY).getAccountKey();
-			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),Keywords.P2P,Keywords.NODES,nodeOwner);
-			node=P2PUser.create(this,nodeOwner).node().withCursor(nodeState.cursor());
+			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),null,Keywords.P2P,Keywords.NODES,nodeOwner);
+			node=P2PUser.create(this,nodeOwner).node().rebind(nodeState.cursor());
 		}
 
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> HOST_ROOT.merge(VERIFY,own,other));
 		}
 
-		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeOps.mergePublication(HOST_ROOT,VERIFY,own,other);
+		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeComponent.reconcile(HOST_ROOT,VERIFY,own,other);
 		}
 
 		/**
 		 * Each owned subtree publishes through its own fork of the host, beside this
 		 * application's staged root. Its fork reconciles only that subtree, so the
 		 * root's merge never has to ask which subtrees this application touched.
+		 * The merge is the subtree's domain rule for local changes on both sides, or
+		 * null where they conflict.
 		 */
 		@SuppressWarnings("unchecked")
 		private <T extends ACell> SignedComponent<T> owned(LatticeHost<Index<Keyword,ACell>> host,
-				LatticeContext context,ACell... path) {
+				LatticeContext context,BinaryOperator<T> merge,ACell... path) {
 			ALattice<?> lattice=HOST_ROOT;
 			for (ACell key:path) lattice=lattice.path(key);
 			var rule=(SignedLattice<T>)lattice;
 			// This legacy application's resolver supplies both the public owner rule
 			// and an explicit signer; the draft itself does not look up a context.
-			return new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
+			return new Draft<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
 				LatticeComponent.<SignedData<T>>resolve(host.cursor(),HOST_ROOT,path),
-				value -> context.signAs(rule.getOwner(),value));
+				value -> context.signAs(rule.getOwner(),value),merge);
 		}
 
 		@Override protected void syncChildren() {
@@ -193,7 +222,7 @@ public class SharedApplicationInternalsTest {
 		socialApp.node.setNodeInfo(info);
 		filesApp.node.setNodeInfo(info);
 		assertEquals(HOST_ROOT.zero(),host.cursor().get());
-		assertNotNull(socialApp.social.withCursor(socialApp.socialState.cursor()).feed().getPost(post),
+		assertNotNull(socialApp.social.rebind(socialApp.socialState.cursor()).feed().getPost(post),
 			"Lightweight views share the owner's unsigned working state");
 		assertEquals(0,signatures.get(),"Domain edits must not sign before application sync");
 		assertEquals(HOST_ROOT.zero(),socialApp.cursor().get());
@@ -245,12 +274,12 @@ public class SharedApplicationInternalsTest {
 			super(cursor);
 			this.policy=policy;
 			for (Keyword key:new Keyword[]{Social.KEY_SOCIAL,Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
-				region(key,LatticeComponent.live(SOCIAL_ROOT.path(key),cursor.path(key),LatticeContext.EMPTY));
+				region(key,LatticeComponent.live(SOCIAL_ROOT.path(key),new IndexComponent<>(cursor).path(key),LatticeContext.EMPTY));
 			}
-			social=Social.connect(cursor.path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+			social=Social.connect(new IndexComponent<>(cursor).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
-		@Override public SocialWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		@Override public SocialWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new SocialWithP2P(cursor,policy);
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
@@ -262,15 +291,15 @@ public class SharedApplicationInternalsTest {
 		FilesWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
 			this(host.cursor(),host.store(),context(FILES_KEY));
 		}
-		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,LatticeContext context) {
-			super(cursor,store,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
+		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,Persister persister,LatticeContext context) {
+			super(cursor,persister,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
 			policy=context;
 			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
-				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),cursor.path(key),context));
+				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),new IndexComponent<>(cursor).path(key),context));
 			}
 		}
-		@Override public FilesWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(cursor,store(),policy);
+		@Override public FilesWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+			return new FilesWithP2P(cursor,persister(),policy);
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
 	}
@@ -301,10 +330,8 @@ public class SharedApplicationInternalsTest {
 		final FilesWithP2P files;
 		final LatticePropagator socialGroup=group(socialStore,root -> project(root,Social.KEY_SOCIAL));
 		final LatticePropagator filesGroup=group(filesStore,root -> project(root,Keywords.FS));
-		Fixture() { this(false); }
-		Fixture(boolean coordinated) {
-			var cursor=coordinated?Cursors.transactionalRoot(HOST_ROOT.zero()):Cursors.root(HOST_ROOT.zero());
-			var host=new LatticeHost<>(cursor,store);
+		Fixture() {
+			var host=new LatticeHost<>(Cursors.root(HOST_ROOT.zero()),store);
 			social=new SocialWithP2P(host);
 			files=new FilesWithP2P(host);
 			host.addApplication(social);
@@ -338,19 +365,9 @@ public class SharedApplicationInternalsTest {
 		return new Data(post,drive);
 	}
 
-	@Test public void testTypedTransactionsOnOrdinaryHost() throws Exception {
-		testTypedTransactionsAcrossSharedApplicationRegions(false);
-	}
-
-	@Test public void testTypedTransactionsOnTransactionalHost() throws Exception {
-		testTypedTransactionsAcrossSharedApplicationRegions(true);
-	}
-
-	private void testTypedTransactionsAcrossSharedApplicationRegions(boolean coordinated) throws Exception {
-		try (Fixture f=new Fixture(coordinated)) {
+	@Test public void testTypedTransactionsAcrossSharedApplicationRegions() throws Exception {
+		try (Fixture f=new Fixture()) {
 			var root=f.node.getHost().cursor();
-			assertEquals(coordinated,root.supportsExclusiveTransactions());
-			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
 			var before=root.get();
 			f.social.execute(app -> {
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
@@ -405,7 +422,7 @@ public class SharedApplicationInternalsTest {
 					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 				}
 			});
-			var feed=Social.connect(f.social.cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+			var feed=Social.connect(new IndexComponent<>(f.social.cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> delayedPolicy.signAs(owner,value),delayedPolicy::currentTimestamp).user(SOCIAL_KEY.getAccountKey()).feed();
 			var beforePost=f.node.getCursor().get();
 			try (var executor=Executors.newSingleThreadExecutor()) {

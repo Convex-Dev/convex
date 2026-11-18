@@ -5,6 +5,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -34,24 +35,17 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 		cursor().set(nodeInfo);
 	}
 
-	/** Creates an isolated working component at the same logical path, merging on sync with the node value lattice. */
+	/**
+	 * Creates an isolated working component at the same logical path. Its sync fails
+	 * with a {@link MergeConflictException}, changing nothing, if the record here has
+	 * changed too.
+	 */
 	public P2PNodeRecord fork() {
 		return rebind(storage.fork());
 	}
 
 	@Override
-	public P2PNodeRecord withCursor(AForkableCursor<ACell> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected P2PNodeRecord rebind(AForkableCursor<ACell> cursor) {
+	public P2PNodeRecord rebind(AForkableCursor<ACell> cursor) {
 		return new P2PNodeRecord(cursor,owner);
-	}
-
-	/** Reconciles this component's draft using its domain merge rule. */
-	@Override
-	protected ACell mergePublication(ACell own,ACell other) {
-		return P2PLattice.NODES_LATTICE.getValueLattice().merge(own,other);
 	}
 }

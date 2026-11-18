@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,9 @@ import convex.db.lattice.SQLDatabase;
  */
 class NumericExpressionTest {
 
+	private static final AtomicLong DB_COUNTER=new AtomicLong();
+	private final String dbName="numeric_test_"+DB_COUNTER.incrementAndGet();
+
 	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
@@ -34,9 +38,9 @@ class NumericExpressionTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		cdb = ConvexDB.create(RowLWW::merge);
-		db = cdb.database("numeric_test");
+		db = cdb.database(dbName);
 		IdentifierPolicy.LOWER.applyTo(db);
-		cdb.register("numeric_test");
+		cdb.register(dbName);
 
 		// Create table with various numeric types
 		ConvexColumnType[] types = {
@@ -54,13 +58,14 @@ class NumericExpressionTest {
 		db.tables().insert("numbers", 4L, 40L, 4.5, "delta");
 		db.tables().insert("numbers", 5L, 50L, 5.5, "epsilon");
 
-		conn = DriverManager.getConnection("jdbc:convex:database=numeric_test");
+		conn = DriverManager.getConnection("jdbc:convex:database="+dbName);
 	}
 
 	@AfterEach
 	void tearDown() throws Exception {
-		if (conn != null) conn.close();
-		if (cdb != null) cdb.unregister("numeric_test");
+		assertAll("Close this test's connection and database",
+			() -> { if (conn != null) conn.close(); },
+			() -> { if (cdb != null) cdb.unregister(dbName); });
 	}
 
 	// ========== Arithmetic Operations ==========

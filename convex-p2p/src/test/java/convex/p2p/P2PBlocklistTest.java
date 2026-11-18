@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import convex.api.Convex;
 import convex.core.ErrorCodes;
@@ -29,6 +30,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.LocalLattice;
 import convex.net.PeerRefusedException;
@@ -50,68 +52,82 @@ public class P2PBlocklistTest {
 	private final List<AutoCloseable> resources=new ArrayList<>();
 
 	@AfterEach
-	public void tearDown() throws Exception {
+	public void tearDown() {
 		Collections.reverse(resources);
-		for (AutoCloseable resource:resources) resource.close();
+		List<Executable> closes=new ArrayList<>();
+		for (AutoCloseable resource:resources) closes.add(resource::close);
+		assertAll("Close what the test opened",closes);
 	}
 
 	private static AString s(String text) {
 		return Strings.create(text);
 	}
 
-	private EtchStore store(String name) throws Exception {
+	private MemoryStore store() {
+		MemoryStore store=new MemoryStore();
+		resources.add(store);
+		return store;
+	}
+
+	/** An on-disk store, for the test that restarts a node on its store */
+	private EtchStore restartableStore(String name) throws Exception {
 		EtchStore store=EtchStore.createTemp(name);
 		resources.add(store);
 		return store;
 	}
 
-	private P2PNode launch(String name,NodeConfig config,LatticePropagatorConfig group,AKeyPair key) throws Exception {
-		P2PNode node=P2PNode.create(store(name),config,group,key).serveAllInbound();
+	/** Closes the node after the test, then the host it opened, which closing the node leaves open */
+	private P2PNode track(P2PNode node) {
+		resources.add(node.getNodeServer().getHost());
 		resources.add(node);
+		return node;
+	}
+
+	private P2PNode launch(NodeConfig config,LatticePropagatorConfig group,AKeyPair key) throws Exception {
+		P2PNode node=track(P2PNode.create(store(),config,group,key)).serveAllInbound();
 		node.launch();
 		return node;
 	}
 
 	private P2PNode hub() throws Exception {
-		return launch("blocklist-hub",NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey);
+		return launch(NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey);
 	}
 
 	private P2PNode leaf() throws Exception {
-		return launch("blocklist-leaf",NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
+		return launch(NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
 	}
 
 	/** Shuts a node down as a service does, keeping its store. */
 	private static void closeKeepingStore(P2PNode node) throws Exception {
-		try (node; var host=node.getNodeServer().getHost()) {
+		// Closed in reverse: the node, then its host
+		try (var host=node.getNodeServer().getHost(); node) {
 			node.getApplication().sync();
 		}
 	}
 
 	@Test
 	public void testABlockAndAnUnblockSurviveARestart() throws Exception {
-		EtchStore store=store("blocklist-restart");
+		EtchStore store=restartableStore("blocklist-restart");
 		AccountKey bob=AKeyPair.generate().getAccountKey();
-		P2PNode first=P2PNode.create(store,NodeConfig.localNetwork(),hubKey);
+		P2PNode first=track(P2PNode.create(store,NodeConfig.localNetwork(),hubKey));
 		assertTrue(first.block(bob));
 		assertTrue(first.block(s("10.0.0.9")));
 		closeKeepingStore(first);
 
-		P2PNode second=P2PNode.create(store,NodeConfig.localNetwork(),hubKey);
+		P2PNode second=track(P2PNode.create(store,NodeConfig.localNetwork(),hubKey));
 		assertTrue(second.isBlocked(bob));
 		assertTrue(second.isBlocked(s("10.0.0.9")));
 		assertTrue(second.unblock(bob));
 		closeKeepingStore(second);
 
-		P2PNode third=P2PNode.create(store,NodeConfig.localNetwork(),hubKey);
-		resources.add(third);
+		P2PNode third=track(P2PNode.create(store,NodeConfig.localNetwork(),hubKey));
 		assertFalse(third.isBlocked(bob),"the removal carried over too");
 		assertTrue(third.isBlocked(s("10.0.0.9")));
 	}
 
 	@Test
 	public void testANodeWithoutAKeyKeepsItsBlocklistInMemory() throws Exception {
-		P2PNode node=P2PNode.create(store("blocklist-keyless"),NodeConfig.localNetwork(),null);
-		resources.add(node);
+		P2PNode node=track(P2PNode.create(store(),NodeConfig.localNetwork(),null));
 		AccountKey bob=AKeyPair.generate().getAccountKey();
 		assertTrue(node.block(bob));
 		assertTrue(node.isBlocked(bob));
@@ -122,7 +138,7 @@ public class P2PBlocklistTest {
 	@Test
 	public void testDiscoveryOffersNoBlockedNodeOrAddress() throws Exception {
 		// No ambient slots: the hub keeps candidates but dials none of them
-		P2PNode hub=launch("blocklist-hub",NodeConfig.localNetwork(),LatticePropagatorConfig.create(Maps.of(
+		P2PNode hub=launch(NodeConfig.localNetwork(),LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(0))),hubKey);
 		AKeyPair blockedKey=AKeyPair.generate();
 		AccountKey blockedNode=blockedKey.getAccountKey();
@@ -252,15 +268,12 @@ public class P2PBlocklistTest {
 	public void testNoMessageGoesToOrThroughABlockedNode() throws Exception {
 		AKeyPair daveKey=AKeyPair.generate();
 		AccountKey pop=hubKey.getAccountKey(),dave=daveKey.getAccountKey();
-		P2PNode hub=P2PNode.create(store("blocklist-pop"),NodeConfig.localNetwork(),hubKey)
+		P2PNode hub=track(P2PNode.create(store(),NodeConfig.localNetwork(),hubKey))
 			.serveAllInbound().relayMessages();
-		resources.add(hub);
 		hub.launch();
-		P2PNode alice=P2PNode.create(store("blocklist-alice"),NodeConfig.port(-1),leafKey).pointsOfPresence(pop);
-		resources.add(alice);
+		P2PNode alice=track(P2PNode.create(store(),NodeConfig.port(-1),leafKey)).pointsOfPresence(pop);
 		alice.launch();
-		P2PNode daveNode=P2PNode.create(store("blocklist-dave"),NodeConfig.port(-1),daveKey).pointsOfPresence(pop);
-		resources.add(daveNode);
+		P2PNode daveNode=track(P2PNode.create(store(),NodeConfig.port(-1),daveKey)).pointsOfPresence(pop);
 		daveNode.launch();
 		alice.connect(pop,hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
 		daveNode.connect(pop,hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
