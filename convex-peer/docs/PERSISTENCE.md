@@ -60,8 +60,10 @@ origin. Checkpointing a private host with a separate store therefore saves a
 private draft; explicit fork sync or delivery accepts it into another host.
 `persist()` writes a draft's cells to its host's store without publishing it; the
 draft is still not retained until it is synced and checkpointed. Persisting is also
-what releases a draft's memory, and a component given a persistence function does it
-at each `sync()`. A host save leaves a draft on the cells it already held, as
+what allows a draft's saved cells to leave memory. Component `sync()` only reconciles
+into its destination; persisting intermediate working state is an explicit
+application decision. Host retention and durability operations remain separate.
+A host save leaves a draft on the cells it already held, as
 [cursor persistence](../../convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence)
 explains.
 

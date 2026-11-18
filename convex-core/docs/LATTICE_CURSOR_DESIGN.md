@@ -193,9 +193,9 @@ it refuses any write.
 
 Saving a value switches nobody else. A fork is separate storage, so a host sync that
 saves its destination leaves the fork on the cells it already held. A long-lived fork
-keeps what is written to it in memory until it is persisted, which a component given
-a persistence function does at each sync, or until it syncs with no edits since its
-last sync and so adopts the saved value. The host root switches as part of its own
+keeps what is written to it in memory until the application explicitly persists it,
+or until it syncs with no edits since its last sync and so adopts the saved value.
+The host root switches as part of its own
 sync, even when a write
 [lands during the save](../../convex-peer/docs/PERSISTENCE.md#ordering).
 

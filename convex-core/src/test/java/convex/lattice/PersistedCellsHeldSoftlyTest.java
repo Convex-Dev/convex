@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -34,7 +35,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.StoreException;
 import convex.core.store.Persister;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
@@ -404,9 +404,9 @@ public class PersistedCellsHeldSoftlyTest {
 		for (long seed:written) assertTrue(holds(root.get(),seed),"Every write is kept");
 	}
 
-	// ===== Component sync =====
+	// ===== Component sync and explicit persistence =====
 
-	@Test void afterSyncAComponentHoldsItsWorkingStateSoftly() throws IOException {
+	@Test void afterExplicitPersistAComponentHoldsItsWorkingStateSoftly() throws IOException {
 		var host=savedHost();
 		var component=new Working(host.cursor().fork(),host::persist);
 		var saved=store.getRootData();
@@ -414,6 +414,8 @@ public class PersistedCellsHeldSoftlyTest {
 		assertFalse(strongCells(component.held()).isEmpty(),"An unsynced edit is strong");
 
 		component.sync();
+		assertFalse(strongCells(component.held()).isEmpty(),"Sync does not persist the working copy");
+		component.persist();
 
 		assertHeldSoftly(store,component.held());
 		assertTrue(holds(component.held(),9000));
@@ -421,11 +423,12 @@ public class PersistedCellsHeldSoftlyTest {
 		assertEquals(saved,store.getRootData(),"Before the host saves it");
 	}
 
-	@Test void afterSyncTheBaselineIsHeldSoftlyToo() {
+	@Test void explicitPersistHoldsTheReconciledBaselineSoftlyToo() throws IOException {
 		var host=savedHost();
 		var component=new Working(host.cursor().fork(),host::persist);
 		component.edit(9000);
 		component.sync();
+		component.persist();
 
 		component.edit(9001);
 		write(host,9002);
@@ -443,7 +446,7 @@ public class PersistedCellsHeldSoftlyTest {
 
 		component.edit(9000);
 		component.sync();
-		assertHeldSoftly(store,component.held());
+		assertFalse(strongCells(component.held()).isEmpty());
 
 		host.sync();
 		assertHeldSoftly(store,host.cursor().get());
@@ -483,13 +486,14 @@ public class PersistedCellsHeldSoftlyTest {
 		assertHeldSoftly(store,host.cursor().get());
 	}
 
-	@Test void cellsBuiltByAMergeAreHeldSoftlyAfterTheSameSync() {
+	@Test void cellsBuiltByAMergeAreHeldSoftlyAfterExplicitPersist() throws IOException {
 		var host=savedHost();
 		var component=new Working(host.cursor().fork(),host::persist);
 		component.edit(9000);
 		write(host,9001);
 
 		component.sync();
+		component.persist();
 
 		assertNotNull(component.mergedOwn,"Both sides changed");
 		assertHeldSoftly(store,component.held());
@@ -497,7 +501,7 @@ public class PersistedCellsHeldSoftlyTest {
 		assertTrue(holds(component.held(),9001));
 	}
 
-	@Test void anEditDuringThePersistIsKeptAndHeldSoftly() {
+	@Test void anEditDuringThePersistIsKeptAndHeldSoftly() throws IOException {
 		var host=savedHost();
 		var component=new AtomicReference<Working>();
 		var edited=new AtomicReference<Boolean>(false);
@@ -507,24 +511,26 @@ public class PersistedCellsHeldSoftlyTest {
 		component.get().edit(9000);
 
 		component.get().sync();
+		component.get().persist();
 
 		assertHeldSoftly(store,component.get().held());
 		assertTrue(holds(component.get().held(),9001),"The edit is kept");
 		assertFalse(holds(host.cursor().get(),9001),"The edit came after the publication");
 	}
 
-	@Test void anEditAfterSyncIsTheOnlyPathHeldStrongly() {
+	@Test void anEditAfterExplicitPersistIsTheOnlyPathHeldStrongly() throws IOException {
 		var host=savedHost();
 		var component=new Working(host.cursor().fork(),host::persist);
 		component.edit(9000);
 		component.sync();
+		component.persist();
 
 		component.edit(9001);
 
 		assertOnlyStrongAround(component.held(),blob(9001));
 	}
 
-	@Test void aSignedForkHoldsItsValueSoftlyInsideTheSignature() {
+	@Test void aSignedForkHoldsItsValueSoftlyInsideTheSignature() throws IOException {
 		var key=AKeyPair.createSeeded(1234);
 		var host=LatticeHost.<AHashMap<ACell,ACell>>create(Maps.empty(),hostStore());
 		AForkableCursor<SignedData<AHashMap<ACell,ACell>>> slot=new MapComponent<>(host.cursor()).path(SIGNED);
@@ -535,6 +541,7 @@ public class PersistedCellsHeldSoftlyTest {
 		component.edit(9000);
 
 		component.sync();
+		component.persist();
 		assertHeldSoftly(store,component.held());
 
 		host.sync();
@@ -545,7 +552,7 @@ public class PersistedCellsHeldSoftlyTest {
 		assertEquals(component.held(),saved.getValue());
 	}
 
-	@Test void anApplicationAndItsChildrenAreHeldSoftlyAfterSyncAndSave() {
+	@Test void anApplicationAndItsChildrenAreHeldSoftlyAfterExplicitPersistence() throws IOException {
 		AHashMap<ACell,ACell> start=tree().assoc(CHILD,tree());
 		var host=LatticeHost.create(start,hostStore());
 		host.sync();
@@ -554,6 +561,10 @@ public class PersistedCellsHeldSoftlyTest {
 		application.child.edit(9001);
 
 		application.sync();
+		assertFalse(strongCells(application.held()).isEmpty());
+		assertFalse(strongCells(application.child.held()).isEmpty());
+		application.persist();
+		application.child.persist();
 		assertHeldSoftly(store,application.held());
 		assertHeldSoftly(store,application.child.held());
 
@@ -563,12 +574,13 @@ public class PersistedCellsHeldSoftlyTest {
 		assertTrue(holds(application.child.held(),9001));
 	}
 
-	@Test void aLongRunningComponentNeverAccumulatesStrongCells() {
+	@Test void aLongRunningComponentCanExplicitlyPersistItsWorkingState() throws IOException {
 		var host=savedHost();
 		var component=new Working(host.cursor().fork(),host::persist);
 		for (long cycle=0;cycle<10;cycle++) {
 			for (long write=0;write<10;write++) component.edit(1000+cycle*100+write);
 			component.sync();
+			component.persist();
 			assertHeldSoftly(store,component.held());
 			host.sync();
 			assertHeldSoftly(store,host.cursor().get());
@@ -576,27 +588,32 @@ public class PersistedCellsHeldSoftlyTest {
 		}
 	}
 
-	@Test void withoutAPersistFunctionSyncLeavesCellsAsTheyAre() {
+	@ParameterizedTest
+	@ValueSource(booleans={false,true})
+	void syncLeavesCellsAsTheyAreWhetherOrNotAPersisterIsSupplied(boolean supplied) {
 		var host=savedHost();
-		var component=new Working(host.cursor().fork());
+		var component=new Working(host.cursor().fork(),supplied?host::persist:null);
 		component.edit(9000);
 
 		component.sync();
 
 		assertFalse(strongCells(component.held()).isEmpty());
 		assertNull(store.refForHash(blob(9000).getHash()),"Nothing was written to the store");
+		assertTrue(holds(host.cursor().get(),9000),"The update reached its destination");
 	}
 
-	@Test void whenPersistingFailsThePublishStandsAndTheErrorIsReported() {
+	@Test void aFailingPersisterDoesNotAffectSyncAndFailsOnlyWhenCalledExplicitly() {
 		var host=savedHost();
 		var failure=new IOException("store failed");
 		var component=new Working(host.cursor().fork(),Persisters.failing(failure));
 		component.edit(9000);
 		var held=component.held();
 
-		var thrown=assertThrows(StoreException.class,component::sync);
+		assertEquals(held,component.sync());
+		assertEquals(held,component.sync(),"Repeated sync also leaves persistence explicit");
+		var thrown=assertThrows(IOException.class,component::persist);
 
-		assertSame(failure,thrown.getCause());
+		assertSame(failure,thrown);
 		assertTrue(holds(host.cursor().get(),9000),"The publication stands");
 		assertEquals(held,component.held());
 	}

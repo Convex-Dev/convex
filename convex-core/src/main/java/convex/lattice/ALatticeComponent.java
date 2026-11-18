@@ -7,7 +7,6 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Path;
-import convex.core.exceptions.StoreException;
 import convex.core.store.Persister;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
@@ -32,9 +31,10 @@ import convex.lattice.cursor.ThreeWayMerge;
  * rules as implementation details. {@link LatticeComponent} adapts a supplied lattice
  * when its generic merge and navigation are the intended component behaviour.</p>
  *
- * <p>A component never holds a store. One with working state of its own persists
- * it through a function supplied at construction, at each {@link #sync()} and on
- * demand with {@link #persist()}; others are persisted with their parent, and the root by the host ({@link LatticeHost}).
+ * <p>A component never holds a store. One with working state of its own may persist
+ * it explicitly with {@link #persist()}, through a function supplied at construction.
+ * Whether and when to persist intermediate working state is the application's decision.
+ * Sync reconciles into the destination, whose storage behaviour is its own concern.
  * Components which own a store for their own data, such as DLFS drives, manage it
  * themselves.</p>
  *
@@ -45,7 +45,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Working storage bound at construction; editing views do not move this boundary. */
 	protected final AForkableCursor<V> storage;
 
-	/** Persists this component's own working state, or null when its parent persists it. */
+	/** Optional function used by explicit {@link #persist()} calls for this working state. */
 	private final Persister persister;
 
 	/** This component's {@link #reconcile(ACell,ACell,ACell)}, made once rather than at each sync or commit. */
@@ -313,9 +313,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 *
 	 * <p>A transaction may call this several times, once per attempt, each time on a
 	 * new view. Each child it syncs there is one made on that view, so the child's
-	 * own sync runs within the attempt: its preparation and any persistence function
-	 * it was given must be safe to repeat and must not depend on the attempt
-	 * committing.</p>
+	 * own sync runs within the attempt: its preparation and any additional behaviour
+	 * supplied by an override must be safe to repeat and must not depend on the
+	 * attempt committing.</p>
 	 */
 	protected void syncChildren() {
 	}
@@ -344,27 +344,17 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Editing-view overrides cannot hide this boundary, and descendant views never
 	 * publish enclosing storage. No host persistence is implied.
 	 *
-	 * <p>A component given a persistence function then persists its working state, so
-	 * what it has published can leave memory. Persisting follows publication so that it
-	 * also covers cells built by a merge. If it fails, the publication stands and this
-	 * reports the failure.</p>
+	 * <p>The base implementation does not persist working state or call the supplied
+	 * persistence function. The destination owns its update behaviour, which may
+	 * include signing or storage writes. Applications choose when to call
+	 * {@link #persist()} separately; subclasses may add persistence to their sync
+	 * policy, with their own completion and failure semantics.</p>
 	 *
 	 * @return Published value
-	 * @throws StoreException If persisting the working state fails
 	 */
 	public V sync() {
 		syncChildren();
-		V published=storage.reconcile(reconciler);
-		if (persister!=null) persistWorkingState();
-		return published;
-	}
-
-	private void persistWorkingState() {
-		try {
-			storage.persist(persister);
-		} catch (IOException e) {
-			throw new StoreException("Unable to persist working state after sync",e);
-		}
+		return storage.reconcile(reconciler);
 	}
 
 	/**
@@ -373,9 +363,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * with the persisted equal in one atomic update
 	 * ({@link convex.lattice.cursor.ACursor#persist}), and a fork persists its
 	 * baseline too, so the cells need not stay in memory. Nothing is
-	 * signed and no destination changes. Persisted state survives a restart only once
-	 * synced into the host and retained. A component without a function refuses: its
-	 * state, if any, is its parent's.
+	 * signed and no destination changes. Persisting alone supplies no retention or
+	 * durability guarantee. A component without a persistence function refuses.
 	 *
 	 * @return Persisted working value
 	 * @throws IOException If the store fails

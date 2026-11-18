@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,6 +22,7 @@ import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.RefDirect;
@@ -29,6 +32,7 @@ import convex.core.store.MemoryStore;
 import convex.core.store.Persister;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
 import convex.test.Persisters;
 import convex.test.Samples;
 
@@ -126,6 +130,37 @@ public class ALatticeComponentTest {
 		var published=live.cursor().get();
 		assertSame(published,second.sync());
 		assertSame(published,live.cursor().get());
+	}
+
+	/** Storage writes belong to the destination's update policy, not the syncing component. */
+	@Test
+	public void syncUsesTheDestinationsStoragePolicy() throws Exception {
+		try (MemoryStore store=new MemoryStore()) {
+			var failing=new AtomicBoolean(true);
+			var destination=new Root<ASet<ACell>>(Sets.empty()) {
+				@Override protected boolean install(ASet<ACell> held,ASet<ACell> next) {
+					try {
+						if (failing.get()) throw new IOException("Destination storage unavailable");
+						return super.install(held,Cells.persist(next,store));
+					} catch (IOException e) {
+						throw new UncheckedIOException(e);
+					}
+				}
+			};
+			var component=new TestComponent(destination.fork(),Persisters.after(value -> {
+				throw new AssertionError("Sync must not call the component's persister");
+			},Persisters.UNCHANGED));
+			ABlob blob=Blobs.createRandom(new Random(8765),1000);
+			component.add(blob);
+			assertThrows(UncheckedIOException.class,component::sync);
+			assertTrue(destination.get().isEmpty());
+			assertEquals(Sets.of(blob),component.value());
+			failing.set(false);
+			assertEquals(Sets.of(blob),component.sync());
+			assertEquals(component.value(),destination.get());
+			assertNotNull(store.refForHash(blob.getHash()));
+			assertNull(store.getRootData(),"Destination policy stored cells without retaining a root");
+		}
 	}
 
 	/** Persisting writes working state to the store and keeps it in place, leaving the root alone. */

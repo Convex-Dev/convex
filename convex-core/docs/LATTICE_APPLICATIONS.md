@@ -507,20 +507,25 @@ of recovery. A checkpoint retains one host snapshot and completes the store's
 barrier. It excludes private application drafts and writes arriving after that
 snapshot. A failed barrier does not roll back publication already performed.
 
-A component with working state of its own, given a persistence function when
-built, persists it at each `sync()`, straight after publishing, and on demand with
-`persist()`. An application holding a private copy of the root is built as
-`super(host.cursor().fork(), host::persist)`. Persisting puts its cells in the store
-and switches the copy to them, so they can leave memory. On its own it publishes,
-signs and retains nothing as the root, so the copy survives a restart only once
-synced and checkpointed. A host save does not do this for the copy: without a
-persistence function, a copy keeps in memory what has been written to it, however
-much of that the host has saved
-([cursor persistence](LATTICE_CURSOR_DESIGN.md#persistence)). The component
-never holds a store: it persists through the function it was built with. A component without one refuses `persist()`,
-since its state is its parent's. Which components are given one is the
-application's policy; a long-lived working copy needs one, so that its memory follows
-what it is working on.
+Component `sync()` reconciles working state into its immediate destination. It
+does not persist intermediate working state, even when the component was given a
+persistence function. The destination owns its update behaviour, which may include
+signing or storage writes. An application that previously relied on automatic
+working-copy persistence must now call `persist()` explicitly when it wants it;
+an extender may also add persistence to its own sync policy.
+
+A component given a persistence function can persist its working copy explicitly
+with `persist()`, for example when recording a snapshot. An application can enable
+this with `super(host.cursor().fork(), host::persist)`. Persisting puts its cells
+in the store and switches the copy to them, so they can leave memory. On its own
+it publishes, signs and retains nothing as the root; recovery also requires
+retaining the snapshot and completing the store's durability barrier. A host save
+does not switch a separate working copy's cells. The application may persist that
+copy explicitly, or an unchanged copy may adopt its destination's saved cells on
+a later sync ([cursor persistence](LATTICE_CURSOR_DESIGN.md#persistence)).
+The component persists through its supplied function without holding a store;
+without a function, `persist()` refuses. Whether to persist a working copy is
+the application's policy.
 
 State that is not meant to be shared externally, such as configuration or what
 a node has seen of others, lives in the owner's slot in `:local`, one record per
