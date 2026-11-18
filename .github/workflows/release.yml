@@ -71,6 +71,9 @@ jobs:
             echo "::error::No CHANGELOG.md section found for [$VERSION]. Rename the [X.Y.Z-SNAPSHOT] heading to [$VERSION] with a release date first."
             exit 1
           fi
+          # CHANGELOG.md links are relative to the repository root; the release
+          # page needs them absolute, pointing at the files as tagged
+          CHANGELOG=$(printf '%s\n' "$CHANGELOG" | perl -pe 's{\]\((?![a-z][a-z0-9+.-]*:|#)([^)\s]+)\)}{](https://github.com/$ENV{GITHUB_REPOSITORY}/blob/$ENV{VERSION}/$1)}gi')
           {
             echo 'changelog<<EOF'
             echo "$CHANGELOG"

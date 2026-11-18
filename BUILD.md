@@ -286,7 +286,7 @@ Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
 - Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
-- The release text is the version's changelog section.
+- The release text is the version's changelog section, with its links pointing at the tagged files.
 
 Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 
