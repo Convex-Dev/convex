@@ -163,7 +163,12 @@ public abstract class ALatticeComponent<V extends ACell> {
 		return storage;
 	}
 
-	/** Returns this component's value, including stored nil; throws when absent. */
+	/**
+	 * Returns this component's value, including stored nil; throws when absent.
+	 *
+	 * <p>This method may be removed from the public API in favour of domain components
+	 * providing explicit accessors for the views or fields they choose to expose.</p>
+	 */
 	public V value() {
 		return cursor().get();
 	}
