@@ -56,6 +56,7 @@ public class X402PolicyTest extends ARESTTest {
 	static String paidUrl;
 	static AKeyPair kp;
 	static Address payer;
+	static Address payTo;
 	static Convex convex;
 	static CreditPolicy policy;
 
@@ -71,7 +72,7 @@ public class X402PolicyTest extends ARESTTest {
 
 		CreditPolicy(X402Gate gate) {
 			topUp = gate.price(Long.toString(CALL_PRICE * CALLS_PER_TOP_UP),
-					X402Client.cvmAsset(), "#13");
+					X402Client.cvmAsset(), payTo.toString());
 		}
 
 		@Override
@@ -99,6 +100,7 @@ public class X402PolicyTest extends ARESTTest {
 		peerServer = server.getServer();
 		kp = CLIENT_KP;
 		payer = newAccount();
+		payTo = newAccount();
 		convex = Convex.connect(peerServer);
 		convex.setAddress(payer, kp);
 

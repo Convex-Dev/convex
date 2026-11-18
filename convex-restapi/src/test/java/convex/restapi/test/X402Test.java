@@ -48,7 +48,7 @@ import convex.x402.model.VerifyResponse;
 public class X402Test extends ARESTTest {
 
 	static final long PRICE = 1_000_000;
-	static final Address PAY_TO = Address.create(13);
+	static Address payTo;
 	static final String GATED_PATH = "/api/v1/status";
 
 	static Server peerServer;
@@ -60,10 +60,11 @@ public class X402Test extends ARESTTest {
 
 	@BeforeAll
 	static void setup() throws Exception {
+		payTo = newAccount(); // Other suites must not change the balances asserted here.
 		RESTConfig config = RESTConfig.parse("""
-			{rest:{x402:{enabled:true, payTo:"#13",
+			{rest:{x402:{enabled:true, payTo:"%s",
 				routes:[{path:"/api/v1/status", amount:"1000000", description:"Paid status"}]}}}
-			""");
+			""".formatted(payTo));
 		peerServer = server.getServer();
 		restServer = RESTServer.create(peerServer, config);
 		restServer.start(0);
@@ -104,7 +105,7 @@ public class X402Test extends ARESTTest {
 		assertEquals(X402.SCHEME_EXACT, req.scheme());
 		assertEquals("1000000", req.amount());
 		assertEquals("slip44:864", req.asset());
-		assertEquals("#13", req.payTo());
+		assertEquals(payTo.toString(), req.payTo());
 		assertTrue(req.network().startsWith("convex:"));
 		assertNotNull(demand.resource());
 		assertTrue(demand.resource().url().endsWith(GATED_PATH));
@@ -133,7 +134,7 @@ public class X402Test extends ARESTTest {
 
 	@Test
 	public void testPaidFlowWithClient() throws Exception {
-		long before = convex.getBalance(PAY_TO);
+		long before = convex.getBalance(payTo);
 
 		X402Client client = X402Client.create(httpClient, convex, kp);
 		HttpResponse<String> response = client.get(gatedUri());
@@ -145,7 +146,7 @@ public class X402Test extends ARESTTest {
 		assertTrue(receipt.transaction().startsWith("0x"));
 		assertEquals(payer.toString(), receipt.payer());
 
-		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
+		assertEquals(before + PRICE, convex.getBalance(payTo));
 	}
 
 	@Test
@@ -155,13 +156,13 @@ public class X402Test extends ARESTTest {
 		PaymentPayload payment = client.buildPayment(req);
 		String paymentHeader = X402.encodeHeader(payment.toJSON());
 
-		long before = convex.getBalance(PAY_TO);
+		long before = convex.getBalance(payTo);
 		HttpResponse<String> paid = httpClient.send(
 				HttpRequest.newBuilder(gatedUri()).GET()
 						.header(X402.HEADER_PAYMENT_SIGNATURE, paymentHeader).build(),
 				HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, paid.statusCode());
-		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
+		assertEquals(before + PRICE, convex.getBalance(payTo));
 
 		// Replaying the identical settled payment is idempotent: the resource is
 		// served again but the payer is not charged again.
@@ -170,13 +171,13 @@ public class X402Test extends ARESTTest {
 						.header(X402.HEADER_PAYMENT_SIGNATURE, paymentHeader).build(),
 				HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, replay.statusCode());
-		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
+		assertEquals(before + PRICE, convex.getBalance(payTo));
 
 		// A payment with a wrong (future) sequence is rejected outright. A future
 		// sequence is used because a stale one could coincide with the identical
 		// already-settled transaction above, which settles idempotently by design.
 		long badSequence = convex.lookupSequence(payer) + 5;
-		ATransaction wrongSeq = Transfer.create(payer, badSequence, PAY_TO, PRICE);
+		ATransaction wrongSeq = Transfer.create(payer, badSequence, payTo, PRICE);
 		SignedData<ATransaction> staleSigned = kp.signData(wrongSeq);
 		PaymentPayload stalePayment = new PaymentPayload(X402.VERSION, null, req,
 				Maps.of(Fields.TRANSACTION,
@@ -193,7 +194,7 @@ public class X402Test extends ARESTTest {
 		// The error carries the reason code plus an actionable diagnostic
 		assertTrue(error.startsWith(ErrorReasons.INVALID_SEQUENCE), error);
 		assertTrue(error.contains("next valid sequence"), error);
-		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
+		assertEquals(before + PRICE, convex.getBalance(payTo));
 	}
 
 	@Test
@@ -220,7 +221,7 @@ public class X402Test extends ARESTTest {
 		assertEquals(payer.toString(), verified.payer());
 
 		// Settle: executes the payment
-		long before = convex.getBalance(PAY_TO);
+		long before = convex.getBalance(payTo);
 		HttpResponse<String> settleResponse = httpClient.send(
 				HttpRequest.newBuilder(URI.create(hostPath + "/x402/settle"))
 						.header("Content-Type", "application/json")
@@ -230,7 +231,7 @@ public class X402Test extends ARESTTest {
 		SettlementResponse settled = SettlementResponse
 				.fromJSON(RT.castMap(JSON.parse(settleResponse.body())));
 		assertTrue(settled.success(), "settle failed: " + settleResponse.body());
-		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
+		assertEquals(before + PRICE, convex.getBalance(payTo));
 
 		// A wrong-network requirement is rejected
 		PaymentRequirements wrongNetwork = new PaymentRequirements(req.scheme(), "eip155:8453",
@@ -276,7 +277,7 @@ public class X402Test extends ARESTTest {
 
 			String network = fetchDemand().accepts().get(0).network();
 			PaymentRequirements req = new PaymentRequirements(X402.SCHEME_EXACT, network, "500",
-					"cad29:" + token.longValue(), "#13", 30, null);
+					"cad29:" + token.longValue(), payTo.toString(), 30, null);
 			X402Client client = X402Client.create(httpClient, deployer, kp);
 			PaymentPayload payment = client.buildPayment(req);
 
@@ -295,7 +296,7 @@ public class X402Test extends ARESTTest {
 			assertTrue(settled.success(), "token settle failed: " + settleResponse.body());
 
 			convex.core.Result balance = deployer
-					.querySync("(@convex.fungible/balance " + token + " #13)");
+					.querySync("(@convex.fungible/balance " + token + " " + payTo + ")");
 			assertEquals(CVMLong.create(500), balance.getValue());
 		}
 	}
@@ -304,9 +305,9 @@ public class X402Test extends ARESTTest {
 	public void testFailedPaymentCannotBeReplayedAsSettled() throws Exception {
 		PaymentRequirements req = fetchDemand().accepts().get(0);
 		long sequence = convex.lookupSequence(payer) + 5;
-		ATransaction transaction = Transfer.create(payer, sequence, PAY_TO, PRICE);
+		ATransaction transaction = Transfer.create(payer, sequence, payTo, PRICE);
 		SignedData<ATransaction> signed = kp.signData(transaction);
-		long before = convex.getBalance(PAY_TO);
+		long before = convex.getBalance(payTo);
 
 		// Intake accepts future sequences, but execution records a failed result.
 		var failed = convex.transactSync(signed);
@@ -314,7 +315,7 @@ public class X402Test extends ARESTTest {
 		assertNotNull(peerServer.getPeer().getTransaction(signed.getHash()));
 		assertEquals(ErrorCodes.SEQUENCE,
 				peerServer.getPeer().getTransactionResult(signed.getHash()).getErrorCode());
-		assertEquals(before, convex.getBalance(PAY_TO));
+		assertEquals(before, convex.getBalance(payTo));
 
 		PaymentPayload payment = new PaymentPayload(X402.VERSION, null, req,
 				Maps.of(Fields.TRANSACTION,
@@ -338,6 +339,6 @@ public class X402Test extends ARESTTest {
 		SettlementResponse settled = SettlementResponse.fromJSON(RT.castMap(JSON.parse(settleResponse.body())));
 		assertFalse(settled.success());
 		assertEquals(ErrorReasons.INVALID_SEQUENCE, settled.errorReason());
-		assertEquals(before, convex.getBalance(PAY_TO));
+		assertEquals(before, convex.getBalance(payTo));
 	}
 }

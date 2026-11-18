@@ -55,6 +55,7 @@ public class X402MultiSchemeTest extends ARESTTest {
 	static Javalin app;
 	static String paidUrl;
 	static AKeyPair kp;
+	static Address payTo;
 	static Convex convex;
 	static ConvexFacilitator convexFacilitator;
 	static RemoteFacilitator remote;
@@ -66,6 +67,7 @@ public class X402MultiSchemeTest extends ARESTTest {
 		kp = CLIENT_KP;
 		convex = Convex.connect(peerServer);
 		convex.setAddress(newAccount(), kp);
+		payTo = newAccount(); // Exact balance assertions need a recipient owned by this class.
 
 		// Stub external facilitator speaking the standard /verify /settle /supported API.
 		// It reads each request body, as a real facilitator does: Jetty resets a connection
@@ -95,7 +97,7 @@ public class X402MultiSchemeTest extends ARESTTest {
 
 		app = Javalin.create(config -> {
 			X402Gate gate = new X402Gate(convexFacilitator, remote);
-			PaymentRequirements convexOption = gate.price("1000000", X402Client.cvmAsset(), "#13");
+			PaymentRequirements convexOption = gate.price("1000000", X402Client.cvmAsset(), payTo.toString());
 			PaymentRequirements usdcOption = new PaymentRequirements(X402.SCHEME_EXACT,
 					BASE_NETWORK, "10000", USDC_ASSET, "0xServiceWallet", 30, null);
 			gate.protect(config.routes, "/paid/*", ctx -> X402Decision
@@ -162,12 +164,12 @@ public class X402MultiSchemeTest extends ARESTTest {
 
 	@Test
 	public void testConvexPaymentStillWorks() throws Exception {
-		long before = convex.getBalance(Address.create(13));
+		long before = convex.getBalance(payTo);
 		X402Client client = X402Client.create(httpClient, convex, kp);
 		HttpResponse<String> paid = client.get(URI.create(paidUrl));
 		assertEquals(200, paid.statusCode());
 		assertTrue(client.lastPaymentResponse().success());
-		assertEquals(before + 1_000_000, convex.getBalance(Address.create(13)));
+		assertEquals(before + 1_000_000, convex.getBalance(payTo));
 	}
 
 	@Test

@@ -37,6 +37,8 @@ share setup use both `@TestInstance(PER_CLASS)` and `@Execution(CONCURRENT)`;
 scratch data local to a test. Use a narrow `@ResourceLock` for shared mutable
 resources, or `SAME_THREAD` within a class only when its lifecycle requires it.
 Vintage runs the existing JUnit 4/quickcheck classes concurrently.
+Canonical decoding header mutations run once per seed as parameterised tests,
+sharing the snapshot fixtures and retaining every decoder, byte and position.
 Ordinary persistence tests reuse `Samples.TEST_STORE` and `TEST_STORE2`; private
 stores are reserved for lifecycle, GC, configuration and exact-content tests.
 Ordinary filesystem fixtures can use a static `@TempDir` for one directory per
@@ -80,6 +82,11 @@ ordinary test phase: JSON, native HTTP and TCP clients share one in-memory peer
 and REST server, with separate clients and accounts per test. Deployment smoke
 checks are a separate opt-in profile; see
 [the integration module](convex-integration/README.md#deployment-smoke-checks).
+
+REST test classes run concurrently in one JVM, reusing the shared peer and HTTP
+server. Methods within each class remain sequential because SDK clients, payer
+accounts and signing identities are reused. Payment suites own their recipient
+accounts too, so exact balance assertions cannot observe another suite's payments.
 
 ### Property tests
 

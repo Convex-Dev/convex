@@ -16,8 +16,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -85,24 +88,28 @@ public class CanonicalDecodeTest {
 		}
 	}
 
-	@Test
-	public void testHeaderMutations() {
+	/** Each seed is independent; let JUnit share the exhaustive work across its workers. */
+	static Stream<Blob> mutationSeeds() {
+		return MUTATION_SEEDS.stream();
+	}
+
+	@ParameterizedTest(name="header mutations for seed {index}")
+	@MethodSource("mutationSeeds")
+	public void testHeaderMutations(Blob seed) {
 		for (CAD3Encoder enc : ENCODERS) {
-			for (Blob seed : MUTATION_SEEDS) {
-				byte[] orig = seed.getBytes();
-				int lim = Math.min(HEADER_POSITIONS, orig.length);
-				for (int p = 0; p < lim; p++) {
-					for (int v = 0; v < 256; v++) {
-						if ((byte) v == orig[p]) continue;
-						byte[] bs = orig.clone();
-						bs[p] = (byte) v;
-						checkCanonical(enc, bs);
-					}
-					// Padding and truncation of VLQ counts and integers
-					checkCanonical(enc, insert(orig, p, (byte) 0x80));
-					checkCanonical(enc, insert(orig, p, (byte) 0x00));
-					checkCanonical(enc, delete(orig, p));
+			byte[] orig = seed.getBytes();
+			int lim = Math.min(HEADER_POSITIONS, orig.length);
+			for (int p = 0; p < lim; p++) {
+				for (int v = 0; v < 256; v++) {
+					if ((byte) v == orig[p]) continue;
+					byte[] bs = orig.clone();
+					bs[p] = (byte) v;
+					checkCanonical(enc, bs);
 				}
+				// Padding and truncation of VLQ counts and integers
+				checkCanonical(enc, insert(orig, p, (byte) 0x80));
+				checkCanonical(enc, insert(orig, p, (byte) 0x00));
+				checkCanonical(enc, delete(orig, p));
 			}
 		}
 	}
