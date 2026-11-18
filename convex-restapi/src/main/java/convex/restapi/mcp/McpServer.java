@@ -197,13 +197,11 @@ public class McpServer {
 
 			if (body instanceof AMap<?, ?> map) {
 				if (isNotification(map)) {
-					processNotification(map);
+					handleNotification(ctx, map);
 					ctx.status(202).contentType(ContentTypes.JSON);
 					return;
 				}
-
-				AMap<AString, ACell> response = createResponse(map);
-				sendResponse(ctx, response, useSSE);
+				handleRequest(ctx, map);
 			} else if (body instanceof AVector<?> vector) {
 				long n = vector.count();
 				if (n == 0) {
@@ -219,7 +217,7 @@ public class McpServer {
 					ACell entry = vector.get(i);
 					if (entry instanceof AMap<?, ?> batchMap) {
 						if (isNotification(batchMap)) {
-							processNotification(batchMap);
+							handleNotification(ctx, batchMap);
 						} else {
 							responses = responses.conj(createResponse(batchMap));
 						}
@@ -246,6 +244,8 @@ public class McpServer {
 			throw e;
 		} catch (Exception e) {
 			log.warn("Unexpected error handling MCP request", e);
+			// An answer already begun, such as an override's SSE stream, cannot be followed by another
+			if (ctx.res().isCommitted()) return;
 			ctx.contentType(ContentTypes.JSON);
 			ctx.result(JSON.print(protocolError(-32603, "Internal error")).toString());
 		} finally {
@@ -254,6 +254,21 @@ public class McpServer {
 	}
 
 	// ==================== JSON-RPC dispatch ====================
+
+	/**
+	 * Answers one JSON-RPC request that arrived alone, not in a batch. The default
+	 * sends the response from {@link #createResponse}, as an SSE event when the client
+	 * accepts one. An override may answer the request itself, for example as an SSE
+	 * stream, and leaves it unanswered only when the client has gone. Called with
+	 * {@link #getCurrentContext()} set; an exception thrown before anything is sent
+	 * is answered as an internal error.
+	 *
+	 * @param ctx Context of the POST
+	 * @param request The request, which is not a notification
+	 */
+	protected void handleRequest(Context ctx, AMap<?, ?> request) {
+		sendResponse(ctx, createResponse(request), acceptsEventStream(ctx));
+	}
 
 	protected AMap<AString, ACell> createResponse(AMap<?, ?> request) {
 		ACell idCell = request.get(FIELD_ID);
@@ -368,7 +383,10 @@ public class McpServer {
 		return tool.handle(arguments);
 	}
 
-	private AMap<AString, ACell> listPrompts() {
+	/**
+	 * Lists prompts. The default lists the prompt registry.
+	 */
+	protected AMap<AString, ACell> listPrompts() {
 		AVector<AMap<AString, ACell>> vec = Vectors.empty();
 		for (McpPrompt prompt : prompts.values()) {
 			vec = vec.conj(prompt.getMetadata());
@@ -376,7 +394,13 @@ public class McpServer {
 		return Maps.of("prompts", vec);
 	}
 
-	private AMap<AString, ACell> promptGet(ACell paramsCell) {
+	/**
+	 * Handles a prompts/get request. The default renders a prompt from the registry.
+	 *
+	 * @param paramsCell The JSON-RPC params (contains "name" and optional "arguments")
+	 * @return JSON-RPC result or error
+	 */
+	protected AMap<AString, ACell> promptGet(ACell paramsCell) {
 		if (!(paramsCell instanceof AMap<?, ?> params)) {
 			return protocolError(-32602, "params must be an object");
 		}
@@ -399,8 +423,16 @@ public class McpServer {
 
 	// ==================== Notifications ====================
 
-	private void processNotification(AMap<?, ?> request) {
-		String method = getMethodName(request);
+	/**
+	 * Acts on one notification, alone or in a batch. It sends nothing: {@link #handlePost}
+	 * answers the POST. The default acts on none. Called with
+	 * {@link #getCurrentContext()} set.
+	 *
+	 * @param ctx Context of the POST
+	 * @param notification The notification
+	 */
+	protected void handleNotification(Context ctx, AMap<?, ?> notification) {
+		String method = getMethodName(notification);
 		if (method == null) return;
 		switch (method) {
 			case "notifications/initialized", "notifications/cancelled" -> { /* acknowledged */ }
@@ -481,7 +513,14 @@ public class McpServer {
 
 	// ==================== Response helpers ====================
 
-	private void sendResponse(Context ctx, ACell response, boolean useSSE) {
+	/**
+	 * Sends one response, as an SSE event when {@code useSSE}, otherwise as JSON.
+	 *
+	 * @param ctx Context of the POST
+	 * @param response The response
+	 * @param useSSE Whether to send it as an SSE event
+	 */
+	protected void sendResponse(Context ctx, ACell response, boolean useSSE) {
 		if (useSSE) {
 			McpProtocol.sendResponse(ctx, response, true);
 		} else {
