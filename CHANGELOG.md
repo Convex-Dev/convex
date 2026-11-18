@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support forks and transactions in custom local-state components. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
 - Let MCP server embedders stream a long tool call and act on cancellations. ([CAD041](https://docs.convex.world/docs/cad/mcp#extensibility))
 
 ### Changed

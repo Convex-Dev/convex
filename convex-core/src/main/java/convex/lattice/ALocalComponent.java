@@ -58,7 +58,22 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	protected ALocalComponent(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AccountKey owner,
 			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,Supplier<CVMLong> clock,
 			Persister persister) {
-		super(recordPath(root,service,owner,signer).fork(),persister);
+		this(recordPath(root,service,owner,signer).fork(),clock,persister);
+	}
+
+	/**
+	 * Binds supplied working storage for a {@link #rebind}, reinstating the record's
+	 * timestamp policy without creating a fork or signing boundary. The supplied
+	 * cursor determines publication: a transaction draft commits into its source,
+	 * and a nested fork syncs only into its immediate destination.
+	 *
+	 * @param cursor Working storage to bind directly
+	 * @param clock Supplies the record's timestamp for each changed local edit
+	 * @param persister Persists this working copy, or null when it needs no separate persistence
+	 */
+	protected ALocalComponent(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
+			Supplier<CVMLong> clock,Persister persister) {
+		super(cursor,persister);
 		record=Timestamped.create(storage.withDefault(Maps.empty()),clock);
 	}
 

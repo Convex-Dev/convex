@@ -527,7 +527,11 @@ a node has seen of others, lives in the owner's slot in `:local`, one record per
 service; it may still be replicated for backup. An
 `ALocalComponent` edits a private copy of its record and writes it into the slot
 with one signature when the application syncs it, so the application decides how
-many edits share a signature.
+many edits share a signature. Domain subclasses can implement `rebind` using the
+protected constructor taking working storage, a clock and an optional persister.
+It binds the supplied cursor directly and reinstalls timestamping, so forks and
+transaction drafts keep the domain's editing policy. Rebinding must retain the
+clock and other domain configuration; signing remains at the original slot.
 
 The service chooses when to promise durability. It can checkpoint before
 acknowledging a durable request or, when delayed durability is acceptable, have

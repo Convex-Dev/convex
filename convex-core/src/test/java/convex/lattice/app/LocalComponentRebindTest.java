@@ -1,0 +1,111 @@
+package convex.lattice.app;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.ALocalComponent;
+import convex.lattice.Timestamped;
+import convex.lattice.TransactionalComponent;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
+
+/** A third-party domain can bind local records to forks and transaction drafts. */
+class LocalComponentRebindTest {
+
+	private static final Keyword SERVICE=Keyword.intern("notes");
+	private static final Keyword VALUE=Keyword.intern("value");
+	private static final AKeyPair KEY=AKeyPair.createSeeded(7532);
+
+	private static final class Notes extends ALocalComponent
+			implements TransactionalComponent<AHashMap<Keyword,ACell>,Notes> {
+		private final Supplier<CVMLong> clock;
+
+		Notes(AForkableCursor<Index<Keyword,ACell>> root,Supplier<CVMLong> clock,AtomicInteger signatures) {
+			super(root,SERVICE,KEY.getAccountKey(),value -> {
+				signatures.incrementAndGet();
+				return KEY.signData(value);
+			},clock,null);
+			this.clock=clock;
+		}
+
+		Notes(AForkableCursor<AHashMap<Keyword,ACell>> cursor,Supplier<CVMLong> clock) {
+			super(cursor,clock,null);
+			this.clock=clock;
+		}
+
+		@Override public Notes rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+			return new Notes(cursor,clock);
+		}
+
+		@Override public Notes fork() { return rebind(storage.fork()); }
+
+		void put(long value) { cursor().assoc(VALUE,CVMLong.create(value)); }
+	}
+
+	@Test void nestedForkReinstallsStampingAndStopsAtItsDestination() {
+		var root=Root.create(Index.<Keyword,ACell>none());
+		var signatures=new AtomicInteger();
+		var time=new AtomicLong(10);
+		var notes=new Notes(root,() -> CVMLong.create(time.get()),signatures);
+		var supplied=notes.storage().fork();
+		var draft=notes.rebind(supplied);
+		assertSame(supplied,draft.storage(),"Rebinding must not add another fork");
+		assertNull(draft.storage().get(),"Construction must not materialise a record");
+		draft.put(1);
+		assertEquals(CVMLong.create(10),draft.value().get(Timestamped.TIMESTAMP));
+		assertNull(notes.storage().get());
+		draft.sync();
+		assertEquals(draft.value(),notes.value());
+		assertTrue(root.get().isEmpty());
+		assertEquals(0,signatures.get());
+		notes.sync();
+		assertEquals(1,signatures.get());
+		var published=root.get();
+		var nested=draft.fork();
+		time.set(20);
+		nested.put(2);
+		nested.sync();
+		assertEquals(CVMLong.create(20),draft.value().get(Timestamped.TIMESTAMP));
+		assertEquals(CVMLong.ONE,notes.value().get(VALUE));
+		assertSame(published,root.get());
+	}
+
+	@Test void transactionsCommitToWorkingStorageAndDiscardFailedEdits() {
+		var root=Root.create(Index.<Keyword,ACell>none());
+		var signatures=new AtomicInteger();
+		var time=new AtomicLong(10);
+		var notes=new Notes(root,() -> CVMLong.create(time.get()),signatures);
+		notes.execute(draft -> {
+			draft.put(1);
+			assertNull(notes.storage().get());
+		});
+		assertEquals(CVMLong.ONE,notes.value().get(VALUE));
+		assertEquals(CVMLong.create(10),notes.value().get(Timestamped.TIMESTAMP));
+		assertTrue(root.get().isEmpty());
+		assertEquals(0,signatures.get());
+		var before=notes.value();
+		time.set(20);
+		assertThrows(IllegalStateException.class,() -> notes.execute(draft -> {
+			draft.put(2);
+			throw new IllegalStateException("Discard draft");
+		}));
+		assertSame(before,notes.value());
+		notes.exclusive().execute(draft -> draft.put(3));
+		assertEquals(CVMLong.create(3),notes.value().get(VALUE));
+		assertEquals(CVMLong.create(20),notes.value().get(Timestamped.TIMESTAMP));
+		assertEquals(0,signatures.get());
+		notes.sync();
+		assertEquals(1,signatures.get());
+	}
+}
