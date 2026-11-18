@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -252,13 +253,30 @@ public class DLFSDriveManagerTest {
 		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
 		DLFSDriveManager first=new DLFSDriveManager(cursor);
 		DLFSDriveManager second=new DLFSDriveManager(cursor);
+		CountDownLatch ready=new CountDownLatch(2);
 		CountDownLatch start=new CountDownLatch(1);
 
-		try (ExecutorService executor=Executors.newFixedThreadPool(2)) {
-			Future<Boolean> a=executor.submit(()->{ start.await(); return first.createDrive(null, "same"); });
-			Future<Boolean> b=executor.submit(()->{ start.await(); return second.createDrive(null, "same"); });
+		// Daemon workers and bounded shutdown keep a deadlock regression from hanging the JVM.
+		ExecutorService executor=Executors.newFixedThreadPool(2,Thread.ofPlatform().daemon().factory());
+		try {
+			Future<Boolean> a=executor.submit(()->{
+				ready.countDown();
+				assertTrue(start.await(5,TimeUnit.SECONDS),"first creator was not released");
+				return first.createDrive(null,"same");
+			});
+			Future<Boolean> b=executor.submit(()->{
+				ready.countDown();
+				assertTrue(start.await(5,TimeUnit.SECONDS),"second creator was not released");
+				return second.createDrive(null,"same");
+			});
+			assertTrue(ready.await(5,TimeUnit.SECONDS),"both creators must be ready");
 			start.countDown();
-			assertTrue(a.get() ^ b.get(), "exactly one concurrent creator must report success");
+			assertTrue(a.get(10,TimeUnit.SECONDS) ^ b.get(10,TimeUnit.SECONDS),
+				"exactly one concurrent creator must report success");
+		} finally {
+			start.countDown();
+			executor.shutdownNow();
+			assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"drive creators did not stop");
 		}
 		assertEquals(List.of("same"), first.listDrives(null));
 	}

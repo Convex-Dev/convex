@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import static convex.core.lang.TestState.eval;
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,7 +19,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.test.Samples;
 
-public class ParamTestCasts {
+public class CastsParamTest {
 
 	public final ACell[] values = new ACell[] {
 			CVMLong.ZERO,
@@ -42,7 +43,7 @@ public class ParamTestCasts {
 
 	@SuppressWarnings("unchecked")
 	@ParameterizedTest
-	@ValueSource(strings = { "long","boolean","double","byte","char","blob","str","vec","set","blob","address"})
+	@ValueSource(strings = { "long","boolean","double","byte","char","blob","str","vec","set","address"})
 	public void testIdempotent(String name) {
 		ACell namedFn=eval(name);
 		
@@ -52,15 +53,21 @@ public class ParamTestCasts {
 		Context ctx=TestState.CONTEXT.fork();
 		
 		for (ACell x: values) {
+			String where=name+" applied to "+x;
 			ACell[] args= new ACell[] {x};
 			Context r = ctx.fork().invoke(fn, args);
 			if (r.isExceptional()) {
 				ACell code=r.getExceptional().getCode();
-				assertTrue(Sets.of(ErrorCodes.CAST,ErrorCodes.ARGUMENT).contains(code));
+				assertTrue(Sets.of(ErrorCodes.CAST,ErrorCodes.ARGUMENT).contains(code),where);
 			} else {
 				ACell result=r.getResult();
-				ACell result2=r.invoke(fn, args).getResult();
-				assertEquals(result,result2);
+				Context repeated=ctx.fork().invoke(fn,args);
+				assertNotError(repeated);
+				assertEquals(result,repeated.getResult(),"Repeatability: "+where);
+
+				Context recast=ctx.fork().invoke(fn,new ACell[] {result});
+				assertNotError(recast);
+				assertEquals(result,recast.getResult(),"Idempotence: "+where);
 			}
 		}
 	}

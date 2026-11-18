@@ -83,6 +83,10 @@ checks are a separate opt-in profile; see
 
 ### Property tests
 
+Name ordinary JUnit test classes `*Test` (including parameterised tests), so
+Surefire discovers them without a `-Dtest` filter. Keep reusable assertion helpers
+separate from test classes where several suites use the same checks.
+
 Core property tests use the existing `junit-quickcheck` generators and runners,
 executed by the JUnit 6 Vintage engine alongside the Jupiter tests. Classes are
 named `*PropertyTest` so ordinary Maven test runs discover them.
