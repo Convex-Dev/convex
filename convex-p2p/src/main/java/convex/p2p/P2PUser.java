@@ -11,21 +11,20 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Convenience facade over a single P2P user's independently located components.
  *
  * <p>Obtained from {@link P2PApplication#p2p(AccountKey)} or
- * {@link P2PNode#p2p(AccountKey)}. {@link #cursor()} returns a cursor
- * rooted at that user's identity slot — {@code [:id <userKey> :value]} — already through
- * the signing boundary. {@link #identity()} and {@link #node()} expose the two
- * path-specific components. This facade deliberately is not an
- * {@link ALatticeComponent}: it aggregates two disjoint lattice locations.
+ * {@link P2PNode#p2p(AccountKey)}. {@link #identity()} is the component at the user's
+ * identity slot, {@code [:id <userKey> :value]}, and {@link #node()} the one at the
+ * user's node record, {@code [:p2p :nodes <userKey> :value]}; both are already through
+ * the signing boundary. This facade deliberately is not an {@link ALatticeComponent}:
+ * it aggregates two disjoint lattice locations.
  *
  * <pre>{@code
  * P2PUser me = node.p2p();
- * me.cursor().set(P2PLattice.createIdentity(Strings.create("alice"), null, null, ts));
+ * me.setIdentity(P2PLattice.createIdentity(Strings.create("alice"), null, null, ts));
  * me.sync();   // push back to the lattice root
  * }</pre>
  *
@@ -93,11 +92,6 @@ public class P2PUser {
 		return node;
 	}
 
-	/** Compatibility shortcut for {@code identity().cursor()}. */
-	public AForkableCursor<ACell> cursor() {
-		return identity.cursor();
-	}
-
 	/**
 	 * Gets this user's account key — the owner key their slots are keyed by, and the
 	 * key that must sign them.
@@ -106,20 +100,6 @@ public class P2PUser {
 	 */
 	public AccountKey getUserKey() {
 		return userKey;
-	}
-
-	/**
-	 * Gets a cursor at this user's node record, {@code [:p2p :nodes <userKey> :value]},
-	 * also through the signing boundary and scoped the same way.
-	 *
-	 * <p>Separate from {@link #cursor()} because the node registry is a distinct
-	 * top-level region: identity claims and transport details are published, and
-	 * replicated, independently.
-	 *
-	 * @return Cursor at this user's NodeInfo record
-	 */
-	public AForkableCursor<ACell> nodeCursor() {
-		return node.cursor();
 	}
 
 	/**
@@ -165,8 +145,8 @@ public class P2PUser {
 	 * until {@link #sync()}.
 	 *
 	 * <p>Only the identity cursor is forked — {@link #sync()} syncs that cursor, so a
-	 * forked node record would have no matching sync path. {@link #nodeCursor()} on a
-	 * fork still addresses the live node record.
+	 * forked node record would have no matching sync path. {@link #node()} on a fork
+	 * is still the live node record.
 	 *
 	 * @return Forked P2PUser
 	 */

@@ -317,8 +317,7 @@ public class P2PNodeTest {
 		assertNull(node.getApplication().getLattice().path(Social.KEY_SOCIAL));
 
 		// Full P2P capability: identity and node registry both writable
-		assertNotNull(node.p2p().cursor());
-		node.p2p().cursor().set(
+		node.p2p().setIdentity(
 			P2PLattice.createIdentity(Strings.create("relay"), null, null, 1000L));
 		node.p2p().sync();
 		assertEquals(Strings.create("relay"),

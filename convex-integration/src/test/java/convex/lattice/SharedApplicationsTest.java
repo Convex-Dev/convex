@@ -19,7 +19,7 @@ import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.etch.EtchStore;
 import convex.lattice.SharedApplicationsExample.Node;
-import convex.p2p.P2PUser;
+import convex.p2p.P2PLattice;
 import convex.social.Social;
 
 /** What an embedder can rely on; {@link SharedApplicationsExample} assembles the nodes. */
@@ -36,7 +36,7 @@ public class SharedApplicationsTest {
 			Blob post=source.social.feed(ALICE).post("Hello from Social + P2P");
 			Files.writeString(source.files.drives(BOB.getAccountKey()).createDrive("home")
 				.fileSystem().getPath("/hello.txt"),TEXT);
-			source.social.p2p(ALICE).node().setNodeInfo(nodeInfo("social node",100));
+			source.p2p(ALICE).node().setNodeInfo(nodeInfo("social node",100));
 			assertNull(source.root().get(Social.KEY_SOCIAL),"staged edits are not in the host until published");
 			source.publish();
 
@@ -47,7 +47,7 @@ public class SharedApplicationsTest {
 			assertNotNull(target.social.feed(ALICE).getPost(post));
 			assertEquals(TEXT,Files.readString(target.files.drives(BOB.getAccountKey())
 				.drive("home").fileSystem().getPath("/hello.txt")));
-			assertNotNull(target.social.p2p(ALICE).node().getNodeInfo());
+			assertNotNull(target.p2p(ALICE).node().getNodeInfo());
 		}
 	}
 
@@ -99,8 +99,8 @@ public class SharedApplicationsTest {
 			node.social.feed(ALICE).post("A post");
 			Files.writeString(node.files.drives(BOB.getAccountKey()).createDrive("home")
 				.fileSystem().getPath("/hello.txt"),"A file");
-			P2PUser.create(node.files,BOB.getAccountKey(),(owner,value) -> BOB.signData(value)).node().setNodeInfo(nodeInfo("files node",100));
-			assertNotNull(node.social.p2p(BOB).node().getNodeInfo(),"the P2P region is live and shared");
+			node.p2p(BOB).node().setNodeInfo(nodeInfo("files node",100));
+			assertNotNull(node.root().get(P2PLattice.KEY_P2P),"the P2P region is live on the host");
 			assertNull(node.root().get(Social.KEY_SOCIAL));
 			assertNull(node.root().get(Keywords.FS));
 
@@ -125,7 +125,7 @@ public class SharedApplicationsTest {
 			post=node.social.feed(ALICE).post("Durable");
 			Files.writeString(node.files.drives(BOB.getAccountKey()).createDrive("home")
 				.fileSystem().getPath("/hello.txt"),TEXT);
-			node.social.p2p(ALICE).node().setNodeInfo(nodeInfo("durable node",100));
+			node.p2p(ALICE).node().setNodeInfo(nodeInfo("durable node",100));
 			node.publish();
 			node.flush();
 		}
@@ -134,7 +134,7 @@ public class SharedApplicationsTest {
 			assertNotNull(node.social.feed(ALICE).getPost(post));
 			assertEquals(TEXT,Files.readString(node.files.drives(BOB.getAccountKey())
 				.drive("home").fileSystem().getPath("/hello.txt")));
-			assertNotNull(P2PUser.create(node.files,ALICE.getAccountKey()).node().getNodeInfo());
+			assertNotNull(node.p2p(ALICE).node().getNodeInfo());
 		}
 	}
 }

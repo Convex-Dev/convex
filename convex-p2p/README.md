@@ -76,8 +76,8 @@ pass the same owner rule as incoming delivery.
 `P2PApplication.connect(root, host, ownKey, signer, clock, didAuthoriser)` supplies
 the node's public identity independently of signing capability. `NodeDirectory`
 uses that public key and the supplied `Supplier<CVMLong>` to publish node records.
-`P2PUser.create(application, owner, signer)` opens explicit authoring views;
-the two-argument overload is a read view. `P2PApplication.p2p(owner)` uses the
+`P2PApplication.p2p(owner, signer)` opens authoring views with an explicit signer,
+and a null signer opens a read view. `P2PApplication.p2p(owner)` uses the
 application's configured signer.
 
 The application binds the same DID authoriser to social delivery and local social
@@ -303,10 +303,10 @@ P2PUser me = node.p2p();              // own area, using the node's key pair
 me.identity().setIdentity(identityMap); // signed on write
 me.identity().sync();                 // merge this working path
 
-me.node().cursor()                    // independent node-record component
+me.node().setNodeInfo(nodeInfo);      // independent node-record component
 
 P2PUser draft = me.fork();            // identity edits, isolated
-draft.cursor().set(...);
+draft.setIdentity(...);
 draft.sync();                         // merged back; refused if the record changed too
 node.getApplication().sync();         // publish the complete root
 ```

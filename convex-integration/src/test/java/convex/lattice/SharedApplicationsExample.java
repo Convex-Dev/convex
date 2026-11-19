@@ -29,6 +29,7 @@ import convex.lattice.cursor.LazyCursor;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
+import convex.p2p.P2PApplication;
 import convex.p2p.P2PLattice;
 import convex.p2p.P2PUser;
 import convex.social.Feed;
@@ -58,7 +59,7 @@ public final class SharedApplicationsExample {
 			Strings.create(name),Strings.create("example"),null,time);
 	}
 
-	/** Social feeds, staged at {@code :social}. The P2P regions are shared live. */
+	/** Social feeds, staged at {@code :social}. */
 	public static final class SocialApp extends AKeyedRegions {
 		/** A relay of the region as the host holds it */
 		private final Social published;
@@ -82,10 +83,6 @@ public final class SharedApplicationsExample {
 		public Feed publishedFeed(AKeyPair user) {
 			return published.user(user.getAccountKey()).feed();
 		}
-
-		public P2PUser p2p(AKeyPair user) {
-			return P2PUser.create(this,user.getAccountKey(),(owner,value) -> user.signData(value));
-		}
 	}
 
 	/**
@@ -96,6 +93,8 @@ public final class SharedApplicationsExample {
 		public final LatticeHost<Index<Keyword,ACell>> host;
 		public final SocialApp social;
 		public final DLFSApplication files;
+		/** The P2P regions, which both applications use live */
+		private final P2PApplication infrastructure;
 		private final LatticeNode<Index<Keyword,ACell>> network;
 		private final LatticePropagator propagation;
 
@@ -111,7 +110,7 @@ public final class SharedApplicationsExample {
 		private Node(EtchStore store,AKeyPair nodeKey,long time) throws Exception {
 			host=LatticeHost.open(store);
 			// Infrastructure is registered once; both domain applications use its live state.
-			host.addApplication(new LatticeComponent<>(P2PLattice.ROOT,host.cursor()));
+			infrastructure=host.addApplication(P2PApplication.connect(P2PLattice.ROOT,host));
 			social=host.addApplication(new SocialApp(host,ALICE,time));
 			var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),store,
 				BOB::signData,() -> CVMLong.create(time));
@@ -126,6 +125,11 @@ public final class SharedApplicationsExample {
 			network.setIdentity(DID.forKey(nodeKey.getAccountKey()),nodeKey);
 			propagation=network.createPropagator();
 			network.serveAllInbound(propagation).launch();
+		}
+
+		/** A user's P2P area, signed with that user's key. */
+		public P2PUser p2p(AKeyPair user) {
+			return infrastructure.p2p(user.getAccountKey(),(owner,value) -> user.signData(value));
 		}
 
 		/** The root value this node's host currently holds. */
@@ -189,7 +193,7 @@ public final class SharedApplicationsExample {
 			Blob post=source.social.feed(ALICE).post("Hello from Alice");
 			Files.writeString(source.files.drives(BOB.getAccountKey()).createDrive("home")
 				.fileSystem().getPath("/hello.txt"),"Hello from Bob");
-			source.social.p2p(ALICE).node().setNodeInfo(nodeInfo("alice's node",100));
+			source.p2p(ALICE).node().setNodeInfo(nodeInfo("alice's node",100));
 			out.println("Before publish the source host holds only the live P2P region: "+source.root().keySet());
 			source.publish();
 			out.println("After publish it holds: "+source.root().keySet());

@@ -397,9 +397,8 @@ public class P2PNode implements Closeable {
 	/**
 	 * Gets a view of a P2P user's owned area of the lattice.
 	 *
-	 * <p>{@code node.p2p(userKey).cursor()} yields a cursor at that user's identity
-	 * slot, already through the signing boundary — writes are signed with this node's
-	 * key pair and {@code sync()} pushes them back into the lattice.
+	 * <p>Its components are already through the signing boundary: writes are signed
+	 * with this node's key pair and {@code sync()} pushes them back into the lattice.
 	 *
 	 * <p>Any user key may be passed: another user's area is readable, but not writable
 	 * (see {@link P2PUser} for why that fails at two independent layers).

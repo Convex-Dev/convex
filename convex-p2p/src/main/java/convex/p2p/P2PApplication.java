@@ -27,7 +27,6 @@ import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
 import convex.lattice.OwnedMap;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
@@ -111,7 +110,8 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		this.signer=signer;
 		this.clock=java.util.Objects.requireNonNull(clock);
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
-		this.socialPolicy=new SocialReplicationPolicy(LazyCursor.create(cursor().withDefault(Index.none()),Social.KEY_SOCIAL),
+		this.socialPolicy=new SocialReplicationPolicy(
+			new IndexComponent<Keyword,ACell>(cursor()).<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>>path(Social.KEY_SOCIAL),
 			java.util.Objects.requireNonNull(didAuthorizer),clock);
 		this.directory=new NodeDirectory(this);
 		// Only a node that can sign its own :local slot keeps contact records
@@ -124,7 +124,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		// A node without contact records has reached no other node
 		Supplier<ToIntFunction<AccountKey>> standings=(contacts==null)
 			?() -> node -> ContactRecords.standing(null):contacts::standings;
-		this.registry=new NodeRegistry(LazyCursor.create(cursor().withDefault(Index.none()),P2PLattice.KEY_P2P),
+		this.registry=new NodeRegistry(new IndexComponent<Keyword,ACell>(cursor()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P),
 			ownKey,blocklist::isBlocked,standings);
 	}
 
@@ -219,8 +219,16 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		policy().pin(did);
 	}
 
-	/** Returns the component representing one P2P user's owned regions. */
+	/** Returns the component representing one P2P user's owned regions, signed with this application's signer. */
 	public P2PUser p2p(AccountKey userKey) {
+		return p2p(userKey,signer);
+	}
+
+	/**
+	 * Returns the component representing one P2P user's owned regions, signed with an
+	 * owner-aware signer that may serve several keys. A null signer opens a read view.
+	 */
+	public P2PUser p2p(AccountKey userKey,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		return P2PUser.create(this,userKey,signer);
 	}
 

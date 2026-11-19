@@ -28,12 +28,11 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.store.MemoryStore;
 import convex.lattice.MergeConflictException;
-import convex.lattice.cursor.AForkableCursor;
 import convex.node.NodeConfig;
 
 /**
- * Tests for the {@code node.p2p(userID).cursor()} application API — reading and writing
- * a user's owned P2P area through a cursor, with signing handled by the cursor chain.
+ * Tests for the {@code node.p2p(userID)} application API — reading and writing
+ * a user's owned P2P area, with signing handled by the cursor chain.
  */
 public class P2PUserTest {
 
@@ -81,7 +80,7 @@ public class P2PUserTest {
 	public void testCursorWriteAndSync() {
 		P2PUser me = node.p2p(KEY);
 
-		me.cursor().set(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
+		me.setIdentity(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
 		me.sync();
 
 		AHashMap<Keyword, ACell> identity = me.getIdentity();
@@ -93,7 +92,7 @@ public class P2PUserTest {
 	@Test
 	public void testWriteReachesLatticeRoot() {
 		P2PUser me = node.p2p(KEY);
-		me.cursor().set(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
+		me.setIdentity(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
 		me.sync();
 
 		AHashMap<ACell, SignedData<ACell>> region = ownerMap(node.getCursor().get(P2PLattice.KEY_ID));
@@ -111,7 +110,7 @@ public class P2PUserTest {
 	public void testOwnUserShorthand() {
 		assertEquals(KEY, node.p2p().getUserKey());
 
-		node.p2p().cursor().set(P2PLattice.createIdentity(Strings.create("self"), null, null, 1000L));
+		node.p2p().setIdentity(P2PLattice.createIdentity(Strings.create("self"), null, null, 1000L));
 		node.p2p().sync();
 
 		assertEquals(Strings.create("self"),
@@ -127,7 +126,7 @@ public class P2PUserTest {
 	@Test
 	public void testValueIsStoredSignedByUser() {
 		P2PUser me = node.p2p(KEY);
-		me.cursor().set(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
+		me.setIdentity(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
 		me.sync();
 
 		SignedData<ACell> slot = rawIdentitySlot(KEY);
@@ -136,7 +135,7 @@ public class P2PUserTest {
 		assertTrue(slot.checkSignature(), "Stored signature must verify");
 
 		// The cursor presents the unsigned value, so the app never unwraps it
-		assertEquals(slot.getValue(), me.cursor().get());
+		assertEquals(slot.getValue(), me.getIdentity());
 	}
 
 	@Test
@@ -174,7 +173,7 @@ public class P2PUserTest {
 		AccountKey otherKey = AKeyPair.generate().getAccountKey();
 
 		P2PUser them = node.p2p(otherKey);
-		assertThrows(IllegalStateException.class,()->them.cursor().set(
+		assertThrows(IllegalStateException.class,()->them.setIdentity(
 			P2PLattice.createIdentity(Strings.create("mallory"),null,null,9000L)));
 
 		SignedData<ACell> slot = rawIdentitySlot(otherKey);
@@ -191,7 +190,7 @@ public class P2PUserTest {
 		AHashMap<Keyword, ACell> info = P2PLattice.createNodeInfo(
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
-		me.nodeCursor().set(info);
+		me.node().setNodeInfo(info);
 		me.node().sync();
 
 		AHashMap<ACell, SignedData<ACell>> nodes = ownerMap(
@@ -206,11 +205,11 @@ public class P2PUserTest {
 	public void testIdentityAndNodeRecordAreIndependent() {
 		P2PUser me = node.p2p(KEY);
 
-		me.cursor().set(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
+		me.setIdentity(P2PLattice.createIdentity(Strings.create("alice"), null, null, 1000L));
 		me.sync();
 
 		assertNotNull(me.getIdentity());
-		assertFalse(me.nodeCursor().exists(), "Publishing identity must not create a node record");
+		assertNull(me.node().getNodeInfo(), "Publishing identity must not create a node record");
 	}
 
 	// ===== Fork / sync-on-demand =====
@@ -221,11 +220,11 @@ public class P2PUserTest {
 	@Test
 	public void testForkIsolatesUntilSync() {
 		P2PUser me = node.p2p(KEY);
-		me.cursor().set(P2PLattice.createIdentity(Strings.create("original"), null, null, 1000L));
+		me.setIdentity(P2PLattice.createIdentity(Strings.create("original"), null, null, 1000L));
 		me.sync();
 
 		P2PUser draft = me.fork();
-		draft.cursor().set(P2PLattice.createIdentity(Strings.create("draft"), null, null, 2000L));
+		draft.setIdentity(P2PLattice.createIdentity(Strings.create("draft"), null, null, 2000L));
 
 		// Parent unchanged before sync
 		assertEquals(Strings.create("original"),
@@ -244,15 +243,15 @@ public class P2PUserTest {
 	@Test
 	public void testForkSyncRefusesAnIdentityThatChangedToo() {
 		P2PUser me = node.p2p(KEY);
-		me.cursor().set(P2PLattice.createIdentity(Strings.create("base"), null, null, 1000L));
+		me.setIdentity(P2PLattice.createIdentity(Strings.create("base"), null, null, 1000L));
 		me.sync();
 
 		P2PUser draft = me.fork();
-		draft.cursor().set(P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L));
+		draft.setIdentity(P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L));
 
 		// Parent moves on while the fork is open
 		P2PUser me2 = node.p2p(KEY);
-		me2.cursor().set(P2PLattice.createIdentity(Strings.create("newer"), null, null, 3000L));
+		me2.setIdentity(P2PLattice.createIdentity(Strings.create("newer"), null, null, 3000L));
 		me2.sync();
 
 		assertThrows(MergeConflictException.class, draft::sync);
@@ -267,15 +266,15 @@ public class P2PUserTest {
 	// ===== Scoping =====
 
 	/**
-	 * The cursor is rooted at this user's own area: its value is that user's identity
+	 * A user's view is rooted at that user's own area: it holds that user's identity
 	 * map, with no other user's data reachable through it.
 	 */
 	@Test
-	public void testCursorIsScopedToOneUser() {
+	public void testViewIsScopedToOneUser() {
 		AKeyPair otherKP = AKeyPair.generate();
 		AccountKey otherKey = otherKP.getAccountKey();
 
-		node.p2p(KEY).cursor().set(
+		node.p2p(KEY).setIdentity(
 			P2PLattice.createIdentity(Strings.create("mine"), null, null, 1000L));
 		node.p2p(KEY).sync();
 
@@ -288,27 +287,26 @@ public class P2PUserTest {
 		AHashMap<ACell, SignedData<ACell>> region = ownerMap(node.getCursor().get(P2PLattice.KEY_ID));
 		assertEquals(2, region.count());
 
-		// ...but each user's cursor sees only its own
-		AForkableCursor<ACell> mine = node.p2p(KEY).cursor();
-		assertEquals(Strings.create("mine"),
-			((AHashMap<Keyword, ACell>) mine.get()).get(P2PLattice.ID_NAME));
-		assertFalse(mine.path(otherKey).exists(), "Another user must not be reachable from this cursor");
+		// ...but each user's view sees only its own
+		AHashMap<Keyword, ACell> mine = node.p2p(KEY).getIdentity();
+		assertEquals(Strings.create("mine"), mine.get(P2PLattice.ID_NAME));
+		assertNull(mine.get(otherKey), "Another user must not be reachable from this view");
 
 		assertEquals(Strings.create("theirs"),
 			node.p2p(otherKey).getIdentity().get(P2PLattice.ID_NAME));
 	}
 
-	// ===== Cursor identity =====
+	// ===== View identity =====
 
 	/** Each call builds a fresh view over the same underlying lattice state. */
 	@Test
 	public void testViewsShareUnderlyingState() {
-		node.p2p(KEY).cursor().set(
-			P2PLattice.createIdentity(Strings.create("shared"), null, null, 1000L));
-		node.p2p(KEY).sync();
+		P2PUser a = node.p2p(KEY);
+		P2PUser b = node.p2p(KEY);
+		a.setIdentity(P2PLattice.createIdentity(Strings.create("shared"), null, null, 1000L));
+		a.sync();
 
-		AForkableCursor<ACell> a = node.p2p(KEY).cursor();
-		AForkableCursor<ACell> b = node.p2p(KEY).cursor();
-		assertEquals(a.get(), b.get());
+		assertNotNull(b.getIdentity());
+		assertEquals(a.getIdentity(), b.getIdentity());
 	}
 }
