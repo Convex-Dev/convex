@@ -25,6 +25,7 @@ import convex.etch.EtchStore;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.mail.Mail;
 import convex.lattice.mail.MailEnvelope;
@@ -59,7 +60,11 @@ class MailDeliveryTest {
 	 */
 	static final class MailApp extends ALatticeApplication<Index<Keyword,ACell>> {
 		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(host.cursor().fork(),host::persist); }
-		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,(owner,value) -> user.signData(value)); }
+		/** The application's mail region, created by its first send, signing receipts as the user. */
+		Mail mail(AKeyPair user) {
+			return Mail.connect(LazyCursor.create(cursor().withDefault(Index.none()),Mail.KEY_MAIL),Mail.LATTICE,
+				(owner,value) -> user.signData(value));
+		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> ROOT.merge(own,other));
 		}
@@ -107,7 +112,7 @@ class MailDeliveryTest {
 		/** The mail region in the application's working state, where incoming values land. */
 		@SuppressWarnings("unchecked")
 		AHashMap<ACell,ACell> region() {
-			return (AHashMap<ACell,ACell>)app.cursor().get().get(Mail.KEY_MAIL);
+			return (AHashMap<ACell,ACell>)app.value().get(Mail.KEY_MAIL);
 		}
 
 		/** The mail region in the published host root. */

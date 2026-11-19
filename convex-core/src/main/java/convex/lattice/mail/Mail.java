@@ -13,9 +13,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.AMapComponent;
-import convex.lattice.IndexComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -75,16 +73,13 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 		return new Mail(Cursors.root(lattice.zero()),lattice,signer);
 	}
 
-	/** Connects a region with explicit verification and receipt signing. Forks retain both. */
+	/**
+	 * Binds a region to the place its owner gives it, with explicit verification and
+	 * receipt signing. Forks retain both.
+	 */
 	public static Mail connect(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor,
 			MailLattice lattice,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		return new Mail(cursor,lattice,signer);
-	}
-
-	/** Connects to an application's mail region without inheriting any policy. */
-	public static Mail connect(ALatticeComponent<Index<Keyword,ACell>> application,MailLattice lattice,
-			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		return connect(new IndexComponent<>(application.cursor()).path(KEY_MAIL),lattice,signer);
 	}
 
 	public MailLattice getLattice() { return lattice; }

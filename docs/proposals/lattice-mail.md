@@ -406,13 +406,13 @@ public final class MailEntryLattice extends AValueLattice<SignedData<ACell>>
     // the per-key register as specified above, bound to the mailbox DID and the entry key
     static ABlob key(long issuedAt, Hash envelopeHash)       // t‖hash
 
-public final class Mail extends ALatticeComponent<AHashMap<ACell, Index<ABlob, SignedData<ACell>>>>
+public final class Mail extends AMapComponent<ACell, Index<ABlob, SignedData<ACell>>, AHashMap<...>>
         implements TransactionalComponent<..., Mail>
     static Keyword KEY_MAIL                                  // :mail
     static MailLattice LATTICE                               // did:key-only default
     static Mail create(BiFunction<ACell,ACell,SignedData<ACell>> signer) // standalone root
-    static Mail connect(ALatticeComponent<Index<Keyword,ACell>> app, MailLattice lattice,
-        BiFunction<ACell,ACell,SignedData<ACell>> signer)
+    static Mail connect(AForkableCursor<AHashMap<...>> region, MailLattice lattice,
+        BiFunction<ACell,ACell,SignedData<ACell>> signer)    // at the place the application gives it
     Mailbox mailbox(AString did)                             // view of any mailbox
     Hash send(MailEnvelope envelope)                         // one atomic deposit in the recipient mailbox
     Mail fork(); void sync();
