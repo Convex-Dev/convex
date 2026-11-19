@@ -30,6 +30,7 @@ class FeedComponentTest {
 		assertNull(feed.getPost(missing));
 		assertEquals(0,feed.count());
 		feed.delete(missing);
+		assertThrows(IllegalArgumentException.class,() -> feed.delete(null),"nil is not a post key");
 		assertThrows(UnsupportedOperationException.class,() -> feed.post("post"));
 		assertThrows(UnsupportedOperationException.class,() -> feed.reply("reply",missing,author));
 		assertNull(root.get());

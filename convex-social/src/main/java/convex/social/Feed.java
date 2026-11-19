@@ -97,10 +97,11 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
-		if (get(postKey)==null) return;
+		AForkableCursor<ACell> entry=entry(postKey);
+		if (entry.getOrDefault(null)==null) return;
 		CVMLong now = clock.get();
 		// The post may have gone since the read, which the update leaves alone
-		entry(postKey).update(existing -> {
+		entry.update(existing -> {
 			if (existing==null) return null;
 			AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) existing;
 			return post.assoc(SocialPost.DELETED,now).assoc(SocialPost.TIMESTAMP,now);
