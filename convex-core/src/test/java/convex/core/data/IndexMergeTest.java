@@ -204,6 +204,7 @@ public class IndexMergeTest {
 		Index<ABlob, CVMLong> b = Index.unsafeCreate(2, rootEntry, (Ref[]) bChildren, 1 << 1, 2);
 
 		assertSame(a, a.mergeDifferences(b, MAX));
+		assertSame(a, a.merge(b));
 	}
 
 	/**
@@ -225,6 +226,7 @@ public class IndexMergeTest {
 		Index<ABlob, CVMLong> b = Index.unsafeCreate(2, rootEntry, (Ref[]) bChildren, 1 << 1, 2);
 
 		assertSame(a, a.mergeDifferences(b, MAX));
+		assertSame(a, a.merge(b));
 	}
 
 	/**

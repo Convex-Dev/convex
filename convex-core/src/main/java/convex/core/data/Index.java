@@ -1497,6 +1497,30 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return hm;
 	}
 
+	/** Internal ordinary-merge mode: keep both single sides, replace whole matching entries. */
+	private static final MergeFunction<ACell> OVERWRITE = (a, b) -> b;
+
+	/**
+	 * Ordinary right-biased merge. Index operands share unchanged radix branches;
+	 * other maps retain the entry-insertion conversion path. Unlike callback
+	 * merges, an incoming nil is a stored value, and the incoming key is retained.
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public Index<K, V> merge(AMap<K, V> b) {
+		if (b == this || b.count() == 0) return this;
+		if (!(b instanceof Index)) return (Index<K, V>) super.merge(b);
+		Index<K, V> other = (Index<K, V>) b;
+		if (count == 0) return other;
+		if (other.count == 1) return assocEntry(other.entry);
+		MergeFunction<V> mode = (MergeFunction<V>) OVERWRITE;
+		try {
+			return mergeNode(this, other, mode);
+		} catch (StackOverflowError e) {
+			return mergeIntoDeep(this, other, mode);
+		}
+	}
+
 	@Override
 	public Index<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func) {
 		if (b instanceof Index) {
@@ -1645,7 +1669,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (aref == null) {
 				nc = applySide(bref.getValue(), func, false);      // b-only child
 			} else if (bref == null) {
-				if (func instanceof KeepOwn) continue;              // a-only child kept, without traversing it
+				if (func == OVERWRITE || func instanceof KeepOwn) continue; // a-only child kept without traversal
 				ac = aref.getValue();
 				nc = applySide(ac, func, true);                    // a-only child
 			} else if (aref.equals(bref)) {
@@ -1680,7 +1704,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V>[] kids = null; // built lazily on first change
 		boolean changed = (ne != shallow.entry);
 		// The shallow node's other children are single-side; an own side that is kept is not traversed
-		int sm = (shallowIsLeft && func instanceof KeepOwn) ? 0 : shallow.mask & 0xFFFF;
+		int sm = (func == OVERWRITE || (shallowIsLeft && func instanceof KeepOwn)) ? 0 : shallow.mask & 0xFFFF;
 		for (int d = 0; d < 16; d++) {
 			if (d == dig) continue;
 			if (((sm >> d) & 1) == 0) continue;
@@ -1729,6 +1753,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * same node if unchanged, and at once for an own side that a {@link KeepOwn} merge keeps.
 	 */
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> applySide(Index<K, V> node, MergeFunction<V> func, boolean left) {
+		if (func == OVERWRITE) return node;
 		if (node.count == 0) return node;
 		if (left && func instanceof KeepOwn) return node;
 		MapEntry<K, V> ne = singleEntry(node.entry, func, left);
@@ -1810,6 +1835,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		long n=b.count;
 		for (long i=0; i<n; i++) {
 			MapEntry<K,V> be=b.entryAt(i);
+			if (func == OVERWRITE) {
+				result = result.assocEntryDeep(be, 0);
+				continue;
+			}
 			MapEntry<K,V> ae=a.getEntry(be.getKey());
 			K key=(ae==null) ? be.getKey() : ae.getKey();
 			V av=(ae==null) ? null : ae.getValue();
@@ -1871,6 +1900,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	private static <K extends ABlobLike<?>, V extends ACell> MapEntry<K, V> mergeEntries(MapEntry<K, V> ea, MapEntry<K, V> eb, MergeFunction<V> func) {
 		if (eb == null) return singleEntry(ea, func, true);
 		if (ea == null) return singleEntry(eb, func, false);
+		// Ordinary assocEntry replaces the stored key as well as the value, even
+		// when different key types (or bytes beyond the key limit) identify one slot.
+		if (func == OVERWRITE) return ea.equals(eb) ? ea : eb;
 		V va = ea.getValue(), vb = eb.getValue();
 		if (Utils.equals(va, vb)) return ea;                  // equal values: keep a's, no func call
 		V nv = func.merge(ea.getKey(), va, vb);
@@ -1882,6 +1914,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/** Apply {@code func} to a single-side entry (other side null). Returns the entry, or null if removed. */
 	private static <K extends ABlobLike<?>, V extends ACell> MapEntry<K, V> singleEntry(MapEntry<K, V> e, MergeFunction<V> func, boolean left) {
 		if (e == null) return null;
+		if (func == OVERWRITE) return e;
 		if (left && func instanceof KeepOwn) return e;
 		V v = e.getValue();
 		V nv = left ? func.merge(e.getKey(), v, null) : func.merge(e.getKey(), null, v);

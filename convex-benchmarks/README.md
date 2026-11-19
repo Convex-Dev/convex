@@ -17,6 +17,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `IndexSeekBenchmark` | Lower-bound search for exact keys, absent keys and prefixes |
 | `IndexSliceBenchmark` | Structural slices and seek-based cuts against per-entry deletion |
 | `IndexConcatBenchmark` | Ordered concatenation and split/rejoin against ordinary map merge |
+| `IndexMergeBenchmark` | Structural ordinary merge against the original entry-insertion loop |
 | `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
@@ -244,6 +245,39 @@ Etch writes, lattice path updates and local peer transactions, including a final
 pair after refining the small-operand dispatch. They showed no consistent overall
 slowdown; these short runs do not establish an application-wide speedup. Rerun on
 the deployment JVM and workload, particularly for cold store-backed maps.
+
+### Ordinary Index merge
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main IndexMergeBenchmark -prof gc
+```
+
+This retains the original insertion loop as a baseline and checks equivalence
+in setup. Immutable resident indexes use hash-distributed keys, with the same
+size and overlap parameters as `HashMapMergeBenchmark`. Construction and store
+I/O are excluded. Ordinary merge now reuses the callback merge's radix traversal
+with whole-entry overwrite semantics: explicit `nil` survives, and an incoming
+byte-equivalent key replaces the stored key, including its original type.
+Callback merge semantics remain unchanged. Single incoming entries still use
+direct insertion; the existing explicit-stack fallback handles deep indexes.
+
+A local JDK 27.0.1.0.3 run on 2026-11-19 used two forks, three 300 ms
+warmups, four 300 ms measurements, one worker, `-Xms256m -Xmx512m` and
+`-prof gc`. Medians of per-iteration average times at 65,536 entries were:
+
+| Incoming index | Insertion loop | Structural merge |
+|---|---:|---:|
+| Shared version, one value changed | 23.90 ms | 0.58 microseconds |
+| Independent half-overlapping keys | 17.26 ms | 9.46 ms |
+| Independent disjoint keys | 14.38 ms | 6.72 ms |
+| Single changed entry | 132 ns | 106 ns |
+
+Allocation for overlapping merges fell from 49.57 MB to 10.91 MB per operation;
+disjoint merges fell from 50.26 MB to 5.49 MB. Single-entry allocation was
+unchanged. The eight-entry shared case was faster (239 ns to 76 ns), but used
+336 rather than 176 bytes because structural rebuilding allocates child arrays.
+These are resident-data microbenchmarks, not application-wide speedup claims.
 
 ### With Profiling (Java Flight Recorder)
 

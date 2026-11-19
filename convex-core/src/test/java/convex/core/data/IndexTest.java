@@ -1372,6 +1372,17 @@ public class IndexTest {
 	}
 
 	@Test
+	public void testStackOverflowFallbackOrdinaryMerge() throws IOException {
+		OverflowingStore store=new OverflowingStore();
+		Index<Blob,CVMLong> baseline=fourKeyIndex();
+		Index<Blob,CVMLong> incoming=Index.of(K1000,null,K1001,20,Blob.fromHex("100a"),null);
+		Index<Blob,CVMLong> expected=baseline;
+		for (long i=0;i<incoming.count();i++) expected=expected.assocEntry(incoming.entryAt(i));
+		assertEquals(expected,hostileIndex(store).merge(incoming));
+		assertEquals(1,store.fired);
+	}
+
+	@Test
 	public void testStackOverflowFallbackAssocDissoc() throws IOException {
 		OverflowingStore store=new OverflowingStore();
 		Index<Blob,CVMLong> baseline=fourKeyIndex();
