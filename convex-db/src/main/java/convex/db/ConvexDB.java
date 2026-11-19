@@ -187,21 +187,6 @@ public class ConvexDB extends AMapComponent<AString, Index<Keyword, ACell>, AHas
 		return new ConvexDB(parent.path(), policy);
 	}
 
-	/**
-	 * Connects to a containing component at the database-map level, as a live view of
-	 * the component's cursor that receives no incoming values and stamps writes with the
-	 * runtime clock.
-	 *
-	 * @param parent Containing database-map component
-	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
-	 * @return ConvexDB over the containing component's cursor
-	 */
-	public static ConvexDB connect(ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent,
-			BinaryOperator<Index<Keyword, ACell>> policy) {
-		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		return new ConvexDB(parent.cursor(), policy);
-	}
-
 	/** Subclasses override this to return their own type, so forks keep their databases, policy and clock. */
 	@Override
 	public ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {

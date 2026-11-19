@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.db.lattice.RowLWW;
@@ -51,6 +53,13 @@ public class ConvexDBComponentTest {
 		return host;
 	}
 
+	/** Edits fields of the database's state that it does not manage, as another writer of the host root would. */
+	private static void editDatabase(LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host,
+			UnaryOperator<Index<Keyword,ACell>> edit) {
+		AString name=Strings.create(DB_NAME);
+		host.cursor().update(map -> map.assoc(name,edit.apply(map.get(name))));
+	}
+
 	private static SQLDatabase createDatabase(ConvexDB cdb) {
 		SQLDatabase db=cdb.database(DB_NAME);
 		assertTrue(db.tables().createTable(TABLE_NAME,new String[] {"id","value"}));
@@ -60,20 +69,20 @@ public class ConvexDBComponentTest {
 	@Test
 	public void testHostedComponentsShareRootState() {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
-		ConvexDB cdb=ConvexDB.connect(root,RowLWW::merge);
+		ConvexDB cdb=ConvexDB.connect(root.cursor(),RowLWW::merge);
 		SQLDatabase db=createDatabase(cdb);
 		SQLTable table=db.tables().getTable(TABLE_NAME);
 
 		assertNotNull(table);
-		assertSame(root.cursor().get(),cdb.cursor().get());
+		assertSame(root.cursor().get(),cdb.value());
 		assertEquals(1,root.cursor().get().count());
-		assertTrue(ConvexDB.connect(root,RowLWW::merge).database(DB_NAME).tables().tableExists(TABLE_NAME));
+		assertTrue(ConvexDB.connect(root.cursor(),RowLWW::merge).database(DB_NAME).tables().tableExists(TABLE_NAME));
 	}
 
 	@Test
 	public void testDatabaseForkSyncsToOriginal() {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
-		SQLDatabase original=createDatabase(ConvexDB.connect(root,RowLWW::merge));
+		SQLDatabase original=createDatabase(ConvexDB.connect(root.cursor(),RowLWW::merge));
 		SQLDatabase fork=original.fork();
 
 		assertTrue(fork.tables().insert(TABLE_NAME,1,"forked"));
@@ -87,38 +96,39 @@ public class ConvexDBComponentTest {
 	/** Publishing table edits preserves unrelated current fields, including their deletion. */
 	@Test
 	public void testDatabasePublicationPreservesConcurrentChanges() {
-		SQLDatabase original=createDatabase(ConvexDB.connect(host(),RowLWW::merge));
+		var host=host();
+		SQLDatabase original=createDatabase(ConvexDB.connect(host.cursor(),RowLWW::merge));
 		Keyword retained=Keyword.intern("external");
 		Keyword removed=Keyword.intern("removed");
-		original.cursor().update(db -> db.assoc(retained,CVMLong.ONE).assoc(removed,CVMLong.ONE));
+		editDatabase(host,db -> db.assoc(retained,CVMLong.ONE).assoc(removed,CVMLong.ONE));
 		SQLDatabase fork=original.fork();
 		assertTrue(fork.tables().createTable("draft",new String[] {"id"}));
 		assertTrue(original.tables().createTable("concurrent",new String[] {"id"}));
-		original.cursor().update(db -> db.assoc(retained,CVMLong.TWO).dissoc(removed));
+		editDatabase(host,db -> db.assoc(retained,CVMLong.TWO).dissoc(removed));
 
 		fork.sync();
 		assertTrue(original.tables().tableExists("draft"));
 		assertTrue(original.tables().tableExists("concurrent"));
 		assertTrue(original.tables().tableExists(TABLE_NAME));
-		assertEquals(CVMLong.TWO,original.cursor().get().get(retained));
-		assertFalse(original.cursor().get().containsKey(removed));
-		var published=original.cursor().get();
+		assertEquals(CVMLong.TWO,original.value().get(retained));
+		assertFalse(original.value().containsKey(removed));
+		var published=original.value();
 		fork.sync();
-		assertSame(published,original.cursor().get());
+		assertSame(published,original.value());
 	}
 
 	/** A fork of the whole collection publishes alone, but refuses to reconcile a concurrent change. */
 	@Test
 	public void testCollectionForkRefusesConcurrentChanges() {
-		ConvexDB cdb=ConvexDB.connect(host(),RowLWW::merge);
+		ConvexDB cdb=ConvexDB.connect(host().cursor(),RowLWW::merge);
 		SQLDatabase db=createDatabase(cdb);
 		ConvexDB fork=cdb.fork();
 		assertTrue(fork.database(DB_NAME).tables().insert(TABLE_NAME,1,"forked"));
 		assertTrue(db.tables().insert(TABLE_NAME,2,"concurrent"));
-		var current=cdb.cursor().get();
+		var current=cdb.value();
 
 		assertThrows(MergeConflictException.class,fork::sync);
-		assertSame(current,cdb.cursor().get());
+		assertSame(current,cdb.value());
 
 		ConvexDB alone=cdb.fork();
 		assertTrue(alone.database(DB_NAME).tables().insert(TABLE_NAME,3,"alone"));
@@ -129,7 +139,7 @@ public class ConvexDBComponentTest {
 	/** A database is the unit of forking: its table store and tables are live views. */
 	@Test
 	public void testTablesAreNotForkedSeparately() {
-		SQLDatabase db=createDatabase(ConvexDB.connect(host(),RowLWW::merge));
+		SQLDatabase db=createDatabase(ConvexDB.connect(host().cursor(),RowLWW::merge));
 		assertThrows(UnsupportedOperationException.class,() -> db.tables().fork());
 		assertThrows(UnsupportedOperationException.class,() -> db.tables().getTable(TABLE_NAME).fork());
 	}
