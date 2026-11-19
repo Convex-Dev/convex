@@ -106,8 +106,8 @@ public class SharedApplicationInternalsTest {
 		ALattice<?> lattice=HOST_ROOT;
 		for (ACell key:path) {
 			cursor=(lattice.zero() instanceof Index)
-				?new IndexComponent(cursor).path((convex.core.data.ABlobLike<?>)key)
-				:new MapComponent(cursor).path(key);
+				?new IndexComponent(cursor).entry((convex.core.data.ABlobLike<?>)key)
+				:new MapComponent(cursor).entry(key);
 			lattice=lattice.path(key);
 		}
 		return cursor;
@@ -150,7 +150,7 @@ public class SharedApplicationInternalsTest {
 			if (socialApp) {
 				var policy=context(SOCIAL_KEY,signing);
 				socialState=owned(host,policy,SocialLattice.INSTANCE::merge,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-				social=Social.connect(new IndexComponent<>(cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+				social=Social.connect(new IndexComponent<>(cursor()).entry(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).rebind(socialState.cursor());
 				files=null;
 				fileState=null;
@@ -293,11 +293,11 @@ public class SharedApplicationInternalsTest {
 			super(cursor);
 			this.policy=policy;
 			region(Social.KEY_SOCIAL,LatticeComponent.live(SOCIAL_ROOT.path(Social.KEY_SOCIAL),
-				new IndexComponent<>(cursor).path(Social.KEY_SOCIAL),LatticeContext.EMPTY));
+				new IndexComponent<>(cursor).entry(Social.KEY_SOCIAL),LatticeContext.EMPTY));
 			// The host's P2P application merges the P2P regions; this application views them
 			identities=view(Keywords.ID,P2PIdentities::new);
 			p2pRegion=view(Keywords.P2P,P2PRegion::new);
-			social=Social.connect(new IndexComponent<>(cursor).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+			social=Social.connect(new IndexComponent<>(cursor).entry(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
 		@Override public SocialWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
@@ -453,7 +453,7 @@ public class SharedApplicationInternalsTest {
 					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 				}
 			});
-			var feed=Social.connect(new IndexComponent<>(f.social.cursor()).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+			var feed=Social.connect(new IndexComponent<>(f.social.cursor()).entry(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> delayedPolicy.signAs(owner,value),delayedPolicy::currentTimestamp).user(SOCIAL_KEY.getAccountKey()).feed();
 			var beforePost=f.node.getCursor().get();
 			try (var executor=Executors.newSingleThreadExecutor()) {

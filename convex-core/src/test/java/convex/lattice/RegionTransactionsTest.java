@@ -599,7 +599,7 @@ class RegionTransactionsTest {
 
 	@Test void explicitChildrenAreSyncedByWhoeverMadeThem() {
 		var root=emptyRoot();
-		var mine=new Members(new IndexComponent<Keyword,ACell>(root).<ASet<CVMLong>>path(OTHER).fork());
+		var mine=new Members(new IndexComponent<Keyword,ACell>(root).<ASet<CVMLong>>entry(OTHER).fork());
 		var app=new Regions(root);
 		app.add(OTHER,mine);
 		mine.add(1);

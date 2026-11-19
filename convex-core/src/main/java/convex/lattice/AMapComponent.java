@@ -102,16 +102,6 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 		return (AForkableCursor<T>)new Entry(values(),key);
 	}
 
-	/**
-	 * Returns the view {@link #entry} returns, to callers outside this component.
-	 * @param <T> Entry type expected by the child
-	 * @param key Entry key
-	 * @return Shared entry cursor
-	 */
-	public <T extends V> AForkableCursor<T> path(K key) {
-		return entry(key);
-	}
-
 	/** One entry, read through the map's storage check and constructed with its creation policy. */
 	private final class Entry extends ALazyCursor<V> {
 		private final K key;

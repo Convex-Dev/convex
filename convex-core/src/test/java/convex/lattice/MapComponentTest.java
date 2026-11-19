@@ -32,7 +32,7 @@ class MapComponentTest {
 		var index=new IndexComponent<>(root);
 		var before=root.get();
 		assertThrows(IllegalArgumentException.class,() -> index.put(null,CVMLong.ONE));
-		assertThrows(IllegalArgumentException.class,() -> index.path(null));
+		assertThrows(IllegalArgumentException.class,() -> index.entry(null));
 		assertNull(index.remove(null));
 		assertSame(before,root.get());
 		var map=new MapComponent<AString,ACell>(new Root<>());
@@ -64,18 +64,18 @@ class MapComponentTest {
 		var root=new Root<ACell>();
 		var map=creationPolicy(root,indexed,false);
 		assertNull(map.get());
-		assertFalse(map.path(A).exists());
+		assertFalse(map.entry(A).exists());
 		assertEquals(0,map.size());
 		assertFalse(map.containsKey(A));
 		assertNull(map.remove(A));
 		map.clear();
-		assertThrows(UnsupportedOperationException.class,() -> map.path(A).set(null));
+		assertThrows(UnsupportedOperationException.class,() -> map.entry(A).set(null));
 		assertThrows(UnsupportedOperationException.class,() -> map.put(A,null));
-		assertThrows(UnsupportedOperationException.class,() -> map.path(A).set(CVMLong.ONE));
+		assertThrows(UnsupportedOperationException.class,() -> map.entry(A).set(CVMLong.ONE));
 		assertNull(root.get(),"failed creation must leave storage absent");
 		root.set(indexed?Index.none():Maps.empty());
 		map.put(A,CVMLong.ONE);
-		map.path(B).set(CVMLong.TWO);
+		map.entry(B).set(CVMLong.TWO);
 		assertEquals(2,map.size());
 		map.clear();
 		assertTrue(map.isEmpty());
@@ -142,14 +142,14 @@ class MapComponentTest {
 		for (boolean child:new boolean[] {false,true}) {
 			var root=new Root<ACell>();
 			var map=creationPolicy(root,indexed,true);
-			if (child) map.path(A).set(CVMLong.ONE);
+			if (child) map.entry(A).set(CVMLong.ONE);
 			else assertNull(map.put(A,CVMLong.ONE),"previous value comes from storage, not initial entries");
 			assertEquals(CVMLong.ONE,map.get(A));
 			assertEquals(CVMLong.TWO,map.get(B));
 			assertEquals(indexed,root.get() instanceof Index<?,?>);
 			root.set(CVMLong.ONE);
 			assertThrows(IllegalStateException.class,() -> map.put(A,CVMLong.ONE));
-			assertThrows(IllegalStateException.class,() -> map.path(A).set(CVMLong.ONE));
+			assertThrows(IllegalStateException.class,() -> map.entry(A).set(CVMLong.ONE));
 			assertSame(CVMLong.ONE,root.get(),"creation must not replace incompatible storage");
 		}
 	}
@@ -170,7 +170,7 @@ class MapComponentTest {
 				}
 			};
 			var map=creationPolicy(root,indexed,true);
-			if (child) assertNull(map.path(A).getAndSet(CVMLong.ONE));
+			if (child) assertNull(map.entry(A).getAndSet(CVMLong.ONE));
 			else assertNull(map.put(A,CVMLong.ONE));
 			assertEquals(CVMLong.ONE,map.get(A));
 			assertEquals(CVMLong.create(99),map.get(B));
@@ -188,7 +188,7 @@ class MapComponentTest {
 		assertNull(map.get(A));
 		assertNull(map.remove(A));
 		map.clear();
-		map.path(A).set(null);
+		map.entry(A).set(null);
 		assertNull(root.get());
 		// Nil is a legitimate stored entry, distinct from an absent key.
 		map.put(A,null);
@@ -204,7 +204,7 @@ class MapComponentTest {
 	void entryViewsReadMissingKeysAsAbsentAndStoredNilAsNil(boolean indexed) {
 		var root=new Root<ACell>();
 		var map=component(root,indexed);
-		AForkableCursor<ACell> entry=map.path(A);
+		AForkableCursor<ACell> entry=map.entry(A);
 		assertFalse(entry.exists(),"absent storage holds no entries");
 		assertThrows(MissingValueException.class,entry::get);
 		assertSame(CVMLong.ZERO,entry.getOrDefault(CVMLong.ZERO));
@@ -213,7 +213,7 @@ class MapComponentTest {
 		assertFalse(root.path(A).exists(),"the same as a plain path");
 		assertThrows(MissingValueException.class,entry::get);
 		assertSame(CVMLong.ZERO,entry.getOrDefault(CVMLong.ZERO));
-		assertFalse(new MapComponent<AString,ACell>(map.path(A)).exists(),"a component bound to a missing entry is absent");
+		assertFalse(new MapComponent<AString,ACell>(map.entry(A)).exists(),"a component bound to a missing entry is absent");
 		map.put(A,null);
 		assertTrue(entry.exists());
 		assertNull(entry.get());
@@ -236,7 +236,7 @@ class MapComponentTest {
 	void entryViewsShareEditsAndPreserveSiblingsAndSnapshots(boolean indexed) {
 		var root=new Root<ACell>();
 		var map=component(root,indexed);
-		var child=map.path(A);
+		var child=map.entry(A);
 		var opaque=Vectors.of("future",Maps.of("version",2));
 		map.put(B,opaque);
 		child.set(CVMLong.ONE);
@@ -266,9 +266,9 @@ class MapComponentTest {
 		assertThrows(IllegalStateException.class,() -> map.put(A,CVMLong.TWO));
 		assertThrows(IllegalStateException.class,() -> map.remove(A));
 		assertThrows(IllegalStateException.class,map::clear);
-		assertThrows(IllegalStateException.class,() -> map.path(A).set(CVMLong.TWO));
+		assertThrows(IllegalStateException.class,() -> map.entry(A).set(CVMLong.TWO));
 		assertSame(CVMLong.ONE,root.get());
 		root.set(indexed?Maps.empty():Index.none());
-		assertThrows(IllegalStateException.class,() -> map.path(A).set(CVMLong.TWO));
+		assertThrows(IllegalStateException.class,() -> map.entry(A).set(CVMLong.TWO));
 	}
 }

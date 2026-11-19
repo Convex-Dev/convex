@@ -26,10 +26,10 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
-import convex.lattice.IndexComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
@@ -134,13 +134,19 @@ public class P2PLatticeTest {
 
 	// ===== :id region =====
 
+
+	/** Merges Alice's signed identity into the root's identity region by the identity lattice */
+	private static void mergeIdentity(Root<Index<Keyword,ACell>> root,AHashMap<Keyword,ACell> identity) {
+		LazyCursor.<AHashMap<ACell,SignedData<ACell>>>create(root.withDefault(Index.none()),P2PLattice.KEY_ID)
+			.updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own,P2PLattice.createSignedIdentity(KP,identity)));
+	}
 	@Test
 	public void testIdentityMergeAndRead() {
 		AHashMap<Keyword, ACell> identity = P2PLattice.createIdentity(
 			Strings.create("alice"), Vectors.of(KEY), null, 1000L);
 
 		Root<Index<Keyword, ACell>> cursor = Cursors.root(P2PLattice.ROOT.zero());
-		new IndexComponent<>(cursor).<AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP, identity)));
+		mergeIdentity(cursor, identity);
 
 		AHashMap<ACell, SignedData<ACell>> merged = ownerMap(cursor.get(P2PLattice.KEY_ID));
 
@@ -157,16 +163,16 @@ public class P2PLatticeTest {
 	public void testIdentityLWWByTimestamp() {
 		Root<Index<Keyword, ACell>> cursor = Cursors.root(P2PLattice.ROOT.zero());
 
-		new IndexComponent<>(cursor).<AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("old"), null, null, 1000L))));
+		mergeIdentity(cursor,
+			P2PLattice.createIdentity(Strings.create("old"), null, null, 1000L));
 
 		// Newer timestamp wins
-		new IndexComponent<>(cursor).<AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("new"), null, null, 2000L))));
+		mergeIdentity(cursor,
+			P2PLattice.createIdentity(Strings.create("new"), null, null, 2000L));
 
 		// Older timestamp is ignored
-		new IndexComponent<>(cursor).<AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L))));
+		mergeIdentity(cursor,
+			P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L));
 
 		AHashMap<ACell, SignedData<ACell>> merged = ownerMap(cursor.get(P2PLattice.KEY_ID));
 		assertEquals(Strings.create("new"),

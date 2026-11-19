@@ -53,7 +53,7 @@ class ComponentSyncTest {
 			super(cursor);
 			this.clock=clock;
 			edits=Timestamped.create(cursor.withDefault(Maps.empty()),clock);
-			items=new SetComponent<>(new MapComponent<>(cursor()).path(VALUE));
+			items=new SetComponent<>(new MapComponent<>(cursor()).entry(VALUE));
 		}
 
 		@Override protected AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return edits.cursor(); }

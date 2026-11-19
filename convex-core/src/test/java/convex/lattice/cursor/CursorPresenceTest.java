@@ -18,7 +18,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.MapComponent;
+import convex.lattice.ComponentTestSupport;
 import convex.lattice.PathWriteException;
 
 /** Required reads, explicit absence, and composition over one immutable snapshot. */
@@ -169,7 +169,7 @@ class CursorPresenceTest {
 		assertEquals(CVMLong.TWO,path.get());
 		// A component's entry view creates its entry when a write changes it
 		root.set(Maps.empty());
-		AForkableCursor<ACell> entry=new MapComponent<>(root).path(A);
+		AForkableCursor<ACell> entry=ComponentTestSupport.entry(root,A,Maps.empty());
 		var entryDefault=entry.withDefault(CVMLong.ZERO);
 		entryDefault.set(CVMLong.ZERO);
 		assertFalse(path.exists());

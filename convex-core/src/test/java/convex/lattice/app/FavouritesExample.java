@@ -17,12 +17,12 @@ import convex.core.util.Utils;
 import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
 import convex.lattice.LatticeHost;
-import convex.lattice.MapComponent;
 import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.SignedLattice;
 
@@ -207,7 +207,7 @@ public final class FavouritesExample {
 			// Wrap the base signing view once; every domain edit uses cursor().
 			record=stamped(super.cursor(),getTimestamp);
 			// The items are the record's entry, created by the first add
-			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
+			itemSet=new SetComponent<>(LazyCursor.create(cursor(),ITEMS));
 		}
 
 		private Favourites(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
@@ -215,7 +215,7 @@ public final class FavouritesExample {
 			super(rule,cursor);
 			this.getTimestamp=getTimestamp;
 			record=stamped(super.cursor(),getTimestamp);
-			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
+			itemSet=new SetComponent<>(LazyCursor.create(cursor(),ITEMS));
 		}
 
 		@Override public Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {

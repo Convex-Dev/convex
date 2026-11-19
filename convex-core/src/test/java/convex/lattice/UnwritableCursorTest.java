@@ -111,7 +111,7 @@ public class UnwritableCursorTest {
 
 	@SuppressWarnings({"unchecked","rawtypes"})
 	private static AForkableCursor<ACell> mapEntry(AForkableCursor<ACell> source) {
-		return new MapComponent<Keyword,ACell>((AForkableCursor)source).path(A);
+		return new MapComponent<Keyword,ACell>((AForkableCursor)source).entry(A);
 	}
 
 	private enum Holder {

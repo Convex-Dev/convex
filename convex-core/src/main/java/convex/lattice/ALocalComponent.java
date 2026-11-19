@@ -81,9 +81,9 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 			Keyword service,AccountKey owner,
 			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer) {
 		var slots=new OwnedMap<ACell,AHashMap<Keyword,ACell>>(LocalLattice.LATTICE,
-			new IndexComponent<Keyword,ACell>(root).<AHashMap<ACell,SignedData<AHashMap<Keyword,ACell>>>>path(LocalLattice.KEY_LOCAL));
+			new IndexComponent<Keyword,ACell>(root).<AHashMap<ACell,SignedData<AHashMap<Keyword,ACell>>>>entry(LocalLattice.KEY_LOCAL));
 		var slot=new MapComponent<Keyword,ACell>(slots.authoringCursor(Objects.requireNonNull(owner),signer));
-		return slot.<AHashMap<Keyword,ACell>>path(Objects.requireNonNull(service));
+		return slot.<AHashMap<Keyword,ACell>>entry(Objects.requireNonNull(service));
 	}
 
 	/** The stamped editing view of the private record; an absent record reads as an empty map. */

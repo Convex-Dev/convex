@@ -31,6 +31,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -45,11 +46,10 @@ import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.core.util.Utils;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
-import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
@@ -113,9 +113,9 @@ public class DLFSComponentTest {
 	/** A project's documents region, each level created by its entry view on a changed write. */
 	private static <T extends ACell> AForkableCursor<T> documents(AForkableCursor<Index<Keyword,ACell>> root,
 			Keyword projects,AString project) {
-		var projectMap=new IndexComponent<Keyword,ACell>(root).<AHashMap<ACell,ACell>>path(projects);
-		var workspace=new MapComponent<ACell,ACell>(projectMap).<Index<Keyword,ACell>>path(project);
-		return new IndexComponent<Keyword,ACell>(workspace).path(KEY_DOCUMENTS);
+		var projectMap=LazyCursor.create(root.withDefault(Index.none()),projects,Maps.empty());
+		var workspace=LazyCursor.create(projectMap,project,Index.none());
+		return LazyCursor.create(workspace,KEY_DOCUMENTS);
 	}
 	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
 
@@ -180,7 +180,8 @@ public class DLFSComponentTest {
 
 		CompositeDLFSApplication(LatticeHost<Index<Keyword,ACell>> host,AKeyPair keyPair) {
 			super(host,keyPair::signData,KEY_DOCUMENTS);
-			this.archive=region(KEY_ARCHIVE,DLFSRegion.connect(new IndexComponent<>(cursor()).path(KEY_ARCHIVE),persister(),keyPair::signData,Utils::getCurrentTimestampCell));
+			this.archive=create(KEY_ARCHIVE,(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> region) ->
+				DLFSRegion.connect(region,persister(),keyPair::signData,Utils::getCurrentTimestampCell));
 		}
 	}
 

@@ -9,7 +9,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.MapComponent;
+import convex.lattice.ComponentTestSupport;
 import convex.lattice.PathWriteException;
 
 class DefaultCursorTest {
@@ -30,11 +30,10 @@ class DefaultCursorTest {
 		assertThrows(PathWriteException.class,() -> cursor.path(A).set(CVMLong.ONE));
 		assertNull(root.get());
 		// A component's entry view creates its entry, and with it the default's container
-		var entries=new MapComponent<>(cursor);
-		entries.path(A).set(null);
+		ComponentTestSupport.entry(cursor,A,Maps.empty()).set(null);
 		assertNull(root.get());
-		entries.path(A).set(CVMLong.ONE);
-		entries.path(B).set(CVMLong.TWO);
+		ComponentTestSupport.entry(cursor,A,Maps.empty()).set(CVMLong.ONE);
+		ComponentTestSupport.entry(cursor,B,Maps.empty()).set(CVMLong.TWO);
 		assertEquals(Maps.of(A,CVMLong.ONE,B,CVMLong.TWO),root.get());
 		assertEquals(root.get(),cursor.get());
 	}

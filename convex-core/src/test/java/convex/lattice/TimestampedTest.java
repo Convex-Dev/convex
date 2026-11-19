@@ -47,7 +47,7 @@ class TimestampedTest {
 		assertTrue(component.cursor().get().isEmpty());
 		component.cursor().set(Maps.empty());
 		// The field is the record's entry, which its first changed write creates
-		AForkableCursor<ACell> field=new MapComponent<>(component.cursor()).path(A);
+		AForkableCursor<ACell> field=new MapComponent<>(component.cursor()).entry(A);
 		field.set(null);
 		component.sync();
 		component.merge(null);
@@ -88,7 +88,7 @@ class TimestampedTest {
 	@Test void partialDeliveriesAreIgnoredWhetherOrNotARecordIsHeld() {
 		// The record's slot is a key its parent does not hold yet, so it is absent
 		Root<AHashMap<Keyword,ACell>> parent=Root.create(Maps.empty());
-		AForkableCursor<AHashMap<Keyword,ACell>> slot=new MapComponent<>(parent).path(B);
+		AForkableCursor<AHashMap<Keyword,ACell>> slot=new MapComponent<>(parent).entry(B);
 		var component=Timestamped.create(slot,() -> {
 			throw new AssertionError("Incoming merges must not read the clock");
 		});

@@ -29,7 +29,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.lattice.AMapComponent;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -254,7 +253,7 @@ public class DLFSCursorTest {
 		Root<Index<Keyword, ACell>> rootCursor =
 			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
-		AForkableCursor<?> dlfsCursor = new IndexComponent<>(rootCursor).path(DLFS_KW);
+		AForkableCursor<?> dlfsCursor = convex.lattice.ComponentTestSupport.entry(rootCursor,DLFS_KW,Index.none());
 		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(dlfsCursor,ak,dlfsUsersLattice.zero()), dlfsUsersLattice, ak, ctx);
 		DLFSLocal dlfs = connect(userCursor, driveName);
 		dlfs.setClock(ctx::currentTimestamp);
@@ -288,7 +287,7 @@ public class DLFSCursorTest {
 		KeyedLattice rootLattice=KeyedLattice.create(dlfsKey,owners);
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
 		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
-		AForkableCursor<?> region=new IndexComponent<>(root.cursor()).path(dlfsKey);
+		AForkableCursor<?> region=convex.lattice.ComponentTestSupport.entry(root.cursor(),dlfsKey,Index.none());
 		DLFSLocal fileSystem=connect(convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(region,owner,owners.zero()), owners, owner, context),driveName);
 		fileSystem.setClock(context::currentTimestamp);
 		Path path=fileSystem.getPath("/recreated");
@@ -357,7 +356,7 @@ public class DLFSCursorTest {
 		Root<Index<Keyword, ACell>> rootCursor =
 			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
-		AForkableCursor<?> dlfsCursor = new IndexComponent<>(rootCursor).path(DLFS_KW);
+		AForkableCursor<?> dlfsCursor = convex.lattice.ComponentTestSupport.entry(rootCursor,DLFS_KW,Index.none());
 		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(dlfsCursor,ak,dlfsUsersLattice.zero()), dlfsUsersLattice, ak, ctx);
 		final DLFSLocal dlfs = connect(userCursor, driveName);
 		dlfs.setClock(ctx::currentTimestamp);

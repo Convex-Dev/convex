@@ -287,7 +287,7 @@ class AccessListTest {
 		Service(AForkableCursor<Index<Keyword,ACell>> root) {
 			super(root,SERVICE,KEY.getAccountKey(),KEY::signData,() -> CVMLong.create(time.get()),null);
 			listed=new AccessList<ABlobLike<?>>(new MapComponent<Keyword,ACell>(cursor())
-				.<Index<ABlobLike<?>,ACell>>path(LISTED),() -> CVMLong.create(time.get()));
+				.<Index<ABlobLike<?>,ACell>>entry(LISTED),() -> CVMLong.create(time.get()));
 		}
 	}
 

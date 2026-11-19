@@ -138,7 +138,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	 * containers. Navigation does not sign or grant authority; a signed component
 	 * binds the owner rule separately.
 	 */
-	public AForkableCursor<SignedData<V>> path(K owner) {
+	protected AForkableCursor<SignedData<V>> path(K owner) {
 		return slot(rule(owner));
 	}
 
@@ -147,7 +147,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	 * same owner rule as incoming delivery. Construction is inert. This does not
 	 * give the collection a signer or change its public merge policy.
 	 */
-	public AForkableCursor<V> authoringCursor(K owner,Function<V,SignedData<V>> signer) {
+	protected AForkableCursor<V> authoringCursor(K owner,Function<V,SignedData<V>> signer) {
 		Objects.requireNonNull(signer);
 		SignedLattice<V> rule=rule(owner);
 		return SignedCursor.create(slot(rule),value -> rule.sign(value,signer));

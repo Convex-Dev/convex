@@ -21,9 +21,10 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.IndexComponent;
+import convex.lattice.Regions;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
@@ -64,6 +65,8 @@ import convex.lattice.LatticeComponent;
 public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	private final KeyedLattice lattice;
+	/** Binds this application's regions at their root keys; this application merges them itself */
+	private final Regions regions;
 	private final LatticeHost<Index<Keyword,ACell>> host;
 	private final SocialReplicationPolicy socialPolicy;
 	private final AccountKey ownKey;
@@ -108,9 +111,8 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		this.signer=signer;
 		this.clock=java.util.Objects.requireNonNull(clock);
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
-		this.socialPolicy=new SocialReplicationPolicy(
-			new IndexComponent<Keyword,ACell>(cursor()).<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>>path(Social.KEY_SOCIAL),
-			java.util.Objects.requireNonNull(didAuthorizer),clock);
+		this.regions=new Regions(cursor());
+		this.socialPolicy=new SocialReplicationPolicy(regions,java.util.Objects.requireNonNull(didAuthorizer),clock);
 		this.directory=new NodeDirectory(this);
 		// Only a node that can sign its own :local slot keeps contact records
 		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
@@ -122,10 +124,9 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		// A node without contact records has reached no other node
 		Supplier<ToIntFunction<AccountKey>> standings=(contacts==null)
 			?() -> node -> ContactRecords.standing(null):contacts::standings;
-		this.registry=new NodeRegistry(new IndexComponent<Keyword,ACell>(cursor()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P),
-			ownKey,blocklist::isBlocked,standings);
-		this.identities=new P2PIdentities(
-			new IndexComponent<Keyword,ACell>(cursor()).<AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID));
+		this.registry=regions.create(P2PLattice.KEY_P2P,(AForkableCursor<Index<Keyword,ACell>> region) ->
+			new NodeRegistry(region,ownKey,blocklist::isBlocked,standings));
+		this.identities=regions.create(P2PLattice.KEY_ID,P2PIdentities::new);
 	}
 
 	AccountKey ownKey() { return ownKey; }

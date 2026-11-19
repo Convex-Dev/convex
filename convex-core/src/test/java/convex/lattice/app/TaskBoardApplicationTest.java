@@ -32,6 +32,7 @@ import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.IndexLattice;
 
@@ -95,7 +96,7 @@ class TaskBoardApplicationTest {
 		@Override public Board fork() { return rebind(storage.fork()); }
 
 		Task task(String id) {
-			return new Task(tasks.path(Strings.create(id)),getTimestamp);
+			return new Task(LazyCursor.create(cursor().withDefault(Index.none()),Strings.create(id)),getTimestamp);
 		}
 
 		void plan(String id,String title) { task(id).create(title); }

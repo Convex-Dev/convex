@@ -17,6 +17,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
 import convex.social.Social;
 
@@ -36,18 +37,18 @@ final class SocialReplicationPolicy {
 	private final Set<AString> pins=ConcurrentHashMap.newKeySet();
 
 	/**
-	 * @param region The application's social region
+	 * @param regions The application's region container, in which this policy makes the social region
 	 * @param authorizer DID authoriser for social owners
 	 * @param clock Clock that stamps social writes
 	 */
-	SocialReplicationPolicy(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region,
-			DIDKeyAuthorizer authorizer,Supplier<CVMLong> clock) {
+	SocialReplicationPolicy(Regions regions,DIDKeyAuthorizer authorizer,Supplier<CVMLong> clock) {
 		this.authorizer=authorizer;
-		social=Social.connect(region,authorizer,
-			(owner,value) -> {
-				AKeyPair key=localSigners.get(owner);
-				return key==null?null:key.signData(value);
-			},clock);
+		social=regions.create(Social.KEY_SOCIAL,(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region) ->
+			Social.connect(region,authorizer,
+				(owner,value) -> {
+					AKeyPair key=localSigners.get(owner);
+					return key==null?null:key.signData(value);
+				},clock));
 	}
 
 	/** Shared multi-DID authoring view; key rotation is observed by existing user views. */

@@ -53,11 +53,17 @@ class FileCountTest {
 		}
 	}
 
+	/** The application's own data at {@code :app}, which makes the count on its entry. */
+	static final class AppData extends IndexComponent<Keyword,ACell> {
+		AppData(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+		Counter filesWritten() { return new Counter(entry(FILE_COUNT)); }
+	}
+
 	/** The root application: files at {@code :fs}, and the count at {@code [:app :file-count]}. */
 	static final class FilesApp extends Regions implements TransactionalComponent<Index<Keyword,ACell>,FilesApp> {
 		FilesApp(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			super(cursor);
-			create(Keywords.APP,(AForkableCursor<Index<Keyword,ACell>> c) -> new IndexComponent<Keyword,ACell>(c));
+			create(Keywords.APP,(AForkableCursor<Index<Keyword,ACell>> c) -> new AppData(c));
 			create(Keywords.FS,(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> c) ->
 				DLFSRegion.connect(c,null,OWNER::signData,() -> CVMLong.create(TIME)));
 		}
@@ -65,8 +71,8 @@ class FileCountTest {
 		@Override public FilesApp rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new FilesApp(cursor,this); }
 
 		Counter filesWritten() {
-			IndexComponent<Keyword,ACell> apps=registered(Keywords.APP);
-			return new Counter(apps.path(FILE_COUNT));
+			AppData app=registered(Keywords.APP);
+			return app.filesWritten();
 		}
 
 		/** The owner's drive, made on its first use. */

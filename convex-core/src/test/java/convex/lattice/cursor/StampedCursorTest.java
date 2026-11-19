@@ -19,7 +19,7 @@ import convex.core.lang.RT;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.MapComponent;
+import convex.lattice.ComponentTestSupport;
 import convex.lattice.generic.JSONLattice;
 import convex.lattice.generic.LWWLattice;
 
@@ -121,10 +121,9 @@ public class StampedCursorTest {
 	}
 
 	/** The component explicitly chooses maps at both levels, each entry created by its first write. */
-	@SuppressWarnings({"unchecked","rawtypes"})
 	static AForkableCursor<ACell> userView(AForkableCursor<ACell> source) {
-		var users=new MapComponent<ACell,ACell>((AForkableCursor)source).<AHashMap<ACell,ACell>>path(USERS);
-		return new MapComponent<>(users).path(ALICE);
+		AForkableCursor<AHashMap<ACell,ACell>> users=ComponentTestSupport.entry(source,USERS,Maps.empty());
+		return ComponentTestSupport.entry(users,ALICE,Maps.empty());
 	}
 
 	// ===== Deep write below the leaf: structural + re-stamped =====

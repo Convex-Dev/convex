@@ -43,7 +43,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.MapComponent;
+import convex.lattice.ComponentTestSupport;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
@@ -109,7 +109,7 @@ public class LatticeCursorTest {
 				ExecutorService reader = Executors.newSingleThreadExecutor()) {
 			for (long i = 1; i <= 1_000; i++) {
 				CVMLong committed = CVMLong.create(i);
-				ASet<CVMLong> written=writer.submit(() -> new MapComponent<>(fork).<ASet<CVMLong>>path(Keywords.FOO)
+				ASet<CVMLong> written=writer.submit(() -> ComponentTestSupport.<ASet<CVMLong>>entry(fork,Keywords.FOO,Maps.empty())
 						.updateAndGet(values -> (values==null?Sets.<CVMLong>empty():values).include(committed))).get();
 
 				ASet<CVMLong> observed = reader.submit(() ->

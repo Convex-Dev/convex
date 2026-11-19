@@ -61,7 +61,7 @@ class TransactionBehaviourTest {
 		}
 
 		/** A branch is the bank's entry, created by its first changed edit. */
-		Ledger branch(Keyword name) { return new Ledger(new MapComponent<>(cursor()).path(name),clock); }
+		Ledger branch(Keyword name) { return new Ledger(new MapComponent<>(cursor()).entry(name),clock); }
 
 		@Override public Bank rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return new Bank(cursor,clock); }
 		@Override public Bank fork() { return rebind(storage.fork()); }
