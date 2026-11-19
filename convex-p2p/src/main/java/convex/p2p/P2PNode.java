@@ -1394,7 +1394,7 @@ public class P2PNode implements Closeable {
 	 * @return Root lattice cursor
 	 */
 	public AForkableCursor<Index<Keyword, ACell>> getCursor() {
-		return application.cursor();
+		return server.getHost().cursor();
 	}
 
 	/**

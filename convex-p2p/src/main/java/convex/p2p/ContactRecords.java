@@ -16,8 +16,8 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALocalComponent;
-import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 
 /**
  * What this node has learned about other nodes, kept as local state at
@@ -34,8 +34,7 @@ import convex.lattice.cursor.AForkableCursor;
  * </pre>
  *
  * <p>The same record holds this node's {@link Blocklist} at {@code :blocked} and its
- * {@link Seeds} at {@code :seeds}, edited through {@link #cursor()}, so all are synced
- * and signed together.</p>
+ * {@link Seeds} at {@code :seeds}, so all are synced and signed together.</p>
  *
  * <p>A node that answered and has not failed since keeps that standing whether or not
  * this node is connected to it: time alone is no evidence against it. At most
@@ -62,14 +61,28 @@ public final class ContactRecords extends ALocalComponent {
 	static final Keyword LAST_FAILURE=Keyword.intern("last-failure");
 
 	private final Supplier<CVMLong> clock;
-	private final MapComponent<AccountKey,AHashMap<Keyword,ACell>> contacts;
+	private final AForkableCursor<AHashMap<AccountKey,AHashMap<Keyword,ACell>>> contacts;
 
 	ContactRecords(AForkableCursor<Index<Keyword,ACell>> root,AccountKey owner,
 			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,Supplier<CVMLong> clock) {
 		super(root,P2PLattice.KEY_P2P,owner,signer,clock,null);
 		this.clock=clock;
-		this.contacts=new MapComponent<>(new MapComponent<Keyword,ACell>(cursor())
-			.<AHashMap<AccountKey,AHashMap<Keyword,ACell>>>path(CONTACTS));
+		this.contacts=field(CONTACTS,Maps.empty());
+	}
+
+	/** The blocklist this record holds at {@code :blocked}. */
+	Blocklist blocklist() {
+		return new Blocklist(field(Blocklist.KEY,null),clock);
+	}
+
+	/** The seed list this record holds at {@code :seeds}. */
+	Seeds seeds() {
+		return new Seeds(field(Seeds.KEY,null),clock);
+	}
+
+	/** A field of this record, which its first changed write creates with the record. */
+	private <T extends ACell> AForkableCursor<T> field(Keyword key,T defaultValue) {
+		return LazyCursor.create(cursor().withDefault(Maps.empty()),key,defaultValue);
 	}
 
 	/** Records authenticated contact with a node, clearing its failures. */
@@ -100,8 +113,8 @@ public final class ContactRecords extends ALocalComponent {
 
 	/** Applies an event to a node's record, making room for a new node by dropping the least useful record. */
 	private void record(AccountKey node,UnaryOperator<AHashMap<Keyword,ACell>> event) {
-		contacts.cursor().update(all -> {
-			AHashMap<AccountKey,AHashMap<Keyword,ACell>> records=(all==null)?Maps.empty():all;
+		contacts.update(all -> {
+			AHashMap<AccountKey,AHashMap<Keyword,ACell>> records=all;
 			AHashMap<Keyword,ACell> record=records.get(node);
 			if (record==null && records.count()>=MAX_NODES) records=records.dissoc(leastUseful(records));
 			return records.assoc(node,event.apply((record==null)?Maps.empty():record));
@@ -135,13 +148,12 @@ public final class ContactRecords extends ALocalComponent {
 
 	/** Returns the contact record for a node, or null if this node has none. */
 	public AHashMap<Keyword,ACell> get(AccountKey node) {
-		return contacts.get(node);
+		return contacts.get().get(node);
 	}
 
 	/** Every contact record this node keeps, by node key. */
 	AHashMap<AccountKey,AHashMap<Keyword,ACell>> all() {
-		AHashMap<AccountKey,AHashMap<Keyword,ACell>> all=contacts.get();
-		return (all==null)?Maps.empty():all;
+		return contacts.get();
 	}
 
 	/** A snapshot of every node's standing, as {@link #standing} gives it. */

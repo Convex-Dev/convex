@@ -94,6 +94,11 @@ final class NodeRegistry extends ALatticeComponent<Index<Keyword,ACell>> {
 		this.pinned=pinned;
 	}
 
+	/** The node records this registry holds, by node key. */
+	AHashMap<ACell,SignedData<ACell>> records() {
+		return nodes(cursor().getOrDefault(null));
+	}
+
 	/** Drops a node's record, if this node holds one. */
 	void drop(AccountKey node) {
 		cursor().updateAndGet(held -> {

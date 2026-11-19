@@ -47,9 +47,11 @@ final class Seeds {
 	/** Most seeds listed. */
 	static final int MAX_SEEDS=16;
 
+	private final AForkableCursor<Index<AString,ACell>> cursor;
 	private final AccessList<AString> list;
 
 	Seeds(AForkableCursor<Index<AString,ACell>> cursor,Supplier<CVMLong> clock) {
+		this.cursor=cursor;
 		this.list=new AccessList<AString>(cursor,clock);
 	}
 
@@ -100,7 +102,7 @@ final class Seeds {
 	/** The URIs stored, including expired and unreadable entries. */
 	private List<AString> uris() {
 		List<AString> uris=new ArrayList<>();
-		ACell stored=list.cursor().getOrDefault(null);
+		ACell stored=cursor.getOrDefault(null);
 		if (!(stored instanceof Index<?,?> index)) return uris;
 		long n=index.count();
 		for (long i=0; i<n; i++) {

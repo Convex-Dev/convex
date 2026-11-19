@@ -9,7 +9,6 @@ import java.util.function.ToIntFunction;
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
@@ -26,7 +25,6 @@ import convex.lattice.ALatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
-import convex.lattice.MapComponent;
 import convex.lattice.OwnedMap;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.LazyCursor;
@@ -119,20 +117,15 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		// Only a node that can sign its own :local slot keeps contact records
 		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
 			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),clock);
-		// The blocklist and seed list share the contact records' :local record
-		this.blocklist=new Blocklist(this.<Index<ABlobLike<?>,ACell>>localField(Blocklist.KEY),clock);
-		this.seeds=new Seeds(this.<Index<AString,ACell>>localField(Seeds.KEY),clock);
+		// The blocklist and seed list share the contact records' :local record; a node
+		// without that record keeps them in memory of its own
+		this.blocklist=(contacts==null)?new Blocklist(new Root<>(),clock):contacts.blocklist();
+		this.seeds=(contacts==null)?new Seeds(new Root<>(),clock):contacts.seeds();
 		// A node without contact records has reached no other node
 		Supplier<ToIntFunction<AccountKey>> standings=(contacts==null)
 			?() -> node -> ContactRecords.standing(null):contacts::standings;
-		this.registry=new NodeRegistry(new IndexComponent<Keyword,ACell>(cursor()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P),
+		this.registry=new NodeRegistry(LazyCursor.create(cursor().withDefault(Index.none()),P2PLattice.KEY_P2P),
 			ownKey,blocklist::isBlocked,standings);
-	}
-
-	/** A field of this node's {@code :local} P2P record, or memory of its own for a node without that record. */
-	private <T extends ACell> AForkableCursor<T> localField(Keyword field) {
-		if (contacts==null) return new Root<T>();
-		return new MapComponent<Keyword,ACell>(contacts.cursor()).<T>path(field);
 	}
 
 	AccountKey ownKey() { return ownKey; }

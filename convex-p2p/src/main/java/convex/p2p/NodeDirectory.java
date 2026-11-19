@@ -135,9 +135,7 @@ final class NodeDirectory {
 	AHashMap<ACell,SignedData<ACell>> ownEntry() {
 		AccountKey ownKey=ownKey();
 		if (ownKey==null) return null;
-		ACell raw=application.cursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		if (!(raw instanceof AHashMap<?,?> nodes)) return null;
-		ACell signed=((AHashMap<ACell,ACell>)nodes).get(ownKey);
+		ACell signed=application.registry().records().get(ownKey);
 		if (!(signed instanceof SignedData<?>)) return null;
 		return (AHashMap) Maps.of(ownKey,signed);
 	}
@@ -166,9 +164,7 @@ final class NodeDirectory {
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	synchronized List<NodeRecord> refresh() {
-		ACell value=application.cursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		AHashMap<ACell,SignedData<ACell>> nodes=(value instanceof AHashMap<?,?> rawNodes)
-			? (AHashMap<ACell,SignedData<ACell>>)rawNodes : Maps.empty();
+		AHashMap<ACell,SignedData<ACell>> nodes=application.registry().records();
 		if (nodes.equals(indexed)) return List.of();
 		List<NodeRecord> changed=new ArrayList<>();
 		AccountKey ownKey=ownKey();
