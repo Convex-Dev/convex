@@ -369,23 +369,16 @@ components they route, which also retains their cached NIO views. Isolated work 
 syncs the temporary component when its changes should merge back.
 
 Large channel writes checkpoint blob data through the host `AStore` every 16 MiB.
-The component hierarchy supplies that store to the same `DLFSLocal` implementation
-used by lower-level cursor embedders. This replaces eligible direct references with
+The component hierarchy supplies that store to each drive's file system. This replaces eligible direct references with
 store-backed soft references, but does not sync the cursor or choose retained GC
 roots; those remain application policy. `fork()` on a region, drive collection or
 drive creates a temporary component which keeps the same store and only merges
 logical changes when explicitly synced.
 
-Lower-level embedders that deliberately open a drive from a cursor
-instead of the component hierarchy must supply the host store explicitly:
-
-```java
-DLFSLocal drive = DLFS.connect(drivesCursor, driveName, store);
-```
-
-The store is not owned or closed by the filesystem. It should be the same store
-used to publish the containing lattice root. The two-argument cursor overload has
-no physical persistence policy and therefore keeps file data on heap.
+A drive in a lattice is always opened through its owner, `DLFSDrives`
+(`createDrive`, `drive`), which supplies its store; there is no way to open one from a
+bare cursor. The store is not owned or closed by the filesystem. It should be the same
+store used to publish the containing lattice root.
 
 `DLFSDriveManager` remains the service-facing local routing and mapping layer. It
 can manage explicitly detached per-identity drives, or route identities to multiple

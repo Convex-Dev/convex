@@ -3,14 +3,8 @@ package convex.lattice.fs;
 import java.nio.file.Path;
 import java.nio.file.ProviderMismatchException;
 
-import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.Strings;
-import convex.core.store.Persister;
-import convex.lattice.MapComponent;
-import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.impl.DLFSLocal;
 
@@ -40,72 +34,6 @@ public class DLFS {
 	 */
 	public static DLFSLocal create() {
 		return new DLFSLocal(PROVIDER,null,Cursors.root(DLFSLattice.INSTANCE.zero()));
-	}
-
-	/**
-	 * Connects a named drive under a parent cursor, creating its zero value if
-	 * absent. Changes to the drive propagate through to the parent cursor.
-	 *
-	 * <p>File data remains heap-backed. For incremental blob persistence during
-	 * streamed writes use {@link #connect(AForkableCursor, AString, Persister)}.</p>
-	 *
-	 * @param parent Parent cursor (e.g. an owner's drives map)
-	 * @param driveName Name of the drive within the parent
-	 * @return A local DLFS filesystem connected to the parent
-	 */
-	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName) {
-		return connect(parent,driveName,(Persister)null);
-	}
-
-	/**
-	 * Connects a named drive and checkpoints streamed blob data incrementally through
-	 * the supplied persister. It should save into the store which publishes the
-	 * containing lattice root, and the caller keeps that store open while the
-	 * filesystem is in use.
-	 *
-	 * @param parent Parent cursor
-	 * @param driveName Name of the drive within the parent
-	 * @param persister Persister for incremental blob persistence, or null for heap-only data
-	 * @return A connected filesystem
-	 */
-	@SuppressWarnings("unchecked")
-	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName, Persister persister) {
-		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
-		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
-		// Atomic initialisation must not replace another caller's concurrent writes.
-		cursor.updateAndGet(current -> current!=null?current:DLFSLattice.INSTANCE.zero());
-		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,persister,DLFSLocation.at(parent,driveName));
-	}
-
-	/**
-	 * Opens an existing named drive without creating it. Intended for registries
-	 * which keep the parent map as their source of truth: unlike
-	 * {@link #connect(AForkableCursor, AString)}, a concurrent deletion cannot be
-	 * reversed merely by opening a cached view. File data remains heap-backed.
-	 *
-	 * @param parent Parent cursor containing named drives
-	 * @param driveName Existing drive name
-	 * @return Connected filesystem view, or {@code null} if the drive is absent
-	 */
-	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName) {
-		return open(parent,driveName,(Persister)null);
-	}
-
-	/**
-	 * Opens an existing drive with incremental blob persistence through the supplied
-	 * persister. The caller keeps its store open while the filesystem is in use.
-	 *
-	 * @param parent Parent cursor containing named drives
-	 * @param driveName Existing drive name
-	 * @param persister Persister for incremental blob persistence, or null for heap-only data
-	 * @return Connected filesystem view, or {@code null} if the drive is absent
-	 */
-	@SuppressWarnings("unchecked")
-	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, Persister persister) {
-		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
-		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
-		if (cursor.getOrDefault(null)==null) return null;
-		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,persister,DLFSLocation.at(parent,driveName));
 	}
 
 	public static DLFSLocal createLocal() {

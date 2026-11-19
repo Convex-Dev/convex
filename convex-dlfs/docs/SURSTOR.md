@@ -123,7 +123,7 @@ Follows the pattern from `DlfsStart.java` and `DLFSBrowser.java`:
 2. Create `EtchStore` (persistent) or `MemoryStore` (dev mode)
 3. Create `NodeServer` with `Lattice.ROOT` + `LatticeContext(keypair)`
 4. Navigate cursor to `:fs → accountKey → :value`
-5. Create `DLFSDriveManager`, connect default "home" drive via `DLFS.connect()`
+5. Create `DLFSDriveManager`, opening the default "home" drive through its `DLFSDrives`
 6. Create `ShareManager`
 7. Build Javalin app:
    - `config.staticFiles.add("/convex/dlfs/surstor/pub", Location.CLASSPATH)`

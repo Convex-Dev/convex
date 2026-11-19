@@ -27,6 +27,8 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
+import convex.lattice.AMapComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
@@ -44,26 +46,72 @@ import convex.lattice.generic.OwnerLattice;
  *
  * Demonstrates the recommended API for:
  * - Creating standalone DLFS drives via {@code DLFS.create()}
- * - Connecting DLFS drives to a parent lattice via {@code DLFS.connect()}
+ * - Connecting DLFS drives to a parent lattice via {@code connect()}
  * - Forking drives for isolated batch operations
  * - Syncing changes back via lattice merge
  */
 public class DLFSCursorTest {
 
+	/** The owner of a drives map, opening its drives by name as a domain owner does. */
+	private static final class Drives extends AMapComponent<AString,AVector<ACell>,AHashMap<AString,AVector<ACell>>> {
+		Drives(AForkableCursor<AHashMap<AString,AVector<ACell>>> cursor) {
+			super(cursor);
+		}
+
+		/** Opens a drive, creating its empty tree if it is absent. */
+		DLFSLocal connect(AString name) {
+			AForkableCursor<AVector<ACell>> drive=entry(name);
+			// Atomic initialisation must not replace another caller's concurrent writes
+			drive.updateAndGet(current -> (current!=null)?current:DLFSLattice.INSTANCE.zero());
+			return DLFSLocal.create(DLFS.provider(),name.toString(),drive,null,DLFSLocation.at(cursor(),name));
+		}
+
+		/** Opens an existing drive, or returns null if it is absent. */
+		DLFSLocal open(AString name) {
+			AForkableCursor<AVector<ACell>> drive=entry(name);
+			if (drive.getOrDefault(null)==null) return null;
+			return DLFSLocal.create(DLFS.provider(),name.toString(),drive,null,DLFSLocation.at(cursor(),name));
+		}
+
+		@Override protected AHashMap<AString,AVector<ACell>> requireMap(ACell value) {
+			if (value==null) return null;
+			AHashMap<AString,AVector<ACell>> drives=RT.ensureHashMap(value);
+			if (drives==null) throw new IllegalStateException("Drive map must be a hash map");
+			return drives;
+		}
+
+		@Override protected AHashMap<AString,AVector<ACell>> createContainer() {
+			return Maps.empty();
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Drives drives(AForkableCursor<?> parent) {
+		return new Drives((AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent);
+	}
+
+	private static DLFSLocal connect(AForkableCursor<?> parent,AString name) {
+		return drives(parent).connect(name);
+	}
+
+	private static DLFSLocal open(AForkableCursor<?> parent,AString name) {
+		return drives(parent).open(name);
+	}
+
 	@Test void namedDriveNavigationDistinguishesAbsenceFromIncompatibleParents() throws Exception {
 		var root=new Root<ACell>();
 		var name=Strings.intern("home");
-		assertNull(DLFS.open(root,name));
+		assertNull(open(root,name));
 		assertNull(root.get(),"Opening must not initialise a drive map");
 		for (ACell bad:new ACell[] {CVMLong.ONE,Index.none()}) {
 			root.set(bad);
-			assertThrows(IllegalStateException.class,() -> DLFS.open(root,name));
-			assertThrows(IllegalStateException.class,() -> DLFS.connect(root,name));
+			assertThrows(IllegalStateException.class,() -> open(root,name));
+			assertThrows(IllegalStateException.class,() -> connect(root,name));
 			assertSame(bad,root.get());
 		}
 		var other=Strings.intern("other");
 		root.set(Maps.of(other,CVMLong.ONE));
-		try (var created=DLFS.connect(root,name); var opened=DLFS.open(root,name)) {
+		try (var created=connect(root,name); var opened=open(root,name)) {
 			assertNotNull(opened);
 			Files.writeString(created.getPath("/hello"),"hello");
 			assertEquals("hello",Files.readString(opened.getPath("/hello")));
@@ -96,7 +144,7 @@ public class DLFSCursorTest {
 
 		// Connect a named drive to the root
 		AString driveName = Strings.create("test");
-		DLFSLocal dlfs = DLFS.connect(root, driveName);
+		DLFSLocal dlfs = connect(root, driveName);
 
 		// Write through NIO
 		Path testDir = dlfs.getPath("/docs");
@@ -109,7 +157,7 @@ public class DLFSCursorTest {
 		assertTrue(rootMap.containsKey(driveName), "Root should contain drive entry");
 
 		// Verify via a second connected drive reading the same path
-		DLFSLocal dlfs2 = DLFS.connect(root, driveName);
+		DLFSLocal dlfs2 = connect(root, driveName);
 		Path verifyFile = dlfs2.getPath("/docs/readme.txt");
 		assertTrue(Files.exists(verifyFile), "File should exist via second connected drive");
 		assertEquals("Connected drive!", Files.readString(verifyFile));
@@ -160,7 +208,7 @@ public class DLFSCursorTest {
 
 		// Connect a drive and write
 		AString driveName = Strings.create("vault");
-		DLFSLocal dlfs = DLFS.connect(host.cursor(), driveName);
+		DLFSLocal dlfs = connect(host.cursor(), driveName);
 		Files.writeString(dlfs.getPath("/test.txt"), "sync me!");
 
 		// Before sync: publication should not have run
@@ -176,7 +224,7 @@ public class DLFSCursorTest {
 
 		// Verify content survives a round-trip through the synced value
 		AHashMap<AString, AVector<ACell>> syncedMap = (AHashMap<AString, AVector<ACell>>) synced.get();
-		DLFSLocal restored = DLFS.connect(Cursors.root(syncedMap), driveName);
+		DLFSLocal restored = connect(Cursors.root(syncedMap), driveName);
 		assertEquals("sync me!", Files.readString(restored.getPath("/test.txt")),
 			"File content should survive sync round-trip");
 	}
@@ -208,7 +256,7 @@ public class DLFSCursorTest {
 
 		AForkableCursor<?> dlfsCursor = new IndexComponent<>(rootCursor).path(DLFS_KW);
 		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(dlfsCursor,ak,dlfsUsersLattice.zero()), dlfsUsersLattice, ak, ctx);
-		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+		DLFSLocal dlfs = connect(userCursor, driveName);
 		dlfs.setClock(ctx::currentTimestamp);
 
 		Files.createDirectory(dlfs.getPath("/tmp"));
@@ -241,7 +289,7 @@ public class DLFSCursorTest {
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
 		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
 		AForkableCursor<?> region=new IndexComponent<>(root.cursor()).path(dlfsKey);
-		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(region,owner,owners.zero()), owners, owner, context),driveName);
+		DLFSLocal fileSystem=connect(convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(region,owner,owners.zero()), owners, owner, context),driveName);
 		fileSystem.setClock(context::currentTimestamp);
 		Path path=fileSystem.getPath("/recreated");
 		Files.write(path,new byte[] {1});
@@ -311,7 +359,7 @@ public class DLFSCursorTest {
 
 		AForkableCursor<?> dlfsCursor = new IndexComponent<>(rootCursor).path(DLFS_KW);
 		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(dlfsCursor,ak,dlfsUsersLattice.zero()), dlfsUsersLattice, ak, ctx);
-		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+		final DLFSLocal dlfs = connect(userCursor, driveName);
 		dlfs.setClock(ctx::currentTimestamp);
 
 		String[] dirs = { "alpha", "beta", "gamma" };

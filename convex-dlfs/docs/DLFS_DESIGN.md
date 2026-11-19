@@ -443,12 +443,10 @@ component-backed adapters use the explicit supplier instead.
 // Standalone drive with its own lattice cursor
 DLFSLocal drive = DLFS.create();
 
-// Connected drive — path into a parent lattice cursor, heap-backed file data
-AForkableCursor<AHashMap<AString, AVector<ACell>>> parent = Cursors.root(Maps.empty());
-DLFSLocal drive = DLFS.connect(parent, Strings.create("myDrive"));
-
-// Store-backed cursor drive — large NIO writes persist incrementally
-DLFSLocal storedDrive = DLFS.connect(parent, Strings.create("storedDrive"), store);
+// A drive in a lattice, opened through its owner; large NIO writes persist
+// incrementally through the region's store
+DLFSDrive drive = region.drives(owner).createDrive("myDrive");
+DLFileSystem fileSystem = drive.fileSystem();
 
 // Alias for a standalone local drive
 DLFSLocal drive = DLFS.createLocal();
@@ -625,10 +623,7 @@ cursor-backed and registered in WebDAV automatically.
 ### Persistence
 
 Component-backed drives obtain the root component's `Persister`, normally the host's
-store; cursor-level embedders get the same incremental blob persistence by passing a
-persister, such as the store itself, to `DLFS.connect(parent, name, persister)` or
-`DLFS.open(parent, name, persister)`. Both paths therefore use `DLFSLocal` and save
-through the persister rather than separate persistence adapters. `DLFSDriveManager.sync()` marks the explicit publication boundary.
+store, and save through it rather than through separate persistence adapters. `DLFSDriveManager.sync()` marks the explicit publication boundary.
 Persisting immutable blob structure before that boundary replaces direct references
 with soft references but does not select a GC root. The filesystem neither owns nor
 closes the supplied store.
@@ -645,7 +640,7 @@ DLFS follows the lattice application best practices defined in CAD045:
 | **Lattice layer** | `DLFSLattice` extends `ALattice<AVector<ACell>>` with recursive directory merge via `IndexLattice` |
 | **Pure functions** | `DLFSNode` — all merge/navigate/update operations are pure, deterministic, and side-effect-free |
 | **Cursor-backed mutability** | `DLFSLocal` wraps `AForkableCursor<AVector<ACell>>`; all writes via `cursor.updateAndGet()` |
-| **Factory methods** | `DLFS.create()` (standalone), `DLFS.connect(parent, name, store)` (store-backed cursor), component-backed `DLFSDrive.fileSystem()` |
+| **Factory methods** | `DLFS.create()` (standalone), component-backed `DLFSDrive.fileSystem()` |
 | **Fork/sync** | `DLFileSystem.fork()` → component working state reconciled with `DLFSLattice` for isolated batch operations; `sync()` merges back |
 | **Lattice merge** | Component NIO adapters apply the drive's bound `DLFSLattice` inside a cursor update |
 | **Foreign validation** | `DLFSLattice.checkForeign()` validates node structure (vector length, timestamp type) |
