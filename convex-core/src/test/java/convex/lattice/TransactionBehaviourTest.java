@@ -517,4 +517,16 @@ class TransactionBehaviourTest {
 		assertInstanceOf(IllegalStateException.class,assertThrows(CompletionException.class,failed::join).getCause());
 		assertSame(before,bank.value());
 	}
+
+	/** Transactions run over a lattice component's bound storage, so nothing else can be transactional. */
+	@Test void onlyALatticeComponentCanTransact() {
+		var stranger=new TransactionalComponent<CVMLong,Object>() {
+			@Override public Object rebind(AForkableCursor<CVMLong> cursor) { return this; }
+		};
+		var runs=new AtomicInteger();
+		assertThrows(UnsupportedOperationException.class,() -> stranger.execute(view -> runs.incrementAndGet()));
+		assertThrows(UnsupportedOperationException.class,() -> stranger.transact(view -> runs.incrementAndGet()));
+		assertThrows(UnsupportedOperationException.class,stranger::exclusive);
+		assertEquals(0,runs.get(),"the callback never runs");
+	}
 }

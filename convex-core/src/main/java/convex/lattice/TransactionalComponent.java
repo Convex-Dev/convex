@@ -35,9 +35,9 @@ import convex.lattice.cursor.Transactions;
  * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
  * callbacks run once under the claim beneath this component's storage.</p>
  *
- * <p>An {@link ALatticeComponent} opts in by declaring this interface and refining
- * {@link ALatticeComponent#rebind} to return its own type; its bound storage comes
- * from the base class, and any root will do. Application subclasses can opt in without changing their base class or introducing a component
+ * <p>Only an {@link ALatticeComponent} can be transactional. It opts in by declaring
+ * this interface and refining {@link ALatticeComponent#rebind} to return its own
+ * type; its bound storage comes from the base class, and any root will do. Application subclasses can opt in without changing their base class or introducing a component
  * registry. The engine is
  * {@link Transactions}; this interface adds the typed component view. Rebinding
  * rebuilds the component's editing views over the draft, so a stamp the component
@@ -70,9 +70,6 @@ import convex.lattice.cursor.Transactions;
  */
 public interface TransactionalComponent<V extends ACell,C> {
 
-	/** Returns bound working storage, before editing policies reinstalled by rebind. */
-	AForkableCursor<V> storage();
-
 	/**
 	 * Makes this component's counterpart over one attempt's private draft. See
 	 * {@link ALatticeComponent#rebind} for what it does with state outside the cursor.
@@ -97,7 +94,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transact(storage(),draft -> {
+		return Transactions.transact(ALatticeComponent.boundStorage(this),draft -> {
 			C view=rebind(draft);
 			R result=action.apply(view);
 			ALatticeComponent.completeDraft(view);
@@ -112,7 +109,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.execute(storage(),draft -> {
+		Transactions.execute(ALatticeComponent.boundStorage(this),draft -> {
 			C view=rebind(draft);
 			action.accept(view);
 			ALatticeComponent.completeDraft(view);
@@ -126,7 +123,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 * @return Exclusive transactions on this component's state
 	 */
 	default ExclusiveComponent<V,C> exclusive() {
-		return new ExclusiveComponent<>(storage(),this::rebind,ALatticeComponent.reconciler(this));
+		return new ExclusiveComponent<>(ALatticeComponent.boundStorage(this),this::rebind,ALatticeComponent.reconciler(this));
 	}
 
 	/**

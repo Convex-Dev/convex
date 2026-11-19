@@ -329,7 +329,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Returns the bound working storage, before this component's editing policies.
 	 * Lifecycle operations use this boundary; ordinary domain edits use {@link #cursor()}.
 	 */
-	public final AForkableCursor<V> storage() {
+	protected final AForkableCursor<V> storage() {
 		return storage;
 	}
 
@@ -420,6 +420,15 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Brings a transaction view's managed children into its draft before the draft commits. */
 	static void completeDraft(Object view) {
 		if (view instanceof ALatticeComponent<?> component) component.syncChildren();
+	}
+
+	/** Returns the bound storage of a transacting component, which must be a lattice component. */
+	@SuppressWarnings("unchecked")
+	static <V extends ACell> AForkableCursor<V> boundStorage(TransactionalComponent<V,?> source) {
+		if (!(source instanceof ALatticeComponent<?> c)) {
+			throw new UnsupportedOperationException("Only a lattice component can be transactional: "+source.getClass().getName());
+		}
+		return ((ALatticeComponent<V>)c).storage;
 	}
 
 	/**
