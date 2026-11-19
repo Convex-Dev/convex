@@ -39,11 +39,14 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Cleanup;
 import convex.core.util.FileUtils;
 import convex.core.util.Shutdown;
+import convex.core.util.Utils;
+import convex.dlfs.DLFSDrive;
+import convex.dlfs.DLFSDrives;
+import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.etch.EtchStore;
 import convex.gui.components.AbstractGUI;
@@ -51,15 +54,10 @@ import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
-import convex.lattice.MapComponent;
-import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
-import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
-import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.node.NodeConfig;
@@ -77,13 +75,12 @@ import net.miginfocom.swing.MigLayout;
  * {@link DLFSLattice} — matching the {@code :fs} branch of
  * {@code Lattice.ROOT}. Drive updates are signed with a local key pair.
  *
- * <p>A {@link SignedCursor} transparently handles signing when writes
- * propagate up through the OwnerLattice. Each drive is a
- * {@link DLFSLocal} backed by a {@link convex.lattice.cursor.PathCursor}
- * into the signed drives map.
+ * <p>The browser works on the local owner's drives through {@link DLFSRegion#drives},
+ * which creates, opens and deletes them and signs each write. Each drive is shown
+ * through its component's {@link DLFSDrive#fileSystem}.
  *
  * <p>A WebDAV server starts alongside the viewer, exposing drives over HTTP.
- * Since both GUI and WebDAV share the same DLFSLocal instances, operations
+ * Since both GUI and WebDAV share the same file systems, operations
  * through either path are automatically consistent.
  *
  * <p>The node runs locally, with no listener. The host retains edits every second
@@ -118,11 +115,11 @@ public class DLFSBrowser extends AbstractGUI {
 	/** Owner key (derived from keyPair) */
 	private AccountKey ownerKey;
 
-	/** Cursor into the owner's unsigned drives map (writes re-sign via SignedCursor) */
-	private AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
+	/** The local owner's drives, which sign each write with the local key pair */
+	private DLFSDrives ownerDrives;
 
 	/** Active drives keyed by name (insertion ordered) */
-	private final Map<String, DLFSLocal> drives = new LinkedHashMap<>();
+	private final Map<String, DLFileSystem> drives = new LinkedHashMap<>();
 
 	/** WebDAV server sharing our drives */
 	private DLFSServer webdavServer;
@@ -311,22 +308,16 @@ public class DLFSBrowser extends AbstractGUI {
 			host.autoFlush(Duration.ofSeconds(30)).failure()
 				.thenAcceptAsync(error -> log.warn("DLFS store flush failed", error));
 
-			// Navigate to owner's signed entry, wrap in SignedCursor
-			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
-				nodeServer.getCursor();
-			var rule=OWNER_LATTICE.signingFor(ownerKey);
-			// The owner's slot is created by its first write, so it is the map's entry and not a plain path
-			drivesCursor = SignedCursor.create(new MapComponent<>(rootCursor).path(ownerKey),v -> rule.sign(ctx,v));
+			// The local owner's drives, each write signed with the local key
+			ownerDrives = DLFSRegion.connect(nodeServer.getCursor(), null, keyPair::signData,
+				Utils::getCurrentTimestampCell).drives(ownerKey);
 
-			// Rebuild drives from restored lattice state
+			// Reopen the live drives from restored lattice state
 			drives.clear();
-			AHashMap<AString, AVector<ACell>> driveMap = drivesCursor.getOrDefault(null);
-			if (driveMap != null && !driveMap.isEmpty()) {
-				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
-					String name = entry.getKey().toString();
-					AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
-					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
-					drives.put(name, driveFS);
+			List<String> names = ownerDrives.driveNames();
+			if (!names.isEmpty()) {
+				for (String name : names) {
+					drives.put(name, ownerDrives.drive(name).fileSystem());
 				}
 				log.info("Restored {} drives from store: {}", drives.size(), file);
 			} else {
@@ -423,20 +414,16 @@ public class DLFSBrowser extends AbstractGUI {
 	// ========== Drive Management ==========
 
 	/**
-	 * Creates a new drive backed by a cursor descended from the signed drives map.
+	 * Creates a new drive among the local owner's drives.
 	 * @param name Drive name
-	 * @return true if created, false if already exists
+	 * @return true if created, false if it already exists or the name is not a valid drive name
 	 */
 	public boolean createDrive(String name) {
 		if (drives.containsKey(name)) return false;
+		DLFSDrive drive = ownerDrives.createDrive(name);
+		if (drive == null) return false;
 
-		AString cvmName = Strings.create(name);
-		AVector<ACell> initial=DLFSNode.createDirectory(CVMLong.ZERO);
-		drivesCursor.updateAndGet(current -> (current==null?DRIVES_MAP_LATTICE.zero():current)
-			.assoc(cvmName,initial));
-		AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
-
-		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
+		DLFileSystem driveFS = drive.fileSystem();
 		drives.put(name, driveFS);
 
 		// Register in WebDAV if running
@@ -472,12 +459,9 @@ public class DLFSBrowser extends AbstractGUI {
 	 * Deletes a drive.
 	 */
 	public boolean deleteDrive(String name) {
-		DLFSLocal removed = drives.remove(name);
+		DLFileSystem removed = drives.remove(name);
 		if (removed == null) return false;
-
-		// Clear from lattice: a write to the drives map, so an entry already gone is nothing to do
-		AString cvmName = Strings.create(name);
-		drivesCursor.update(current -> (current==null || !current.containsKey(cvmName))?current:current.assoc(cvmName,null));
+		ownerDrives.deleteDrive(name);
 
 		// Remove from WebDAV
 		if (webdavServer != null) {
@@ -576,7 +560,7 @@ public class DLFSBrowser extends AbstractGUI {
 		try {
 			webdavServer = DLFSServer.createEphemeral();
 			// Seed all existing lattice-backed drives
-			for (Map.Entry<String, DLFSLocal> entry : drives.entrySet()) {
+			for (Map.Entry<String, DLFileSystem> entry : drives.entrySet()) {
 				webdavServer.getDriveManager().seedDrive(null, entry.getKey(), entry.getValue());
 			}
 			webdavServer.start(0);
