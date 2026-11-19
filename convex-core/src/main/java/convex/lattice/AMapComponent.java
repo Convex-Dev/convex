@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.ATransformCursor;
+import convex.lattice.cursor.ALazyCursor;
 
 /**
  * Atomic map operations for components to extend, without replication, signing or
@@ -112,29 +112,22 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 		return entry(key);
 	}
 
-	/** One entry, read through the map's storage check and written with its creation policy. */
-	private final class Entry extends ATransformCursor<V,ACell> {
+	/** One entry, read through the map's storage check and constructed with its creation policy. */
+	private final class Entry extends ALazyCursor<V> {
 		private final K key;
 
 		Entry(AForkableCursor<ACell> values,K key) {
-			super(values);
+			super(values,null);
 			this.key=key;
 		}
 
-		@Override protected V view(ACell stored) { return valueAt(stored,key); }
-
-		@Override protected Object viewValue(ACell stored) {
+		@Override protected Object locate(ACell stored) {
 			M map=requireMap(stored);
 			if (map==null) return MISSING;
 			V value=map.get(key);
 			return value==null && !map.containsKey(key)?MISSING:value;
 		}
 
-		/** An absent map that cannot be created leaves nowhere to write, whatever the value. */
-		@Override protected void requireWritable(ACell stored) {
-			if (requireMap(stored)==null) createContainer();
-		}
-
-		@Override protected ACell write(ACell current,V value) { return associate(current,key,value); }
+		@Override protected ACell construct(ACell stored,V value) { return associate(stored,key,value); }
 	}
 }
