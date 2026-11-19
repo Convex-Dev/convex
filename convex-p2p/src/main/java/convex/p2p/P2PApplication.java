@@ -21,12 +21,9 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
-import convex.lattice.OwnedMap;
-import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
@@ -78,6 +75,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	private final Blocklist blocklist;
 	private final Seeds seeds;
 	private final NodeRegistry registry;
+	private final P2PIdentities identities;
 
 	/** Connects a relay with standard DID verification and no authoring capability. */
 	public static P2PApplication connect(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) {
@@ -126,6 +124,8 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 			?() -> node -> ContactRecords.standing(null):contacts::standings;
 		this.registry=new NodeRegistry(new IndexComponent<Keyword,ACell>(cursor()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P),
 			ownKey,blocklist::isBlocked,standings);
+		this.identities=new P2PIdentities(
+			new IndexComponent<Keyword,ACell>(cursor()).<AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID));
 	}
 
 	AccountKey ownKey() { return ownKey; }
@@ -229,19 +229,17 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	 * owner-aware signer that may serve several keys. A null signer opens a read view.
 	 */
 	public P2PUser p2p(AccountKey userKey,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		return P2PUser.create(this,userKey,signer);
+		return P2PUser.create(identities.identity(userKey,signer),registry.node(userKey,signer));
 	}
 
 	/** Returns the component at one user's identity slot, wrapped in its signing boundary. */
 	public P2PIdentity identity(AccountKey userKey) {
-		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return new P2PIdentity(identitySlot(this,userKey,signer),userKey);
+		return identities.identity(userKey,signer);
 	}
 
 	/** Returns the component at one user's node-record slot, wrapped in its signing boundary. */
 	public P2PNodeRecord node(AccountKey userKey) {
-		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return new P2PNodeRecord(nodeSlot(this,userKey,signer),userKey);
+		return registry.node(userKey,signer);
 	}
 
 	/**
@@ -274,26 +272,5 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	void syncHost() {
 		sync();
 		host.sync();
-	}
-
-	/**
-	 * Unsigned view at {@code [:id owner :value]}. Container components create missing
-	 * ancestors only on a changed write and reject incompatible storage on access.
-	 * The owned map binds local signing to the same rule as incoming delivery.
-	 */
-	static AForkableCursor<ACell> identitySlot(ALatticeComponent<Index<Keyword,ACell>> application, AccountKey userKey,
-			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		var root=new IndexComponent<>(application.cursor());
-		var ids=new OwnedMap<>(P2PLattice.ID_LATTICE,root.path(P2PLattice.KEY_ID));
-		return ids.authoringCursor(userKey,value -> signer==null?null:signer.apply(userKey,value));
-	}
-
-	/** Cursor at {@code [:p2p :nodes owner :value]}, navigated and signed the same way. */
-	static AForkableCursor<ACell> nodeSlot(ALatticeComponent<Index<Keyword,ACell>> application, AccountKey userKey,
-			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		var root=new IndexComponent<>(application.cursor());
-		var p2p=new IndexComponent<Keyword,ACell>(root.path(P2PLattice.KEY_P2P));
-		var nodes=new OwnedMap<>(P2PLattice.NODES_LATTICE,p2p.path(P2PLattice.KEY_NODES));
-		return nodes.authoringCursor(userKey,value -> signer==null?null:signer.apply(userKey,value));
 	}
 }

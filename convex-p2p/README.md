@@ -317,6 +317,20 @@ published components. Writes require an authorised signer for that owner
 (see [Owner binding](#owner-binding) above). A facade fork isolates identity edits;
 use `me.node().fork()` to stage the independent node-record component.
 
+On a host shared with other applications, the P2P application merges `:id` and `:p2p`,
+and the others normally use its `p2p(owner, signer)`. An application that needs a
+user's P2P components inside its own forks or transactions views the two regions from
+its region container, with the components the P2P application uses itself:
+
+```java
+P2PIdentities identities = view(P2PLattice.KEY_ID, P2PIdentities::new);
+P2PRegion p2p = view(P2PLattice.KEY_P2P, P2PRegion::new);
+P2PUser user = P2PUser.create(identities.identity(owner, signer), p2p.node(owner, signer));
+```
+
+Both reconcile a region changed on both sides user by user, so such an application's
+edits never bring back a record the P2P application dropped.
+
 ## Running a node
 
 A node joins a network through seed nodes: expected-good nodes that the operator

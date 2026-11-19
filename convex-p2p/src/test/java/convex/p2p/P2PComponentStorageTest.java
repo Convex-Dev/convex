@@ -19,10 +19,12 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.MergeConflictException;
 import convex.lattice.Regions;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 
 /** Domain storage properties need neither a node nor a disk store. */
@@ -38,9 +40,31 @@ class P2PComponentStorageTest {
 		P2PLattice.createIdentity(Strings.intern("third"),null,null,3);
 	private static final Keyword NOTE=Keyword.intern("note");
 
+	/** A user's components over an application that views the P2P regions of a root. */
 	private static P2PUser user(Root<ACell> root,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		var application=new Regions(root.<Index<Keyword,ACell>>path());
-		return P2PUser.create(application,KEY,signer);
+		P2PIdentities identities=application.view(P2PLattice.KEY_ID,P2PIdentities::new);
+		P2PRegion region=application.view(P2PLattice.KEY_P2P,P2PRegion::new);
+		return P2PUser.create(identities.identity(KEY,signer),region.node(KEY,signer));
+	}
+
+	/** A view's published edit keeps the record the merging application dropped meanwhile. */
+	@Test void viewedRegionKeepsTheRecordTheMergingApplicationDropped() {
+		AccountKey bob=BOB.getAccountKey();
+		AHashMap<Keyword,ACell> info=P2PLattice.createNodeInfo(Vectors.empty(),Strings.create("node"),Strings.create("test"),null,1);
+		Index<Keyword,ACell> nodes=Index.of(P2PLattice.KEY_NODES,Maps.of(bob,BOB.signData(info)));
+		var root=new Root<Index<Keyword,ACell>>(Index.of(P2PLattice.KEY_P2P,nodes));
+		var holder=new Regions(root);
+		NodeRegistry registry=holder.create(P2PLattice.KEY_P2P,
+			(AForkableCursor<Index<Keyword,ACell>> cursor) -> new NodeRegistry(cursor,null,node -> false,() -> node -> 1));
+		var viewer=new Regions(root.fork());
+		P2PRegion seen=viewer.view(P2PLattice.KEY_P2P,P2PRegion::new);
+		seen.node(KEY,(owner,value) -> ALICE.signData(value)).setNodeInfo(info);
+		registry.drop(bob);
+		viewer.sync();
+		AHashMap<?,?> published=(AHashMap<?,?>)((Index<?,?>)root.get().get(P2PLattice.KEY_P2P)).get(P2PLattice.KEY_NODES);
+		assertNotNull(published.get(KEY),"the view's record is published");
+		assertNull(published.get(bob),"the record the merging application dropped stays dropped");
 	}
 
 	private static ALatticeComponent<ACell> component(P2PUser user,boolean node) {

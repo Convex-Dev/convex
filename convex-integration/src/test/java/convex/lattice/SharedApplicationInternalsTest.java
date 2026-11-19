@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -59,8 +60,10 @@ import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.RelayHost;
 import convex.p2p.P2PApplication;
+import convex.p2p.P2PIdentities;
 import convex.p2p.P2PLattice;
 import convex.p2p.P2PNodeRecord;
+import convex.p2p.P2PRegion;
 import convex.p2p.P2PUser;
 import convex.social.Social;
 import convex.social.SocialLattice;
@@ -93,10 +96,6 @@ public class SharedApplicationInternalsTest {
 		(owner,signer) -> owner.equals(signer) || owner.equals(DID.forKey(signer)));
 
 	/** A live component over the whole host root, for opening domain views. */
-	private static ALatticeComponent<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {
-		return new Regions(host.cursor());
-	}
-
 	/**
 	 * The entry view at a path of the host root, each level of the map kind its lattice's
 	 * empty value has; a changed write creates the levels that are missing.
@@ -163,7 +162,7 @@ public class SharedApplicationInternalsTest {
 			}
 			AccountKey nodeOwner=(socialApp?COMMON_KEY:FILES_KEY).getAccountKey();
 			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),null,Keywords.P2P,Keywords.NODES,nodeOwner);
-			node=P2PUser.create(this,nodeOwner).node().rebind(nodeState.cursor());
+			node=new P2PRegion(hostEntry(cursor(),Keywords.P2P)).node(nodeOwner,null).rebind(nodeState.cursor());
 		}
 
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
@@ -250,8 +249,9 @@ public class SharedApplicationInternalsTest {
 		assertNotNull(Social.connect(hostEntry(host.cursor(),Social.KEY_SOCIAL)).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
 		assertEquals("working file",Files.readString(DLFSRegion.connect(hostEntry(host.cursor(),Keywords.FS),host.store())
 			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
-		assertEquals(info,P2PUser.create(view(host),COMMON_KEY.getAccountKey()).node().getNodeInfo());
-		assertEquals(info,P2PUser.create(view(host),FILES_KEY.getAccountKey()).node().getNodeInfo());
+		var published=new P2PRegion(hostEntry(host.cursor(),Keywords.P2P));
+		assertEquals(info,published.node(COMMON_KEY.getAccountKey(),null).getNodeInfo());
+		assertEquals(info,published.node(FILES_KEY.getAccountKey(),null).getNodeInfo());
 		assertEquals(4,signatures.get(),"Root publication needs no additional signatures");
 		socialApp.sync();
 		filesApp.sync();
@@ -284,41 +284,53 @@ public class SharedApplicationInternalsTest {
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
 		private final LatticeContext policy;
 		final Social social;
+		private final P2PIdentities identities;
+		private final P2PRegion p2pRegion;
 		SocialWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
 			this(host.cursor(),context(SOCIAL_KEY));
 		}
 		SocialWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext policy) {
 			super(cursor);
 			this.policy=policy;
-			for (Keyword key:new Keyword[]{Social.KEY_SOCIAL,Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
-				region(key,LatticeComponent.live(SOCIAL_ROOT.path(key),new IndexComponent<>(cursor).path(key),LatticeContext.EMPTY));
-			}
+			region(Social.KEY_SOCIAL,LatticeComponent.live(SOCIAL_ROOT.path(Social.KEY_SOCIAL),
+				new IndexComponent<>(cursor).path(Social.KEY_SOCIAL),LatticeContext.EMPTY));
+			// The host's P2P application merges the P2P regions; this application views them
+			identities=view(Keywords.ID,P2PIdentities::new);
+			p2pRegion=view(Keywords.P2P,P2PRegion::new);
 			social=Social.connect(new IndexComponent<>(cursor).path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
 		@Override public SocialWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new SocialWithP2P(cursor,policy);
 		}
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
+		P2PUser p2p(AccountKey owner) {
+			BiFunction<ACell,ACell,SignedData<ACell>> signer=(key,value) -> policy.signAs(key,value);
+			return P2PUser.create(identities.identity(owner,signer),p2pRegion.node(owner,signer));
+		}
 	}
 
 	private static final class FilesWithP2P extends DLFSApplication
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
 		private final LatticeContext policy;
+		private final P2PIdentities identities;
+		private final P2PRegion p2pRegion;
 		FilesWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
 			this(host.cursor(),host.store(),context(FILES_KEY));
 		}
 		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,Persister persister,LatticeContext context) {
 			super(cursor,persister,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
 			policy=context;
-			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
-				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),new IndexComponent<>(cursor).path(key),context));
-			}
+			// The host's P2P application merges the P2P regions; this application views them
+			identities=view(Keywords.ID,P2PIdentities::new);
+			p2pRegion=view(Keywords.P2P,P2PRegion::new);
 		}
 		@Override public FilesWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new FilesWithP2P(cursor,persister(),policy);
 		}
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
+		P2PUser p2p(AccountKey owner) {
+			BiFunction<ACell,ACell,SignedData<ACell>> signer=(key,value) -> policy.signAs(key,value);
+			return P2PUser.create(identities.identity(owner,signer),p2pRegion.node(owner,signer));
+		}
 	}
 
 	/** Explicit allow-list projection; a selective lattice merge is not projection. */
@@ -351,6 +363,8 @@ public class SharedApplicationInternalsTest {
 			var host=new LatticeHost<>(Cursors.root(HOST_ROOT.zero()),store);
 			social=new SocialWithP2P(host);
 			files=new FilesWithP2P(host);
+			// One application merges the shared P2P regions; the domain applications view them
+			host.addApplication(P2PApplication.connect(P2PLattice.ROOT,host));
 			host.addApplication(social);
 			host.addApplication(files);
 			node=new NodeServer<>(host,NodeConfig.port(-1));

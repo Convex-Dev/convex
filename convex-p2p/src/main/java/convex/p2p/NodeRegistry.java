@@ -22,12 +22,12 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.MergeFunction;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
  * The node registry this node holds at {@code [:p2p :nodes]}, as the component at
- * {@code [:p2p]}: it defines how that region merges.
+ * {@code [:p2p]}: the {@link P2PRegion} of the application that merges the region,
+ * defining how it merges.
  *
  * <p>Its merge is the registry's acceptance boundary: the owner rule, applied only to
  * the records this node wants. Nodes that accept every record converge under the
@@ -52,7 +52,7 @@ import convex.lattice.cursor.AForkableCursor;
  * turned away before, and each costs only a comparison. A dropped record leaves the
  * directory but not the connection manager's candidates.</p>
  */
-final class NodeRegistry extends ALatticeComponent<Index<Keyword,ACell>> {
+final class NodeRegistry extends P2PRegion {
 
 	/** Bound on counted records, the contact-record cap, so each can carry contact history. */
 	static final int DEFAULT_MAX_RECORDS=ContactRecords.MAX_NODES;

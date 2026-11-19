@@ -1,22 +1,20 @@
 package convex.p2p;
 
-import java.util.function.BiFunction;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.SignedData;
 import convex.lattice.ALatticeComponent;
 
 /**
  * Convenience facade over a single P2P user's independently located components.
  *
  * <p>Obtained from {@link P2PApplication#p2p(AccountKey)} or
- * {@link P2PNode#p2p(AccountKey)}. {@link #identity()} is the component at the user's
+ * {@link P2PNode#p2p(AccountKey)}, or made with {@link #create} from the
+ * {@link P2PIdentities} and {@link P2PRegion} an application views. {@link #identity()} is the component at the user's
  * identity slot, {@code [:id <userKey> :value]}, and {@link #node()} the one at the
  * user's node record, {@code [:p2p :nodes <userKey> :value]}; both are already through
  * the signing boundary. This facade deliberately is not an {@link ALatticeComponent}:
@@ -60,26 +58,18 @@ public class P2PUser {
 	}
 
 	/**
-	 * Creates a user facade over a root component holding the P2P regions. This
-	 * overload opens a read view without signing capability.
+	 * Combines one user's identity and node record into a facade.
 	 *
-	 * @param application Root component, normally the application, whose cursor holds the P2P regions
-	 * @param userKey P2P user key
+	 * @param identity The user's identity component
+	 * @param node The same user's node-record component
 	 * @return P2P user facade
 	 */
-	public static P2PUser create(ALatticeComponent<Index<Keyword,ACell>> application,AccountKey userKey) {
-		return create(application,userKey,null);
-	}
-
-	/** Opens both owned slots with one owner-aware signer, which may serve multiple keys. */
-	public static P2PUser create(ALatticeComponent<Index<Keyword,ACell>> application, AccountKey userKey,
-			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		if (application==null) throw new IllegalArgumentException("Application must not be null");
-		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return new P2PUser(
-			new P2PIdentity(P2PApplication.identitySlot(application,userKey,signer),userKey),
-			new P2PNodeRecord(P2PApplication.nodeSlot(application,userKey,signer),userKey),
-			userKey);
+	public static P2PUser create(P2PIdentity identity,P2PNodeRecord node) {
+		if (identity==null || node==null) throw new IllegalArgumentException("Identity and node record must not be null");
+		if (!identity.owner().equals(node.owner())) {
+			throw new IllegalArgumentException("Identity and node record must belong to the same user");
+		}
+		return new P2PUser(identity,node,identity.owner());
 	}
 
 	/** Returns the path-specific identity component. */
