@@ -1372,6 +1372,13 @@ public class IndexTest {
 	}
 
 	@Test
+	public void testStackOverflowFallbackGetKeys() throws IOException {
+		OverflowingStore store=new OverflowingStore();
+		assertEquals(fourKeyIndex().getKeys(),hostileIndex(store).getKeys());
+		assertEquals(1,store.fired);
+	}
+
+	@Test
 	public void testStackOverflowFallbackOrdinaryMerge() throws IOException {
 		OverflowingStore store=new OverflowingStore();
 		Index<Blob,CVMLong> baseline=fourKeyIndex();

@@ -582,6 +582,18 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	@Override
+	protected int copyKeys(ACell[] keys, int offset) {
+		Walk<Void> progress=new Walk<>();
+		walk(entry -> {
+			// walk advances done only after this completes, so overflow recovery
+			// retries the same output position if loading a key overflows the stack.
+			keys[offset+(int)progress.done]=entry.getKey();
+			return true;
+		},progress);
+		return offset+(int)count;
+	}
+
+	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
 		walk(me -> {
 			action.accept(me.getKey(), me.getValue());

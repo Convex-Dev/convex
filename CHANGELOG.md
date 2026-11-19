@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Collect map and Index keys with a single tree traversal. ([Benchmarks](convex-benchmarks/README.md#map-key-traversal))
 - Reuse immutable blob chunks when building blobs and strings. ([Benchmarks](convex-benchmarks/README.md#blobbuilder-chunk-reuse))
 - Speed up ordinary Index merges by sharing unchanged radix branches. ([Benchmarks](convex-benchmarks/README.md#ordinary-index-merge))
 - Speed up ordinary hash-map merges by reusing unchanged tree branches. ([Benchmarks](convex-benchmarks/README.md#ordinary-hash-map-merge))

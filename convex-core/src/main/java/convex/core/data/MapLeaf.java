@@ -340,6 +340,12 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
+	protected int copyKeys(ACell[] keys, int offset) {
+		for (MapEntry<K,V> entry:entries) keys[offset++]=entry.getKey();
+		return offset;
+	}
+
+	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
 		for (MapEntry<K, V> e : entries) {
 			action.accept(e.getKey(), e.getValue());

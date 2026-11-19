@@ -509,6 +509,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * FANOUT;
 
 	@Override
+	protected int copyKeys(ACell[] keys, int offset) {
+		for (Ref<AHashMap<K,V>> child:children) offset=child.getValue().copyKeys(keys,offset);
+		return offset;
+	}
+
+	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
 		for (Ref<AHashMap<K, V>> sub : children) {
 			sub.getValue().forEach(action);

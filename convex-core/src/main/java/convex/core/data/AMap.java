@@ -409,10 +409,19 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public AVector<K> getKeys() {
 		int n=Utils.checkedInt(count);
 		ACell[] keys=new ACell[n];
-		for (int i=0; i<n; i++) {
-			keys[i]=entryAt(i).getKey();
-		}
+		copyKeys(keys,0);
 		return Vectors.wrap(keys);
+	}
+
+	/**
+	 * Copies keys in entry order without loading values. The caller supplies space
+	 * for every key, with the total count already checked to fit a Java array.
+	 * Tree implementations override this to visit each node once.
+	 * @return First unused array position
+	 */
+	protected int copyKeys(ACell[] keys, int offset) {
+		for (int i=0;i<count;i++) keys[offset++]=entryAt(i).getKey();
+		return offset;
 	}
 	
 	/**

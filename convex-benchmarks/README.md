@@ -19,6 +19,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `IndexConcatBenchmark` | Ordered concatenation and split/rejoin against ordinary map merge |
 | `IndexMergeBenchmark` | Structural ordinary merge against the original entry-insertion loop |
 | `BlobBuilderBenchmark` | Immutable chunk sharing versus the original copying append path |
+| `MapKeysBenchmark` | Ordered key traversal versus repeated indexed entry lookup |
 | `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
@@ -313,6 +314,37 @@ case measured 306 → 359 ns with overlapping JMH confidence intervals and uncha
 allocation; no improvement is claimed for that case. Timings varied across runs
 with other local workloads, so these are indicative microbenchmarks. Flat inputs
 are also supported; repeated runs may reuse their cached canonical representation.
+
+### Map key traversal
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main MapKeysBenchmark -prof gc
+```
+
+The benchmark compares `getKeys()` with the original `entryAt(i)` loop, returning
+the same ordered vector. Setup checks equivalence. It covers empty, eight-entry,
+1,024-entry and 65,536-entry resident hash maps and indexes. Hash-map leaves copy
+directly and tree nodes visit each child once; Index uses its existing ordered
+walk and stack-overflow recovery. Neither path loads map values just to read keys.
+
+A local JDK 27.0.1.0.3 run on 2026-11-19 used two forks, three 300 ms
+warmups, four 300 ms measurements, one worker, `-Xms256m -Xmx512m` and
+`-prof gc`. Medians of per-iteration average times were:
+
+| Map / entries | Indexed lookup | Traversal |
+|---|---:|---:|
+| Hash map / 1,024 | 19.14 microseconds | 2.13 microseconds |
+| Index / 1,024 | 19.72 microseconds | 5.70 microseconds |
+| Hash map / 65,536 | 3.83 ms | 0.87 ms |
+| Index / 65,536 | 3.27 ms | 0.99 ms |
+
+Eight-entry hash maps measured 10.21 → 9.74 ns with unchanged allocation;
+eight-entry indexes measured 34.89 → 28.43 ns but used 136 rather than 88 bytes.
+Index's traversal state adds 48 bytes per non-empty call in these runs, allowing
+the walk to resume safely after stack overflow. Output-vector allocation is
+unchanged. These measurements exclude construction and cold-store I/O and do not
+establish an application-wide speedup.
 
 ### With Profiling (Java Flight Recorder)
 
