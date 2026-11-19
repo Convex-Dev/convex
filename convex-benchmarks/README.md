@@ -18,6 +18,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `IndexSliceBenchmark` | Structural slices and seek-based cuts against per-entry deletion |
 | `IndexConcatBenchmark` | Ordered concatenation and split/rejoin against ordinary map merge |
 | `IndexMergeBenchmark` | Structural ordinary merge against the original entry-insertion loop |
+| `BlobBuilderBenchmark` | Immutable chunk sharing versus the original copying append path |
 | `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
@@ -278,6 +279,40 @@ disjoint merges fell from 50.26 MB to 5.49 MB. Single-entry allocation was
 unchanged. The eight-entry shared case was faster (239 ns to 76 ns), but used
 336 rather than 176 bytes because structural rebuilding allocates child arrays.
 These are resident-data microbenchmarks, not application-wide speedup claims.
+
+### BlobBuilder chunk reuse
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main BlobBuilderBenchmark -prof gc
+```
+
+Both methods build and return a blob from the same immutable input. The baseline
+retains the original copying append implementation and its private buffer helpers;
+setup verifies equal results. Parameters cover small blobs, chunk and tree
+boundaries, flat and canonical tree inputs, and empty, unaligned or chunk-aligned
+builders. Full immutable chunks are shared; partial tails and mutable byte-array
+or buffer inputs still use the builder's writable storage. The full-chunk path
+also avoids loading children when accepting an entire store-backed blob tree.
+
+A local JDK 27.0.1.0.3 run on 2026-11-19 used two forks, three 400 ms
+warmups, five 400 ms measurements, one worker, `-Xms256m -Xmx512m` and
+`-prof gc`. For a resident 1 MiB tree, medians of per-iteration average times were:
+
+| Existing builder bytes | Copying | Sharing | Allocated bytes/op, copying → sharing |
+|---|---:|---:|---:|
+| 0 | 90.57 microseconds | 4.49 ns | 1,120,226 → 24 |
+| 1 (unaligned) | 163.42 microseconds | 101.04 microseconds | 2,216,019 → 1,155,218 |
+| 4,096 (chunk-aligned) | 87.68 microseconds | 17.32 microseconds | 1,124,521 → 71,548 |
+
+The empty builder returns the existing immutable tree, so its result does not
+require visiting every byte. The unaligned case still copies boundary data.
+For 64-byte inputs, empty and one-byte-prefix builders measured 14.74 → 13.34 ns
+and 18.54 → 18.04 ns, with unchanged allocation. The 4,096-byte-prefix small-input
+case measured 306 → 359 ns with overlapping JMH confidence intervals and unchanged
+allocation; no improvement is claimed for that case. Timings varied across runs
+with other local workloads, so these are indicative microbenchmarks. Flat inputs
+are also supported; repeated runs may reuse their cached canonical representation.
 
 ### With Profiling (Java Flight Recorder)
 

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reuse immutable blob chunks when building blobs and strings. ([Benchmarks](convex-benchmarks/README.md#blobbuilder-chunk-reuse))
 - Speed up ordinary Index merges by sharing unchanged radix branches. ([Benchmarks](convex-benchmarks/README.md#ordinary-index-merge))
 - Speed up ordinary hash-map merges by reusing unchanged tree branches. ([Benchmarks](convex-benchmarks/README.md#ordinary-hash-map-merge))
 - Reconcile component updates without automatically persisting intermediate working state; applications choose when to save snapshots. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking))

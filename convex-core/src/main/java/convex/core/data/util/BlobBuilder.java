@@ -68,27 +68,47 @@ public class BlobBuilder {
 	public BlobBuilder append(ABlob b) {
 		long blen=b.count();
 		if (blen==0) return this; // nothing to do
-		
 		long spare=spare();
-		
-		if (blen<=spare) {
-			// Does not overflow current chunk
+		if (blen<spare) {
+			// Keep the common small append path compact for inlining.
 			ensureArray(arrayPos()+blen);
 			b.getBytes(tail,arrayPos());
 			count+=blen;
-			if (blen==spare) completeChunk();
-			return this;
-		} else {
-			// append to fill current chunk
-			append(b.slice(0, spare));
-			
-			// Index over offset into b
-			for (long off=spare; off<blen; off+=Blob.CHUNK_LENGTH) {
-				long take=Math.min(Blob.CHUNK_LENGTH, blen-off);
-				append(b.slice(off,off+take));
-			}
 			return this;
 		}
+		return appendAtBoundary(b,blen,spare);
+	}
+
+	private BlobBuilder appendAtBoundary(ABlob b, long blen, long spare) {
+		// Long.MAX_VALUE ends one byte before a chunk boundary: an append that
+		// stays inside the current chunk cannot overflow the total count.
+		if (count>Long.MAX_VALUE-blen) throw new IllegalArgumentException("Blob append would exceed maximum size");
+		if (spare==Blob.CHUNK_LENGTH) return appendChunks(b,blen);
+		if (blen==spare) {
+			ensureArray(Blob.CHUNK_LENGTH);
+			b.getBytes(tail,arrayPos());
+			count+=blen;
+			completeChunk();
+			return this;
+		}
+		append(b.slice(0,spare));
+		for (long off=spare;off<blen;off+=Blob.CHUNK_LENGTH) {
+			long take=Math.min(Blob.CHUNK_LENGTH,blen-off);
+			append(b.slice(off,off+take));
+		}
+		return this;
+	}
+
+	private BlobBuilder appendChunks(ABlob b, long blen) {
+		// Completed immutable chunks can be shared. Only the partial last
+		// chunk belongs in the mutable tail; normalise flat, oversized blobs.
+		long full=blen-(blen%Blob.CHUNK_LENGTH);
+		// AArrayBlob.append delegates large appends back to BlobBuilder.
+		// Promote a single full chunk to a tree before appending a whole tree.
+		if (acc.count()==Blob.CHUNK_LENGTH) full=Blob.CHUNK_LENGTH;
+		acc=acc.append(b.slice(0,full).getCanonical());
+		count+=full;
+		return append(b.slice(full,blen));
 	}
 
 	/**
