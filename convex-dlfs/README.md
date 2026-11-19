@@ -329,24 +329,21 @@ components for multiple owners. Local identity-to-owner and cross-region mapping
 remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store
 lifecycle.
 
-A custom application can embed `DLFSRegion` at any correctly bound cursor.
-For a root application that stages files, explicitly supply a fork:
+A custom application can embed `DLFSRegion` in a region container of its own,
+which makes it over the container's cursor for its key.
+`new DLFSApplication(host, myKeyPair::signData)` uses a live region, so edits are
+immediately part of the host's working state. To stage files, register a fork of
+the application:
 
 ```java
-var files = DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS), store,
-    myKeyPair::signData, Utils::getCurrentTimestampCell);
-var staged = files.fork();
-var app = host.addApplication(new DLFSApplication(host, Keywords.FS, staged));
+var app = host.addApplication(new DLFSApplication(host, myKeyPair::signData).fork());
 ```
 
-`app.dlfs()` is the exact registered component. Its incoming merges and local
-edits use the same working state. The application did not make it, so its maker
-publishes it with `staged.sync()`; `app.sync()` does not. Multiple applications may
-explicitly register the same component. The default
-`new DLFSApplication(host, myKeyPair::signData)` instead uses a live region, so edits
-are immediately part of the host's working state. Without a signer,
-`new DLFSApplication(host)` is a relay: it can accept existing signed envelopes,
-but cannot write or author a combination that requires a new signature.
+Incoming merges and local edits share the fork's working state, and nothing
+reaches the host until `app.sync()`. Another application on the same host that
+uses the files views `:fs` (`Regions.view`) rather than merging it. Without a
+signer, `new DLFSApplication(host)` is a relay: it can accept existing signed
+envelopes, but cannot write or author a combination that requires a new signature.
 
 Ownership, signing and clocks are explicit DLFS policies; a host or application
 `LatticeContext` does not grant signing authority. The standard owner key is an

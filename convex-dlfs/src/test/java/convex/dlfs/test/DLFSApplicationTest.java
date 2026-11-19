@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,9 @@ import org.junit.jupiter.api.function.Executable;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -20,12 +24,14 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.fs.DLFSLattice;
-import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
+import convex.lattice.Regions;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 
 /** Component boundaries, independent of transport or disk-store lifecycle. */
@@ -76,12 +82,6 @@ public class DLFSApplicationTest {
 		rebound.drives(OWNER.getAccountKey()).createDrive("home");
 		assertNotNull(draft.get().get(Keywords.FS));
 		assertSame(before,host.cursor().get());
-	}
-
-	@Test void applicationGivenAnExistingRegionCannotBeRebound() {
-		var host=owned(LatticeHost.create());
-		var app=new DLFSApplication(host,Keywords.FS,files(owned(LatticeHost.create())).dlfs());
-		assertThrows(UnsupportedOperationException.class,() -> app.rebind(new Root<>(host.cursor().get())));
 	}
 
 	@Test void applicationsOnOneHostHaveIndependentTimestampAdmission() {
@@ -143,36 +143,61 @@ public class DLFSApplicationTest {
 		}
 	}
 
-	@Test void sharedForkReconcilesIncomingFilesWithoutPublishingPendingEdits() throws Exception {
+	@Test void stagedApplicationReconcilesIncomingFilesWithoutPublishingPendingEdits() throws Exception {
 		var host=owned(LatticeHost.create());
-		var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),null,OWNER::signData,() -> CVMLong.create(100));
-		var staged=region.fork();
-		var app=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
-		var shared=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
-		assertSame(staged,app.dlfs());
-		assertSame(staged,shared.dlfs());
-		var local=app.drives(OWNER.getAccountKey()).createDrive("home").fileSystem();
+		var staged=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
+			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW).fork());
+		var viewer=host.addApplication(new Regions(host.cursor()));
+		var published=view(viewer,null);
+		var local=staged.drives(OWNER.getAccountKey()).createDrive("home").fileSystem();
 		Files.writeString(local.getPath("/local"),"local");
 
-		var remote=files(owned(LatticeHost.create()));
-		Files.writeString(remote.drives(OWNER.getAccountKey()).createDrive("home")
-			.fileSystem().getPath("/remote"),"remote");
-		host.merge(remote.cursor().get());
+		var remoteHost=owned(LatticeHost.create());
+		var remote=files(remoteHost).drives(OWNER.getAccountKey()).createDrive("home").fileSystem();
+		Files.writeString(remote.getPath("/remote"),"remote");
+		host.merge(remoteHost.cursor().get());
 		assertEquals("remote",Files.readString(local.getPath("/remote")));
 		assertEquals("local",Files.readString(local.getPath("/local")));
-		assertNull(host.cursor().get().get(Keywords.FS),"delivery must not publish the shared fork");
+		assertNull(host.cursor().get().get(Keywords.FS),"delivery must not publish the staged application");
 
 		host.cursor().updateAndGet(root -> root.assoc(UNRELATED,CVMLong.ONE));
-		shared.sync();
-		assertNull(host.cursor().get().get(Keywords.FS),"an application does not publish a region it was given");
+		viewer.sync();
+		assertNull(host.cursor().get().get(Keywords.FS),"an application viewing the files does not publish them");
 		staged.sync();
-		assertEquals(staged.cursor().get(),host.cursor().get().get(Keywords.FS));
-		assertTrue(staged.cursor().get().get(OWNER.getAccountKey()).checkSignature());
-		Files.writeString(local.getPath("/next"),"next");
-		staged.sync();
-		assertEquals("next",Files.readString(region.drives(OWNER.getAccountKey())
-			.drive("home").fileSystem().getPath("/next")));
+		var home=published.drives(OWNER.getAccountKey()).drive("home").fileSystem();
+		assertEquals("local",Files.readString(home.getPath("/local")));
+		assertEquals("remote",Files.readString(home.getPath("/remote")));
+		assertTrue(signedFiles(host).checkSignature());
 		assertEquals(CVMLong.ONE,host.cursor().get().get(UNRELATED));
+
+		// A later delivery still reaches the working copy
+		Files.writeString(remote.getPath("/later"),"later");
+		host.merge(remoteHost.cursor().get());
+		assertEquals("later",Files.readString(local.getPath("/later")));
+
+		// Both sides change: another application writes live while this one has pending edits
+		var writer=view(new Regions(host.cursor()),OWNER::signData);
+		Files.writeString(writer.drives(OWNER.getAccountKey()).drive("home").fileSystem().getPath("/live"),"live");
+		Files.writeString(local.getPath("/pending"),"pending");
+		staged.sync();
+		assertEquals("live",Files.readString(local.getPath("/live")));
+		assertEquals("live",Files.readString(home.getPath("/live")));
+		assertEquals("pending",Files.readString(home.getPath("/pending")));
+		assertEquals("later",Files.readString(home.getPath("/later")));
+		assertTrue(signedFiles(host).checkSignature());
+		assertEquals(CVMLong.ONE,host.cursor().get().get(UNRELATED));
+	}
+
+	/** The files region as another application on the host views it */
+	private static DLFSRegion view(Regions application,
+			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer) {
+		return application.view(Keywords.FS,(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> region) ->
+			DLFSRegion.connect(region,null,signer,() -> CVMLong.create(100)));
+	}
+
+	/** The owner's signed drives as the host holds them */
+	private static SignedData<?> signedFiles(LatticeHost<Index<Keyword,ACell>> host) {
+		return RT.getIn(host.cursor().get(),Keywords.FS,OWNER.getAccountKey());
 	}
 
 	@Test void nestedRegionsCreateOnlyTheirOwnPathAndPreserveSiblingValues() throws Exception {

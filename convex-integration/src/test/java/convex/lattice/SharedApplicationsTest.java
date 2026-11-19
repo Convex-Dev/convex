@@ -81,7 +81,7 @@ public class SharedApplicationsTest {
 			assertEquals(2,published.count(),"and the host publishes both");
 			assertNotNull(published.getPost(localPost));
 			assertEquals(receivedFiles,target.root().get(Keywords.FS));
-			target.files.dlfs().sync();
+			target.files.sync();
 			assertEquals(TEXT,Files.readString(localDrive.fileSystem().getPath("/hello.txt")));
 			assertEquals("A pending local file",Files.readString(localDrive.fileSystem().getPath("/local.txt")));
 
@@ -108,7 +108,7 @@ public class SharedApplicationsTest {
 			ACell social=node.root().get(Social.KEY_SOCIAL);
 			assertNotNull(social);
 			assertNull(node.root().get(Keywords.FS),"publishing the social region publishes nothing else");
-			node.files.dlfs().sync();
+			node.files.sync();
 			assertEquals(social,node.root().get(Social.KEY_SOCIAL),"publishing files leaves social untouched");
 			assertNotNull(node.root().get(Keywords.FS));
 			node.social.sync();

@@ -10,7 +10,6 @@ import convex.api.ConvexRemote;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Blob;
@@ -22,9 +21,9 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Shutdown;
 import convex.dlfs.DLFSApplication;
-import convex.dlfs.DLFSRegion;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.fs.DLFSLattice;
 import convex.lattice.cursor.LazyCursor;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
@@ -112,11 +111,10 @@ public final class SharedApplicationsExample {
 			// Infrastructure is registered once; both domain applications use its live state.
 			infrastructure=host.addApplication(P2PApplication.connect(P2PLattice.ROOT,host));
 			social=host.addApplication(new SocialApp(host,ALICE,time));
-			var region=DLFSRegion.connect(new IndexComponent<>(host.cursor()).path(Keywords.FS),store,
-				BOB::signData,() -> CVMLong.create(time));
-			// Choose a private publication boundary explicitly. The node made it, so the node
-			// publishes it; the application routes to it but does not sync it.
-			files=host.addApplication(new DLFSApplication(host,Keywords.FS,region.fork()));
+			// A fork of the files application is its own publication boundary: incoming files
+			// reach its working copy, and only its sync publishes Bob's edits.
+			files=host.addApplication(new DLFSApplication(host,BOB::signData,() -> CVMLong.create(time),
+				DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW).fork());
 
 			var config=NodeConfig.localNetwork();
 			// Replication knows no lattice: it serves whatever the host publishes, from the host's store.
@@ -140,7 +138,7 @@ public final class SharedApplicationsExample {
 		/** Publishes both applications into the host, persists the root and serves it to peers. */
 		public void publish() throws Exception {
 			social.sync();
-			files.dlfs().sync();
+			files.sync();
 			host.sync();
 			awaitServed();
 		}

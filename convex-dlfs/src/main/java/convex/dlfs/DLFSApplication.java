@@ -27,10 +27,10 @@ import convex.lattice.fs.DLFSLocation;
  * Root application serving a multi-owner DLFS region, normally at {@code :fs}.
  *
  * <p>The registered region defines delivery and publication policy; no separate
- * root lattice is required. The default region is a live view of the supplied
- * cursor. Supply an explicit region to share it with another application or to
- * stage edits in a {@link DLFSRegion#fork() fork}. In either case {@link #dlfs()}
- * and {@link #drives} use that same component, and sync follows its boundary.</p>
+ * root lattice is required. The region is a live view of the supplied cursor. To
+ * stage edits, register a {@link #fork() fork} of the application: deliveries reach
+ * its working copy, and its {@link #sync()} publishes. Another application that uses
+ * the same files views the region rather than merging it.</p>
  *
  * <p>Authoring is explicit, normally {@code new DLFSApplication(host, keyPair::signData)}.
  * Without a signer the application is a relay. Host and application contexts do
@@ -44,7 +44,7 @@ public class DLFSApplication extends Regions {
 
 	private final Persister persister;
 	private final DLFSRegion dlfs;
-	/** Builds this application over other storage; null when it was given its region. */
+	/** Builds this application over other storage */
 	private final Function<AForkableCursor<Index<Keyword,ACell>>,DLFSApplication> rebuild;
 
 	/** Creates a live DLFS relay at {@code :fs}, or an explicit path, without signing authority. */
@@ -110,26 +110,15 @@ public class DLFSApplication extends Regions {
 		rebuild=draft -> new DLFSApplication(draft,persister,verifier,signer,clock,maxFutureSkew,keys);
 	}
 
-	/**
-	 * Registers an existing region at a root key, retaining its cursor, policy and
-	 * publication boundary. The caller binds the region to its intended destination,
-	 * and syncs it: this application's sync does not publish a region it did not make.
-	 */
-	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword key,DLFSRegion files) {
-		super(host.cursor());
-		persister=host.store();
-		dlfs=add(key,files);
-		rebuild=null;
-	}
-
-	/**
-	 * Rebuilds this application and its region over the supplied storage. An application
-	 * given an existing region refuses, since only the caller knows how it was bound.
-	 */
+	/** Rebuilds this application and its region over the supplied storage. */
 	@Override
 	public DLFSApplication rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
-		if (rebuild==null) throw new UnsupportedOperationException("A DLFSApplication given an existing region cannot be rebound");
 		return rebuild.apply(cursor);
+	}
+
+	@Override
+	public DLFSApplication fork() {
+		return (DLFSApplication)super.fork();
 	}
 
 	/** Returns the persister for new components' blob checkpoints. */
