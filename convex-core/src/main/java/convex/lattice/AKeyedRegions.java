@@ -18,9 +18,9 @@ import convex.lattice.cursor.BoundaryCursor;
 /**
  * A component composed of named regions, at a host root or any nested index.
  *
- * <p>Registered children define this component's interests. Incoming entries and
- * path deliveries go through each child's {@link #mergeAt}; unknown keys and
- * absent entries do nothing. An explicitly present null is delivered to the child.
+ * <p>Registered children, other than viewed ones, define this component's interests.
+ * Incoming entries and path deliveries go through each such child's {@link #mergeAt};
+ * unknown and viewed keys and absent entries do nothing. An explicitly present null is delivered to the child.
  * No lattice merge is inferred from a child's shape.</p>
  *
  * <p>This container manages the regions it makes. Each region's factory is given a
@@ -66,6 +66,15 @@ import convex.lattice.cursor.BoundaryCursor;
  * policy or lifecycle, and this container never syncs them. Whoever made an
  * explicit child syncs it. Shared children may receive repeated or concurrent
  * deliveries, so their operations must support that use.</p>
+ *
+ * <p>A region that another application on the same host merges can be viewed rather
+ * than created ({@link #viewRegion}). A viewed region is made, synced, rebound and
+ * reconciled as a created one, so this container's forks and transactions can use its
+ * domain operations, but incoming values are not delivered to it: the application
+ * that merges the region takes them for the host. A host therefore has one merging
+ * inclusion of each shared region. Where both sides changed a viewed region, its
+ * component reconciles it; one that supports a three-way reconcile keeps the merging
+ * application's changes, removals included, beside this container's own.</p>
  *
  * <p>A rebound container keeps its factories but none of the children made by them.
  * It makes each child on its own cursor the first time that child is needed, so a
@@ -127,27 +136,30 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		private final RegionFactory<?,?> factory;
 		/** A container whose regions a child made here also takes, or null. */
 		private final AKeyedRegions template;
+		/** Whether incoming values are delivered to the child; false for a viewed region. */
+		private final boolean delivered;
 		private final AtomicReference<ALatticeComponent<?>> component=new AtomicReference<>();
 
 		Region(Keyword key,ALatticeComponent<?> explicit) {
-			this(key,null,null);
+			this(key,null,null,true);
 			component.set(explicit);
 		}
 
-		Region(Keyword key,RegionFactory<?,?> factory) {
-			this(key,factory,null);
+		Region(Keyword key,RegionFactory<?,?> factory,boolean delivered) {
+			this(key,factory,null,delivered);
 		}
 
 		/** The same region of another container, with no child made yet. */
 		Region(Region source) {
 			this(source.key,source.factory,
-				source.component.get() instanceof AKeyedRegions container?container:source.template);
+				source.component.get() instanceof AKeyedRegions container?container:source.template,source.delivered);
 		}
 
-		private Region(Keyword key,RegionFactory<?,?> factory,AKeyedRegions template) {
+		private Region(Keyword key,RegionFactory<?,?> factory,AKeyedRegions template,boolean delivered) {
 			this.key=key;
 			this.factory=factory;
 			this.template=template;
+			this.delivered=delivered;
 		}
 
 		/** Returns the child, making it on this container's cursor at the first need. */
@@ -217,12 +229,27 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * any domain policy explicitly. This container manages the child: its sync syncs
 	 * it, and a rebound or forked counterpart makes its own with the same factory.
 	 */
-	@SuppressWarnings("unchecked")
 	protected final <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
 			Keyword key,RegionFactory<V,C> factory) {
+		return makeRegion(key,factory,true);
+	}
+
+	/**
+	 * Constructs and registers a child viewing a region that another application on
+	 * the host merges. The child is made, synced, rebound and reconciled as one made
+	 * with {@link #createRegion}, but no incoming value is delivered to it.
+	 */
+	protected final <V extends ACell,C extends ALatticeComponent<?>> C viewRegion(
+			Keyword key,RegionFactory<V,C> factory) {
+		return makeRegion(key,factory,false);
+	}
+
+	@SuppressWarnings("unchecked")
+	private <V extends ACell,C extends ALatticeComponent<?>> C makeRegion(
+			Keyword key,RegionFactory<V,C> factory,boolean delivered) {
 		checkRegistration(key);
 		Objects.requireNonNull(factory,"Region factory must not be null");
-		Region region=new Region(key,factory);
+		Region region=new Region(key,factory,delivered);
 		C child=(C)region.child();
 		checkRegistration(key);
 		registrations.put(key,region);
@@ -258,7 +285,8 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		if (incoming!=null) {
 			for (var entry:selected.entrySet()) {
 				Keyword key=entry.getKey();
-				if (incoming.containsKey(key)) entry.getValue().child().mergeAt(incoming.get(key));
+				Region region=entry.getValue();
+				if (region.delivered && incoming.containsKey(key)) region.child().mergeAt(incoming.get(key));
 			}
 		}
 		return cursor().getOrDefault(null);
@@ -271,7 +299,10 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		var selected=regions();
 		if (!(key instanceof ABlobLike<?> blob)) return null;
 		for (var entry:selected.entrySet()) {
-			if (entry.getKey().toBlob().equals(blob.toBlob())) return (ALatticeComponent<V>)entry.getValue().child();
+			if (entry.getKey().toBlob().equals(blob.toBlob())) {
+				Region region=entry.getValue();
+				return region.delivered?(ALatticeComponent<V>)region.child():null;
+			}
 		}
 		return null;
 	}

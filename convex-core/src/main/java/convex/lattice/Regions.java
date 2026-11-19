@@ -10,9 +10,9 @@ import convex.lattice.cursor.AForkableCursor;
 /**
  * A configurable collection of named region components. An empty collection is
  * inert. Add children before the first merge, path delivery or sync; subsequent
- * registration is rejected. Sync publishes the regions made with {@link #create},
- * in registration order; a component registered with {@link #add} is synced by
- * whoever made it.
+ * registration is rejected. Sync publishes the regions made with {@link #create}
+ * or {@link #view}, in registration order; a component registered with {@link #add}
+ * is synced by whoever made it.
  */
 public class Regions extends AKeyedRegions {
 
@@ -53,5 +53,14 @@ public class Regions extends AKeyedRegions {
 	public <V extends ACell,C extends ALatticeComponent<?>> C create(
 			Keyword key,RegionFactory<V,C> factory) {
 		return createRegion(key,factory);
+	}
+
+	/**
+	 * Constructs and adds a component viewing a region that another application on the
+	 * host merges. This collection syncs it but delivers no incoming value to it.
+	 */
+	public <V extends ACell,C extends ALatticeComponent<?>> C view(
+			Keyword key,RegionFactory<V,C> factory) {
+		return viewRegion(key,factory);
 	}
 }

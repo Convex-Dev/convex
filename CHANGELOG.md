@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support forks and transactions in custom local-state components. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
 - Let MCP server embedders stream a long tool call and act on cancellations. ([CAD041](https://docs.convex.world/docs/cad/mcp#extensibility))
 - Add lazy cursors, so a component can create a child's location on its first write and give it a default until then. ([Component-supplied construction](convex-core/docs/LATTICE_CURSOR_DESIGN.md#component-supplied-construction))
+- Let applications on one host view a region another application merges, and use it in their own forks and transactions. ([Composition and sharing](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing))
 
 ### Changed
 

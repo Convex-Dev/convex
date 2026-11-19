@@ -173,6 +173,20 @@ the same component instance also shares its pending changes; whoever made the
 component publishes them. Separate staged components at the same path reconcile
 their independent copies when publishing.
 
+A region several applications use is merged by one of them, which creates it and
+so receives incoming values for it. Each of the others views it: a region container
+makes a viewed region from a factory, as it makes a created one, and syncs, rebinds
+and reconciles it the same way, but delivers it no incoming values. Two merging
+inclusions would each apply their own merge rule, and one that keeps fewer entries,
+such as a registry bounded by retention, would be undone by the other. An
+application normally works on a shared region through the merging application's
+domain operations. One that needs a shared region inside its own forks or
+transactions views it, and its edits there go through the region's domain
+operations too. When it publishes, a region changed on both sides is reconciled by
+the region's component; a component that may be changed by another application
+meanwhile supports a three-way reconcile, so that each side keeps what only it
+changed, removals included.
+
 A region container (`Regions` or `SingleRegion`) is a component, at the root or
 nested, that routes incoming values to its children. It manages the regions it
 makes from factories: a factory gives its region either a fork of the cursor it

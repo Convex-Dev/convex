@@ -2,6 +2,7 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -21,9 +23,11 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
+import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
+import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -198,6 +202,68 @@ class KeyedRegionsTest {
 		rebound.component().merge(CVMLong.ONE);
 		assertEquals(Index.of(A,CVMLong.ONE),draft.get());
 		assertTrue(root.get().isEmpty());
+	}
+
+	/** A viewed region takes no delivery, but its container syncs it and transactions span it. */
+	@Test void viewedRegionTakesNoDeliveryButIsManagedByItsContainer() {
+		var host=LatticeHost.create();
+		var viewer=new TransactionalRegions(host.cursor());
+		Counter seen=viewer.view(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
+		viewer.merge(Index.of(A,CVMLong.TWO));
+		viewer.mergeAt(CVMLong.TWO,A);
+		assertNull(host.cursor().get().get(A),"another application merges a viewed region");
+		seen.cursor().set(CVMLong.ONE);
+		assertNull(host.cursor().get().get(A),"the view keeps its working copy");
+		viewer.sync();
+		assertEquals(CVMLong.ONE,host.cursor().get().get(A),"its container syncs what it made");
+		viewer.execute(app -> {
+			Counter counter=app.registered(A);
+			counter.cursor().set(CVMLong.create(3));
+		});
+		assertEquals(CVMLong.create(3),host.cursor().get().get(A),"a transaction spans the viewed region");
+	}
+
+	/** Entries of a map, reconciled three-way so that each side keeps what only it changed. */
+	private static class Entries extends LatticeComponent<AHashMap<ACell,AInteger>> {
+		Entries(AForkableCursor<AHashMap<ACell,AInteger>> cursor) {
+			super(MapLattice.create(MaxLattice.INSTANCE),cursor);
+		}
+		@Override public Entries rebind(AForkableCursor<AHashMap<ACell,AInteger>> cursor) { return new Entries(cursor); }
+		@Override public Entries fork() { return rebind(storage.fork()); }
+
+		@Override protected AHashMap<ACell,AInteger> reconcile(AHashMap<ACell,AInteger> base,
+				AHashMap<ACell,AInteger> own,AHashMap<ACell,AInteger> other) {
+			AHashMap<ACell,AInteger> result=(other==null)?Maps.empty():other;
+			for (AHashMap<ACell,AInteger> side:Arrays.asList(base,own)) {
+				if (side==null) continue;
+				for (ACell key:side.keySet()) {
+					AInteger was=(base==null)?null:base.get(key);
+					AInteger mine=(own==null)?null:own.get(key);
+					if (Utils.equals(mine,was)) continue;
+					AInteger theirs=result.get(key);
+					AInteger value=Utils.equals(theirs,was)?mine:MaxLattice.INSTANCE.merge(mine,theirs);
+					result=(value==null)?result.dissoc(key):result.assoc(key,value);
+				}
+			}
+			return result;
+		}
+	}
+
+	/** A view whose component reconciles three-way keeps the merging application's removal. */
+	@Test void viewedRegionReconcilingThreeWayKeepsTheMergingApplicationsRemoval() {
+		ACell first=Strings.create("first");
+		ACell second=Strings.create("second");
+		var host=LatticeHost.create();
+		host.cursor().set(Index.of(A,Maps.of(first,CVMLong.ONE,second,CVMLong.ONE)));
+		var holder=new Regions(host.cursor());
+		Entries held=holder.create(A,Entries::new);
+		host.addApplication(holder);
+		var viewer=new Regions(host.cursor().fork());
+		Entries seen=viewer.view(A,Entries::new);
+		seen.cursor().update(entries -> entries.assoc(first,CVMLong.TWO));
+		held.cursor().update(entries -> entries.dissoc(second));
+		viewer.sync();
+		assertEquals(Maps.of(first,CVMLong.TWO),host.cursor().get().get(A));
 	}
 
 	@Test void containerTransactsOnAnOrdinaryRoot() {
