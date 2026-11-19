@@ -12,9 +12,10 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.lang.RT;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.AMapComponent;
 import convex.lattice.IndexComponent;
-import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -43,7 +44,7 @@ import convex.lattice.cursor.Cursors;
  * inbox.receive(inbox.deposited());               // receipts replace the envelopes
  * }</pre>
  */
-public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>>
+public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell>>,AHashMap<ACell,Index<ABlob,SignedData<ACell>>>>
 		implements TransactionalComponent<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>,Mail> {
 
 	/** Keyword of the mail region in a root lattice. */
@@ -99,7 +100,20 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	public Mailbox mailbox(AString did) {
 		MailboxLattice mailbox=lattice.forMailbox(did);
 		if (mailbox==null) throw new IllegalArgumentException("Mailbox must be a canonical base DID");
-		return new Mailbox(new MapComponent<>(cursor()).path(did),mailbox,signer);
+		return new Mailbox(entry(did),mailbox,signer);
+	}
+
+	@Override
+	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> requireMap(ACell value) {
+		if (value==null) return null;
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> map=RT.ensureHashMap(value);
+		if (map==null) throw new IllegalStateException("Mail region must be a hash map");
+		return map;
+	}
+
+	@Override
+	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> createContainer() {
+		return lattice.zero();
 	}
 
 	/**
