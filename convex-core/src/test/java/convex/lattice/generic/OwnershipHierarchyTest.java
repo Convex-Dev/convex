@@ -77,7 +77,7 @@ public class OwnershipHierarchyTest {
 
 		AForkableCursor<M> root=Cursors.root(lattice.zero());
 		policy.set(allowAll);
-		AForkableCursor<SignedData<AInteger>> slot=LatticeComponent.resolve(root,lattice,DID);
+		AForkableCursor<SignedData<AInteger>> slot=convex.lattice.ComponentTestSupport.entry(root,DID,lattice.zero());
 		assertNull(convex.lattice.ComponentTestSupport.merge(slot,lattice.signingFor(DID),bad));
 		assertSame(good,convex.lattice.ComponentTestSupport.merge(slot,lattice.signingFor(DID),good));
 		AForkableCursor<AInteger> value=convex.lattice.ComponentTestSupport.signed(slot, lattice, DID, policy::get);
@@ -152,8 +152,8 @@ public class OwnershipHierarchyTest {
 			(owner,key) -> DID.equals(owner) && BOB.getAccountKey().equals(key));
 		var root=Cursors.root(KeyedLattice.create(left,aliceRegion,right,bobRegion).zero());
 		policy.set(LatticeContext.create(null,ALICE));
-		AForkableCursor<AInteger> alice=convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,KeyedLattice.create(left,aliceRegion),left,DID), aliceRegion, DID, policy::get);
-		AForkableCursor<AInteger> bob=convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,KeyedLattice.create(right,bobRegion),right,DID), bobRegion, DID, policy::get);
+		AForkableCursor<AInteger> alice=convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(convex.lattice.ComponentTestSupport.entry(root,left,KeyedLattice.create(left,aliceRegion).zero()),DID,aliceRegion.zero()), aliceRegion, DID, policy::get);
+		AForkableCursor<AInteger> bob=convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(convex.lattice.ComponentTestSupport.entry(root,right,KeyedLattice.create(right,bobRegion).zero()),DID,bobRegion.zero()), bobRegion, DID, policy::get);
 		alice.set(CVMLong.ONE);
 		assertThrows(IllegalStateException.class,() -> bob.set(CVMLong.ONE));
 		var before=root.get();
@@ -181,7 +181,7 @@ public class OwnershipHierarchyTest {
 		assertEquals(owner,encodedKey);
 		var root=Cursors.root(lattice.zero());
 		policy.set(LatticeContext.create(null,ALICE));
-		convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,lattice,encodedKey), lattice, encodedKey, policy::get).set(CVMLong.ONE);
+		convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(root,encodedKey,lattice.zero()), lattice, encodedKey, policy::get).set(CVMLong.ONE);
 		assertEquals(good,root.get());
 		policy.set(LatticeContext.create(null,BOB));
 		assertThrows(IllegalStateException.class,
@@ -244,9 +244,9 @@ public class OwnershipHierarchyTest {
 		policy.set(LatticeContext.create(null,BOB));
 		// Each owner level wraps its own boundary: outer rule first, then the inner one
 		AForkableCursor<Index<AccountKey,SignedData<AInteger>>> aliceValue=
-			convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,outer,ALICE.getAccountKey()), outer, ALICE.getAccountKey(), policy::get);
+			convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(root,ALICE.getAccountKey(),outer.zero()), outer, ALICE.getAccountKey(), policy::get);
 		AForkableCursor<AInteger> value=
-			convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(aliceValue,inner,BOB.getAccountKey()), inner, BOB.getAccountKey(), policy::get);
+			convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(aliceValue,BOB.getAccountKey(),inner.zero()), inner, BOB.getAccountKey(), policy::get);
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.ONE));
 		assertEquals(outer.zero(),root.get(),"Inner authority must not waive the outer rule");
 		policy.set(new LatticeContext() {
@@ -270,9 +270,9 @@ public class OwnershipHierarchyTest {
 		policy.set(LatticeContext.create(null,ALICE));
 		Keyword left=Keyword.intern("left");
 		Keyword right=Keyword.intern("right");
-		AForkableCursor<AHashMap<Keyword,AInteger>> record=convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,lattice,DID), lattice, DID, policy::get);
-		AForkableCursor<AInteger> a=LatticeComponent.resolve(record,lattice.getValueLattice(),left);
-		AForkableCursor<AInteger> b=LatticeComponent.resolve(record,lattice.getValueLattice(),right);
+		AForkableCursor<AHashMap<Keyword,AInteger>> record=convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(root,DID,lattice.zero()), lattice, DID, policy::get);
+		AForkableCursor<AInteger> a=convex.lattice.ComponentTestSupport.entry(record,left,lattice.getValueLattice().zero());
+		AForkableCursor<AInteger> b=convex.lattice.ComponentTestSupport.entry(record,right,lattice.getValueLattice().zero());
 		CountDownLatch entered=new CountDownLatch(2);
 		try (var executor=Executors.newFixedThreadPool(2)) {
 			var one=executor.submit(() -> concurrentWrite(a,entered));
@@ -308,7 +308,7 @@ public class OwnershipHierarchyTest {
 			(key,signer) -> owner.equals(key) && BOB.getAccountKey().equals(signer));
 		var root=Cursors.root(lattice.zero());
 		policy.set(LatticeContext.create(null,BOB,(o,k) -> false));
-		convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,lattice,owner), lattice, owner, policy::get).set(CVMLong.ONE);
+		convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(root,owner,lattice.zero()), lattice, owner, policy::get).set(CVMLong.ONE);
 		assertEquals(CVMLong.ONE,root.get().get(owner).getValue());
 		assertEquals(root.get(),lattice.merge(null,root.get()));
 
@@ -317,7 +317,7 @@ public class OwnershipHierarchyTest {
 			(key,signer) -> ALICE.getAccountKey().equals(key) && BOB.getAccountKey().equals(signer));
 		var delegatedRoot=Cursors.root(delegated.zero());
 		policy.set(LatticeContext.create(null,BOB));
-		convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(delegatedRoot,delegated,ALICE.getAccountKey()), delegated, ALICE.getAccountKey(), policy::get).set(CVMLong.TWO);
+		convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(delegatedRoot,ALICE.getAccountKey(),delegated.zero()), delegated, ALICE.getAccountKey(), policy::get).set(CVMLong.TWO);
 		assertEquals(BOB.getAccountKey(),delegatedRoot.get().get(ALICE.getAccountKey()).getAccountKey());
 		assertEquals(delegatedRoot.get(),delegated.merge(null,delegatedRoot.get()));
 	}

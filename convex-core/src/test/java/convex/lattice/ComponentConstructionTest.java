@@ -30,6 +30,11 @@ public class ComponentConstructionTest {
 	private static final KeyedLattice INNER=KeyedLattice.create(Keywords.FOO,MaxLattice.INSTANCE,Keywords.BAR,MaxLattice.INSTANCE);
 	private static final KeyedLattice OUTER=KeyedLattice.create(REGION,INNER);
 
+	/** A view of {@code [:region key]} in which each index entry view constructs its own level. */
+	private static AForkableCursor<CVMLong> view(Root<Index<Keyword,ACell>> root,Keyword key) {
+		return new IndexComponent<Keyword,ACell>(new IndexComponent<Keyword,ACell>(root).<Index<Keyword,ACell>>entry(REGION)).entry(key);
+	}
+
 	@Test public void plainPathsNeverCreateContainers() {
 		Root<Index<Keyword,ACell>> root=new Root<>();
 		AForkableCursor<CVMLong> path=root.path(REGION,Keywords.FOO);
@@ -48,7 +53,7 @@ public class ComponentConstructionTest {
 
 	@Test public void componentViewsConstructOnlyOnWrite() {
 		Root<Index<Keyword,ACell>> root=new Root<>();
-		AForkableCursor<CVMLong> view=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
+		AForkableCursor<CVMLong> view=view(root,Keywords.FOO);
 		assertFalse(view.exists());
 		assertThrows(MissingValueException.class,view::get);
 		assertNull(root.get());
@@ -65,7 +70,7 @@ public class ComponentConstructionTest {
 
 	@Test public void componentViewsReadMissingKeysAsAbsentAndStoredNilAsNil() {
 		Root<Index<Keyword,ACell>> root=Root.create(OUTER.zero().assoc(REGION,INNER.zero()));
-		AForkableCursor<CVMLong> missing=LatticeComponent.resolve(root,OUTER,REGION,Keywords.BAR);
+		AForkableCursor<CVMLong> missing=view(root,Keywords.BAR);
 		assertFalse(missing.exists());
 		assertThrows(MissingValueException.class,missing::get);
 		assertSame(CVMLong.ZERO,missing.getOrDefault(CVMLong.ZERO));
@@ -90,8 +95,8 @@ public class ComponentConstructionTest {
 
 	@Test public void concurrentConstructionPreservesSiblingWrites() throws Exception {
 		Root<Index<Keyword,ACell>> root=new Root<>();
-		AForkableCursor<CVMLong> left=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
-		AForkableCursor<CVMLong> right=LatticeComponent.resolve(root,OUTER,REGION,Keywords.BAR);
+		AForkableCursor<CVMLong> left=view(root,Keywords.FOO);
+		AForkableCursor<CVMLong> right=view(root,Keywords.BAR);
 		CountDownLatch entered=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		AtomicBoolean first=new AtomicBoolean(true);
@@ -116,7 +121,7 @@ public class ComponentConstructionTest {
 
 	@Test public void projectionSupportsAtomicOperationsAndTransactions() {
 		var root=new Root<Index<Keyword,ACell>>(null);
-		AForkableCursor<CVMLong> view=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
+		AForkableCursor<CVMLong> view=view(root,Keywords.FOO);
 		assertTrue(view.compareAndSet(null,CVMLong.ONE));
 		assertFalse(view.compareAndSet(null,CVMLong.TWO));
 		assertEquals(CVMLong.ONE,view.getAndSet(CVMLong.TWO));

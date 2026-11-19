@@ -264,7 +264,7 @@ class KeyedRegionsTest {
 		assertEquals(Index.of(NESTED,Index.of(A,CVMLong.TWO)),host.cursor().get());
 	}
 
-	@Test void creationCanBeRefusedWithoutPreventingInertUseOrLosingPendingEdits() {
+	@Test void creationCanBeRefusedWithoutPreventingReadsOrLosingPendingEdits() {
 		var root=new Root<Index<Keyword,ACell>>();
 		var app=new TestRegions(root) {
 			@Override protected Index<Keyword,ACell> createContainer() {
@@ -276,7 +276,9 @@ class KeyedRegionsTest {
 		child.cursor().set(null);
 		app.merge(Index.of(UNKNOWN,CVMLong.ONE));
 		app.mergeAt(CVMLong.ONE,UNKNOWN);
-		assertNull(app.sync());
+		assertThrows(UnsupportedOperationException.class,app::sync,
+			"an unchanged region's sync writes its place, which cannot be created");
+		assertNull(root.get());
 		app.mergeAt(CVMLong.TWO,A);
 		assertThrows(UnsupportedOperationException.class,app::sync);
 		assertNull(root.get());

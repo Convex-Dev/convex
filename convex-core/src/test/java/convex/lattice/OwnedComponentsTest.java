@@ -105,8 +105,9 @@ class OwnedComponentsTest {
 		assertNull(owners.get(A));
 		assertFalse(slot.exists());
 		assertFalse(edits.exists());
-		slot.set(null);
-		draft.sync();
+		// Where the map cannot be created, a write is refused whatever its value
+		assertThrows(UnsupportedOperationException.class,() -> slot.set(null));
+		assertThrows(UnsupportedOperationException.class,draft::sync);
 		assertNull(root.get());
 		assertThrows(UnsupportedOperationException.class,() -> slot.set(ALICE.signData(CVMLong.ONE)));
 		assertThrows(UnsupportedOperationException.class,() -> edits.set(CVMLong.ONE));

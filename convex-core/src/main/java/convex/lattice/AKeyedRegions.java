@@ -100,8 +100,10 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * Creates an absent containing index for a changed write through a constructed
 	 * child's region cursor. Return a non-null index, optionally with initial entries,
 	 * or throw to require explicit initialisation. This hook must be pure because
-	 * atomic writes may retry it. Construction, reads and unchanged writes never call
-	 * it. Explicitly registered children retain their own storage and creation policy.
+	 * atomic writes may retry it. Construction and reads never call it. Every write
+	 * through a region cursor calls it while the index is absent, including one that
+	 * changes nothing, such as an unchanged region's sync, and is refused if it throws.
+	 * Explicitly registered children retain their own storage and creation policy.
 	 */
 	protected Index<Keyword,ACell> createContainer() { return Index.none(); }
 
@@ -176,7 +178,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 					return AKeyedRegions.this.createContainer();
 				}
 			};
-			ALatticeComponent<?> created=((RegionFactory<ACell,?>)factory).create(BoundaryCursor.over(entries.path(key)));
+			ALatticeComponent<?> created=((RegionFactory<ACell,?>)factory).create(BoundaryCursor.over(entries.entry(key)));
 			Objects.requireNonNull(created,"Region component must not be null");
 			if (template!=null && created instanceof AKeyedRegions container) container.adoptRegions(template);
 			return created;

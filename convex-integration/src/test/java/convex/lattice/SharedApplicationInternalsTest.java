@@ -97,6 +97,23 @@ public class SharedApplicationInternalsTest {
 		return new Regions(host.cursor());
 	}
 
+	/**
+	 * The entry view at a path of the host root, each level of the map kind its lattice's
+	 * empty value has; a changed write creates the levels that are missing.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	private static <T extends ACell> AForkableCursor<T> hostEntry(AForkableCursor<?> root,ACell... path) {
+		AForkableCursor cursor=root;
+		ALattice<?> lattice=HOST_ROOT;
+		for (ACell key:path) {
+			cursor=(lattice.zero() instanceof Index)
+				?new IndexComponent(cursor).path((convex.core.data.ABlobLike<?>)key)
+				:new MapComponent(cursor).path(key);
+			lattice=lattice.path(key);
+		}
+		return cursor;
+	}
+
 	/** A signed draft that reconciles local changes on both sides by its domain's merge. */
 	private static final class Draft<T extends ACell> extends SignedComponent<T> {
 		private final BinaryOperator<T> merge;
@@ -173,7 +190,7 @@ public class SharedApplicationInternalsTest {
 			// This legacy application's resolver supplies both the public owner rule
 			// and an explicit signer; the draft itself does not look up a context.
 			return new Draft<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
-				LatticeComponent.<SignedData<T>>resolve(host.cursor(),HOST_ROOT,path),
+				hostEntry(host.cursor(),path),
 				value -> context.signAs(rule.getOwner(),value),merge);
 		}
 
@@ -231,7 +248,7 @@ public class SharedApplicationInternalsTest {
 		assertNull(host.cursor().get().get(Keywords.FS));
 		filesApp.sync();
 		assertNotNull(Social.connect(view(host)).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
-		assertEquals("working file",Files.readString(DLFSRegion.connect(LatticeComponent.resolve(host.cursor(),HOST_ROOT,Keywords.FS),host.store())
+		assertEquals("working file",Files.readString(DLFSRegion.connect(hostEntry(host.cursor(),Keywords.FS),host.store())
 			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
 		assertEquals(info,P2PUser.create(view(host),COMMON_KEY.getAccountKey()).node().getNodeInfo());
 		assertEquals(info,P2PUser.create(view(host),FILES_KEY.getAccountKey()).node().getNodeInfo());

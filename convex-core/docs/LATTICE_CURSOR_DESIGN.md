@@ -82,15 +82,19 @@ whose place has been deleted is refused at sync and keeps its edits. Views over 
 path, such as a default, a signed view or a stamp, write through it and are
 refused with it.
 
-An entry is created by writing the container that holds it: `assoc` and `assocIn`
-on the container's cursor, or an update function there. This is the standard, and
-what applications should do by default. A component may instead supply a view
-that creates its place lazily when written, and takes responsibility for doing so
-correctly: atomically with a changed write, and never on a read or a write that
-changes nothing. The entry views of map and index components and lattice paths
-below do this, and are the examples to follow. A value the cursor will not
-accept, such as one no signer is authorised for, is refused only when it would be
-written.
+A cursor never creates a place. An entry is created by writing the container that
+holds it: `assoc` and `assocIn` on the container's cursor, or an update function
+there. This is the standard, and what applications should do by default. A
+component may instead write within its own value through a view of its own whose
+write function creates the entry, and its container, atomically with a changed
+write: `AMapComponent.entry`, below, is the one Convex supplies. It suits places
+whose absence means empty, such as regions, owner slots and fields. A record whose
+existence matters is bound by a plain path instead, so a write after the record is
+deleted is refused rather than writing it back. Such a view creates nothing on a read
+or a write that changes nothing, and where the component cannot create its place it
+refuses every write, whatever the value, as a path does. A value the cursor will
+not accept, such as one no signer is authorised for, is refused only when it would
+be written.
 
 Transformations propagate source absence without applying their read function.
 A projection over present storage returns the value its supplied function defines,
@@ -201,15 +205,22 @@ sync, even when a write
 
 ## Component-supplied construction
 
-A plain path writes only where its entry exists. A component that wants its place
-created by its first write supplies a view that does so, and these are the ways to
-do it properly.
+A plain path writes only where its entry exists. A component that wants a place in
+its own value created by its first write uses a view of its own that does so, and
+keeps that view internal: its API offers domain operations and child components,
+not cursors. These are the ways to do it properly.
 
-For ordinary collections, use `MapComponent.path(key)` or `IndexComponent.path(key)`.
-An entry reads as a path does: a missing key is absent and a stored nil is present.
-They reject incompatible stored containers, and on a changed write insert their key,
-creating a correctly typed container first if there is none. Their pure `createContainer()` hook can supply initial
-contents or refuse creation. Reads and no-op edits leave missing storage absent.
+A component whose value is a map extends `AMapComponent` and binds each child to
+`entry(key)`. Its map operations and the entry view are protected, so the component
+chooses what to expose; `MapComponent` and `IndexComponent` expose the map
+operations for code that wants a generic map. An entry reads as a path does: a
+missing key is absent and a stored nil is present. It rejects an incompatible stored
+container, and on a changed write inserts its key, creating a correctly typed
+container first if there is none. The pure `createContainer()` hook can supply
+initial contents or refuse creation. Reads and writes that change nothing leave
+missing storage absent. Where the container is missing and the hook refuses, every
+write through the entry is refused, whatever the value, so a working copy over it is
+refused at sync, changed or not, and keeps its edits.
 
 For custom representations, a component can use
 `ProjectionCursor.create(source, read, write)` to expose a child without requiring
@@ -238,11 +249,8 @@ or reading it has no state-changing effects.
 
 `cursor.withDefault(emptyContainer)` supplies a known container type for reads
 and for update functions, without any merge definition; a plain path below it
-still writes only to an entry that exists. The optional adapter helper
-`LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
-lattice key, using an explicit lattice. It reads as any path does, so a missing
-key is absent. Its writes use `LatticeComponent.assocIn` to insert its key, constructing an
-absent container from the lattice's zero at that level.
+still writes only to an entry that exists. `LatticeComponent.assocIn` writes a
+value at a path, constructing only an absent base from the lattice's zero.
 Unknown missing container types fail; keys never determine container types.
 JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
 Owner envelopes still require an explicit signing boundary.
@@ -355,6 +363,10 @@ exist throws `MissingValueException` before the callback runs, also through an
 entry view that an ordinary write would create. An ordinary write creates the
 place first. A default view is present wherever it is read, so a transaction
 through one starts from the default and its commit is a write like any other.
+The commit is refused like any other write: if the place is deleted while the
+transaction runs, a path, or an entry view that cannot create its place, refuses
+even a run that changed nothing, while an entry view that can create commits that
+run as a write that changes nothing.
 
 Optimistic execution is the fast path for transactions that do not collide. Commit
 is a three-way merge on the transaction's own value: the value the run started

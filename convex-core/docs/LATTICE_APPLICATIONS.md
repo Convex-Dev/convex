@@ -184,7 +184,7 @@ whoever made it. Syncing regions is sequential, not atomic: earlier successful
 work remains if a later region fails.
 
 Within its place, a domain component makes its parts on its own cursor when they
-are needed, such as `new Stock(path(STOCK))` from an `IndexComponent`, rather than
+are needed, such as `new Stock(entry(STOCK))` from an `AMapComponent`, rather than
 registering them as regions. Such a part holds nothing but that cursor, so it is
 cheap to make and works alike on live storage, a fork or a transaction's draft. It
 shares its component's publication and claim boundary, and the component's merge

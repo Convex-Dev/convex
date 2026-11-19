@@ -28,7 +28,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.IndexComponent;
-import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -208,7 +207,7 @@ public class DLFSCursorTest {
 			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
 		AForkableCursor<?> dlfsCursor = new IndexComponent<>(rootCursor).path(DLFS_KW);
-		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
+		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(dlfsCursor,ak,dlfsUsersLattice.zero()), dlfsUsersLattice, ak, ctx);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 		dlfs.setClock(ctx::currentTimestamp);
 
@@ -242,7 +241,7 @@ public class DLFSCursorTest {
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
 		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
 		AForkableCursor<?> region=new IndexComponent<>(root.cursor()).path(dlfsKey);
-		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(region,owners,owner), owners, owner, context),driveName);
+		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(region,owner,owners.zero()), owners, owner, context),driveName);
 		fileSystem.setClock(context::currentTimestamp);
 		Path path=fileSystem.getPath("/recreated");
 		Files.write(path,new byte[] {1});
@@ -311,7 +310,7 @@ public class DLFSCursorTest {
 			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
 		AForkableCursor<?> dlfsCursor = new IndexComponent<>(rootCursor).path(DLFS_KW);
-		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
+		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ComponentTestSupport.entry(dlfsCursor,ak,dlfsUsersLattice.zero()), dlfsUsersLattice, ak, ctx);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 		dlfs.setClock(ctx::currentTimestamp);
 

@@ -65,7 +65,7 @@ public class ApplicationPublicationTest {
 			// The owned subtree publishes through its own fork of the host, beside this
 			// application's staged root, so each fork reconciles only what it owns.
 			owner=new SignedSetComponent<>(SIGNED,
-				LatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED),
+				new IndexComponent<Keyword,ACell>(host.cursor()).<SignedData<ASet<CVMLong>>>entry(OWNED),
 				value -> {
 					signatures.incrementAndGet();
 					onSign.run();
@@ -235,7 +235,7 @@ public class ApplicationPublicationTest {
 		assertSame(selected,app.getLattice());
 		assertEquals(CVMLong.ZERO,host.cursor().get().get(REGISTER),"Incoming equal-time value loses to existing own");
 		assertNull(host.cursor().get().get(IGNORED));
-		LatticeComponent.<CVMLong>resolve(app.cursor(),selected,REGISTER).set(CVMLong.ONE);
+		new IndexComponent<Keyword,ACell>(app.cursor()).<CVMLong>entry(REGISTER).set(CVMLong.ONE);
 		app.sync();
 		assertEquals(CVMLong.ONE,host.cursor().get().get(REGISTER),"A local equal-time edit replaces its predecessor");
 	}

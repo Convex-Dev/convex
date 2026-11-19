@@ -90,14 +90,17 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 	 *
 	 * <p>The post is not removed — a {@code :deleted} timestamp is added
 	 * and the {@code :timestamp} is updated so LWW merge picks the
-	 * deletion. Timeline construction filters out tombstoned posts.</p>
+	 * deletion. Timeline construction filters out tombstoned posts. Deleting a post
+	 * that is absent writes nothing.</p>
 	 *
 	 * @param postKey key of the post to delete
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
+		if (get(postKey)==null) return;
 		CVMLong now = clock.get();
-		path(postKey).update(existing -> {
+		// The post may have gone since the read, which the update leaves alone
+		entry(postKey).update(existing -> {
 			if (existing==null) return null;
 			AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) existing;
 			return post.assoc(SocialPost.DELETED,now).assoc(SocialPost.TIMESTAMP,now);

@@ -21,6 +21,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.Root;
+import convex.lattice.cursor.Transactions;
 
 class MapComponentTest {
 	private static final AString A=Strings.intern("a");
@@ -68,7 +69,7 @@ class MapComponentTest {
 		assertFalse(map.containsKey(A));
 		assertNull(map.remove(A));
 		map.clear();
-		map.path(A).set(null);
+		assertThrows(UnsupportedOperationException.class,() -> map.path(A).set(null));
 		assertThrows(UnsupportedOperationException.class,() -> map.put(A,null));
 		assertThrows(UnsupportedOperationException.class,() -> map.path(A).set(CVMLong.ONE));
 		assertNull(root.get(),"failed creation must leave storage absent");
@@ -78,6 +79,61 @@ class MapComponentTest {
 		assertEquals(2,map.size());
 		map.clear();
 		assertTrue(map.isEmpty());
+	}
+
+	/** Where the map is absent and cannot be created, an entry view has nowhere to write, whatever the value. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void entryViewRefusesEveryWriteWhereTheMapCannotBeCreated(boolean indexed) {
+		var root=new Root<ACell>();
+		var entry=creationPolicy(root,indexed,false).<ACell>entry(A);
+		assertThrows(UnsupportedOperationException.class,() -> entry.set(null));
+		assertThrows(UnsupportedOperationException.class,() -> entry.compareAndSet(null,null));
+		assertThrows(UnsupportedOperationException.class,() -> entry.updateAndGet(value -> value));
+		assertThrows(UnsupportedOperationException.class,() -> entry.set(CVMLong.ONE));
+		assertNull(root.get());
+		ACell empty=indexed?Index.none():Maps.empty();
+		root.set(empty);
+		entry.set(null);
+		assertSame(empty,root.get(),"once the map exists, a write that changes nothing is accepted and creates nothing");
+	}
+
+	/** A working copy of such an entry is refused at sync, changed or not, and keeps its edits. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void forkOfAnEntryIsRefusedAtSyncWhereTheMapCannotBeCreated(boolean indexed) {
+		var root=new Root<ACell>();
+		var fork=creationPolicy(root,indexed,false).<ACell>entry(A).fork();
+		assertThrows(UnsupportedOperationException.class,() -> fork.reconcile((base,own,other) -> own));
+		fork.set(CVMLong.TWO);
+		assertThrows(UnsupportedOperationException.class,() -> fork.reconcile((base,own,other) -> own));
+		assertEquals(CVMLong.TWO,fork.get(),"a refused sync keeps the working value");
+		assertNull(root.get());
+		root.set(indexed?Index.none():Maps.empty());
+		assertEquals(CVMLong.TWO,fork.reconcile((base,own,other) -> own));
+		assertEquals(CVMLong.TWO,creationPolicy(root,indexed,false).get(A));
+	}
+
+	/**
+	 * A transaction that changed nothing, whose record is deleted while it runs, is refused
+	 * through a view inside the record whose map cannot be created, as on a plain path. The
+	 * record's own entry view still accepts it: its map, the records map, still exists.
+	 */
+	@Test void deletedRecordRefusesAnUnchangedCommitInsideItButNotAtTheRecord() {
+		for (boolean inside:new boolean[] {true,false}) {
+			Root<ACell> root=Root.create(Maps.of(A,Maps.of(B,CVMLong.ONE)));
+			AForkableCursor<AHashMap<AString,ACell>> record=component(root,false).entry(A);
+			AForkableCursor<ACell> subject=inside?new MapComponent<AString,ACell>(record) {
+				@Override protected AHashMap<AString,ACell> createContainer() { throw new IllegalStateException("Record missing"); }
+			}.entry(B):component(root,false).entry(A);
+			int[] runs={0};
+			Runnable transaction=() -> Transactions.transact(subject,draft -> {
+				if (runs[0]++==0) root.set(Maps.empty());
+				return draft.get();
+			});
+			if (inside) assertThrows(IllegalStateException.class,transaction::run);
+			else transaction.run();
+			assertEquals(1,runs[0]);
+			assertEquals(Maps.empty(),root.get(),"the deleted record is not written back");
+		}
 	}
 
 	/** Creation may supply initial entries, even the same entry being written. */

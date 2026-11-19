@@ -27,4 +27,17 @@ public final class ComponentTestSupport {
 		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
 		return SignedCursor.create(slot,v -> rule.sign(context,v));
 	}
+
+	/**
+	 * The entry view at a key of the map a cursor holds, of the map kind its lattice's
+	 * empty value has: an index for an {@link convex.core.data.Index}, otherwise a hash map.
+	 * A changed write creates the entry, and a missing map of that kind.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	public static <T extends ACell> AForkableCursor<T> entry(AForkableCursor<?> map, ACell key, ACell empty) {
+		if (empty instanceof convex.core.data.Index) {
+			return new IndexComponent((AForkableCursor)map).entry((convex.core.data.ABlobLike<?>)key);
+		}
+		return new MapComponent((AForkableCursor)map).entry(key);
+	}
 }

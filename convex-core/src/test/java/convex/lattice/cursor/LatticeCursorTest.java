@@ -1073,7 +1073,7 @@ public class LatticeCursorTest {
 
 		// === Step 2: Descend root cursor to the :kv level (OwnerLattice) ===
 		ALattice<ACell> kvLattice = Lattice.ROOT.path(kvPath);
-		AForkableCursor<ACell> kvCursor = LatticeComponent.resolve(root, Lattice.ROOT, kvPath);
+		AForkableCursor<ACell> kvCursor = convex.lattice.ComponentTestSupport.entry(root, Keywords.KV, Lattice.ROOT.zero());
 		assertNotNull(kvCursor);
 
 		// === Step 3: Create and populate a KV database via the high-level API ===

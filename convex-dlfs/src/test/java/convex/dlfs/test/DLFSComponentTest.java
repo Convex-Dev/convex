@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test;
 import convex.core.cvm.Keywords;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
@@ -45,6 +47,8 @@ import convex.core.util.Utils;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
+import convex.lattice.MapComponent;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
@@ -67,7 +71,7 @@ public class DLFSComponentTest {
 		try (var root=LatticeHost.create(lattice.zero(),store)) {
 			var app=new LatticeComponent<>(lattice,root.cursor().fork());
 			var key=AKeyPair.generate();
-			var attached=DLFSRegion.connect(LatticeComponent.resolve(app.cursor(),lattice,projects,project,KEY_DOCUMENTS),
+			var attached=DLFSRegion.connect(documents(app.cursor(),projects,project),
 				null,key::signData,() -> CVMLong.create(123));
 			var destination=attached.cursor();
 			var files=attached.fork();
@@ -89,7 +93,7 @@ public class DLFSComponentTest {
 			root.sync();
 			assertEquals(root.cursor().get(),store.getRootData());
 			var restored=DLFSRegion.connect(
-				LatticeComponent.resolve(root.cursor(),lattice,projects,project,KEY_DOCUMENTS),store);
+				documents(root.cursor(),projects,project),store);
 			assertEquals("embedded subsystem",Files.readString(restored.drives(key.getAccountKey())
 				.drive("home").fileSystem().getPath("/draft.txt")));
 		}
@@ -107,6 +111,14 @@ public class DLFSComponentTest {
 	}
 
 	private static final Keyword KEY_DOCUMENTS=Keyword.intern("documents");
+
+	/** A project's documents region, each level created by its entry view on a changed write. */
+	private static <T extends ACell> AForkableCursor<T> documents(AForkableCursor<Index<Keyword,ACell>> root,
+			Keyword projects,AString project) {
+		var projectMap=new IndexComponent<Keyword,ACell>(root).<AHashMap<ACell,ACell>>path(projects);
+		var workspace=new MapComponent<ACell,ACell>(projectMap).<Index<Keyword,ACell>>path(project);
+		return new IndexComponent<Keyword,ACell>(workspace).path(KEY_DOCUMENTS);
+	}
 	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
 
 	@Test

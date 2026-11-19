@@ -61,8 +61,9 @@ class ApplicationIngressTest {
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			return LatticeComponent.reconcile(rule,LatticeContext.EMPTY,own,other);
 		}
-		<T extends ACell> AForkableCursor<T> resolve(ACell... path) {
-			return LatticeComponent.resolve(cursor(),rule,path);
+		/** A region of this application's root index, created on its first changed write. */
+		<T extends ACell> AForkableCursor<T> region(Keyword key) {
+			return new IndexComponent<Keyword,ACell>(cursor()).entry(key);
 		}
 		@Override protected void beforeSync() { preparations++; }
 	}
@@ -153,7 +154,7 @@ class ApplicationIngressTest {
 				return BOARD.equals(key)?(ALatticeComponent<T>)board[0]:super.child(key);
 			}
 		};
-		board[0]=new Board(app.resolve(BOARD));
+		board[0]=new Board(app.region(BOARD));
 		root.addApplication(app);
 
 		root.mergeAt(Sets.of(CVMLong.ONE),BOARD,PLANNED);
@@ -189,7 +190,8 @@ class ApplicationIngressTest {
 			final SignedComponent<ASet<ACell>> owned;
 			OwnerApp() {
 				super(lattice,root);
-				owned=new SignedComponent<>(owners.signingFor(owner.getAccountKey()),resolve(ITEMS,owner.getAccountKey()),owner::signData);
+				owned=new SignedComponent<>(owners.signingFor(owner.getAccountKey()),
+					ComponentTestSupport.entry(region(ITEMS),owner.getAccountKey(),owners.zero()),owner::signData);
 			}
 			@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
 				if (path.length==2 && ITEMS.equals(path[0]) && owner.getAccountKey().equals(path[1])) {

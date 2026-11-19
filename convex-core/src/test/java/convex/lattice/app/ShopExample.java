@@ -116,9 +116,9 @@ public final class ShopExample {
 		@Override public Shop rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new Shop(cursor); }
 		@Override public Shop fork() { return rebind(storage.fork()); }
 
-		public Catalogue catalogue() { return new Catalogue(path(CATALOGUE)); }
-		public Stock stock() { return new Stock(path(STOCK)); }
-		public Orders orders() { return new Orders(path(ORDERS)); }
+		public Catalogue catalogue() { return new Catalogue(entry(CATALOGUE)); }
+		public Stock stock() { return new Stock(entry(STOCK)); }
+		public Orders orders() { return new Orders(entry(ORDERS)); }
 
 		/** Lists an item with its opening stock, both or neither. */
 		public void list(Keyword item,long quantity) {

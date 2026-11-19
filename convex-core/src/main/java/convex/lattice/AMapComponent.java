@@ -7,7 +7,9 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ATransformCursor;
 
 /**
- * Atomic map operations, without replication, signing or timestamp policy.
+ * Atomic map operations for components to extend, without replication, signing or
+ * timestamp policy. The operations are protected, so a subclass chooses which to
+ * expose; {@link MapComponent} and {@link IndexComponent} expose them all.
  * Missing storage reads as null. Subclasses choose the container representation
  * and creation policy. Reads and no-op removals leave absent storage absent.
  * Direct puts and child edits use the same creation policy, preserving siblings.
@@ -28,7 +30,9 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	 * Creates a container for a write to absent storage. Return a non-null container
 	 * (which may contain initial entries), or throw to forbid creation. This hook
 	 * must be pure: atomic updates may retry it. Reads, removals and clear never
-	 * call it, and incompatible existing storage is rejected before creation.
+	 * call it, and incompatible existing storage is rejected before creation. A write
+	 * through an {@link #entry} view calls it whenever the map is absent, including a
+	 * write that changes nothing, and is refused if it throws.
 	 */
 	protected abstract M createContainer();
 
@@ -39,13 +43,13 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	}
 
 	/** Returns an immutable snapshot, or null for absent storage. */
-	public M get() { return requireMap(values().getOrDefault(null)); }
-	public V get(K key) { return entry(values().getOrDefault(null),key); }
-	public boolean containsKey(K key) { M map=get(); return map!=null && map.containsKey(key); }
-	public long size() { M map=get(); return map==null?0:map.count(); }
-	public boolean isEmpty() { return size()==0; }
+	protected M get() { return requireMap(values().getOrDefault(null)); }
+	protected V get(K key) { return valueAt(values().getOrDefault(null),key); }
+	protected boolean containsKey(K key) { M map=get(); return map!=null && map.containsKey(key); }
+	protected long size() { M map=get(); return map==null?0:map.count(); }
+	protected boolean isEmpty() { return size()==0; }
 
-	private V entry(ACell stored,K key) {
+	private V valueAt(ACell stored,K key) {
 		M map=requireMap(stored);
 		return map==null?null:map.get(key);
 	}
@@ -60,31 +64,33 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	}
 
 	/** Associates a value atomically, returning the previous value. Nil is a stored value. */
-	public V put(K key,V value) {
+	protected V put(K key,V value) {
 		ACell before=values().getAndUpdate(stored -> associate(stored,key,value));
-		return entry(before,key);
+		return valueAt(before,key);
 	}
 
 	/** Removes a key, returning its previous value; absent storage stays absent. */
-	public V remove(K key) {
+	protected V remove(K key) {
 		ACell before=values().getAndUpdate(stored -> {
 			M map=requireMap(stored);
 			return map!=null && map.containsKey(key)?map.dissoc(key):stored;
 		});
-		return entry(before,key);
+		return valueAt(before,key);
 	}
 
 	/** Empties an existing map without materialising absent storage. */
-	public void clear() {
+	protected void clear() {
 		values().update(map -> map==null || requireMap(map).isEmpty()?map:requireMap(map).empty());
 	}
 
 	/**
-	 * A shared entry view, suitable for binding a domain child component.
-	 * A missing key is absent, as on a path: a required read throws, and a stored nil
-	 * is present. A changed write uses {@link #createContainer()} only when the
-	 * containing map is absent.
-	 * Setting an absent entry to null is a no-op; use {@link #put} to insert a nil value.
+	 * A shared view of one entry, for binding a child component within this
+	 * component's own value. A missing key is absent, as on a path: a required read
+	 * throws, and a stored nil is present. A changed write inserts the key, using
+	 * {@link #createContainer()} when the containing map is absent. Where the map is
+	 * absent and {@link #createContainer()} throws, every write is refused with its
+	 * exception, whatever the value. A write that changes nothing creates nothing;
+	 * setting an absent entry to null is such a write, and {@link #put} inserts a nil value.
 	 * The caller declares the entry type for a heterogeneous map; this does not
 	 * validate the entry's representation. The child component owns that check.
 	 * @param <T> Entry type expected by the child
@@ -92,8 +98,18 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	 * @return Shared entry cursor
 	 */
 	@SuppressWarnings("unchecked")
-	public <T extends V> AForkableCursor<T> path(K key) {
+	protected <T extends V> AForkableCursor<T> entry(K key) {
 		return (AForkableCursor<T>)new Entry(values(),key);
+	}
+
+	/**
+	 * Returns the view {@link #entry} returns, to callers outside this component.
+	 * @param <T> Entry type expected by the child
+	 * @param key Entry key
+	 * @return Shared entry cursor
+	 */
+	public <T extends V> AForkableCursor<T> path(K key) {
+		return entry(key);
 	}
 
 	/** One entry, read through the map's storage check and written with its creation policy. */
@@ -105,13 +121,18 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 			this.key=key;
 		}
 
-		@Override protected V view(ACell stored) { return entry(stored,key); }
+		@Override protected V view(ACell stored) { return valueAt(stored,key); }
 
 		@Override protected Object viewValue(ACell stored) {
 			M map=requireMap(stored);
 			if (map==null) return MISSING;
 			V value=map.get(key);
 			return value==null && !map.containsKey(key)?MISSING:value;
+		}
+
+		/** An absent map that cannot be created leaves nowhere to write, whatever the value. */
+		@Override protected void requireWritable(ACell stored) {
+			if (requireMap(stored)==null) createContainer();
 		}
 
 		@Override protected ACell write(ACell current,V value) { return associate(current,key,value); }

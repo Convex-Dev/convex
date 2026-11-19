@@ -31,8 +31,7 @@ import convex.lattice.generic.MapLattice;
  * Path writes: {@link PathCursor#assocExisting} never invents a container and never
  * replaces one that cannot hold its key, and {@link LatticeComponent#assocIn} also
  * creates an absent base from the {@link ALattice} it is given. Typed intermediates come
- * from the component that owns each level, which declares them with
- * {@code LatticeComponent.resolve}.
+ * from the component that owns each level, through its entry view.
  */
 public class PathWriteTest {
 
@@ -70,8 +69,8 @@ public class PathWriteTest {
 	/**
 	 * The engine knows only the lattice of the base. An absent intermediate below it has
 	 * no declared type here, so a deep write through it fails rather than guessing;
-	 * the owning component declares each level with {@code LatticeComponent.resolve} and the
-	 * same write then creates every container with its correct type.
+	 * the component owning each level writes through its entry view, and the same write
+	 * then creates every container with its correct type.
 	 */
 	@SuppressWarnings("unchecked")
 	@Test
@@ -84,7 +83,8 @@ public class PathWriteTest {
 			() -> LatticeComponent.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
 
 		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null);
-		LatticeComponent.resolve(root,outer,KEY_A,KEY_B).set(CVMLong.create(99));
+		new IndexComponent<Keyword,ACell>(new IndexComponent<Keyword,ACell>(root).<Index<Keyword,ACell>>entry(KEY_A))
+			.entry(KEY_B).set(CVMLong.create(99));
 
 		Index<Keyword, ACell> outerIdx = root.get();
 		assertNotNull(outerIdx);

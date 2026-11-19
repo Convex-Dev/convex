@@ -114,7 +114,6 @@ public class CompareAndSetContractTest {
 				CVMLong::create,n -> KEYS.signData(CVMLong.create(n)),value -> value,false,false),
 			new Kind("stamped view over a path",(source,authored) -> stamped(source.path(KEY),authored),
 				CompareAndSetContractTest::numbered,CompareAndSetContractTest::numbered,CompareAndSetContractTest::unstamped,false,false),
-			plainKind("lattice path",true,(source,authored) -> LatticeComponent.resolve(source,null,KEY)),
 			plainKind("map entry",true,(source,authored) -> new MapComponent<Keyword,ACell>(source).path(KEY)),
 			plainKind("JSON path",false,(source,authored) -> jsonPath(source)),
 			new Kind("path over a path",(source,authored) -> source.<ACell>path(NEST).path(KEY),

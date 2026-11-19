@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reconcile component updates without automatically persisting intermediate working state; applications choose when to save snapshots. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking))
+- Keep the views that create lattice entries inside their components; see [Component-supplied construction](convex-core/docs/LATTICE_CURSOR_DESIGN.md#component-supplied-construction) when upgrading.
 
 ### Fixed
 

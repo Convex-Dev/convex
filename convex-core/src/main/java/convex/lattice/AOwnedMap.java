@@ -61,8 +61,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	 * Creates storage for a changed local owner-slot write when the map is absent.
 	 * Return a non-null compatible map, optionally with initial entries, or throw to
 	 * require explicit initialisation. This hook must be pure: atomic updates may
-	 * retry it. Reads and unchanged writes do not call it. Incoming delivery and
-	 * publication continue to use the merge policy.
+	 * retry it. Reads do not call it. Every local owner-slot write calls it while the
+	 * map is absent, including one that changes nothing, and is refused if it throws.
+	 * Incoming delivery and publication continue to use the merge policy.
 	 */
 	protected M createContainer() { return owners.zero(); }
 
@@ -132,9 +133,10 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	 * Returns the signed storage path for an owner, for direct domain construction.
 	 * The path, and the authoring views and drafts built on it, are bound through
 	 * {@link #cursor()} when opened, so local edits apply this collection's editing policy.
-	 * A missing containing map uses {@link #createContainer()} only on a changed write.
-	 * Access rejects incompatible containers. Navigation does
-	 * not sign or grant authority; a signed component binds the owner rule separately.
+	 * A missing containing map is created by {@link #createContainer()} on a changed
+	 * write; where that throws, every write is refused. Access rejects incompatible
+	 * containers. Navigation does not sign or grant authority; a signed component
+	 * binds the owner rule separately.
 	 */
 	public AForkableCursor<SignedData<V>> path(K owner) {
 		return slot(rule(owner));
@@ -187,6 +189,6 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 			@Override protected M requireMap(ACell value) { return AOwnedMap.this.requireMap(value); }
 			@Override protected M createContainer() { return AOwnedMap.this.createContainer(); }
 		};
-		return entries.path((K)rule.getOwner());
+		return entries.entry((K)rule.getOwner());
 	}
 }
