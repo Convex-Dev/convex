@@ -210,9 +210,9 @@ absent gives it a default there, such as `cursor.withDefault(Index.none())`.
 A root application made only of regions extends a region container and is registered
 with the host as it is. One with root-level behaviour of its own, such as a merge
 across its regions or a private copy of the whole root, extends
-`ALatticeApplication` and makes its regions through a region container it holds over
-its root, as `P2PApplication` does, while merging them itself. The host registers
-either, since it takes any root component.
+`ALatticeApplication`, holding a region container where that helps, as
+`P2PApplication` does to make its regions while merging them itself. The host
+registers either, since it takes any root component.
 
 A component's cursor and storage are its own, and protected. Code outside it reads
 its value with `value()` and changes it through its domain operations. The host is

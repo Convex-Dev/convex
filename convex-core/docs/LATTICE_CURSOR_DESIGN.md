@@ -234,11 +234,13 @@ own default supplies it, so a chain of lazy cursors with a default at each level
 constructs a whole path in one atomic write. Where its default is a data structure,
 a stored value of another CVM type is rejected.
 
-A chain of lazy cursors starts beneath a level whose kind is already checked: a
-component's own value, one of its `entry` views, or a region that a region container
-makes. The chain's topmost container is checked only for being a data structure, so
-a root-level place comes from a region container (`create` or `view`), never from a
-lazy cursor over the root.
+A lazy cursor checks the value at its location against its default, but its
+container only for being a data structure. A chain of lazy cursors therefore starts
+in a container whose kind its component already assures, such as a record the
+component only ever accepts as a map. Where a level's kind is not assured, the
+component binds it through a component of that kind, an `AMapComponent` whose
+`entry` refuses a map of the wrong kind. A root-level place comes from a region
+container (`create` or `view`), never from a lazy cursor over the root.
 
 ```java
 // The record may be absent; its items field is created by the first add

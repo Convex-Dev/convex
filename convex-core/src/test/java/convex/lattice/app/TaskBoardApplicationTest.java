@@ -32,7 +32,6 @@ import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.IndexLattice;
 
@@ -80,14 +79,14 @@ class TaskBoardApplicationTest {
 	static final class Board extends LatticeComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>>
 			implements TransactionalComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>,Board> {
 		private final Supplier<CVMLong> getTimestamp;
-		private final IndexComponent<ABlobLike<?>,AHashMap<Keyword,ACell>> tasks;
+		private final Tasks tasks;
 
 
 		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
 		Board(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
 			super(BOARD_LATTICE,cursor);
 			this.getTimestamp=getTimestamp;
-			tasks=new IndexComponent<>(cursor);
+			tasks=new Tasks(cursor,getTimestamp);
 		}
 
 		@Override public Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
@@ -96,7 +95,7 @@ class TaskBoardApplicationTest {
 		@Override public Board fork() { return rebind(storage.fork()); }
 
 		Task task(String id) {
-			return new Task(LazyCursor.create(cursor().withDefault(Index.none()),Strings.create(id)),getTimestamp);
+			return tasks.task(id);
 		}
 
 		void plan(String id,String title) { task(id).create(title); }
@@ -111,6 +110,16 @@ class TaskBoardApplicationTest {
 			}
 			return pending;
 		}
+	}
+
+	/** The board's tasks by ID, each made on its entry, which refuses a board that is not an index. */
+	static final class Tasks extends IndexComponent<ABlobLike<?>,AHashMap<Keyword,ACell>> {
+		private final Supplier<CVMLong> getTimestamp;
+		Tasks(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
+			super(cursor);
+			this.getTimestamp=getTimestamp;
+		}
+		Task task(String id) { return new Task(entry(Strings.create(id)),getTimestamp); }
 	}
 
 	/** Local operations on one timestamped record; no extra fork or publication step. */

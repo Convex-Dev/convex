@@ -31,7 +31,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.RefSoft;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -47,9 +46,11 @@ import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.core.util.Utils;
 import convex.lattice.LatticeComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
+import convex.lattice.MapComponent;
+import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.LazyCursor;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
@@ -70,8 +71,8 @@ public class DLFSComponentTest {
 			var working=root.cursor().fork();
 			var app=new LatticeComponent<>(lattice,working);
 			var key=AKeyPair.generate();
-			AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination=documents(working,projects,project);
-			var attached=DLFSRegion.connect(destination,null,key::signData,() -> CVMLong.create(123));
+			var attached=new Regions(working).view(projects,Projects::new)
+				.workspace(project).documents(null,key::signData,() -> CVMLong.create(123));
 			var files=attached.fork();
 			var liveDrive=files.drives(key.getAccountKey()).getOrCreateDrive("home");
 			var draft=liveDrive.fork();
@@ -83,15 +84,15 @@ public class DLFSComponentTest {
 			liveDrive.sync();
 			assertEquals(lattice.zero(),app.value(),"child sync cannot publish its enclosing component");
 			files.sync();
-			assertNotNull(destination.get());
+			assertTrue(attached.exists());
 			assertEquals(lattice.zero(),root.cursor().get());
 			app.sync();
 			assertEquals(app.value(),root.cursor().get());
 			org.junit.jupiter.api.Assertions.assertNull(store.getRootData());
 			root.sync();
 			assertEquals(root.cursor().get(),store.getRootData());
-			var restored=DLFSRegion.connect(
-				documents(root.cursor(),projects,project),store);
+			var restored=new Regions(root.cursor()).view(projects,Projects::new)
+				.workspace(project).documents(store,null,Utils::getCurrentTimestampCell);
 			assertEquals("embedded subsystem",Files.readString(restored.drives(key.getAccountKey())
 				.drive("home").fileSystem().getPath("/draft.txt")));
 		}
@@ -111,11 +112,20 @@ public class DLFSComponentTest {
 	private static final Keyword KEY_DOCUMENTS=Keyword.intern("documents");
 
 	/** A project's documents region, each level created by its entry view on a changed write. */
-	private static <T extends ACell> AForkableCursor<T> documents(AForkableCursor<Index<Keyword,ACell>> root,
-			Keyword projects,AString project) {
-		var projectMap=LazyCursor.create(root.withDefault(Index.none()),projects,Maps.empty());
-		var workspace=LazyCursor.create(projectMap,project,Index.none());
-		return LazyCursor.create(workspace,KEY_DOCUMENTS);
+	/** The projects, each a workspace made on its entry. */
+	private static final class Projects extends MapComponent<ACell,ACell> {
+		Projects(AForkableCursor<AHashMap<ACell,ACell>> cursor) { super(cursor); }
+		Workspace workspace(AString project) { return new Workspace(entry(project)); }
+	}
+
+	/** One project's workspace, whose documents region is made on its entry. */
+	private static final class Workspace extends IndexComponent<Keyword,ACell> {
+		Workspace(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+		DLFSRegion documents(convex.core.store.Persister persister,
+				java.util.function.Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+				java.util.function.Supplier<CVMLong> clock) {
+			return DLFSRegion.connect(entry(KEY_DOCUMENTS),persister,signer,clock);
+		}
 	}
 	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
 

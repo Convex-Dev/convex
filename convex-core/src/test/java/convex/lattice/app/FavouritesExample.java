@@ -16,13 +16,13 @@ import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
+import convex.lattice.MapComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.SignedLattice;
 
@@ -207,7 +207,7 @@ public final class FavouritesExample {
 			// Wrap the base signing view once; every domain edit uses cursor().
 			record=stamped(super.cursor(),getTimestamp);
 			// The items are the record's entry, created by the first add
-			itemSet=new SetComponent<>(LazyCursor.create(cursor(),ITEMS));
+			itemSet=new Fields(cursor()).items();
 		}
 
 		private Favourites(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
@@ -215,13 +215,20 @@ public final class FavouritesExample {
 			super(rule,cursor);
 			this.getTimestamp=getTimestamp;
 			record=stamped(super.cursor(),getTimestamp);
-			itemSet=new SetComponent<>(LazyCursor.create(cursor(),ITEMS));
+			itemSet=new Fields(cursor()).items();
 		}
 
 		@Override public Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Favourites(cursor,lattice,getTimestamp);
 		}
 		@Override public Favourites fork() { return rebind(storage.fork()); }
+
+		/** The record's fields, each made on its entry, which refuses a record that is not a map */
+		private static final class Fields extends MapComponent<Keyword,ACell> {
+			Fields(AForkableCursor<AHashMap<Keyword,ACell>> record) { super(record); }
+			/** The items, created with the record by the first add */
+			SetComponent<ACell> items() { return new SetComponent<>(entry(ITEMS)); }
+		}
 
 		/** The record's editing view, which stamps every changed write; an absent record reads as empty */
 		private static AForkableCursor<AHashMap<Keyword,ACell>> stamped(AForkableCursor<AHashMap<Keyword,ACell>> record,
