@@ -13,10 +13,10 @@ import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.store.Persister;
 import convex.core.util.Utils;
-import convex.lattice.ALatticeComponent;
-import convex.lattice.MapComponent;
+import convex.lattice.AMapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -31,7 +31,7 @@ import convex.lattice.generic.MapLattice;
  * <p>The optional persister is handed to each drive for incremental blob checkpoints
  * during streamed writes; it is not used for anything else.</p>
  */
-public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVector<ACell>>> implements TransactionalComponent<AHashMap<AString, AVector<ACell>>,DLFSDrives> {
+public final class DLFSDrives extends AMapComponent<AString, AVector<ACell>, AHashMap<AString, AVector<ACell>>> implements TransactionalComponent<AHashMap<AString, AVector<ACell>>,DLFSDrives> {
 	/** State of a drive registry entry. */
 	public enum DriveStatus { LIVE, DELETED, UNTRACKED }
 
@@ -111,8 +111,21 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return new DLFSDrive(key,new MapComponent<>(cursor()).path(key),persister,location.child(key),clock,files);
+			return new DLFSDrive(key,entry(key),persister,location.child(key),clock,files);
 		});
+	}
+
+	@Override
+	protected AHashMap<AString,AVector<ACell>> requireMap(ACell value) {
+		if (value==null) return null;
+		AHashMap<AString,AVector<ACell>> registry=RT.ensureHashMap(value);
+		if (registry==null) throw new IllegalStateException("Drive map must be a hash map");
+		return registry;
+	}
+
+	@Override
+	protected AHashMap<AString,AVector<ACell>> createContainer() {
+		return Maps.empty();
 	}
 
 	/** Creates a drive subject to an atomic owner-specific count limit. */
