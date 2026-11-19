@@ -39,7 +39,6 @@ import convex.lattice.LatticeHost;
 import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.LatticeComponent;
@@ -461,9 +460,14 @@ public class MailTest {
 	/** A root application with private working state over a host, as a node holds it. */
 	private static final class HostedRoot extends ALatticeApplication<Index<Keyword,ACell>> {
 		private final KeyedLattice lattice;
-		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host) {
+		/** The application's mail region, created by its first send */
+		final Mail mail;
+		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 			super(host.cursor().fork(),host::persist);
 			this.lattice=lattice;
+			// A region container binds the mail region at its root key; this application merges the root itself
+			mail=new Regions(cursor()).create(Mail.KEY_MAIL,(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> region) ->
+				Mail.connect(region,Mail.LATTICE,signer));
 		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> lattice.merge(own,other));
@@ -471,19 +475,15 @@ public class MailTest {
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			return LatticeComponent.reconcile(lattice,LatticeContext.EMPTY,own,other);
 		}
-		/** The application's mail region, created by its first send. */
-		Mail mail(BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-			return Mail.connect(LazyCursor.create(cursor().withDefault(Index.none()),Mail.KEY_MAIL),Mail.LATTICE,signer);
-		}
 	}
 
 	@Test
 	public void testHostedApplicationPublishesToHost() {
 		KeyedLattice root=KeyedLattice.create(Mail.KEY_MAIL,Mail.LATTICE);
 		LatticeHost<Index<Keyword,ACell>> host=LatticeHost.create();
-		HostedRoot app=new HostedRoot(root,host);
+		HostedRoot app=new HostedRoot(root,host,(owner,value) -> ALICE.signData(value));
 		host.addApplication(app);
-		Mail mail=app.mail((owner,value) -> ALICE.signData(value));
+		Mail mail=app.mail;
 		mail.send(aliceToBob(1000,"hello bob"));
 		assertNotNull(app.value().get(Mail.KEY_MAIL),"working state holds the region");
 		app.sync();

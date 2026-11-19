@@ -234,6 +234,12 @@ own default supplies it, so a chain of lazy cursors with a default at each level
 constructs a whole path in one atomic write. Where its default is a data structure,
 a stored value of another CVM type is rejected.
 
+A chain of lazy cursors starts beneath a level whose kind is already checked: a
+component's own value, one of its `entry` views, or a region that a region container
+makes. The chain's topmost container is checked only for being a data structure, so
+a root-level place comes from a region container (`create` or `view`), never from a
+lazy cursor over the root.
+
 ```java
 // The record may be absent; its items field is created by the first add
 var record = cursor().withDefault(Maps.empty());
