@@ -21,11 +21,10 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.db.ConvexDB;
-import convex.lattice.ALatticeComponent;
-import convex.lattice.IndexComponent;
-import convex.lattice.MapComponent;
+import convex.lattice.AMapComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -39,8 +38,8 @@ import convex.lattice.cursor.Cursors;
  * <p>Two usage modes:
  * <ul>
  *   <li><b>Standalone</b> ({@link #create}): owns its own cursor, manual export/merge</li>
- *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain
- *       (e.g. from a {@link ConvexDB}), signing and replication handled by the chain</li>
+ *   <li><b>Connected</b> ({@link ConvexDB#database}): bound within a parent cursor chain,
+ *       signing and replication handled by the chain</li>
  * </ul>
  *
  * <p>The database is the unit of merging. Whatever constructs it supplies its merge
@@ -82,7 +81,7 @@ import convex.lattice.cursor.Cursors;
  * db.mergeReplicas(remoteOwnerMap);
  * </pre>
  */
-public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
+public class SQLDatabase extends AMapComponent<Keyword, ACell, Index<Keyword, ACell>> {
 
 	private final AString dbName;
 	private final AKeyPair keyPair;
@@ -212,47 +211,18 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Connects to a database within an existing cursor chain at the database-map
-	 * level, stamping writes with the runtime clock. Signing and replication are
-	 * handled by the cursor chain. Connecting creates nothing.
+	 * Binds a database to its place in a cursor chain, which handles signing and
+	 * replication. Connecting creates nothing.
 	 *
-	 * @param parent Parent lattice cursor at the database-map level
-	 * @param name Database name to connect to
+	 * @param cursor Cursor of the database's state, which may be absent
+	 * @param name Database name
 	 * @param policy Merge policy, for example {@code RowLWW::merge}
-	 * @return New SQLDatabase connected to the cursor chain
+	 * @param clock Clock that stamps writes to this database's tables
+	 * @return New SQLDatabase bound to the cursor
 	 */
-	@SuppressWarnings("unchecked")
-	public static SQLDatabase connect(AForkableCursor<?> parent, String name,
-			BinaryOperator<Index<Keyword, ACell>> policy) {
-		AString dbName = Strings.create(name);
-		var databases = (AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent;
-		return new SQLDatabase(new MapComponent<>(databases).path(dbName), dbName, null, null, null,
-			policy, Utils::getCurrentTimestampCell);
-	}
-
-	/**
-	 * Connects to a database nested beneath a ConvexDB component, at
-	 * {@link ConvexDB#path(AString)} and with its merge policy and clock. Connecting
-	 * creates nothing.
-	 *
-	 * @param parent Containing ConvexDB component
-	 * @param name Database name to connect to
-	 * @return New SQLDatabase over the containing component's cursor chain
-	 */
-	public static SQLDatabase connect(ConvexDB parent, AString name) {
-		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
-		return new SQLDatabase(parent.path(name), name, null, null, null, parent.getPolicy(), parent.getClock());
-	}
-
-	/**
-	 * Connects to a database nested beneath a ConvexDB component. Connecting creates nothing.
-	 *
-	 * @param parent Containing ConvexDB component
-	 * @param name Database name to connect to
-	 * @return New SQLDatabase over the containing component's cursor chain
-	 */
-	public static SQLDatabase connect(ConvexDB parent, String name) {
-		return connect(parent, Strings.create(name));
+	public static SQLDatabase connect(AForkableCursor<Index<Keyword, ACell>> cursor, AString name,
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
+		return new SQLDatabase(cursor, name, null, null, null, policy, clock);
 	}
 
 	/**
@@ -302,24 +272,27 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return clock;
 	}
 
-	/**
-	 * Returns the cursor of this database's {@code :tables} section, for constructing
-	 * the table store. A missing database is created only by a changed write.
-	 *
-	 * @return Cursor of the table store, which may be absent
-	 */
-	public AForkableCursor<Index<AString, AVector<ACell>>> tablesPath() {
-		return new IndexComponent<>(cursor()).path(ConvexDB.KEY_TABLES);
+	@Override
+	protected Index<Keyword, ACell> requireMap(ACell value) {
+		if (value == null) return null;
+		Index<Keyword, ACell> state = RT.ensureIndex(value);
+		if (state == null) throw new IllegalStateException("Database state must be an index");
+		return state;
+	}
+
+	@Override
+	protected Index<Keyword, ACell> createContainer() {
+		return Index.none();
 	}
 
 	/**
 	 * Returns the table store, a live view for table operations. Construction reads and
-	 * writes nothing.
+	 * writes nothing; a missing database is created only by a changed write.
 	 *
-	 * @return SQLSchema instance for this database, bound to {@link #tablesPath()}, with its clock
+	 * @return SQLSchema instance for this database's {@code :tables} section, with its clock
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(tablesPath(), clock);
+		return new SQLSchema(entry(ConvexDB.KEY_TABLES), clock);
 	}
 
 	/**

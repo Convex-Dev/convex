@@ -249,7 +249,7 @@ public class SQLDatabaseTest {
 		AForkableCursor<?> root = Cursors.root(Maps.empty());
 
 		// Connect a named database
-		SQLDatabase db = SQLDatabase.connect(root, "mydb", RowLWW::merge);
+		SQLDatabase db = ConvexDB.connect(root, RowLWW::merge).database("mydb");
 		assertNotNull(db);
 		assertEquals("mydb", db.getName().toString());
 
@@ -263,7 +263,7 @@ public class SQLDatabaseTest {
 		assertTrue(rootMap.containsKey(Strings.create("mydb")));
 
 		// Connect a second database to the same root
-		SQLDatabase db2 = SQLDatabase.connect(root, "mydb", RowLWW::merge);
+		SQLDatabase db2 = ConvexDB.connect(root, RowLWW::merge).database("mydb");
 		assertEquals(1, db2.tables().getRowCount("users"));
 		assertNotNull(db2.tables().selectByKey("users", CVMLong.create(1)));
 	}
@@ -425,7 +425,7 @@ public class SQLDatabaseTest {
 		AForkableCursor<?> root = Cursors.root(Maps.empty());
 
 		// Connect and populate
-		SQLDatabase db = SQLDatabase.connect(root, "mydb", RowLWW::merge);
+		SQLDatabase db = ConvexDB.connect(root, RowLWW::merge).database("mydb");
 		db.tables().createTable("data", new String[]{"id", "value"});
 		db.tables().insert("data", 1, "original");
 
@@ -570,7 +570,7 @@ public class SQLDatabaseTest {
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
 		AForkableCursor<?> root = Cursors.root(Maps.empty());
-		SQLDatabase db = SQLDatabase.connect(root, "mydb", RowLWW::merge);
+		SQLDatabase db = ConvexDB.connect(root, RowLWW::merge).database("mydb");
 
 		assertNull(db.getKeyPair());
 		assertNull(db.getOwnerKey());

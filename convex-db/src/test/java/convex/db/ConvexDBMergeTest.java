@@ -326,7 +326,7 @@ public class ConvexDBMergeTest {
 		try (Connection conn = cdb.getConnection("missing")) {
 			conn.getMetaData().getTables(null, null, null, null).close();
 		}
-		assertEquals(0, SQLDatabase.connect(host.cursor(), "missing", RowLWW::merge).tables().getTableNames().length);
+		assertEquals(0, ConvexDB.connect(host.cursor(), RowLWW::merge).database("missing").tables().getTableNames().length);
 
 		// Deliveries that carry nothing the policy accepts create nothing either
 		host.merge(Maps.of(Strings.create("missing"), Index.of(Keyword.intern("other"), CVMLong.ONE)));

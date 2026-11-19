@@ -2,24 +2,24 @@
 
 ## Cursor Chain
 
-A SQL database is a tree of lattice cursors. Each component is bound to its
-section of the tree through its parent's entry view (`MapComponent.path(key)` or
-`IndexComponent.path(key)`), which creates the entry on the first changed write.
+A SQL database is a tree of lattice cursors. Each component makes its children
+over entries of its own value, through its own domain operation, and the first
+changed write creates the entry.
 
 ```
-LatticeHost                     ← persistence and publication policy
+LatticeHost                         ← persistence and publication policy
   │
-  └── ConvexDB                  ← registered application: database name → database
+  └── ConvexDB                      ← registered application: database name → database
         │
-        └── path("mydb")        ← SQLDatabase: :tables → table store, optional :config → settings
+        └── database("mydb")        ← SQLDatabase: :tables → table store, optional :config → settings
               │
-              └── path(:tables) ← SQLSchema: table name → table entry
+              └── tables()          ← SQLSchema: table name → table entry
                     │
-                    └── path("users") ← SQLTable: schema, rows, ctime, live count, version
+                    └── getTable("users") ← SQLTable: schema, rows, ctime, live count, version
 ```
 
-Each `path()` call creates a lightweight descended cursor that reads/writes through
-its parent. A `set()` or `updateAndGet()` at any level atomically propagates
+Each child's cursor is a lightweight view that reads and writes through its
+parent's. A `set()` or `updateAndGet()` at any level atomically propagates
 up the chain to the root `AtomicReference`. No copies, no extra work — just
 `assocIn` on the immutable tree and a `compareAndSet` at the root.
 
@@ -33,24 +33,27 @@ registers, as the [API summary](#api-summary) shows.
 
 ## Component ↔ Cursor Mapping
 
-Each component extends `ALatticeComponent<V>`, wrapping one cursor in the chain:
+Each component wraps one cursor in the chain. `ConvexDB`, `SQLDatabase` and
+`SQLSchema` hold maps, so they extend `AMapComponent`; `SQLTable` extends
+`ALatticeComponent`:
 
 ```
 LatticeHost   cursor: AHashMap<AString, Index>    hosted root
   └── ConvexDB  cursor: AHashMap<AString, Index>    database map (here the same cursor)
-        └── SQLDatabase cursor: Index<Keyword, ACell>   path(database-name)
-              └── SQLSchema cursor: Index<AString, AVector> path(:tables)
-                    └── SQLTable cursor: AVector<ACell>      path(table-name)
+        └── SQLDatabase cursor: Index<Keyword, ACell>   entry for the database name
+              └── SQLSchema cursor: Index<AString, AVector> entry for :tables
+                    └── SQLTable cursor: AVector<ACell>      entry for the table name
 ```
 
 `database()`, `tables()` and `table()` each construct the child component over
-its entry view, one level down, passing on the merge policy and clock. This is the same pattern as
-`SocialUser.feed()` and `SocialUser.follows()` in convex-social.
+the parent's own entry view, one level down, passing on the merge policy and
+clock. The entry views stay inside their components: an application reaches a
+database or a table only through these operations.
 
 Components hold no link to their parent. Constructing one reads and writes nothing:
 connecting to a database that does not exist, or reading it, creates no state. The
 first changed write creates the database, and the table store within it, through
-the cursor defaults.
+the parents' entry views.
 
 ## Clock
 
@@ -77,7 +80,7 @@ navigation without adding another copy of the application state.
 
 ## Transaction Forks
 
-`ConvexDB.database()` returns a live path beneath the hosted database map. A
+`ConvexDB.database()` returns a live view beneath the hosted database map. A
 transaction forks that `SQLDatabase`; this gives atomic commit and cheap rollback:
 
 ```

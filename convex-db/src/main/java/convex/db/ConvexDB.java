@@ -15,12 +15,13 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.MapComponent;
+import convex.lattice.AMapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -77,7 +78,7 @@ import convex.lattice.cursor.Cursors;
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
  * </pre>
  */
-public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> {
+public class ConvexDB extends AMapComponent<AString, Index<Keyword, ACell>, AHashMap<AString, Index<Keyword, ACell>>> {
 
 	/** Keyword for the tables section within a database. */
 	public static final Keyword KEY_TABLES = Keyword.intern("tables");
@@ -222,29 +223,31 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 		return rebind(storage.fork());
 	}
 
-	/**
-	 * Returns the cursor of a named database's state, for constructing database
-	 * components. A missing database map is created only by a changed write.
-	 *
-	 * @param name Database name
-	 * @return Cursor of the database's state, which may be absent
-	 */
-	public AForkableCursor<Index<Keyword, ACell>> path(AString name) {
-		return new MapComponent<>(cursor()).path(name);
+	@Override
+	protected AHashMap<AString, Index<Keyword, ACell>> requireMap(ACell value) {
+		if (value == null) return null;
+		AHashMap<AString, Index<Keyword, ACell>> map = RT.ensureHashMap(value);
+		if (map == null) throw new IllegalStateException("Database map must be a hash map");
+		return map;
+	}
+
+	@Override
+	protected AHashMap<AString, Index<Keyword, ACell>> createContainer() {
+		return EMPTY;
 	}
 
 	/**
 	 * Returns the component for a named database, which may be absent, with this
 	 * ConvexDB's policy and clock. Connecting and reading create nothing; the first
-	 * changed write creates the database. Merge, delivery and database operations all
-	 * use this component, so an override supplying a database with another policy
-	 * changes how that database merges.
+	 * changed write creates the database, and the database map if it is missing.
+	 * Merge, delivery and database operations all use this component, so an override
+	 * supplying a database with another policy changes how that database merges.
 	 *
 	 * @param name Database name
-	 * @return SQLDatabase bound to {@link #path(AString)}
+	 * @return SQLDatabase bound to the named entry of this database map
 	 */
 	public SQLDatabase database(AString name) {
-		return SQLDatabase.connect(this, name);
+		return SQLDatabase.connect(entry(name), name, policy, clock);
 	}
 
 	/**

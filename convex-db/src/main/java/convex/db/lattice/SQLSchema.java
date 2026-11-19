@@ -13,11 +13,11 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
-import convex.lattice.ALatticeComponent;
-import convex.lattice.IndexComponent;
+import convex.lattice.AMapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -55,7 +55,7 @@ import convex.lattice.cursor.Cursors;
  * the tables. The application supplies the clock; how it orders a writer's writes, for
  * example strictly increasing stamps, is the application's policy.
  */
-public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
+public class SQLSchema extends AMapComponent<AString, AVector<ACell>, Index<AString, AVector<ACell>>> {
 
 	private final Supplier<CVMLong> clock;
 
@@ -103,26 +103,36 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	// ========== Tables ==========
 
-	/**
-	 * Returns the cursor of a named table's entry, for constructing table components.
-	 * A missing table store is created only by a changed write.
-	 *
-	 * @param name Table name
-	 * @return Cursor of the table's entry, which may be absent
-	 */
-	public AForkableCursor<AVector<ACell>> path(AString name) {
-		return new IndexComponent<>(cursor()).path(name);
+	@Override
+	protected Index<AString, AVector<ACell>> requireMap(ACell value) {
+		if (value == null) return null;
+		Index<AString, AVector<ACell>> store = RT.ensureIndex(value);
+		if (store == null) throw new IllegalStateException("Table store must be an index");
+		return store;
+	}
+
+	@Override
+	protected Index<AString, AVector<ACell>> createContainer() {
+		return Index.none();
+	}
+
+	/** Table names are strings; nil is not a table name. */
+	@Override
+	protected <T extends AVector<ACell>> AForkableCursor<T> entry(AString name) {
+		if (name == null) throw new IllegalArgumentException("Table name must not be nil");
+		return super.entry(name);
 	}
 
 	/**
 	 * Returns the component for a named table, which may be absent. Construction reads
-	 * and writes nothing; table operations use this component.
+	 * and writes nothing; a missing table store is created only by a changed write.
+	 * Table operations use this component.
 	 *
 	 * @param name Table name
-	 * @return Table component bound to {@link #path(AString)}, with this store's clock
+	 * @return Table component bound to the named entry, with this store's clock
 	 */
 	protected SQLTable table(AString name) {
-		return new SQLTable(path(name), clock);
+		return new SQLTable(entry(name), clock);
 	}
 
 	// ========== Internal Helpers ==========
@@ -258,7 +268,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		path(name).set(SQLTable.createState((AVector<AVector<ACell>>) schema, clock.get()));
+		entry(name).set(SQLTable.createState((AVector<AVector<ACell>>) schema, clock.get()));
 		return true;
 	}
 
@@ -269,7 +279,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		path(name).set(SQLTable.createTombstoneState(clock.get()));
+		entry(name).set(SQLTable.createTombstoneState(clock.get()));
 		return true;
 	}
 

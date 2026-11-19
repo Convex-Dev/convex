@@ -30,7 +30,7 @@ import convex.node.NodeServer;
  * Insert performance demo/benchmark for Convex DB.
  *
  * Uses a realistic setup: NodeServer with temp Etch persistence,
- * SQLDatabase connected through the cursor chain.
+ * SQLDatabase from the ConvexDB registered with its host.
  *
  * Tests:
  * 1. Standalone (no persistence, baseline)
@@ -86,10 +86,10 @@ public class InsertDemo {
 	static void benchmarkDirectLattice() throws Exception {
 		EtchStore store = EtchStore.createTemp();
 		var host = open(store);
-		host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();
-		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME, RowLWW::merge);
+		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 
 		long start = System.nanoTime();
