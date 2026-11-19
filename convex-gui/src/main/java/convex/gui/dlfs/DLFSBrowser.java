@@ -317,7 +317,12 @@ public class DLFSBrowser extends AbstractGUI {
 			List<String> names = ownerDrives.driveNames();
 			if (!names.isEmpty()) {
 				for (String name : names) {
-					drives.put(name, ownerDrives.drive(name).fileSystem());
+					DLFSDrive drive = ownerDrives.drive(name);
+					if (drive == null) {
+						log.warn("Not opening drive '{}': not a valid drive name", name);
+						continue;
+					}
+					drives.put(name, drive.fileSystem());
 				}
 				log.info("Restored {} drives from store: {}", drives.size(), file);
 			} else {
@@ -484,7 +489,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (name == null || name.isBlank()) return;
 		name = name.trim();
 		if (!createDrive(name)) {
-			JOptionPane.showMessageDialog(this, "Drive '" + name + "' already exists.", "Error", JOptionPane.ERROR_MESSAGE);
+			JOptionPane.showMessageDialog(this, "Drive '" + name + "' already exists or is not a valid drive name.", "Error", JOptionPane.ERROR_MESSAGE);
 			return;
 		}
 		refreshDriveList();
@@ -508,6 +513,8 @@ public class DLFSBrowser extends AbstractGUI {
 			switchDrive(remaining.get(0));
 		} else {
 			currentDriveName = null;
+			// The deleted drive's file system is closed, so show an empty one
+			panel.setDrive(DLFS.createLocal());
 		}
 	}
 
