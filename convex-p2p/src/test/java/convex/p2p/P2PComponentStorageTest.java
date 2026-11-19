@@ -92,6 +92,17 @@ class P2PComponentStorageTest {
 		return node?user.node():user.identity();
 	}
 
+	/** Replaces the record through the component's own setter */
+	private static void set(ALatticeComponent<ACell> component,AHashMap<Keyword,ACell> record) {
+		if (component instanceof P2PNodeRecord node) node.setNodeInfo(record);
+		else ((P2PIdentity)component).setIdentity(record);
+	}
+
+	/** The record the component holds */
+	private static AHashMap<Keyword,ACell> record(ALatticeComponent<ACell> component) {
+		return (component instanceof P2PNodeRecord node)?node.getNodeInfo():((P2PIdentity)component).getIdentity();
+	}
+
 	@Test void missingOrWrongSignerLeavesAllAncestorsAbsent() {
 		for (boolean node:new boolean[] {false,true}) assertFailedSigning(node);
 	}
@@ -105,11 +116,11 @@ class P2PComponentStorageTest {
 				default -> (owner,value) -> BOB.signData(value);
 			};
 			var view=component(user(root,signer),node);
-			assertFalse(view.cursor().exists());
-			view.cursor().set(null);
+			assertFalse(view.exists());
+			set(view,null);
 			view.sync();
 			assertNull(root.get());
-			assertThrows(IllegalStateException.class,() -> view.cursor().set(FIRST));
+			assertThrows(IllegalStateException.class,() -> set(view,FIRST));
 			assertNull(root.get(),"Failed signing must not create even an enclosing region");
 		}
 	}
@@ -128,8 +139,8 @@ class P2PComponentStorageTest {
 				Index.of(P2PLattice.KEY_ID,Index.none()));
 		for (ACell value:invalid) {
 			root.set(value);
-			assertThrows(IllegalStateException.class,() -> view.cursor().get());
-			assertThrows(IllegalStateException.class,() -> view.cursor().set(FIRST));
+			assertThrows(IllegalStateException.class,() -> view.value());
+			assertThrows(IllegalStateException.class,() -> set(view,FIRST));
 			assertSame(value,root.get());
 		}
 	}
@@ -147,22 +158,22 @@ class P2PComponentStorageTest {
 			return ALICE.signData(value);
 		});
 		// A transaction needs its record to exist, so an ordinary write creates it first
-		component(user,node).cursor().set(FIRST);
+		set(component(user,node),FIRST);
 		assertEquals(1,signatures.get());
 		ACell created=root.get();
 		Consumer<ALatticeComponent<ACell>> edits=draft -> {
-			draft.cursor().set(FIRST);
-			draft.cursor().set(SECOND);
+			set(draft,FIRST);
+			set(draft,SECOND);
 			assertSame(created,root.get());
 			assertEquals(1,signatures.get());
 		};
 		if (node) user.node().execute(edits::accept);
 		else user.identity().execute(edits::accept);
-		assertEquals(SECOND,component(user,node).cursor().get());
+		assertEquals(SECOND,component(user,node).value());
 		assertEquals(2,signatures.get());
 		ACell before=root.get();
 		Consumer<ALatticeComponent<ACell>> abort=draft -> {
-			draft.cursor().set(FIRST);
+			set(draft,FIRST);
 			throw new IllegalArgumentException("Aborted edit");
 		};
 		assertThrows(IllegalArgumentException.class,() -> {
@@ -200,13 +211,13 @@ class P2PComponentStorageTest {
 			return ALICE.signData(value);
 		});
 		var draft=node?user.node().fork():user.identity().fork();
-		draft.cursor().set(FIRST);
-		draft.cursor().set(SECOND);
+		set(draft,FIRST);
+		set(draft,SECOND);
 		assertNull(root.get());
 		assertEquals(0,signatures.get());
 		draft.sync();
 		assertEquals(2,attempts.get(),"A conflicting root write must force a retry");
-		assertEquals(SECOND,component(user,node).cursor().get());
+		assertEquals(SECOND,component(user,node).value());
 		var actual=(Index<?,?>)root.get();
 		assertSame(opaque,actual.get(P2PLattice.KEY_KAD));
 		ACell region=node?((Index<?,?>)actual.get(P2PLattice.KEY_P2P)).get(P2PLattice.KEY_NODES)
@@ -223,22 +234,21 @@ class P2PComponentStorageTest {
 		for (boolean node:new boolean[] {false,true}) assertTransactionRerun(node);
 	}
 
-	@SuppressWarnings("unchecked")
 	private void assertTransactionRerun(boolean node) {
 		var root=new Root<ACell>();
 		var user=user(root,(owner,value) -> ALICE.signData(value));
 		var live=component(user,node);
-		live.cursor().set(FIRST);
+		set(live,FIRST);
 		var runs=new AtomicInteger();
 		Consumer<ALatticeComponent<ACell>> edit=draft -> {
 			// Another writer replaces the record with a newer one during the first run
-			if (runs.incrementAndGet()==1) live.cursor().set(SECOND);
-			draft.cursor().updateAndGet(record -> ((AHashMap<Keyword,ACell>)record).assoc(NOTE,CVMLong.ONE));
+			if (runs.incrementAndGet()==1) set(live,SECOND);
+			set(draft,record(draft).assoc(NOTE,CVMLong.ONE));
 		};
 		if (node) user.node().execute(edit::accept);
 		else user.identity().execute(edit::accept);
 		assertEquals(2,runs.get(),"the transaction that met the change ran again");
-		assertEquals(SECOND.assoc(NOTE,CVMLong.ONE),live.cursor().get(),"both changes are kept");
+		assertEquals(SECOND.assoc(NOTE,CVMLong.ONE),live.value(),"both changes are kept");
 	}
 
 	/** A fork whose record changed too cannot sync, whichever change is newer, and the sync changes nothing. */
@@ -252,13 +262,13 @@ class P2PComponentStorageTest {
 		var root=new Root<ACell>();
 		var user=user(root,(owner,value) -> ALICE.signData(value));
 		var live=component(user,node);
-		live.cursor().set(FIRST);
+		set(live,FIRST);
 		var draft=node?user.node().fork():user.identity().fork();
-		draft.cursor().set(forkNewer?THIRD:SECOND);
-		live.cursor().set(forkNewer?SECOND:THIRD);
+		set(draft,forkNewer?THIRD:SECOND);
+		set(live,forkNewer?SECOND:THIRD);
 		ACell before=root.get();
 		assertThrows(MergeConflictException.class,draft::sync);
 		assertSame(before,root.get(),"a refused sync changes nothing");
-		assertEquals(forkNewer?THIRD:SECOND,draft.cursor().get(),"the fork keeps its edits");
+		assertEquals(forkNewer?THIRD:SECOND,draft.value(),"the fork keeps its edits");
 	}
 }

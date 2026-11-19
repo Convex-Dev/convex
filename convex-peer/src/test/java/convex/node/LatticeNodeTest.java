@@ -307,7 +307,7 @@ class LatticeNodeTest {
 				try (var peer=ConvexRemote.connect(sender.getHostAddress())) {
 					targetGroup.addPeer(sourceKey.getAccountKey(),peer).get(5,TimeUnit.SECONDS);
 					receiver.getServer().pull(targetGroup,peer).get(5,TimeUnit.SECONDS);
-					assertEquals(Sets.of(1),app.cursor().get());
+					assertEquals(Sets.of(1),app.value());
 					assertTrue(target.cursor().get().isEmpty(),"Network delivery respects the staged boundary");
 					app.sync();
 					target.sync();
@@ -387,7 +387,7 @@ class LatticeNodeTest {
 				var diallerGroup=dialler.createPropagator();
 				var received=new CompletableFuture<Void>();
 				diallerGroup.setInboundLatticeListener((connection,group,path,value,changed) -> {
-					if (app.cursor().get().contains(CVMLong.ONE)) received.complete(null);
+					if (app.value().contains(CVMLong.ONE)) received.complete(null);
 				});
 
 				diallerGroup.getConnectionManager().connectPeer(Transports.endpoint(served.getHostAddress()))
@@ -397,7 +397,7 @@ class LatticeNodeTest {
 				servedHost.cursor().set(Sets.of(1));
 				servedHost.sync();
 				received.get(10,TimeUnit.SECONDS);
-				assertEquals(Sets.of(1),app.cursor().get());
+				assertEquals(Sets.of(1),app.value());
 			}
 		}
 	}

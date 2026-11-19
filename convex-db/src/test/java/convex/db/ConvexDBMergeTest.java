@@ -133,7 +133,7 @@ public class ConvexDBMergeTest {
 	private static AHashMap<AString, Index<Keyword, ACell>> remoteWithRow2(AHashMap<AString, Index<Keyword, ACell>> root) {
 		ConvexDB remote = ConvexDB.connect(Cursors.root(root), RowLWW::merge);
 		insert(remote.database(DB), 2);
-		return remote.cursor().get();
+		return remote.value();
 	}
 
 	/** The key under which an integer primary key is stored. */
@@ -177,7 +177,7 @@ public class ConvexDBMergeTest {
 		assertTrue(has(db, PLAIN, 2));
 		assertFalse(has(db, FROZEN, 2));
 		var before = host.cursor().get();
-		host.mergeAt(remoteTables.cursor().get(), DB_NAME, ConvexDB.KEY_TABLES);
+		host.mergeAt(remoteTables.value(), DB_NAME, ConvexDB.KEY_TABLES);
 		host.mergeAt(remote.get(DB_NAME), DB_NAME);
 		assertSame(before, host.cursor().get());
 	}
@@ -242,7 +242,7 @@ public class ConvexDBMergeTest {
 		SQLDatabase db = SQLDatabase.create(DB, local, local.getAccountKey(), ConvexDBMergeTest::keepFrozen, counter());
 		populate(db);
 		SQLDatabase remote = SQLDatabase.create(DB, other, RowLWW::merge);
-		remote.cursor().set(db.cursor().get());
+		remote.merge(db.value());
 		insert(remote, 2);
 
 		assertEquals(1, db.mergeReplicas(remote.exportReplica()));

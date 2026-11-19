@@ -32,6 +32,7 @@ import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.IndexLattice;
 
 /**
@@ -114,7 +115,8 @@ class TaskBoardApplicationTest {
 	/** Local operations on one timestamped record; no extra fork or publication step. */
 	static final class Task extends ALatticeComponent<AHashMap<Keyword,ACell>> {
 		Task(AForkableCursor<AHashMap<Keyword,ACell>> storage,Supplier<CVMLong> getTimestamp) {
-			super(Timestamped.create(storage.withDefault(Maps.empty()),getTimestamp).cursor());
+			super(StampedCursor.create(storage.withDefault(Maps.empty()),getTimestamp,
+				(record,time) -> record.assoc(Timestamped.TIMESTAMP,time)));
 		}
 
 		boolean isCreated() { return cursor().get().containsKey(TITLE); }
@@ -156,15 +158,15 @@ class TaskBoardApplicationTest {
 		assertFalse(task.isDone());
 		assertTrue(board.pending().contains(remoteId));
 		board.mergeAt(record.assoc(Timestamped.TIMESTAMP,CVMLong.TWO),remoteId);
-		assertEquals(CVMLong.TWO,board.cursor().get().get(remoteId).get(Timestamped.TIMESTAMP));
+		assertEquals(CVMLong.TWO,board.value().get(remoteId).get(Timestamped.TIMESTAMP));
 		task.complete();
 		assertTrue(task.isDone());
 		assertSame(title,task.title());
-		assertSame(extra,task.cursor().get().get(extension));
+		assertSame(extra,task.value().get(extension));
 		assertEquals(Sets.of(remoteId),board.pending());
 		task.rename("Local title"); // An explicit replacement changes only this field and its timestamp.
 		assertEquals(Strings.create("Local title"),task.title());
-		assertSame(extra,task.cursor().get().get(extension));
+		assertSame(extra,task.value().get(extension));
 	}
 
 	/** Readers see the old board until commit; the async continuation publishes only after commit. */
@@ -189,7 +191,7 @@ class TaskBoardApplicationTest {
 		// The future signals commit and publication; the timeout only bounds test failure.
 		board.executeAsync(draft -> draft.task("review").complete())
 			.thenRun(app::sync).get(10,TimeUnit.SECONDS);
-		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
+		assertEquals(board.value(),host.cursor().get().get(BOARD));
 		assertTrue(board.pending().isEmpty());
 	}
 
@@ -223,20 +225,20 @@ class TaskBoardApplicationTest {
 		assertEquals(Sets.of("publish","other"),board.pending());
 		assertTrue(host.cursor().get().isEmpty());
 		app.sync();
-		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
+		assertEquals(board.value(),host.cursor().get().get(BOARD));
 	}
 
 	/** Failure after changing two task records must leak neither change into the live board. */
 	@Test void abandonedPlanLeavesTheBoardUnchanged() {
 		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.ONE).board();
 		board.plan("review","Review");
-		var before=board.cursor().get();
+		var before=board.value();
 		assertThrows(IllegalStateException.class,() -> board.execute(draft -> {
 			draft.plan("publish","Publish");
 			draft.task("review").complete();
 			throw new IllegalStateException("Review not approved");
 		}));
-		assertSame(before,board.cursor().get());
+		assertSame(before,board.value());
 		assertEquals(Sets.of("review"),board.pending());
 		assertFalse(board.task("publish").isCreated());
 	}
@@ -257,11 +259,11 @@ class TaskBoardApplicationTest {
 		assertEquals(Sets.of("first","second"),board.pending());
 		assertEquals(Strings.create("Review revised draft"),board.task("first").title());
 		assertEquals(Strings.create("Review"),board.task("second").title());
-		var before=board.cursor().get();
+		var before=board.value();
 		assertThrows(IllegalStateException.class,() -> board.plan("first","Replacement"));
 		clock.set(CVMLong.create(4));
 		first.reopen(); // An unchanged edit must not stamp, even after the clock advances.
-		assertSame(before,board.cursor().get());
+		assertSame(before,board.value());
 	}
 
 	/** Stale completion cannot undo a later reopen; different IDs survive replica merges. */
@@ -286,10 +288,10 @@ class TaskBoardApplicationTest {
 			for (var incoming:deliveries) host.merge(incoming);
 			host.merge(completed);
 			assertEquals(Sets.of("review","other"),replica.board().pending());
-			assertEquals(CVMLong.create(3),replica.board().task("review").cursor().get().get(Timestamped.TIMESTAMP));
+			assertEquals(CVMLong.create(3),replica.board().task("review").value().get(Timestamped.TIMESTAMP));
 			assertTrue(host.cursor().get().isEmpty());
 			replica.sync();
-			assertEquals(replica.board().cursor().get(),host.cursor().get().get(BOARD));
+			assertEquals(replica.board().value(),host.cursor().get().get(BOARD));
 		}
 	}
 
@@ -298,10 +300,10 @@ class TaskBoardApplicationTest {
 		var clock=new AtomicReference<>(CVMLong.ONE);
 		var source=new TaskBoardApp(LatticeHost.create(),clock::get).board();
 		source.plan("review","Review");
-		var planned=source.cursor().get();
+		var planned=source.value();
 		clock.set(CVMLong.TWO);
 		source.task("review").complete();
-		var completed=source.cursor().get();
+		var completed=source.value();
 		var whole=new TaskBoardApp(LatticeHost.create(),clock::get).board();
 		var partial=new TaskBoardApp(LatticeHost.create(),clock::get).board();
 		whole.plan("other","Independent task");
@@ -310,13 +312,13 @@ class TaskBoardApplicationTest {
 		for (var delivery:List.of(completed,planned,completed)) {
 			whole.merge(delivery);
 			partial.mergeAt(delivery.get(id),id);
-			assertEquals(whole.cursor().get(),partial.cursor().get());
+			assertEquals(whole.value(),partial.value());
 		}
 		assertTrue(partial.task("review").isDone());
 		assertEquals(Sets.of("other"),partial.pending());
-		var before=partial.cursor().get();
+		var before=partial.value();
 		partial.mergeAt(CVMBool.FALSE,id,DONE);
-		assertSame(before,partial.cursor().get());
+		assertSame(before,partial.value());
 	}
 
 	/** Read-only handles and failed edits of absent tasks do not create records. */

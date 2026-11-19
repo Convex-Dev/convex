@@ -318,9 +318,9 @@ public class SQLDatabaseTest {
 		SQLDatabase source = withRow(SQLDatabase.create("db", attacker, RowLWW::merge), 1);
 		for (ACell claimed : new ACell[] {owner.getAccountKey(), DID.forKey(owner.getAccountKey())}) {
 			SQLDatabase local = SQLDatabase.create("db", localKey, RowLWW::merge);
-			var before = local.cursor().get();
+			var before = local.value();
 			assertEquals(0, local.mergeReplicas(claim(source, claimed)));
-			assertSame(before, local.cursor().get());
+			assertSame(before, local.value());
 			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed, RowLWW::merge)::exportReplica);
 		}
 	}
@@ -362,9 +362,9 @@ public class SQLDatabaseTest {
 		for (ACell claimed : new ACell[] {Address.create(1337), Strings.create("did:web:victim.example"),
 				Strings.create("did:convex:1337")}) {
 			SQLDatabase local = SQLDatabase.create("db", localKey, RowLWW::merge);
-			var before = local.cursor().get();
+			var before = local.value();
 			assertEquals(0, local.mergeReplicas(claim(source, claimed)), "unverified owners must fail closed");
-			assertSame(before, local.cursor().get());
+			assertSame(before, local.value());
 			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed, RowLWW::merge)::exportReplica);
 		}
 	}

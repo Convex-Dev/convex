@@ -251,7 +251,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * must not invoke an override before its view is initialised. Updating this
 	 * cursor does not publish the component.
 	 */
-	public AForkableCursor<V> cursor() {
+	protected AForkableCursor<V> cursor() {
 		return storage;
 	}
 

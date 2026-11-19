@@ -11,15 +11,9 @@ import org.junit.jupiter.api.function.Executable;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.Strings;
-import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
-import convex.lattice.JSONValueComponent;
-import convex.lattice.ValueComponent;
 import convex.test.Persisters;
 
 class ReadOnlyCursorTest {
@@ -107,21 +101,6 @@ class ReadOnlyCursorTest {
 		assertEquals(root.get(),view.withDefault(Maps.empty()).reconcile((base,own,other) -> own));
 		assertEquals(0,merges.get());
 		assertEquals(0,root.writes.get());
-	}
-
-	@Test void valueComponentsOverTheViewAreReadOnlyThroughout() {
-		AString a=Strings.create("a");
-		AString zero=Strings.create("0");
-		var root=new Root<ACell>(Maps.of(a,Vectors.of(CVMLong.ONE)));
-		var json=new JSONValueComponent<>(root.readOnly()).resolve(a,zero);
-		assertEquals(CVMLong.ONE,json.value());
-		assertRefused(() -> json.cursor().set(CVMLong.TWO));
-		var component=new ValueComponent<>(root.readOnly());
-		var literal=component.resolve(a);
-		assertRefused(() -> literal.cursor().set(Vectors.empty()));
-		assertRefused(component::sync);
-		assertEquals(Vectors.of(CVMLong.ONE),literal.sync());
-		assertEquals(Vectors.of(CVMLong.ONE),RT.getIn(root.get(),a));
 	}
 
 	@Test void viewsRefuseWithTheSameException() {

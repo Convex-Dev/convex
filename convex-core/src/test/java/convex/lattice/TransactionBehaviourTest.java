@@ -79,7 +79,7 @@ class TransactionBehaviourTest {
 			stamped=Timestamped.create(cursor.withDefault(Maps.empty()),clock);
 		}
 
-		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return stamped.cursor(); }
+		@Override protected AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return stamped.cursor(); }
 		@Override public Ledger rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return new Ledger(cursor,clock); }
 
 		void open(String name,long amount) {

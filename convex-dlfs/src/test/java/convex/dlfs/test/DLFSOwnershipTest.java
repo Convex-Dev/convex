@@ -37,18 +37,18 @@ public class DLFSOwnershipTest {
 		Files.writeString(right.drives(ALICE.getAccountKey()).createDrive("home")
 			.fileSystem().getPath("/right"),"right");
 		var relay=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null);
-		relay.merge(left.cursor().get());
-		var before=relay.cursor().get();
+		relay.merge(left.value());
+		var before=relay.value();
 		// A relay cannot sign a merged value; it can only adopt existing envelopes.
-		relay.merge(right.cursor().get());
-		assertSame(before,relay.cursor().get());
+		relay.merge(right.value());
+		assertSame(before,relay.value());
 		assertThrows(IllegalStateException.class,() -> relay.drives(ALICE.getAccountKey()).createDrive("no"));
 
-		left.merge(right.cursor().get());
-		var combined=left.cursor().get().get(ALICE.getAccountKey());
+		left.merge(right.value());
+		var combined=left.value().get(ALICE.getAccountKey());
 		assertTrue(combined.checkSignature());
 		relay.mergeAt(combined,ALICE.getAccountKey());
-		assertSame(combined,relay.cursor().get().get(ALICE.getAccountKey()));
+		assertSame(combined,relay.value().get(ALICE.getAccountKey()));
 		var fs=relay.drives(ALICE.getAccountKey()).drive("home").fileSystem();
 		assertEquals("left",Files.readString(fs.getPath("/left")));
 		assertEquals("right",Files.readString(fs.getPath("/right")));
@@ -63,29 +63,29 @@ public class DLFSOwnershipTest {
 		var drive=region.drives(owner).createDrive("home");
 		var fs=drive.fileSystem();
 		Files.writeString(fs.getPath("/before"),"Alice");
-		var old=region.cursor().get().get(owner);
+		var old=region.value().get(owner);
 		assertEquals(ALICE.getAccountKey(),old.getAccountKey());
 		assertThrows(IllegalStateException.class,() -> region.drives(Strings.create("unknown")).createDrive("no"));
 
 		// Authority may rotate without rebuilding views; both callbacks see the same local rule.
 		key.set(BOB);
 		Files.writeString(fs.getPath("/after"),"Bob");
-		var current=region.cursor().get();
+		var current=region.value();
 		assertEquals(BOB.getAccountKey(),current.get(owner).getAccountKey());
 		assertTrue(current.get(owner).checkSignature());
 		region.mergeAt(old,owner);
-		assertSame(current,region.cursor().get());
+		assertSame(current,region.value());
 		for (boolean whole:new boolean[]{false,true}) {
 			var receiver=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null,
 				(identity,signer) -> owner.equals(identity) && BOB.getAccountKey().equals(signer),
 				null,CLOCK,30);
 			if (whole) receiver.merge(current);
 			else receiver.mergeAt(current.get(owner),owner);
-			assertEquals(current,receiver.cursor().get());
+			assertEquals(current,receiver.value());
 		}
 		var relay=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null);
 		relay.merge(current);
-		assertTrue(relay.cursor().get().isEmpty(),"indirect ownership needs an explicit verifier");
+		assertTrue(relay.value().isEmpty(),"indirect ownership needs an explicit verifier");
 	}
 
 	@Test void failedAuthoringDuringForkSyncChangesNeitherSnapshot() throws Exception {
@@ -98,12 +98,12 @@ public class DLFSOwnershipTest {
 		var fork=region.fork();
 		Files.writeString(region.drives(ALICE.getAccountKey()).drive("home").fileSystem().getPath("/live"),"live");
 		Files.writeString(fork.drives(ALICE.getAccountKey()).drive("home").fileSystem().getPath("/draft"),"draft");
-		var live=region.cursor().get();
-		var draft=fork.cursor().get();
+		var live=region.value();
+		var draft=fork.value();
 		fail.set(true);
 		assertThrows(IllegalStateException.class,fork::sync);
-		assertSame(live,region.cursor().get());
-		assertSame(draft,fork.cursor().get());
+		assertSame(live,region.value());
+		assertSame(draft,fork.value());
 		fail.set(false);
 		fork.sync();
 		var fs=region.drives(ALICE.getAccountKey()).drive("home").fileSystem();
@@ -115,10 +115,10 @@ public class DLFSOwnershipTest {
 		var time=new AtomicReference<>(CVMLong.create(100));
 		var region=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null,ALICE::signData,time::get);
 		var drive=region.drives(ALICE.getAccountKey()).createDrive("home");
-		assertEquals(time.get(),DLFSNode.getUTime(drive.cursor().get()));
+		assertEquals(time.get(),DLFSNode.getUTime(drive.value()));
 		time.set(CVMLong.create(125));
 		Files.createDirectory(drive.fileSystem().getPath("/original-clock"));
-		assertEquals(time.get(),DLFSNode.getUTime(drive.cursor().get()));
+		assertEquals(time.get(),DLFSNode.getUTime(drive.value()));
 		// The NIO adapter owns the same explicit clock policy for its derived views.
 		var replacement=new AtomicReference<>(CVMLong.create(150));
 		((DLFSLocal)drive.fileSystem()).setClock(replacement::get);
@@ -143,10 +143,10 @@ public class DLFSOwnershipTest {
 			ALICE::signData,() -> CVMLong.create(131));
 		Files.writeString(future.drives(ALICE.getAccountKey()).createDrive("home")
 			.fileSystem().getPath("/file"),"future");
-		var before=region.cursor().get();
+		var before=region.value();
 		int signed=signatures.get();
-		region.merge(future.cursor().get());
-		assertSame(before,region.cursor().get());
+		region.merge(future.value());
+		assertSame(before,region.value());
 		assertEquals(signed,signatures.get(),"rejected input does not invoke the signer");
 		assertEquals("current",Files.readString(local.getPath("/file")));
 	}

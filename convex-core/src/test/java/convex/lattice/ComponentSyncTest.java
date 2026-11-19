@@ -56,7 +56,7 @@ class ComponentSyncTest {
 			items=new SetComponent<>(new MapComponent<>(cursor()).path(VALUE));
 		}
 
-		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return edits.cursor(); }
+		@Override protected AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return edits.cursor(); }
 		@Override public Record rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Record(cursor,clock);
 		}

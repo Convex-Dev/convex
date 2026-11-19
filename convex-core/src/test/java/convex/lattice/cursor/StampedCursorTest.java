@@ -52,14 +52,15 @@ public class StampedCursorTest {
 	@Test public void testWorkingStateAdoptsPreparedDestinationValue() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
 		var stamped=StampedCursor.create(root,() -> CVMLong.create(100),(value,time) -> stampWith(value,time.longValue()));
-		var working=new LatticeComponent<>(stateLattice(),stamped.fork(),LatticeContext.EMPTY);
-		working.cursor().set(Maps.of(A,CVMLong.ONE));
+		var fork=stamped.fork();
+		var working=new LatticeComponent<>(stateLattice(),fork,LatticeContext.EMPTY);
+		fork.set(Maps.of(A,CVMLong.ONE));
 		working.sync();
 		assertEquals(CVMLong.ONE,RT.getIn(root.get(),A));
 		assertEquals(100,tsOf(root.get()),"The destination view stamps what the component publishes");
 		// An unedited component adopts the prepared destination value on its next sync.
 		working.sync();
-		assertSame(root.get(),working.cursor().get());
+		assertSame(root.get(),working.value());
 	}
 
 	/** Last-write-wins would otherwise discard a retried write in favour of the one it built on. */

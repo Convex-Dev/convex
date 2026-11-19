@@ -214,15 +214,4 @@ public class LatticeMQTest {
 		assertEquals(2L, primary.partition(0).size());
 		assertEquals(1L, primary.partition(1).size());
 	}
-
-	// ===== Cursor Access =====
-
-	@Test
-	public void testCursorAccess() {
-		LatticeMQ mq = LatticeMQ.create();
-		assertNotNull(mq.cursor());
-
-		LatticeTopic topic = mq.topic("t");
-		assertNotNull(topic.cursor());
-	}
 }

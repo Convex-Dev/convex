@@ -429,7 +429,7 @@ class OwnedComponentsTest {
 		var root=new Root<AHashMap<AString,SignedData<AInteger>>>();
 		var owners=new OwnedMap<AString,AInteger>(root,MaxLattice.INSTANCE,VERIFIER) {
 			private final AForkableCursor<AHashMap<AString,SignedData<AInteger>>> editing=super.cursor().readOnly();
-			@Override public AForkableCursor<AHashMap<AString,SignedData<AInteger>>> cursor() { return editing; }
+			@Override protected AForkableCursor<AHashMap<AString,SignedData<AInteger>>> cursor() { return editing; }
 		};
 		assertThrows(ReadOnlyCursorException.class,() -> owners.path(A).set(ALICE.signData(CVMLong.ONE)));
 		assertThrows(ReadOnlyCursorException.class,() -> owners.authoringCursor(A,ALICE::signData).set(CVMLong.ONE));

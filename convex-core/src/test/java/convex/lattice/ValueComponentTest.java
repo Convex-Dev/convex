@@ -25,6 +25,7 @@ import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ProjectionCursor;
+import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Transactions;
 import convex.lattice.cursor.PathCursor;
@@ -129,7 +130,7 @@ class ValueComponentTest {
 		var component=new ValueComponent<ACell>(root) {
 			private final AForkableCursor<ACell> exposed=ProjectionCursor.create(root,
 				stored -> RT.getIn(stored,DATA),(stored,value) -> PathCursor.assocExisting(stored,value,DATA));
-			@Override public AForkableCursor<ACell> cursor() { return exposed; }
+			@Override protected AForkableCursor<ACell> cursor() { return exposed; }
 		};
 		assertEquals(Maps.of(NAME,CVMLong.ONE),component.value());
 		component.resolve(NAME).cursor().set(CVMLong.TWO);
@@ -308,5 +309,20 @@ class ValueComponentTest {
 		conflicting.cursor().set(CVMLong.ONE);
 		live.cursor().set(CVMLong.TWO);
 		assertThrows(MergeConflictException.class,conflicting::sync);
+	}
+
+	@Test void valueComponentsOverTheViewAreReadOnlyThroughout() {
+		AString a=Strings.create("a");
+		AString zero=Strings.create("0");
+		var root=new Root<ACell>(Maps.of(a,Vectors.of(CVMLong.ONE)));
+		var json=new JSONValueComponent<>(root.readOnly()).resolve(a,zero);
+		assertEquals(CVMLong.ONE,json.value());
+		assertThrows(ReadOnlyCursorException.class,() -> json.cursor().set(CVMLong.TWO));
+		var component=new ValueComponent<>(root.readOnly());
+		var literal=component.resolve(a);
+		assertThrows(ReadOnlyCursorException.class,() -> literal.cursor().set(Vectors.empty()));
+		assertThrows(ReadOnlyCursorException.class,component::sync);
+		assertEquals(Vectors.of(CVMLong.ONE),literal.sync());
+		assertEquals(Vectors.of(CVMLong.ONE),RT.getIn(root.get(),a));
 	}
 }

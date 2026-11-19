@@ -100,7 +100,7 @@ public class SigningServiceTest {
 		Index<Keyword, ACell> before = host.cursor().get();
 
 		SigningService svc = createService(AKeyPair.generate(), host.cursor());
-		assertTrue(svc.cursor().get().isEmpty());
+		assertTrue(svc.value().isEmpty());
 		assertTrue(svc.listKeys(s("did:key:alice")).isEmpty());
 		svc.sync();
 		assertSame(before, host.cursor().get(), "An unused service writes and signs nothing");
@@ -120,7 +120,7 @@ public class SigningServiceTest {
 		SignedData<AHashMap<Keyword, ACell>> signed = slot(host.cursor().get(), peerKP);
 		assertTrue(signed.checkSignature());
 		assertEquals(peerKP.getAccountKey(), signed.getAccountKey());
-		assertEquals(svc.cursor().get(), signed.getValue().get(SigningService.KEY_SIGNING));
+		assertEquals(svc.value(), signed.getValue().get(SigningService.KEY_SIGNING));
 	}
 
 	@Test
@@ -155,7 +155,7 @@ public class SigningServiceTest {
 		SigningService backup = new SigningService(LatticeHost.create().cursor(), peerKP,
 				() -> CVMLong.create(time.get()));
 		AccountKey backedUp = backup.createKey(alice, s("pass"));
-		AHashMap<Keyword, ACell> record = backup.cursor().get();
+		AHashMap<Keyword, ACell> record = backup.value();
 
 		// This copy's own record, under a secret of its own, is older than the backup
 		time.set(10);
@@ -304,7 +304,7 @@ public class SigningServiceTest {
 
 		// Peer 2 is given peer 1's record
 		SigningService svc2 = createService();
-		svc2.merge(svc1.cursor().get());
+		svc2.merge(svc1.value());
 		assertThrows(RuntimeException.class, () -> svc2.loadKey(s("did:key:alice"), pk, s("pass")),
 				"Different peer key should fail to decrypt the encryption secret");
 		assertThrows(RuntimeException.class, () -> svc2.createKey(s("did:key:bob"), s("pass")),
@@ -610,12 +610,12 @@ public class SigningServiceTest {
 	public void testChangePassphraseWrongOldThrows() {
 		SigningService svc = createService();
 		AccountKey pk = svc.createKey(s("did:key:alice"), s("correct"));
-		AHashMap<Keyword, ACell> before = svc.cursor().get();
+		AHashMap<Keyword, ACell> before = svc.value();
 
 		assertThrows(IllegalArgumentException.class,
 				() -> svc.changePassphrase(s("did:key:alice"), pk, s("wrong"), s("new")),
 				"Wrong old passphrase should throw");
-		assertSame(before, svc.cursor().get(), "A failed change leaves the record as it was");
+		assertSame(before, svc.value(), "A failed change leaves the record as it was");
 	}
 
 	@Test
@@ -666,7 +666,7 @@ public class SigningServiceTest {
 		AccountKey pk2 = oldSvc.createKey(s("did:key:alice"), s("pass2"));
 
 		// Re-wrap: decrypt the encryption secret with the old key, re-encrypt with the new key
-		AHashMap<Keyword, ACell> data = oldSvc.cursor().get();
+		AHashMap<Keyword, ACell> data = oldSvc.value();
 		byte[] rawSecret = oldSvc.decryptSecret((ABlob) data.get(SigningService.KEY_SECRET));
 		SigningService newSvc = createService(newKP, LatticeHost.create().cursor());
 		ABlob newEncryptedSecret = newSvc.encryptSecret(rawSecret);
@@ -704,7 +704,7 @@ public class SigningServiceTest {
 
 	@SuppressWarnings("unchecked")
 	private static Index<Hash, ABlob> keysIndex(SigningService svc) {
-		return (Index<Hash, ABlob>) svc.cursor().get().get(SigningService.KEY_KEYS);
+		return (Index<Hash, ABlob>) svc.value().get(SigningService.KEY_KEYS);
 	}
 
 	@Test

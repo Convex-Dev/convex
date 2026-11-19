@@ -322,7 +322,7 @@ public class QueueDemo {
 	@SuppressWarnings("unchecked")
 	private static void syncToStore(LatticeMQ mq) throws IOException {
 		// Get the unsigned topic-map data
-		ACell topicMapData = mq.cursor().get();
+		ACell topicMapData = mq.value();
 
 		// Sign with the owner's keypair (Ed25519)
 		SignedData<ACell> signed = keyPair.signData(topicMapData);

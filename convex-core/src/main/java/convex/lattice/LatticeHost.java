@@ -17,6 +17,7 @@ import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.core.store.Persister;
 import convex.core.util.Cleanup;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 
@@ -235,6 +236,15 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 		List<ALatticeComponent<V>> configured=applications;
 		for (ALatticeComponent<V> application:configured) application.mergeAt(value,path);
 		return cursor().get();
+	}
+
+	/**
+	 * Returns the root cursor, the destination of hosted applications. Writes through
+	 * it change this host's working state; they do not persist or replicate it.
+	 */
+	@Override
+	public AForkableCursor<V> cursor() {
+		return super.cursor();
 	}
 
 	/**

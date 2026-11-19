@@ -51,6 +51,9 @@ class LocalComponentRebindTest {
 		@Override public Notes fork() { return rebind(storage.fork()); }
 
 		void put(long value) { cursor().assoc(VALUE,CVMLong.create(value)); }
+
+		/** The storage this component is bound to, beneath its stamping view */
+		AForkableCursor<AHashMap<Keyword,ACell>> bound() { return storage(); }
 	}
 
 	@Test void nestedForkReinstallsStampingAndStopsAtItsDestination() {
@@ -58,13 +61,13 @@ class LocalComponentRebindTest {
 		var signatures=new AtomicInteger();
 		var time=new AtomicLong(10);
 		var notes=new Notes(root,() -> CVMLong.create(time.get()),signatures);
-		var supplied=notes.storage().fork();
+		var supplied=notes.bound().fork();
 		var draft=notes.rebind(supplied);
-		assertSame(supplied,draft.storage(),"Rebinding must not add another fork");
-		assertNull(draft.storage().get(),"Construction must not materialise a record");
+		assertSame(supplied,draft.bound(),"Rebinding must not add another fork");
+		assertNull(draft.bound().get(),"Construction must not materialise a record");
 		draft.put(1);
 		assertEquals(CVMLong.create(10),draft.value().get(Timestamped.TIMESTAMP));
-		assertNull(notes.storage().get());
+		assertNull(notes.bound().get());
 		draft.sync();
 		assertEquals(draft.value(),notes.value());
 		assertTrue(root.get().isEmpty());
@@ -88,7 +91,7 @@ class LocalComponentRebindTest {
 		var notes=new Notes(root,() -> CVMLong.create(time.get()),signatures);
 		notes.execute(draft -> {
 			draft.put(1);
-			assertNull(notes.storage().get());
+			assertNull(notes.bound().get());
 		});
 		assertEquals(CVMLong.ONE,notes.value().get(VALUE));
 		assertEquals(CVMLong.create(10),notes.value().get(Timestamped.TIMESTAMP));

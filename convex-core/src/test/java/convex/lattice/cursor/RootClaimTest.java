@@ -57,8 +57,9 @@ class RootClaimTest {
 			writer("getAndAccumulate",r -> r.getAndAccumulate(CVMLong.TWO,(a,b) -> b)),
 			writer("incoming merge",r -> convex.lattice.ComponentTestSupport.merge(r,MaxLattice.INSTANCE,CVMLong.TWO)),
 			writer("component publication",r -> {
-				var working=new LatticeComponent<>(MaxLattice.INSTANCE,r.fork(),convex.lattice.LatticeContext.EMPTY);
-				working.cursor().set(CVMLong.TWO);
+				var fork=r.fork();
+				var working=new LatticeComponent<>(MaxLattice.INSTANCE,fork,convex.lattice.LatticeContext.EMPTY);
+				fork.set(CVMLong.TWO);
 				working.sync();
 			}));
 	}

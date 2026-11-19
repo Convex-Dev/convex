@@ -23,6 +23,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSDrives;
 import convex.lattice.LatticeHost;
+import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFSNode;
 
@@ -36,7 +37,7 @@ public class DLFSDrivesTest {
 		assertNotNull(drive);
 		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"preserved");
 		var oldPath=drive.fileSystem().getPath("/hello.txt");
-		var before=drives.cursor().get();
+		var before=drives.value();
 		time.set(CVMLong.create(200));
 		assertSame(drive,drives.getOrCreateDrive("home",0));
 		assertNull(drives.createDrive("home"));
@@ -49,38 +50,38 @@ public class DLFSDrivesTest {
 		var reopened=drives.getOrCreateDrive("home",1);
 		assertNotSame(drive,reopened);
 		assertEquals("preserved",Files.readString(reopened.fileSystem().getPath("/hello.txt")));
-		assertSame(before,drives.cursor().get(),"opening must not change any lattice state");
+		assertSame(before,drives.value(),"opening must not change any lattice state");
 	}
 
 	@Test
 	public void testInvalidAndMalformedEntriesPreserved() {
-		var drives=DLFSDrives.create();
 		var malformed=Vectors.<ACell>of(CVMLong.ONE);
-		drives.cursor().set(Maps.of(Strings.create("broken"),malformed));
-		var before=drives.cursor().get();
+		var drives=DLFSDrives.wrap(Cursors.root(Maps.of(Strings.create("broken"),malformed)));
+		var before=drives.value();
 		assertNull(drives.getOrCreateDrive(null));
 		assertNull(drives.getOrCreateDrive("../invalid"));
 		assertNull(drives.getOrCreateDrive("broken"));
 		assertNull(drives.getOrCreateDrive("absent",0));
 		assertNull(drives.getOrCreateDrive("absent",-1));
-		assertSame(before,drives.cursor().get());
+		assertSame(before,drives.value());
 	}
 
 	@Test
 	public void testRecreateUsesExactClockAndPreservesLocalTie() throws Exception {
 		var time=CVMLong.create(100);
-		var drives=DLFSDrives.create(() -> time);
+		var stored=Cursors.root(DLFSDrives.LATTICE.zero());
+		var drives=DLFSDrives.wrap(stored,() -> time);
 		var old=drives.getOrCreateDrive("home",1);
 		Files.writeString(old.fileSystem().getPath("/old.txt"),"deleted");
 		assertTrue(drives.deleteDrive("home"));
 		assertFalse(old.isOpen());
-		var tombstone=drives.cursor().get();
+		var tombstone=drives.value();
 		var recreated=drives.getOrCreateDrive("home",1);
 		assertNotNull(recreated);
 		assertNotSame(old,recreated);
 		assertFalse(Files.exists(recreated.fileSystem().getPath("/old.txt")));
-		assertEquals(time,DLFSNode.getUTime(recreated.cursor().get()));
-		drives.cursor().updateAndGet(own->DLFSDrives.LATTICE.merge(own,tombstone));
+		assertEquals(time,DLFSNode.getUTime(recreated.value()));
+		stored.updateAndGet(own->DLFSDrives.LATTICE.merge(own,tombstone));
 		assertEquals(DLFSDrives.DriveStatus.LIVE,drives.driveStatus("home"));
 	}
 
@@ -100,7 +101,7 @@ public class DLFSDrivesTest {
 			var time=CVMLong.create(123);
 			var drives=DLFSDrives.connect(host.cursor(),host.store(),() -> time);
 			var drive=drives.getOrCreateDrive("home");
-			assertEquals(time,DLFSNode.getUTime(drive.cursor().get()));
+			assertEquals(time,DLFSNode.getUTime(drive.value()));
 		}
 	}
 

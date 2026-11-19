@@ -237,14 +237,14 @@ public class DLFSDriveManagerTest {
 		DLFSDriveManager manager=new DLFSDriveManager(drives);
 		assertTrue(manager.createDrive(null,"home"));
 		FileSystem first=manager.getDrive(null,"home");
-		AHashMap<AString,AVector<ACell>> registry=drives.cursor().get();
+		AHashMap<AString,AVector<ACell>> registry=drives.value();
 
 		first.close();
 		FileSystem reopened=manager.getDrive(null,"home");
 
 		assertNotSame(first,reopened);
 		assertTrue(reopened.isOpen());
-		assertEquals(registry,drives.cursor().get());
+		assertEquals(registry,drives.value());
 		assertEquals(List.of("home"),manager.listDrives(null));
 	}
 

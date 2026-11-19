@@ -136,7 +136,7 @@ public class ConvexDBClockTest {
 		SQLSchema sourceTables = source.database(DB).tables();
 		sourceTables.createTable(TABLE, new String[] {"id", "v"});
 		sourceTables.insert(TABLE, 1, "one");
-		var remote = source.cursor().get();
+		var remote = source.value();
 
 		var host = host();
 		ConvexDB cdb = hosted(host, NO_CLOCK);
@@ -155,7 +155,7 @@ public class ConvexDBClockTest {
 		AKeyPair local = AKeyPair.generate();
 		AKeyPair other = AKeyPair.generate();
 		SQLDatabase replica = SQLDatabase.create(DB, other, other.getAccountKey(), RowLWW::merge, new Clock());
-		replica.cursor().set(source.database(DB).cursor().get());
+		replica.merge(source.database(DB).value());
 		SQLDatabase db = SQLDatabase.create(DB, local, local.getAccountKey(), RowLWW::merge, NO_CLOCK);
 		assertEquals(1, db.mergeReplicas(replica.exportReplica()));
 		assertEquals(1, db.tables().getRowCount(TABLE));

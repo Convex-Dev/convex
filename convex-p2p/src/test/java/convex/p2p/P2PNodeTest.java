@@ -294,11 +294,8 @@ public class P2PNodeTest {
 		node = observe(track(P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate())));
 
 		var host=node.getNodeServer().getHost();
-		var root=host.cursor();
-		var application=node.getApplication().cursor();
-		assertSame(root,application);
 		assertNotNull(node.getApplication().getLattice());
-		assertSame(root.get(),application.get());
+		assertSame(host.cursor().get(),node.getApplication().value());
 		assertNotNull(node.getApplication().getLattice().path(Social.KEY_SOCIAL));
 		assertNotNull(node.getApplication().getLattice().path(Keywords.P2P, Keywords.NODES));
 	}

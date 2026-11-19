@@ -37,7 +37,7 @@ public class LatticeQueueTest {
 			assertThrows(UnsupportedOperationException.class,() -> queue.offer(CVMLong.ONE));
 			assertThrows(UnsupportedOperationException.class,() -> queue.setMeta(CVMLong.ONE,CVMLong.TWO));
 			assertThrows(UnsupportedOperationException.class,() -> queue.truncate(1));
-			assertNull(queue.cursor().get());
+			assertNull(queue.value());
 		}
 		assertNull(root.get());
 		root.set(QueueLattice.INSTANCE.zero());
@@ -355,14 +355,6 @@ public class LatticeQueueTest {
 		// fork1's entries should win (longer)
 		assertEquals(4L, root.size());
 		assertEquals(Strings.create("f1-c"), root.peek(3));
-	}
-
-	// ===== Cursor Access =====
-
-	@Test
-	public void testCursorAccess() {
-		LatticeQueue q = LatticeQueue.create();
-		assertNotNull(q.cursor());
 	}
 
 	// ===== Entry Timestamps =====

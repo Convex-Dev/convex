@@ -93,29 +93,29 @@ public class DLFSApplicationTest {
 		var tolerant=host.addApplication(new DLFSApplication(host,null,time::get,30,tolerantKey));
 		var source=new DLFSApplication(owned(LatticeHost.create()),OWNER::signData,() -> CVMLong.create(90),30);
 		source.drives(OWNER.getAccountKey()).createDrive("home");
-		var baseline=source.dlfs().cursor().get();
+		var baseline=source.dlfs().value();
 		host.merge(Index.of(strictKey,baseline,tolerantKey,baseline));
 		var later=new DLFSApplication(owned(LatticeHost.create()),OWNER::signData,() -> CVMLong.create(130),30);
 		later.drives(OWNER.getAccountKey()).createDrive("home");
-		var region=later.dlfs().cursor().get();
+		var region=later.dlfs().value();
 		var signed=region.get(OWNER.getAccountKey());
 		// A root delivery gives the same envelope to two different application policies.
 		host.merge(Index.of(strictKey,region,tolerantKey,region));
-		assertEquals(baseline,strict.dlfs().cursor().get());
-		assertSame(signed,tolerant.dlfs().cursor().get().get(OWNER.getAccountKey()));
+		assertEquals(baseline,strict.dlfs().value());
+		assertSame(signed,tolerant.dlfs().value().get(OWNER.getAccountKey()));
 		// Path delivery uses the same rule. Advancing only the component clock admits it.
 		host.mergeAt(signed,strictKey,OWNER.getAccountKey());
-		assertEquals(baseline,strict.dlfs().cursor().get());
+		assertEquals(baseline,strict.dlfs().value());
 		time.set(CVMLong.create(130));
 		host.mergeAt(signed,strictKey,OWNER.getAccountKey());
-		assertSame(signed,strict.dlfs().cursor().get().get(OWNER.getAccountKey()));
+		assertSame(signed,strict.dlfs().value().get(OWNER.getAccountKey()));
 	}
 
 	@Test void rootRegionAndOwnerDeliveryEnforceTheSameSignedBoundary() throws Exception {
 		var source=files(owned(LatticeHost.create()));
 		Files.writeString(source.drives(OWNER.getAccountKey()).createDrive("home")
 			.fileSystem().getPath("/hello"),"hello");
-		var region=source.dlfs().cursor().get();
+		var region=source.dlfs().value();
 		var signed=region.get(OWNER.getAccountKey());
 		var forged=SignedData.create(OWNER.getAccountKey(),signed.getSignature(),Ref.get(Maps.empty()));
 
@@ -123,10 +123,10 @@ public class DLFSApplicationTest {
 			var host=owned(LatticeHost.create());
 			var app=files(host);
 			host.cursor().updateAndGet(root -> root.assoc(UNRELATED,CVMLong.ONE));
-			if (depth==0) host.merge(source.cursor().get().assoc(UNRELATED,CVMLong.TWO));
+			if (depth==0) host.merge(source.value().assoc(UNRELATED,CVMLong.TWO));
 			else if (depth==1) host.mergeAt(region,Keywords.FS);
 			else host.mergeAt(signed,Keywords.FS,OWNER.getAccountKey());
-			assertEquals(region,app.dlfs().cursor().get());
+			assertEquals(region,app.dlfs().value());
 			var before=host.cursor().get();
 
 			// Replays, wrong signers, corrupt signatures and unsigned interiors are inert.
@@ -214,7 +214,7 @@ public class DLFSApplicationTest {
 			.updateAndGet(value -> value.assoc(UNRELATED,CVMLong.ONE));
 		var source=files(owned(LatticeHost.create()));
 		source.drives(OWNER.getAccountKey()).createDrive("remote");
-		host.mergeAt(source.dlfs().cursor().get(),projects,documents);
+		host.mergeAt(source.dlfs().value(),projects,documents);
 		assertNotNull(app.drives(OWNER.getAccountKey()).drive("remote"));
 		assertEquals(CVMLong.ONE,host.cursor().<Index<Keyword,ACell>>path(projects).get().get(UNRELATED));
 	}

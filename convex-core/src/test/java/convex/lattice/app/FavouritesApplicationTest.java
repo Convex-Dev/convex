@@ -174,14 +174,14 @@ class FavouritesApplicationTest {
 		var alice=app.user(ALICE);
 		appClock.set(CVMLong.create(123));
 		assertNull(alice.sync(),"Sync returns the absent bound value without materialising editing defaults");
-		assertEquals(Maps.empty(),alice.cursor().get());
+		assertEquals(Maps.empty(),alice.value());
 		assertNull(app.component().get(ALICE.getAccountKey()),"Reading the default view creates no envelope");
 		alice.cursor().assoc(Keyword.intern("note"),CVMLong.ONE);
 		var record=app.component().get(ALICE.getAccountKey());
 		assertEquals(CVMLong.create(123),record.getValue().get(TIMESTAMP));
 		assertTrue(record.checkSignature());
 		appClock.set(CVMLong.create(456));
-		alice.cursor().set(alice.cursor().get());
+		alice.cursor().set(alice.value());
 		assertSame(record,app.component().get(ALICE.getAccountKey()));
 	}
 
@@ -225,7 +225,7 @@ class FavouritesApplicationTest {
 		assertEquals(CVMLong.create(200),app.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 		assertTrue(app.component().get(ALICE.getAccountKey()).checkSignature());
 		app.sync();
-		assertEquals(app.component().cursor().get(),host.cursor().get().get(FAVOURITES));
+		assertEquals(app.component().value(),host.cursor().get().get(FAVOURITES));
 	}
 
 	/**
@@ -257,7 +257,7 @@ class FavouritesApplicationTest {
 			assertEquals(CVMLong.create(100),app.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 			assertEquals(Index.<Keyword,ACell>none(),host.cursor().get());
 			app.sync();
-			assertEquals(app.component().cursor().get(),host.cursor().get().get(FAVOURITES));
+			assertEquals(app.component().value(),host.cursor().get().get(FAVOURITES));
 		}
 	}
 
@@ -305,7 +305,7 @@ class FavouritesApplicationTest {
 		localHost.merge(older); // Replays cannot resurrect the removed item.
 		assertNull(localHost.cursor().getOrDefault(null,FAVOURITES,CHARLIE.getAccountKey()),
 			"Incoming merges wait for application publication");
-		assertEquals(local.component().cursor().get(),replica.component().cursor().get());
+		assertEquals(local.component().value(),replica.component().value());
 		assertEquals(Sets.of(40),local.items(CHARLIE.getAccountKey()));
 		assertEquals(remote.component().get(CHARLIE.getAccountKey()),local.component().get(CHARLIE.getAccountKey()),
 			"The application adopts Charlie's original signed record without his private key");
@@ -315,7 +315,7 @@ class FavouritesApplicationTest {
 		assertTrue(local.component().get(CHARLIE.getAccountKey()).checkSignature());
 		local.sync();
 		replica.sync();
-		assertEquals(local.component().cursor().get(),localHost.cursor().get().get(FAVOURITES));
+		assertEquals(local.component().value(),localHost.cursor().get().get(FAVOURITES));
 		assertEquals(localHost.cursor().get(),replicaHost.cursor().get());
 	}
 
@@ -407,7 +407,7 @@ class FavouritesApplicationTest {
 		assertEquals(Sets.of(20,30),local.items(ALICE.getAccountKey()));
 		assertEquals(CVMLong.create(300),local.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 		local.sync();
-		assertEquals(local.component().cursor().get(),localHost.cursor().get().get(FAVOURITES));
+		assertEquals(local.component().value(),localHost.cursor().get().get(FAVOURITES));
 	}
 
 	/** Owner authorisation and payload integrity are separate checks, both enforced on incoming state. */
@@ -463,7 +463,7 @@ class FavouritesApplicationTest {
 		assertTrue(host.cursor().get().isEmpty(),"only the application that made the region publishes it");
 		first.sync();
 		var published=host.cursor().get();
-		assertEquals(first.component().cursor().get(),published.get(FAVOURITES));
+		assertEquals(first.component().value(),published.get(FAVOURITES));
 		assertEquals(CVMLong.create(200),first.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 		host.merge(published); // Both registered applications deliver to the same region.
 		first.sync();
@@ -508,7 +508,7 @@ class FavouritesApplicationTest {
 		pathHost.addApplication(pathApp);
 		rootHost.merge(sourceHost.cursor().get());
 		pathHost.mergeAt(source.component().get(CHARLIE.getAccountKey()),FAVOURITES,CHARLIE.getAccountKey());
-		assertEquals(rootApp.component().cursor().get(),pathApp.component().cursor().get());
+		assertEquals(rootApp.component().value(),pathApp.component().value());
 		assertTrue(rootHost.cursor().get().isEmpty());
 		assertTrue(pathHost.cursor().get().isEmpty());
 		rootApp.sync();

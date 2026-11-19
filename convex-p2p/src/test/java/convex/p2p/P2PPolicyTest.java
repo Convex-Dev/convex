@@ -22,6 +22,7 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -54,9 +55,9 @@ public class P2PPolicyTest {
 		assertEquals(3,signatures.get());
 		assertEquals(Strings.create("updated"),app.identity(BOB.getAccountKey()).getIdentity().get(P2PLattice.ID_NAME));
 		// A record placed under another owner's key is refused by the bound owner rule.
-		var before=app.cursor().get();
+		var before=app.value();
 		app.mergeAt(Maps.of(ALICE.getAccountKey(),incoming.get(BOB.getAccountKey())),P2PLattice.KEY_ID);
-		assertSame(before,app.cursor().get());
+		assertSame(before,app.value());
 	}
 
 	/** A node record names the top-level regions its application serves. */
@@ -135,16 +136,16 @@ public class P2PPolicyTest {
 		var aView=social.user(a);
 		aView.feed().post("Alice");
 		social.user(b).feed().post("Bob");
-		assertEquals(ALICE.getAccountKey(),social.cursor().get().get(a).getAccountKey());
-		assertEquals(BOB.getAccountKey(),social.cursor().get().get(b).getAccountKey());
-		var old=social.cursor().get().get(a);
+		assertEquals(ALICE.getAccountKey(),social.value().get(a).getAccountKey());
+		assertEquals(BOB.getAccountKey(),social.value().get(b).getAccountKey());
+		var old=social.value().get(a);
 		keys.put(a,BOB);
 		app.social(a,BOB);
 		aView.feed().post("rotated");
-		assertEquals(BOB.getAccountKey(),social.cursor().get().get(a).getAccountKey());
-		var before=app.cursor().get();
+		assertEquals(BOB.getAccountKey(),social.value().get(a).getAccountKey());
+		var before=app.value();
 		app.mergeAt(old,Social.KEY_SOCIAL,a);
-		assertSame(before,app.cursor().get());
+		assertSame(before,app.value());
 	}
 
 	@Test void relayPreservesUnknownFieldsAndRechecksCurrentAuthority() {
@@ -158,12 +159,12 @@ public class P2PPolicyTest {
 		var value=convex.core.data.Index.of(convex.core.data.Keyword.intern("future-field"),CVMLong.ONE);
 		var signed=ALICE.signData(value);
 		app.mergeAt(signed,Social.KEY_SOCIAL,did);
-		assertSame(signed,app.cursor().get(Social.KEY_SOCIAL,did));
-		var root=app.cursor().get();
+		assertSame(signed,RT.getIn(app.value(),Social.KEY_SOCIAL,did));
+		var root=app.value();
 		assertEquals(Maps.of(did,signed),app.policy().projectRoot(root).get(Social.KEY_SOCIAL));
 		key.set(BOB.getAccountKey());
 		assertEquals(Maps.empty(),app.policy().projectRoot(root).get(Social.KEY_SOCIAL),
 			"A previously validated signer must not bypass the current authority rule");
-		assertSame(root,app.cursor().get(),"Revocation does not retroactively delete accepted state");
+		assertSame(root,app.value(),"Revocation does not retroactively delete accepted state");
 	}
 }

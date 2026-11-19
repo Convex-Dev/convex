@@ -50,7 +50,8 @@ public class AccountInfoPanelTest {
 	@Test void legacyModelAndDomainComponentUseTheSameView() throws Exception {
 		var account=AccountStatus.create(1000L,Init.DEFAULT_GENESIS_KEY);
 		var model=StateModel.create(State.EMPTY.putAccount(Address.ZERO,account));
-		var component=new ValueComponent<>(Root.create(account));
+		var stored=Root.create(account);
+		var component=new ValueComponent<>(stored);
 		Probe[] panels=new Probe[2];
 		EventQueue.invokeAndWait(() -> {
 			panels[0]=new Probe(model,Address.ZERO);
@@ -61,10 +62,10 @@ public class AccountInfoPanelTest {
 			expectText(panels,getInfoText(account));
 			var updated=account.withBalance(2000);
 			model.setValue(State.EMPTY.putAccount(Address.ZERO,updated));
-			component.cursor().set(updated);
+			stored.set(updated);
 			expectText(panels,getInfoText(updated));
 			model.setValue(State.EMPTY);
-			component.cursor().set((AccountStatus)null);
+			stored.set((AccountStatus)null);
 			expectText(panels,getInfoText(null));
 		} finally {
 			List<Executable> closes=new ArrayList<>();

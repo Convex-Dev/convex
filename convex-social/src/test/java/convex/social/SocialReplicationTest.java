@@ -36,15 +36,15 @@ class SocialReplicationTest {
 		assertNotEquals(first,second);
 		assertEquals(100,SocialPost.extractTimestamp(first));
 		assertEquals(100,SocialPost.extractTimestamp(second));
-		var beforeA=a.cursor().get();
-		var beforeB=b.cursor().get();
+		var beforeA=a.value();
+		var beforeB=b.value();
 		a.merge(beforeB);
 		b.merge(beforeA);
-		assertEquals(a.cursor().get(),b.cursor().get());
+		assertEquals(a.value(),b.value());
 		assertEquals(2,a.user(owner).feed().count());
 		assertEquals("first",SocialPost.getText(a.user(owner).feed().getPost(first)));
 		assertEquals("second",SocialPost.getText(a.user(owner).feed().getPost(second)));
-		assertTrue(a.cursor().get().get(DID.forKey(owner)).checkSignature());
+		assertTrue(a.value().get(DID.forKey(owner)).checkSignature());
 	}
 
 	@Test void opaqueSectionsDoNotPreventOtherSectionsMerging() {
@@ -62,12 +62,12 @@ class SocialReplicationTest {
 			var did=DID.forKey(ALICE.getAccountKey());
 			var envelope=ALICE.signData(foreign);
 			social.merge(Maps.of(did,envelope));
-			assertSame(envelope,social.cursor().get().get(did),"Receipt preserves an unfamiliar signed payload");
+			assertSame(envelope,social.value().get(did),"Receipt preserves an unfamiliar signed payload");
 			Index<Keyword,ACell> update=Index.of(SocialLattice.KEY_PROFILE,profile,
 				SocialLattice.KEY_FEED,Index.of(SocialPost.createKey(100,0),SocialPost.createPost("known",100)),
 				SocialLattice.KEY_FOLLOWING,Index.of(SocialPost.TIMESTAMP,CVMLong.ONE,SocialLattice.KEY_FOLLOWS,Maps.empty()));
 			social.merge(Maps.of(did,ALICE.signData(update)));
-			var result=social.cursor().get().get(did).getValue();
+			var result=social.value().get(did).getValue();
 			assertEquals(opaque,result.get(SocialLattice.KEY_FEED));
 			assertEquals(opaque,result.get(extension));
 			assertEquals(profile,result.get(SocialLattice.KEY_PROFILE));

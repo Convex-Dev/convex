@@ -76,7 +76,9 @@ class SharedRegionsTest {
 		b.sync(); // both moved: each publication touches only its region
 		assertEquals(Sets.of(1,3,5),region(host,A));
 		assertEquals(Sets.of(2,4),region(host,B));
-		assertSame(host.cursor(),b.cursor(),"the container is a view of the host, not a private copy");
+		aItems.add(6);
+		a.sync();
+		assertSame(host.cursor().get(),b.value(),"the container is a view of the host, not a private copy");
 	}
 
 	/** One incoming root updates both working regions, whose publication remains independent. */
@@ -91,8 +93,8 @@ class SharedRegionsTest {
 
 		host.merge(Index.<Keyword,ACell>none().assoc(A,Sets.of(1)).assoc(B,Sets.of(2)));
 		assertTrue(host.cursor().get().isEmpty(),"staged regions merge into their own copies");
-		assertEquals(Sets.of(1),aItems.cursor().get());
-		assertEquals(Sets.of(2),bItems.cursor().get());
+		assertEquals(Sets.of(1),aItems.value());
+		assertEquals(Sets.of(2),bItems.value());
 
 		// Publishing :a neither discards nor implicitly publishes :b's received working state.
 		a.sync();

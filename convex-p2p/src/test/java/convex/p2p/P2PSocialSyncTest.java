@@ -271,7 +271,7 @@ public class P2PSocialSyncTest {
 
 	private void assertMaterialised(Social social,Set<AString> expected) {
 		for (AString did:Set.of(aliceDid,bobDid,carolDid,daveDid)) {
-			boolean present=social.cursor().get()!=null && social.cursor().get().get(did)!=null;
+			boolean present=social.value()!=null && social.value().get(did)!=null;
 			assertEquals(expected.contains(did),present,"Unexpected materialisation for "+did);
 		}
 	}

@@ -151,11 +151,11 @@ public class QueueLatticeTest {
 	public void validAppendAndTruncationStillMerge() {
 		var queue=LatticeQueue.create(() -> CVMLong.ONE);
 		for (int i=0;i<100;i++) queue.offer(CVMLong.create(i));
-		var before=queue.cursor().get();
+		var before=queue.value();
 		queue.offer(CVMLong.create(100));
-		assertEquals(queue.cursor().get(),L.merge(before,queue.cursor().get()));
+		assertEquals(queue.value(),L.merge(before,queue.value()));
 		queue.truncate(50);
-		assertEquals(queue.cursor().get(),L.merge(before,queue.cursor().get()));
+		assertEquals(queue.value(),L.merge(before,queue.value()));
 	}
 
 	// ===== Helpers =====

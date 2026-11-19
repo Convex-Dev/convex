@@ -427,7 +427,7 @@ public class ConvexDriverTest {
 			c.setReadOnly(true);
 		}
 		var instance = ConvexDriver.instances.get("file:" + file.getCanonicalPath());
-		assertEquals(instance.cdb.cursor().get(), instance.store.getRootData());
+		assertEquals(instance.cdb.value(), instance.store.getRootData());
 	}
 
 	// ========== Direct API ==========

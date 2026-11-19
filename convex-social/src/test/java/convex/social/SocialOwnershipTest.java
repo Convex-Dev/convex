@@ -44,7 +44,7 @@ public class SocialOwnershipTest {
 		fork.sync();
 		for (var did:List.of(A,B)) {
 			assertEquals(3,social.user(did).feed().count());
-			var envelope=social.cursor().get().get(did);
+			var envelope=social.value().get(did);
 			assertEquals(keys.get(did).getAccountKey(),envelope.getAccountKey());
 			assertTrue(envelope.checkSignature());
 		}
@@ -52,7 +52,7 @@ public class SocialOwnershipTest {
 		// Rotation changes the resolver, not the existing component tree.
 		keys.put(A,BOB);
 		aView.feed().post("rotated");
-		assertEquals(BOB.getAccountKey(),social.cursor().get().get(A).getAccountKey());
+		assertEquals(BOB.getAccountKey(),social.value().get(A).getAccountKey());
 		// A transaction view retains the same owner-aware signer and clock.
 		time.set(CVMLong.create(400));
 		social.execute(draft -> {
@@ -62,9 +62,9 @@ public class SocialOwnershipTest {
 		});
 		assertEquals(4,social.user(B).feed().count());
 		keys.remove(A);
-		var before=social.cursor().get();
+		var before=social.value();
 		assertThrows(IllegalStateException.class,() -> aView.feed().post("unavailable"));
-		assertSame(before,social.cursor().get());
+		assertSame(before,social.value());
 	}
 
 	@Test void relayAndWrongSignerCannotAuthorButCanSelectExistingEnvelopes() {
@@ -74,20 +74,20 @@ public class SocialOwnershipTest {
 		left.user(A).feed().post("left");
 		right.user(A).feed().post("right");
 		var relay=Social.create(authority,null,() -> CVMLong.ZERO);
-		relay.merge(left.cursor().get());
-		var before=relay.cursor().get();
-		relay.merge(right.cursor().get());
-		assertSame(before,relay.cursor().get());
+		relay.merge(left.value());
+		var before=relay.value();
+		relay.merge(right.value());
+		assertSame(before,relay.value());
 		assertThrows(IllegalStateException.class,() -> relay.user(A).feed().post("no authority"));
 		var wrong=Social.create(authority,(owner,value) -> BOB.signData(value),() -> CVMLong.ZERO);
 		wrong.merge(before);
-		wrong.merge(right.cursor().get());
-		assertEquals(before,wrong.cursor().get());
+		wrong.merge(right.value());
+		assertEquals(before,wrong.value());
 		assertThrows(IllegalStateException.class,() -> wrong.user(A).feed().post("wrong key"));
-		left.merge(right.cursor().get());
-		relay.mergeAt(left.cursor().get().get(A),A);
+		left.merge(right.value());
+		relay.mergeAt(left.value().get(A),A);
 		assertEquals(2,relay.user(A).feed().count());
-		assertSame(left.cursor().get().get(A),relay.cursor().get().get(A));
+		assertSame(left.value().get(A),relay.value().get(A));
 	}
 
 	@Test void failedSigningDuringReconciliationIsAtomic() {
@@ -101,12 +101,12 @@ public class SocialOwnershipTest {
 		social.user(ALICE.getAccountKey()).feed().post("live");
 		time.set(CVMLong.create(200));
 		fork.user(ALICE.getAccountKey()).feed().post("draft");
-		var live=social.cursor().get();
-		var draft=fork.cursor().get();
+		var live=social.value();
+		var draft=fork.value();
 		fail.set(true);
 		assertThrows(IllegalStateException.class,fork::sync);
-		assertSame(live,social.cursor().get());
-		assertSame(draft,fork.cursor().get());
+		assertSame(live,social.value());
+		assertSame(draft,fork.value());
 		fail.set(false);
 		fork.sync();
 		assertEquals(2,social.user(ALICE.getAccountKey()).feed().count());

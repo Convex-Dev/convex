@@ -62,11 +62,11 @@ class NodeApplicationIngressTest {
 			var app=new App(host);
 			host.addApplication(app);
 			try (var node=new NodeServer<>(host)) {
-				assertEquals(retained,app.cursor().get());
+				assertEquals(retained,app.value());
 				assertFalse(node.isRunning());
 				node.launch();
 				node.mergeAt(Sets.of(CVMLong.TWO),ITEMS);
-				assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS));
+				assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.value().get(ITEMS));
 				assertEquals(retained,node.getLocalValue());
 				assertEquals(0,app.preparations);
 				assertThrows(IllegalStateException.class,node::launch);
@@ -113,7 +113,7 @@ class NodeApplicationIngressTest {
 				var app=new App(node.getHost());
 			node.getHost().addApplication(app);
 			node.launch();
-				assertEquals(retained,app.cursor().get());
+				assertEquals(retained,app.value());
 				assertEquals(retained,store.getRootData());
 			}
 		}
@@ -130,12 +130,12 @@ class NodeApplicationIngressTest {
 				node.mergeValue(incoming);
 				node.mergeAt(Sets.of(CVMLong.TWO),ITEMS);
 				assertEquals(2,app.merges);
-				assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS));
+				assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.value().get(ITEMS));
 				assertEquals(LATTICE.zero(),node.getLocalValue());
 				assertEquals(0,app.preparations);
 				app.sync();
 				root.sync();
-				assertEquals(app.cursor().get(),store.getRootData());
+				assertEquals(app.value(),store.getRootData());
 			}
 		}
 	}
@@ -172,14 +172,14 @@ class NodeApplicationIngressTest {
 				var payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.ONE,Vectors.of(ITEMS),first);
 				var result=peer.message(Message.create(MessageType.LATTICE_VALUE,payload)).get(5,TimeUnit.SECONDS);
 				assertFalse(result.isError(),result.toString());
-				assertEquals(first,app.cursor().get().get(ITEMS));
+				assertEquals(first,app.value().get(ITEMS));
 				assertEquals(LATTICE.zero(),node.getLocalValue());
 				assertEquals(LATTICE.zero(),store.getRootData());
 				assertEquals(0,app.preparations);
 				var announced=group.nextAnnounce();
 				app.sync();
 				node.getHost().sync();
-				assertEquals(app.cursor().get(),announced.get(5,TimeUnit.SECONDS));
+				assertEquals(app.value(),announced.get(5,TimeUnit.SECONDS));
 			}
 		}
 	}
@@ -200,7 +200,7 @@ class NodeApplicationIngressTest {
 			assertEquals(LATTICE.zero(),store.getRootData());
 			app.ignore=false;
 			node.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
-			assertEquals(incoming,app.cursor().get(),"host schema must not filter application paths");
+			assertEquals(incoming,app.value(),"host schema must not filter application paths");
 			assertEquals(0,app.preparations);
 		}
 	}
@@ -227,7 +227,7 @@ class NodeApplicationIngressTest {
 			assertNull(node.pullPath(group,null,ITEMS).get(5,TimeUnit.SECONDS));
 			assertTrue(node.pull(group));
 			assertEquals(3,app.merges);
-			assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS));
+			assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.value().get(ITEMS));
 			assertEquals(LATTICE.zero(),store.getRootData());
 			assertEquals(0,app.preparations);
 		}

@@ -32,6 +32,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.RefSoft;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.crypto.AKeyPair;
@@ -66,11 +67,11 @@ public class DLFSComponentTest {
 		var lattice=KeyedLattice.create(projects,convex.lattice.generic.MapLattice.create(workspace));
 		var store=new MemoryStore();
 		try (var root=LatticeHost.create(lattice.zero(),store)) {
-			var app=new LatticeComponent<>(lattice,root.cursor().fork());
+			var working=root.cursor().fork();
+			var app=new LatticeComponent<>(lattice,working);
 			var key=AKeyPair.generate();
-			var attached=DLFSRegion.connect(documents(app.cursor(),projects,project),
-				null,key::signData,() -> CVMLong.create(123));
-			var destination=attached.cursor();
+			AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination=documents(working,projects,project);
+			var attached=DLFSRegion.connect(destination,null,key::signData,() -> CVMLong.create(123));
 			var files=attached.fork();
 			var liveDrive=files.drives(key.getAccountKey()).getOrCreateDrive("home");
 			var draft=liveDrive.fork();
@@ -78,14 +79,14 @@ public class DLFSComponentTest {
 			assertFalse(Files.exists(liveDrive.fileSystem().getPath("/draft.txt")));
 			draft.fileSystem().sync();
 			assertEquals("embedded subsystem",Files.readString(liveDrive.fileSystem().getPath("/draft.txt")));
-			assertEquals(lattice.zero(),app.cursor().get());
+			assertEquals(lattice.zero(),app.value());
 			liveDrive.sync();
-			assertEquals(lattice.zero(),app.cursor().get(),"child sync cannot publish its enclosing component");
+			assertEquals(lattice.zero(),app.value(),"child sync cannot publish its enclosing component");
 			files.sync();
 			assertNotNull(destination.get());
 			assertEquals(lattice.zero(),root.cursor().get());
 			app.sync();
-			assertEquals(app.cursor().get(),root.cursor().get());
+			assertEquals(app.value(),root.cursor().get());
 			org.junit.jupiter.api.Assertions.assertNull(store.getRootData());
 			root.sync();
 			assertEquals(root.cursor().get(),store.getRootData());
@@ -226,7 +227,7 @@ public class DLFSComponentTest {
 			application.sync();
 			host.sync();
 			store.flush();
-			assertEquals(application.cursor().get(),store.getRootData());
+			assertEquals(application.value(),store.getRootData());
 		}
 
 		try (EtchStore reopened=EtchStore.create(storeFile);
@@ -249,13 +250,11 @@ public class DLFSComponentTest {
 				var host=LatticeHost.open(convex.lattice.Lattice.ROOT.zero(),store)) {
 			DLFSApplication application=
 				new DLFSApplication(host,hostKey::signData);
-			Index<Keyword,ACell> before=application.cursor().get();
+			Index<Keyword,ACell> before=application.value();
 
 			assertNotSame(application.drives(hostKey.getAccountKey()),
 				application.drives(hostKey.getAccountKey()));
-			assertNotSame(application.drives(hostKey.getAccountKey()).cursor(),
-				application.drives(otherOwner).cursor());
-			assertSame(before,application.cursor().get(),
+			assertSame(before,application.value(),
 				"looking up an owner component must not write signed state");
 		}
 	}

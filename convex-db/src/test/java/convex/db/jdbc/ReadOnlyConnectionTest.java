@@ -40,16 +40,15 @@ class ReadOnlyConnectionTest {
 		assertSame(reader, reader.readOnly());
 		assertNull(reader.getKeyPair());
 		assertTrue(reader.isReadOnly());
-		assertSame(db.cursor().get(), reader.cursor().get());
+		assertSame(db.value(), reader.value());
 		var snapshot = reader.fork();
 		db.tables().insert("t", 1L);
 		assertNotNull(reader.tables().selectByKey("t", CVMLong.ONE));
 		assertNull(snapshot.tables().selectByKey("t", CVMLong.ONE));
 		assertThrows(ReadOnlyCursorException.class, () -> reader.tables().insert("t", 2L));
 		assertThrows(ReadOnlyCursorException.class, () -> snapshot.tables().insert("t", 2L));
-		assertThrows(ReadOnlyCursorException.class, () -> reader.cursor().set(db.cursor().get()));
 		assertThrows(ReadOnlyCursorException.class, snapshot::sync);
-		var rebound = reader.rebind(Root.create(db.cursor().get()));
+		var rebound = reader.rebind(Root.create(db.value()));
 		assertTrue(rebound.isReadOnly());
 		assertNull(rebound.getKeyPair());
 		assertThrows(ReadOnlyCursorException.class, () -> rebound.tables().insert("t", 2L));
@@ -101,7 +100,7 @@ class ReadOnlyConnectionTest {
 
 	@Test void openingAndTransactingOnAnAbsentDatabaseCreatesNothing() throws Exception {
 		var db = ConvexDB.create(RowLWW::merge);
-		var before = db.cursor().get();
+		var before = db.value();
 		try (var c = db.getReadOnlyConnection("absent")) {
 			c.setAutoCommit(false);
 			c.commit();
@@ -109,7 +108,7 @@ class ReadOnlyConnectionTest {
 			c.setAutoCommit(true);
 			state("25006", () -> c.prepareStatement("CREATE TABLE t (id INTEGER)"));
 		}
-		assertSame(before, db.cursor().get());
+		assertSame(before, db.value());
 	}
 
 	@Test void ordinaryModeIsReversibleAndPreparedWritesCheckAtExecution() throws Exception {

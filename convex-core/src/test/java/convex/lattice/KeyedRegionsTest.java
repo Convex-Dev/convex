@@ -659,7 +659,7 @@ class KeyedRegionsTest {
 			added=add(B,elsewhere);
 		}
 
-		@Override public AForkableCursor<Index<Keyword,ACell>> cursor() { return editing; }
+		@Override protected AForkableCursor<Index<Keyword,ACell>> cursor() { return editing; }
 	}
 
 	/** A constructed child edits through its parent's editing view; an added child keeps its own binding. */

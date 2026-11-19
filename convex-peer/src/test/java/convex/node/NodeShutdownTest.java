@@ -57,7 +57,7 @@ class NodeShutdownTest {
 				ConvexRemote route=ConvexRemote.connect(receiver.getHostAddress());
 				senderGroup.addPeer(receiverGroup.getTransportKey(),route).get(10,TimeUnit.SECONDS);
 
-				app.cursor().updateAndGet(set -> set.include(draft));
+				app.merge(Sets.of(draft));
 				app.sync();
 				assertFalse(senderStore.<ASet<ACell>>getRootData().contains(draft),
 					"application sync alone neither saves nor publishes");

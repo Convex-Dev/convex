@@ -23,6 +23,7 @@ import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.SignedLattice;
 
 /**
@@ -193,7 +194,7 @@ public final class FavouritesExample {
 	static final class Favourites extends ASignedComponent<AHashMap<Keyword,ACell>>
 			implements TransactionalComponent<AHashMap<Keyword,ACell>,Favourites> {
 		private final Supplier<CVMLong> getTimestamp;
-		private final Timestamped<AHashMap<Keyword,ACell>> record;
+		private final AForkableCursor<AHashMap<Keyword,ACell>> record;
 		final SetComponent<ACell> itemSet;
 
 		Favourites(AForkableCursor<SignedData<AHashMap<Keyword,ACell>>> destination,
@@ -204,7 +205,7 @@ public final class FavouritesExample {
 			super(destination,rule,signer);
 			this.getTimestamp=getTimestamp;
 			// Wrap the base signing view once; every domain edit uses cursor().
-			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
+			record=stamped(super.cursor(),getTimestamp);
 			// The items are the record's entry, created by the first add
 			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
 		}
@@ -213,7 +214,7 @@ public final class FavouritesExample {
 				SignedLattice<AHashMap<Keyword,ACell>> rule,Supplier<CVMLong> getTimestamp) {
 			super(rule,cursor);
 			this.getTimestamp=getTimestamp;
-			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
+			record=stamped(super.cursor(),getTimestamp);
 			itemSet=new SetComponent<>(new MapComponent<>(cursor()).path(ITEMS));
 		}
 
@@ -222,8 +223,15 @@ public final class FavouritesExample {
 		}
 		@Override public Favourites fork() { return rebind(storage.fork()); }
 
+		/** The record's editing view, which stamps every changed write; an absent record reads as empty */
+		private static AForkableCursor<AHashMap<Keyword,ACell>> stamped(AForkableCursor<AHashMap<Keyword,ACell>> record,
+				Supplier<CVMLong> getTimestamp) {
+			return StampedCursor.create(record.withDefault(Maps.empty()),getTimestamp,
+				(value,time) -> value.assoc(Timestamped.TIMESTAMP,time));
+		}
+
 		/** Direct local edits use the same timestamped path as the embedded set. */
-		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }
+		@Override protected AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record; }
 
 		void add(long item) { itemSet.add(CVMLong.create(item)); }
 		void remove(long item) { itemSet.remove(CVMLong.create(item)); }

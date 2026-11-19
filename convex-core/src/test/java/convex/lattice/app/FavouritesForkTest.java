@@ -108,7 +108,7 @@ class FavouritesForkTest {
 		draft.merge(SignedData.create(ALICE.getAccountKey(),envelope.getSignature(),Ref.get(newer)));
 		draft.mergeAt(ALICE.signData(newer),ITEMS);
 		assertThrows(IllegalArgumentException.class,() -> draft.mergeAt(payload));
-		assertSame(payload,draft.storage().get());
+		assertSame(payload,draft.value());
 		assertNull(app.component().get(ALICE.getAccountKey()));
 	}
 
@@ -122,13 +122,13 @@ class FavouritesForkTest {
 		clock.set(CVMLong.create(3));
 		draft.remove(1);
 		draft.add(3);
-		var pending=draft.storage().get();
+		var pending=draft.value();
 		var before=app.component().get(ALICE.getAccountKey());
 		assertThrows(IllegalStateException.class,draft::sync);
 		signingKey.set(null);
 		assertThrows(IllegalStateException.class,draft::sync);
 		assertSame(before,app.component().get(ALICE.getAccountKey()));
-		assertSame(pending,draft.storage().get());
+		assertSame(pending,draft.value());
 		signingKey.set(ALICE);
 		draft.sync();
 		assertEquals(Sets.of(3),app.user(ALICE).items());

@@ -51,7 +51,7 @@ class FavouritesPersistenceTest {
 			localClock.set(CVMLong.create(1000)); // Application publication must not replace the edit timestamps.
 			assertEquals(Index.<Keyword,ACell>none(),localHost.cursor().get(),"Signing publishes into region working state only");
 			local.sync();
-			assertEquals(local.component().cursor().get(),localHost.cursor().get().get(FAVOURITES));
+			assertEquals(local.component().value(),localHost.cursor().get().get(FAVOURITES));
 			assertEquals(CVMLong.create(200),local.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 			assertEquals(CVMLong.create(100),local.component().get(BOB.getAccountKey()).getValue().get(TIMESTAMP));
 			assertNull(store.getRootData(),"Application publication stops at the host");

@@ -44,7 +44,7 @@ class NodeApplicationBoundaryTest {
 			var outcome=node.mergeInbound(new ACell[0],first);
 			assertTrue(outcome.accepted());
 			assertFalse(outcome.changed(),"changed reports published host state, not application drafts");
-			assertEquals(first,app.cursor().get());
+			assertEquals(first,app.value());
 			assertEquals(0,app.preparations);
 			assertEquals(lattice.zero(),store.getRootData());
 			app.sync();
@@ -53,7 +53,7 @@ class NodeApplicationBoundaryTest {
 			var published=node.getLocalValue();
 			assertEquals(published,store.getRootData());
 			node.mergeInbound(new ACell[0],Sets.of(CVMLong.TWO));
-			assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get());
+			assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.value());
 			node.close();
 			assertEquals(published,store.getRootData());
 			assertEquals(1,app.preparations);

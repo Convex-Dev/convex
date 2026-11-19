@@ -44,21 +44,21 @@ public class SocialAppTest {
 		var source=Social.create(owner);
 		var post=source.user(owner.getAccountKey()).feed().post("incoming");
 		var did=DID.forKey(owner.getAccountKey());
-		var signed=source.cursor().get().get(did);
+		var signed=source.value().get(did);
 		for (boolean whole:new boolean[]{false,true}) {
 			var destination=Social.create(owner);
 			var working=destination.fork();
-			if (whole) working.mergeAt(source.cursor().get());
+			if (whole) working.mergeAt(source.value());
 			else working.mergeAt(signed,did);
 			assertNotNull(working.user(owner.getAccountKey()).feed().getPost(post));
 			assertNull(destination.user(owner.getAccountKey()).feed().getPost(post));
-			var before=working.cursor().get();
+			var before=working.value();
 			working.mergeAt(signed,DID.forKey(other.getAccountKey()));
 			working.mergeAt(Maps.of(DID.forKey(other.getAccountKey()),signed));
 			working.mergeAt(CVMLong.ONE);
 			working.mergeAt(signed.getValue(),did);
 			working.mergeAt(Maps.empty(),did,convex.core.cvm.Keywords.VALUE);
-			assertSame(before,working.cursor().get());
+			assertSame(before,working.value());
 			working.sync();
 			assertNotNull(destination.user(owner.getAccountKey()).feed().getPost(post));
 		}
@@ -255,13 +255,13 @@ public class SocialAppTest {
 		});
 		assertEquals(Set.of(dave,bob,carol),follows.getActive());
 		assertEquals(2,signatures.get());
-		var before=social.cursor().get();
+		var before=social.value();
 		assertTrue(before.get(DID.forKey(alice.getAccountKey())).checkSignature());
 		assertThrows(IllegalStateException.class,() -> follows.execute(draft -> {
 			draft.unfollow(bob);
 			throw new IllegalStateException("Abort the edit");
 		}));
-		assertSame(before,social.cursor().get());
+		assertSame(before,social.value());
 		assertEquals(2,signatures.get());
 	}
 
@@ -275,7 +275,7 @@ public class SocialAppTest {
 		follows.follow(bobDid);
 		assertTrue(follows.isFollowing(bobDid));
 
-		SignedData<?> signed=social.cursor().get().get(DID.forKey(alice.getAccountKey()));
+		SignedData<?> signed=social.value().get(DID.forKey(alice.getAccountKey()));
 		SignedData<?> decoded=(SignedData<?>)CVMEncoder.INSTANCE.decodeMultiCell(
 			Format.encodeMultiCell(signed,true));
 		@SuppressWarnings("unchecked")
@@ -370,8 +370,8 @@ public class SocialAppTest {
 
 		assertEquals(1,signatures.get(),"Publication must retain the explicit signer");
 		assertEquals(3,live.user(key.getAccountKey()).feed().count());
-		assertEquals(live.cursor().get(),fork.cursor().get());
-		assertTrue(live.cursor().get().get(DID.forKey(key.getAccountKey())).checkSignature());
+		assertEquals(live.value(),fork.value());
+		assertTrue(live.value().get(DID.forKey(key.getAccountKey())).checkSignature());
 	}
 
 	@Test
@@ -389,7 +389,7 @@ public class SocialAppTest {
 		work.sync();
 
 		SignedData<Index<Keyword,ACell>> signed=
-			(SignedData<Index<Keyword,ACell>>)social.cursor().get().get(
+			(SignedData<Index<Keyword,ACell>>)social.value().get(
 				DID.forKey(alice.getAccountKey()));
 		SignedData<Index<Keyword,ACell>> decoded=
 			(SignedData<Index<Keyword,ACell>>)CVMEncoder.INSTANCE.decodeMultiCell(
@@ -481,18 +481,11 @@ public class SocialAppTest {
 	}
 
 	@Test
-	public void testCursorAccessors() {
+	public void testUserReportsItsOwner() {
 		AKeyPair kp = AKeyPair.generate();
 		Social social = Social.create(kp);
-
-		assertNotNull(social.cursor());
-
 		SocialUser user = social.user(kp.getAccountKey());
-		assertNotNull(user.cursor());
 		assertEquals(kp.getAccountKey(), user.getOwnerKey());
-
-		assertNotNull(user.feed().cursor());
-		assertNotNull(user.follows().cursor());
 	}
 
 	// ===== Adversarial: posting to another user's feed =====
@@ -642,7 +635,7 @@ public class SocialAppTest {
 		assertThrows(IllegalStateException.class,
 			()->social.user(bob.getAccountKey()).feed().post("Forged!"));
 
-		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> ownerMap = social.cursor().get();
+		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> ownerMap = social.value();
 		assertNull(ownerMap.get(DID.forKey(bob.getAccountKey())));
 	}
 }

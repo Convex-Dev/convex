@@ -42,7 +42,7 @@ public class LatticePanelTest {
 			edt(() -> { live.showing(true); working.showing(true); return null; });
 			assertEquals(CVMLong.ZERO,take(live.renders).value());
 			assertEquals(CVMLong.ZERO,take(working.renders).value());
-			draft.cursor().set(CVMLong.create(7));
+			draft.merge(CVMLong.create(7));
 			assertEquals(CVMLong.create(7),take(working.renders).value());
 			assertEquals(CVMLong.ZERO,published.value());
 			draft.sync();

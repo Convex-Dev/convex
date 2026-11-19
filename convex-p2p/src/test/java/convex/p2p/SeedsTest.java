@@ -20,7 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
-import convex.lattice.MapComponent;
+import convex.lattice.Timestamped;
 import convex.net.PeerName;
 
 /** A node's seed list is local state: one entry per peer URI, bounded, kept by the host. */
@@ -76,11 +76,12 @@ public class SeedsTest {
 
 	@Test void anEntryThatIsNotAPeerNameIsSkipped() {
 		P2PApplication alice=alice(LatticeHost.create());
-		var stored=new MapComponent<Keyword,ACell>(alice.contacts().cursor()).<Index<AString,ACell>>path(Seeds.KEY);
 		PeerName hub=name("tcp://hub.example:18888",HUB);
-		stored.set(Index.<AString,ACell>of(Strings.create("not a uri"),Maps.empty(),
+		// A record from elsewhere, such as a restored backup, holds entries this version cannot read
+		alice.contacts().merge(Maps.of(Seeds.KEY,Index.<AString,ACell>of(Strings.create("not a uri"),Maps.empty(),
 			Strings.create("tcp://bad-key.example:18888"),Maps.of(Seeds.EXPECTED_KEY,CVMLong.create(5)),
-			Strings.create(hub.uri().toString()),Maps.of(Seeds.EXPECTED_KEY,HUB)));
+			Strings.create(hub.uri().toString()),Maps.of(Seeds.EXPECTED_KEY,HUB)),
+			Timestamped.TIMESTAMP,CVMLong.ONE));
 		assertEquals(List.of(hub),alice.seeds().all());
 	}
 

@@ -74,14 +74,14 @@ class SocialReadTest {
 
 	@Test void absentReadsRemainAbsent() {
 		var social=Social.create(ALICE);
-		var before=social.cursor().get();
+		var before=social.value();
 		var user=social.user(DID_ALICE);
 		assertNull(user.feed().getPost(POST));
 		assertEquals(0,user.feed().count());
 		assertNull(user.follows().getRecord(DID_ALICE));
 		assertNull(user.follows().getActive());
 		assertFalse(user.follows().isFollowing(DID_ALICE));
-		assertSame(before,social.cursor().get());
+		assertSame(before,social.value());
 		assertNull(SocialLattice.getFollowing(null));
 		assertNull(SocialHelpers.getActiveFollows(null));
 		assertNull(SocialHelpers.computeFollowSet(null,Set.of(DID_ALICE)));
@@ -133,7 +133,7 @@ class SocialReadTest {
 		Index<Keyword,ACell> state=Index.of(SocialLattice.KEY_FEED,opaque,
 			SocialLattice.KEY_PROFILE,Maps.empty(),SocialLattice.KEY_FOLLOWING,opaque);
 		var social=social(state);
-		var before=social.cursor().get();
+		var before=social.value();
 		var user=social.user(DID_ALICE);
 		assertThrows(ClassCastException.class,() -> SocialLattice.getFeed(state));
 		assertThrows(ClassCastException.class,() -> SocialLattice.getFollowing(state));
@@ -144,7 +144,7 @@ class SocialReadTest {
 		assertThrows(ClassCastException.class,() -> user.feed().post("hello"));
 		assertThrows(IllegalStateException.class,() -> user.follows().getActive());
 		assertThrows(IllegalStateException.class,() -> user.follows().follow(DID_ALICE));
-		assertSame(before,social.cursor().get());
+		assertSame(before,social.value());
 	}
 
 	@Test void incompatibleFollowMapAndRecordAreNotReplaced() {
@@ -152,25 +152,25 @@ class SocialReadTest {
 			Index<Keyword,ACell> state=Index.of(SocialLattice.KEY_FOLLOWING,
 				Index.of(SocialLattice.KEY_FOLLOWS,follows));
 			var social=social(state);
-			var before=social.cursor().get();
+			var before=social.value();
 			var component=social.user(DID_ALICE).follows();
 			Class<? extends RuntimeException> error=follows instanceof AHashMap<?,?>
 				?ClassCastException.class:IllegalStateException.class;
 			assertThrows(error,() -> component.getRecord(DID_ALICE));
 			assertThrows(error,component::getActive);
 			assertThrows(error,() -> component.follow(DID_ALICE));
-			assertSame(before,social.cursor().get());
+			assertSame(before,social.value());
 		}
 	}
 
 	@Test void incompatiblePostsCannotDisappearFromReadsOrDeletes() {
 		Index<Keyword,ACell> state=Index.of(SocialLattice.KEY_FEED,Index.of(POST,CVMLong.ONE));
 		var social=social(state);
-		var before=social.cursor().get();
+		var before=social.value();
 		var feed=social.user(DID_ALICE).feed();
 		assertThrows(ClassCastException.class,() -> feed.getPost(POST));
 		assertThrows(ClassCastException.class,() -> feed.delete(POST));
-		assertSame(before,social.cursor().get());
+		assertSame(before,social.value());
 	}
 
 	@Test void fieldsAreNotCoercedOrDefaultedOnErrors() {

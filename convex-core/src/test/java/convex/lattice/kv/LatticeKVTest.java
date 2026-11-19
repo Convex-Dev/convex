@@ -67,7 +67,7 @@ public class LatticeKVTest {
 		time.set(CVMLong.create(120));
 		assertEquals(30,draft.ttl("a"));
 		draft.set("b",Strings.create("second"));
-		assertEquals(time.get(),KVEntry.getUTime(draft.cursor().get().get(Strings.create("b"))));
+		assertEquals(time.get(),KVEntry.getUTime(draft.value().get(Strings.create("b"))));
 		// Publication reconciles state without consulting a mutation clock.
 		time.set(null);
 		draft.sync();
@@ -194,10 +194,10 @@ public class LatticeKVTest {
 		var time = new AtomicReference<>(CVMLong.create(100));
 		LatticeKV kv = LatticeKV.create(Strings.create("replica"), time::get);
 		kv.set("a", Strings.create("1"));
-		Index<AString, AVector<ACell>> stale = kv.cursor().get();
+		Index<AString, AVector<ACell>> stale = kv.value();
 		time.set(CVMLong.create(200));
 		assertTrue(kv.del("a"));
-		Index<AString, AVector<ACell>> current = kv.cursor().get();
+		Index<AString, AVector<ACell>> current = kv.value();
 
 		assertEquals(current, KVStoreLattice.INSTANCE.merge(current, stale));
 		assertEquals(current, KVStoreLattice.INSTANCE.merge(stale, current));

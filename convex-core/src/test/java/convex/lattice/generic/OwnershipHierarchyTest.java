@@ -89,8 +89,8 @@ public class OwnershipHierarchyTest {
 		value.set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(DID).getValue());
 		assertTrue(root.get().get(DID).checkSignature());
-		var forkComponent=new LatticeComponent<>(lattice.getValueLattice(),value.fork(),convex.lattice.LatticeContext.EMPTY);
-		AForkableCursor<AInteger> fork=forkComponent.cursor();
+		AForkableCursor<AInteger> fork=value.fork();
+		var forkComponent=new LatticeComponent<>(lattice.getValueLattice(),fork,convex.lattice.LatticeContext.EMPTY);
 		fork.set(CVMLong.create(3));
 		assertEquals(CVMLong.TWO,value.get());
 		forkComponent.sync();

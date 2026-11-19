@@ -99,7 +99,7 @@ class OwnedScoresApplicationTest {
 		var bob=app.component().score(TEAM,BOB);
 		alice.record(10);
 		bob.record(20);
-		assertEquals(CVMLong.create(20),alice.cursor().get());
+		assertEquals(CVMLong.create(20),alice.value());
 		assertTrue(host.cursor().get().isEmpty());
 		app.sync();
 

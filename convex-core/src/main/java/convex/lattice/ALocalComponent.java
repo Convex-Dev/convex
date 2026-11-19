@@ -88,7 +88,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 
 	/** The stamped editing view of the private record; an absent record reads as an empty map. */
 	@Override
-	public AForkableCursor<AHashMap<Keyword,ACell>> cursor() {
+	protected AForkableCursor<AHashMap<Keyword,ACell>> cursor() {
 		return record.cursor();
 	}
 

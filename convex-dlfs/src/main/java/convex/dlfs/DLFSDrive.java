@@ -93,7 +93,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		}
 		@Override public DLFSLocal clone() {
 			checkOpen();
-			return drive.rebind(Cursors.root(drive.cursor().get())).fileSystem;
+			return drive.rebind(Cursors.root(drive.value())).fileSystem;
 		}
 		@Override public void sync() {
 			checkOpen();

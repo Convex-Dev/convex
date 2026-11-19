@@ -75,8 +75,7 @@ public class NodeRegistryTest {
 				node.pointsOfPresence(pop.getAccountKey());
 				P2PApplication application=node.getApplication();
 				application.merge(registry(record(pop,1).merge(record(other,1))));
-				ACell nodes=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-				AHashMap<?,?> held=(AHashMap<?,?>)nodes;
+				AHashMap<?,?> held=application.registry().records();
 				assertNotNull(held.get(pop.getAccountKey()));
 				assertNull(held.get(other.getAccountKey()),"a full registry turns other nodes away");
 			}
