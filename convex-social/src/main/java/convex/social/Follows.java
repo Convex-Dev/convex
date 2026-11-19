@@ -98,7 +98,7 @@ public class Follows extends MapComponent<ACell, ACell> implements Transactional
 	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
 		CVMLong timestamp=clock.get();
-		path(target).update(existing -> {
+		entry(target).update(existing -> {
 			AHashMap<Keyword,ACell> record=(AHashMap<Keyword,ACell>)existing;
 			if (record==null) record=Maps.empty();
 			return record.assoc(key,value).assoc(SocialPost.TIMESTAMP,timestamp);

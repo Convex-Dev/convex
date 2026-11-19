@@ -49,7 +49,7 @@ public class SocialUser extends IndexComponent<Keyword, ACell> implements Transa
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(path(SocialLattice.KEY_FEED),ownerDid,clock);
+		return new Feed(entry(SocialLattice.KEY_FEED),ownerDid,clock);
 	}
 
 	/**
@@ -62,9 +62,18 @@ public class SocialUser extends IndexComponent<Keyword, ACell> implements Transa
 	 */
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			path(SocialLattice.KEY_FOLLOWING),
+			entry(SocialLattice.KEY_FOLLOWING),
 			clock,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
-		return new Follows(new IndexComponent<>(following).path(SocialLattice.KEY_FOLLOWS),clock);
+		return new Following(following).follows(clock);
+	}
+
+	/** The stamped {@code :following} section, which binds the follow list to its own entry. */
+	private static final class Following extends IndexComponent<Keyword, ACell> {
+		Following(AForkableCursor<Index<Keyword, ACell>> cursor) { super(cursor); }
+
+		Follows follows(Supplier<CVMLong> clock) {
+			return new Follows(entry(SocialLattice.KEY_FOLLOWS),clock);
+		}
 	}
 
 	/**
