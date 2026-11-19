@@ -29,6 +29,7 @@ import convex.lattice.LocalLattice;
 import convex.lattice.MapComponent;
 import convex.lattice.OwnedMap;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
@@ -112,7 +113,8 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		this.signer=signer;
 		this.clock=java.util.Objects.requireNonNull(clock);
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
-		this.socialPolicy=new SocialReplicationPolicy(this,java.util.Objects.requireNonNull(didAuthorizer));
+		this.socialPolicy=new SocialReplicationPolicy(LazyCursor.create(cursor().withDefault(Index.none()),Social.KEY_SOCIAL),
+			java.util.Objects.requireNonNull(didAuthorizer),clock);
 		this.directory=new NodeDirectory(this);
 		// Only a node that can sign its own :local slot keeps contact records
 		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,

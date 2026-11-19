@@ -3,6 +3,7 @@ package convex.p2p;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
@@ -15,19 +16,18 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.lattice.IndexComponent;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.AForkableCursor;
 import convex.social.Social;
-import convex.social.SocialHelpers;
 
 /**
  * Default one-hop social retention policy, owned by the P2P application. It reads
- * the application's lattice to decide which social owners this node wants and offers
- * that decision as a projection of the root: the application merges incoming values
- * through it, and a node publishes through it.
+ * the application's social region to decide which social owners this node wants and
+ * offers that decision as a projection of the root: the application merges incoming
+ * values through it, and a node publishes through it.
  */
 final class SocialReplicationPolicy {
 
-	private final P2PApplication application;
 	private final DIDKeyAuthorizer authorizer;
 	private final Social social;
 	private final Set<AString> localUsers=ConcurrentHashMap.newKeySet();
@@ -35,14 +35,19 @@ final class SocialReplicationPolicy {
 		new ConcurrentHashMap<>();
 	private final Set<AString> pins=ConcurrentHashMap.newKeySet();
 
-	SocialReplicationPolicy(P2PApplication application,DIDKeyAuthorizer authorizer) {
-		this.application=application;
+	/**
+	 * @param region The application's social region
+	 * @param authorizer DID authoriser for social owners
+	 * @param clock Clock that stamps social writes
+	 */
+	SocialReplicationPolicy(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region,
+			DIDKeyAuthorizer authorizer,Supplier<CVMLong> clock) {
 		this.authorizer=authorizer;
-		social=Social.connect(new IndexComponent<>(application.cursor()).path(Social.KEY_SOCIAL),authorizer,
+		social=Social.connect(region,authorizer,
 			(owner,value) -> {
 				AKeyPair key=localSigners.get(owner);
 				return key==null?null:key.signData(value);
-			},application.clock());
+			},clock);
 	}
 
 	/** Shared multi-DID authoring view; key rotation is observed by existing user views. */
@@ -67,12 +72,10 @@ final class SocialReplicationPolicy {
 	Set<AString> desiredOwners() {
 		HashSet<AString> desired=new HashSet<>(localUsers);
 		desired.addAll(pins);
-		ACell raw=application.cursor().getOrDefault(null,Social.KEY_SOCIAL);
-		if (raw==null) return Set.copyOf(desired);
-		@SuppressWarnings("unchecked")
-		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> typed=
-			(AHashMap<ACell,SignedData<Index<Keyword,ACell>>>)raw;
-		desired.addAll(SocialHelpers.computeFollowSet(typed,localUsers));
+		for (AString did:localUsers) {
+			Set<AString> follows=social.user(did).follows().getActive();
+			if (follows!=null) desired.addAll(follows);
+		}
 		return Set.copyOf(desired);
 	}
 

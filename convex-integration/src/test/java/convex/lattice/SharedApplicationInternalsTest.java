@@ -215,7 +215,7 @@ public class SharedApplicationInternalsTest {
 		Blob b=second.social.feed().post("Second application");
 		first.sync();
 		second.sync();
-		var published=Social.connect(view(host)).user(SOCIAL_KEY.getAccountKey()).feed();
+		var published=Social.connect(hostEntry(host.cursor(),Social.KEY_SOCIAL)).user(SOCIAL_KEY.getAccountKey()).feed();
 		assertNotNull(published.getPost(a));
 		assertNotNull(published.getPost(b));
 		assertEquals(2,published.count());
@@ -247,7 +247,7 @@ public class SharedApplicationInternalsTest {
 		assertEquals(2,signatures.get(),"One signature per changed owner subtree");
 		assertNull(host.cursor().get().get(Keywords.FS));
 		filesApp.sync();
-		assertNotNull(Social.connect(view(host)).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
+		assertNotNull(Social.connect(hostEntry(host.cursor(),Social.KEY_SOCIAL)).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
 		assertEquals("working file",Files.readString(DLFSRegion.connect(hostEntry(host.cursor(),Keywords.FS),host.store())
 			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
 		assertEquals(info,P2PUser.create(view(host),COMMON_KEY.getAccountKey()).node().getNodeInfo());

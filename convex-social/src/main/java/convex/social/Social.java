@@ -16,8 +16,6 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
-import convex.lattice.ALatticeComponent;
-import convex.lattice.IndexComponent;
 import convex.lattice.OwnedMap;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -47,8 +45,8 @@ import convex.lattice.generic.OwnerMapLattice;
  * AString myDid = DID.forKey(myKeyPair.getAccountKey());
  * social.user(myDid).feed().post("Hello!");
  *
- * // Connected beneath a hosted application component
- * Social social = Social.connect(application, myKeyPair);
+ * // Bound by the application that holds the :social region
+ * Social social = Social.connect(region, DIDKeyAuthorizer.CONVEX, signer, clock);
  *
  * // Fork for batch operations
  * Social forked = social.fork();
@@ -145,17 +143,6 @@ public class Social extends OwnedMap<ACell,Index<Keyword,ACell>> implements Tran
 			BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer,
 			Supplier<CVMLong> clock) {
 		return new Social(cursor,ownerLattice(authoriser),signer,clock);
-	}
-
-	/** Opens a relay view of an application's standard social region. */
-	public static Social connect(ALatticeComponent<Index<Keyword,ACell>> application) {
-		return connect(new IndexComponent<>(application.cursor()).path(KEY_SOCIAL));
-	}
-
-	/** Opens a did:key author view of an application's standard social region. */
-	public static Social connect(ALatticeComponent<Index<Keyword,ACell>> application,AKeyPair keyPair) {
-		return connect(new IndexComponent<>(application.cursor()).path(KEY_SOCIAL),
-			DIDKeyAuthorizer.CONVEX,(owner,value) -> keyPair.signData(value),Utils::getCurrentTimestampCell);
 	}
 
 	/**

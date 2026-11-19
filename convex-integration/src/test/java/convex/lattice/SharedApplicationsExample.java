@@ -25,6 +25,7 @@ import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
@@ -59,9 +60,12 @@ public final class SharedApplicationsExample {
 
 	/** Social feeds, staged at {@code :social}. The P2P regions are shared live. */
 	public static final class SocialApp extends AKeyedRegions {
+		/** A relay of the region as the host holds it */
+		private final Social published;
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
 			super(host.cursor());
+			published=Social.connect(LazyCursor.create(host.cursor(),Social.KEY_SOCIAL));
 			// The region is the host index's entry, created by its first publication. This
 			// application makes it over a fork, so its sync publishes it.
 			createRegion(Social.KEY_SOCIAL,(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region) ->
@@ -76,7 +80,7 @@ public final class SharedApplicationsExample {
 
 		/** The same user's feed as the host currently holds it. */
 		public Feed publishedFeed(AKeyPair user) {
-			return Social.connect(this).user(user.getAccountKey()).feed();
+			return published.user(user.getAccountKey()).feed();
 		}
 
 		public P2PUser p2p(AKeyPair user) {

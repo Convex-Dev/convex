@@ -125,9 +125,9 @@ A null signer creates a relay, which reuses existing envelopes and keeps its own
 value when synthesis would need a new signature. No component inherits signing
 authority or timestamps from `LatticeContext`.
 
-For an embedded region, pass the cursor directly to
-`Social.connect(cursor, authoriser, signer, clock)`. The no-policy
-`Social.connect(cursor)` and `Social.connect(application)` overloads are relay views.
+An application that holds a `:social` region binds it by passing the region's
+cursor to `Social.connect(cursor, authoriser, signer, clock)`. The no-policy
+`Social.connect(cursor)` overload is a relay view.
 
 ### Node integration
 
@@ -179,8 +179,8 @@ application.sync();
 ```
 
 `P2PNode.social` also registers the DID as local, so its own slot and direct active
-follows form the default replicated social view. `Social.connect(parent, keyPair)` is
-available for lower-level hosting when follow-driven P2P policy is not required.
+follows form the default replicated social view. An application that does not need
+follow-driven P2P policy binds its own `:social` region with `Social.connect`.
 Registering several DIDs on one P2P application returns the same social component;
 its signer selects each registered DID's key. Registering a replacement authorised
 key updates existing views without replacing the DID.

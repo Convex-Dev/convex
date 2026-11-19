@@ -9,6 +9,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import convex.auth.did.DID;
+import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -21,7 +22,9 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.Regions;
+import convex.core.util.Utils;
+import convex.lattice.IndexComponent;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 
 /** Reads distinguish absence, empty values and incompatible data without modifying storage. */
@@ -31,11 +34,23 @@ class SocialReadTest {
 	private static final AString DID_ALICE=DID.forKey(ALICE.getAccountKey());
 	private static final Blob POST=SocialPost.createKey(100,1);
 
+	/** An application root that holds the social region as one of its entries. */
+	private static final class App extends IndexComponent<Keyword,ACell> {
+		App(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+
+		Social relay() { return Social.connect(entry(Social.KEY_SOCIAL)); }
+
+		Social author(AKeyPair keyPair) {
+			return Social.connect(entry(Social.KEY_SOCIAL),DIDKeyAuthorizer.CONVEX,
+				(owner,value) -> keyPair.signData(value),Utils::getCurrentTimestampCell);
+		}
+	}
+
 	@Test void applicationViewsRejectIncompatibleRootsAndPreserveOtherRegions() {
 		var root=new Root<ACell>();
-		var app=new Regions(root.<Index<Keyword,ACell>>path());
-		var relay=Social.connect(app).user(DID_ALICE);
-		var author=Social.connect(app,ALICE).user(DID_ALICE);
+		var app=new App(root.<Index<Keyword,ACell>>path());
+		var relay=app.relay().user(DID_ALICE);
+		var author=app.author(ALICE).user(DID_ALICE);
 		assertEquals(0,relay.feed().count());
 		assertNull(root.get());
 		for (ACell bad:List.<ACell>of(CVMLong.ONE,Maps.empty(),Index.of(Social.KEY_SOCIAL,Index.none()))) {

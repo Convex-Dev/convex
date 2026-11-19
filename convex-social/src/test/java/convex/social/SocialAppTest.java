@@ -29,6 +29,7 @@ import convex.core.util.Utils;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.Regions;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerMapLattice;
@@ -73,6 +74,15 @@ public class SocialAppTest {
 	/** An application at the root level over an in-memory root holding the lattice's zero. */
 	private static Regions testRoot(KeyedLattice lattice) {
 		return new Regions(Cursors.root(lattice.zero()));
+	}
+
+	/** Binds the application's social region: a did:key author for the key pair, or a relay without one. */
+	private static Social social(Regions application,AKeyPair kp) {
+		return application.create(Social.KEY_SOCIAL,
+			(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region) -> (kp==null)
+				?Social.connect(region)
+				:Social.connect(region,DIDKeyAuthorizer.CONVEX,(owner,value) -> kp.signData(value),
+					Utils::getCurrentTimestampCell));
 	}
 
 	@Test
@@ -395,11 +405,11 @@ public class SocialAppTest {
 	public void testConnectToRootCursor() {
 		AKeyPair kp = AKeyPair.generate();
 
-		// An application at the root declares :social and hands the region its cursor
+		// An application at the root declares :social and binds the region
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
 		var application = testRoot(root);
 
-		Social social = Social.connect(application, kp);
+		Social social = social(application, kp);
 
 		Feed feed = social.user(kp.getAccountKey()).feed();
 		Blob key = feed.post("Connected post");
@@ -416,11 +426,11 @@ public class SocialAppTest {
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
 		var application = testRoot(root);
 
-		Social social = Social.connect(application, kp);
+		Social social = social(application, kp);
 		social.user(kp.getAccountKey()).feed().post("Propagated");
 
 		// The application's root should have the data
-		ACell rootValue = application.cursor().get();
+		ACell rootValue = application.value();
 		assertNotNull(rootValue, "Root cursor should contain data after post");
 	}
 
@@ -429,7 +439,7 @@ public class SocialAppTest {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		var root=testRoot(lattice);
-		Social social=Social.connect(root);
+		Social social=social(root,null);
 
 		assertThrows(IllegalStateException.class,() -> social.user(kp.getAccountKey()).feed().post("No authority"));
 		assertEquals(0,social.user(kp.getAccountKey()).feed().count());
@@ -440,7 +450,7 @@ public class SocialAppTest {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		var root=testRoot(lattice);
-		Social social=Social.connect(root,kp);
+		Social social=social(root,kp);
 		Social fork=social.fork();
 		Feed forkFeed=fork.user(kp.getAccountKey()).feed();
 		forkFeed.post("Not yet synced");
