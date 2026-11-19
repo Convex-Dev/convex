@@ -2,7 +2,6 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -16,6 +15,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
@@ -23,7 +23,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
-import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
@@ -233,26 +232,16 @@ class KeyedRegionsTest {
 
 		@Override protected AHashMap<ACell,AInteger> reconcile(AHashMap<ACell,AInteger> base,
 				AHashMap<ACell,AInteger> own,AHashMap<ACell,AInteger> other) {
-			AHashMap<ACell,AInteger> result=(other==null)?Maps.empty():other;
-			for (AHashMap<ACell,AInteger> side:Arrays.asList(base,own)) {
-				if (side==null) continue;
-				for (ACell key:side.keySet()) {
-					AInteger was=(base==null)?null:base.get(key);
-					AInteger mine=(own==null)?null:own.get(key);
-					if (Utils.equals(mine,was)) continue;
-					AInteger theirs=result.get(key);
-					AInteger value=Utils.equals(theirs,was)?mine:MaxLattice.INSTANCE.merge(mine,theirs);
-					result=(value==null)?result.dissoc(key):result.assoc(key,value);
-				}
-			}
-			return result;
+			return reconcileEntries(base,own,other,(key,was,mine,theirs) -> MapEntry.create(key,
+				MaxLattice.INSTANCE.merge((mine==null)?null:mine.getValue(),(theirs==null)?null:theirs.getValue())));
 		}
 	}
 
-	/** A view whose component reconciles three-way keeps the merging application's removal. */
+	/** A view whose component reconciles three-way keeps the merging application's changes, removal included. */
 	@Test void viewedRegionReconcilingThreeWayKeepsTheMergingApplicationsRemoval() {
 		ACell first=Strings.create("first");
 		ACell second=Strings.create("second");
+		ACell third=Strings.create("third");
 		var host=LatticeHost.create();
 		host.cursor().set(Index.of(A,Maps.of(first,CVMLong.ONE,second,CVMLong.ONE)));
 		var holder=new Regions(host.cursor());
@@ -260,10 +249,11 @@ class KeyedRegionsTest {
 		host.addApplication(holder);
 		var viewer=new Regions(host.cursor().fork());
 		Entries seen=viewer.view(A,Entries::new);
-		seen.cursor().update(entries -> entries.assoc(first,CVMLong.TWO));
-		held.cursor().update(entries -> entries.dissoc(second));
+		seen.cursor().update(entries -> entries.assoc(first,CVMLong.TWO).assoc(third,CVMLong.ONE));
+		held.cursor().update(entries -> entries.dissoc(second).assoc(first,CVMLong.create(3)));
 		viewer.sync();
-		assertEquals(Maps.of(first,CVMLong.TWO),host.cursor().get().get(A));
+		assertEquals(Maps.of(first,CVMLong.create(3),third,CVMLong.ONE),host.cursor().get().get(A),
+			"an entry changed on one side takes that side, and one changed on both is joined");
 	}
 
 	@Test void containerTransactsOnAnOrdinaryRoot() {

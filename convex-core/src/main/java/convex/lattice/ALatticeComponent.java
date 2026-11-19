@@ -1,13 +1,18 @@
 package convex.lattice;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.MapEntry;
 import convex.core.data.Path;
 import convex.core.store.Persister;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
@@ -132,6 +137,93 @@ public abstract class ALatticeComponent<V extends ACell> {
 		if (Utils.equals(other,base)) return own;
 		// Both changed, even to equal values: two increments to the same count are two changes
 		return reconcile(own,other);
+	}
+
+	/**
+	 * Reconciles one entry of a map that both sides changed since the value they last
+	 * agreed on, for {@link ALatticeComponent#reconcileEntries}.
+	 *
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 */
+	@FunctionalInterface
+	protected interface EntryReconciler<K extends ACell,V extends ACell> {
+		/**
+		 * @param key Key of the entry
+		 * @param base Entry both sides last agreed on, or null if it was absent
+		 * @param own Working entry, or null if absent
+		 * @param other Destination entry, or null if absent
+		 * @return Entry to keep, or null to leave it absent
+		 */
+		MapEntry<K,V> reconcile(K key,MapEntry<K,V> base,MapEntry<K,V> own,MapEntry<K,V> other);
+	}
+
+	/**
+	 * Reconciles maps three-way, entry by entry: an entry changed on only one side takes
+	 * that side, removal included, and an entry both sides changed takes what
+	 * {@code both} gives. For a {@link #reconcile(ACell,ACell,ACell)} that opts in.
+	 *
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 * @param <M> Map type
+	 * @param base Map both sides last agreed on, or null if there was none
+	 * @param own Working map, or null
+	 * @param other Destination map, or null
+	 * @param both Reconciles an entry both sides changed
+	 * @return Reconciled map
+	 */
+	@SuppressWarnings("unchecked")
+	protected static <K extends ACell,V extends ACell,M extends AMap<K,V>> M reconcileEntries(M base,M own,M other,
+			EntryReconciler<K,V> both) {
+		M result=other;
+		for (K key:changedKeys(base,own)) {
+			MapEntry<K,V> was=entry(base,key);
+			MapEntry<K,V> mine=entry(own,key);
+			if (sameEntry(mine,was)) continue;
+			MapEntry<K,V> theirs=entry(other,key);
+			MapEntry<K,V> kept=sameEntry(theirs,was)?mine:both.reconcile(key,was,mine,theirs);
+			if (kept!=null) {
+				AMap<K,V> into=(result!=null)?result:((own!=null)?own:base).empty();
+				result=(M)into.assoc(key,kept.getValue());
+			} else if (result!=null) {
+				result=(M)result.dissoc(key);
+			}
+		}
+		return result;
+	}
+
+	/** Keys whose entries may differ between two maps; branches they share are skipped. */
+	@SuppressWarnings("unchecked")
+	private static <K extends ACell,V extends ACell> List<K> changedKeys(AMap<K,V> base,AMap<K,V> own) {
+		List<K> keys=new ArrayList<>();
+		if (base==null || own==null) {
+			AMap<K,V> side=(base==null)?own:base;
+			if (side!=null) {
+				long n=side.count();
+				for (long i=0;i<n;i++) keys.add(side.entryAt(i).getKey());
+			}
+			return keys;
+		}
+		base.mergeDifferences(own,new MergeFunction<V>() {
+			@Override public V merge(V a,V b) {
+				throw new IllegalStateException("Differences are found by key");
+			}
+			@Override public V merge(Object key,V a,V b) {
+				keys.add((K)key);
+				return a;
+			}
+		});
+		return keys;
+	}
+
+	private static <K extends ACell,V extends ACell> MapEntry<K,V> entry(AMap<K,V> map,K key) {
+		return (map==null)?null:map.getEntry(key);
+	}
+
+	/** Whether two entries, either absent, are the same: both absent, or present with equal values. */
+	private static boolean sameEntry(MapEntry<?,?> a,MapEntry<?,?> b) {
+		if (a==null || b==null) return a==b;
+		return Utils.equals(a.getValue(),b.getValue());
 	}
 
 	/**

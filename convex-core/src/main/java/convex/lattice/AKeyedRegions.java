@@ -11,7 +11,7 @@ import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.util.Utils;
+import convex.core.data.MapEntry;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.BoundaryCursor;
 
@@ -362,28 +362,16 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 */
 	@Override
 	protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> base,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-		Index<Keyword,ACell> result=other;
-		for (Index<Keyword,ACell> side:Arrays.asList(base,own)) {
-			if (side==null) continue;
-			long n=side.count();
-			for (long i=0;i<n;i++) {
-				// Stored keys are whatever blob-like cells arrived, not necessarily Keywords
-				ABlobLike<?> key=((Index<?,?>)side).entryAt(i).getKey();
-				if (side==own && base!=null && base.containsKey(key)) continue; // already seen with base
-				boolean ownHas=has(own,key);
-				ACell ownValue=get(own,key);
-				if (same(ownHas,ownValue,has(base,key),get(base,key))) continue;
-				boolean otherHas=has(other,key);
-				ACell otherValue=get(other,key);
-				if (same(otherHas,otherValue,has(base,key),get(base,key))) {
-					result=put(result,key,ownHas,ownValue);
-				} else {
-					Region region=served(key);
-					if (region!=null) result=put(result,key,true,region.reconcile(get(base,key),ownValue,otherValue));
-				}
-			}
-		}
-		return result;
+		return reconcileEntries(base,own,other,(key,was,mine,theirs) -> {
+			// Stored keys are whatever blob-like cells arrived, not necessarily Keywords
+			Region region=served((ABlobLike<?>)(ACell)key);
+			if (region==null) return theirs;
+			return MapEntry.create(key,region.reconcile(value(was),value(mine),value(theirs)));
+		});
+	}
+
+	private static ACell value(MapEntry<?,ACell> entry) {
+		return (entry==null)?null:entry.getValue();
 	}
 
 	/** Returns the region matching a stored key, by the index's blob comparison, or null. */
@@ -392,25 +380,5 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 			if (entry.getKey().toBlob().equals(key.toBlob())) return entry.getValue();
 		}
 		return null;
-	}
-
-	private static boolean has(Index<Keyword,ACell> index,ACell key) {
-		return (index!=null) && index.containsKey(key);
-	}
-
-	private static ACell get(Index<Keyword,ACell> index,ACell key) {
-		return (index==null)?null:index.get(key);
-	}
-
-	private static boolean same(boolean aHas,ACell a,boolean bHas,ACell b) {
-		return (aHas==bHas) && Utils.equals(a,b);
-	}
-
-	@SuppressWarnings("unchecked")
-	private static Index<Keyword,ACell> put(Index<Keyword,ACell> index,ABlobLike<?> key,boolean present,ACell value) {
-		Index<ABlobLike<?>,ACell> entries=(Index<ABlobLike<?>,ACell>)(Index<?,?>)index;
-		if (present) entries=((entries==null)?Index.<ABlobLike<?>,ACell>none():entries).assoc(key,value);
-		else if (entries!=null) entries=entries.dissoc(key);
-		return (Index<Keyword,ACell>)(Index<?,?>)entries;
 	}
 }
