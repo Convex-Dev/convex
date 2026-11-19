@@ -37,7 +37,8 @@ import convex.lattice.generic.SignedLattice;
  * <p>The composition has four responsibilities:</p>
  * <ul>
  *   <li>{@link FavouritesApp} serves only {@code :favourites}, preserving other host regions.</li>
- *   <li>{@link KeyOwnedIndex} verifies ownership and stages the owner collection.</li>
+ *   <li>{@link FavouritesIndex}, a {@link KeyOwnedIndex}, verifies ownership, stages the
+ *       owner collection and opens each owner's record.</li>
  *   <li>{@link Favourites} signs local records with its explicitly supplied user's key.</li>
  *   <li>{@link Timestamped} orders whole records; {@link SetComponent} edits their items.</li>
  * </ul>
@@ -117,20 +118,17 @@ public final class FavouritesExample {
 	}
 
 	/**
-	 * A root application serving an owner index at {@code [:favourites]}. {@link KeyOwnedIndex} checks
-	 * that each envelope's signer matches its owner key. The shared timestamp rule
-	 * selects whole payloads during both incoming merge and publication conflicts.
-	 * The region needs no signing capability to accept another user's record.
-	 * It checks only ownership, signatures and ordering metadata, preserving all
-	 * payload fields even when a local domain view cannot interpret them.
+	 * A root application serving an owner index at {@code [:favourites]}. The shared
+	 * timestamp rule selects whole payloads during both incoming merge and publication
+	 * conflicts. The region needs no signing capability to accept another user's record.
 	 */
-	static final class FavouritesApp extends SingleRegion<KeyOwnedIndex<AHashMap<Keyword,ACell>>> {
+	static final class FavouritesApp extends SingleRegion<FavouritesIndex> {
 		private final Supplier<CVMLong> getTimestamp;
 
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
 			// The region is the host index's entry, created by its first publication
 			super(host.cursor(),FAVOURITES,(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> region) ->
-				new KeyOwnedIndex<>(region,Timestamped.lattice()).fork());
+				new FavouritesIndex(region).fork());
 			this.getTimestamp=getTimestamp;
 		}
 
@@ -139,21 +137,46 @@ public final class FavouritesExample {
 		 * authoring policy. The application that made the region publishes it.
 		 */
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,
-				KeyOwnedIndex<AHashMap<Keyword,ACell>> shared,Supplier<CVMLong> getTimestamp) {
+				FavouritesIndex shared,Supplier<CVMLong> getTimestamp) {
 			super(host.cursor(),FAVOURITES,shared);
 			this.getTimestamp=getTimestamp;
 		}
 
 		/** Opens a live authoring handle. An absent owner is created only by a changed edit. */
 		Favourites user(AKeyPair user) {
-			var owner=user.getAccountKey();
-			return new Favourites(component().path(owner),component().signingFor(owner),user::signData,getTimestamp);
+			return component().user(user.getAccountKey(),user::signData,getTimestamp);
 		}
 
 		/** Reads the relayed field without assuming the remote owner's item representation. */
 		ACell items(AccountKey user) {
 			var record=component().get(user);
 			return record==null?null:record.getValue().get(ITEMS);
+		}
+	}
+
+	/**
+	 * The owner index. {@link KeyOwnedIndex} checks that each envelope's signer matches
+	 * its owner key. It checks only ownership, signatures and ordering metadata,
+	 * preserving all payload fields even when a local domain view cannot interpret them.
+	 */
+	static final class FavouritesIndex extends KeyOwnedIndex<AHashMap<Keyword,ACell>> {
+		FavouritesIndex(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> region) {
+			super(region,Timestamped.lattice());
+		}
+
+		@Override public FavouritesIndex rebind(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> cursor) {
+			return new FavouritesIndex(cursor);
+		}
+		@Override public FavouritesIndex fork() { return rebind(storage.fork()); }
+
+		/**
+		 * Opens a live view of an owner's record, signed with the supplied signer and
+		 * stamped with the supplied clock. An absent record is created by its first changed edit.
+		 */
+		Favourites user(AccountKey owner,
+				Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,
+				Supplier<CVMLong> getTimestamp) {
+			return new Favourites(path(owner),signingFor(owner),signer,getTimestamp);
 		}
 	}
 

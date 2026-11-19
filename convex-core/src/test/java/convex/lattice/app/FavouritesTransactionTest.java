@@ -25,8 +25,7 @@ class FavouritesTransactionTest {
 		var stamps=new AtomicInteger();
 		var signatures=new AtomicInteger();
 		var app=new FavouritesApp(host,() -> CVMLong.create(stamps.incrementAndGet()));
-		var live=new Favourites(app.component().path(ALICE.getAccountKey()),
-			app.component().signingFor(ALICE.getAccountKey()),
+		var live=app.component().user(ALICE.getAccountKey(),
 			value -> { signatures.incrementAndGet(); return ALICE.signData(value); },
 			() -> CVMLong.create(stamps.incrementAndGet()));
 		var retained=new AtomicReference<SetComponent<ACell>>();
@@ -63,8 +62,7 @@ class FavouritesTransactionTest {
 		var original=app.component().get(ALICE.getAccountKey());
 		var signatures=new AtomicInteger();
 		var key=new AtomicReference<>(ALICE);
-		var live=new Favourites(app.component().path(ALICE.getAccountKey()),
-			app.component().signingFor(ALICE.getAccountKey()),value -> {
+		var live=app.component().user(ALICE.getAccountKey(),value -> {
 				signatures.incrementAndGet();
 				return key.get()==null?null:key.get().signData(value);
 			},() -> CVMLong.TWO);

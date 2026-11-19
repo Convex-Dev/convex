@@ -29,8 +29,7 @@ class FavouritesForkTest {
 	private static Favourites alice(FavouritesApp app,
 			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,
 			Supplier<CVMLong> clock) {
-		return new Favourites(app.component().path(ALICE.getAccountKey()),
-			app.component().signingFor(ALICE.getAccountKey()),signer,clock);
+		return app.component().user(ALICE.getAccountKey(),signer,clock);
 	}
 
 	@Test void domainDraftBatchesSignaturesAndStopsAtTheRegion() {
