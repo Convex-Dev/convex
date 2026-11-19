@@ -16,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.LatticeContext;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -26,10 +27,31 @@ import convex.lattice.generic.MapLattice;
  */
 public class KVDatabaseTest {
 
+	/** An owner's database map, which binds each named database to its own entry. */
+	static final class Databases extends MapComponent<AString,Index<AString,AVector<ACell>>> {
+		@SuppressWarnings({"unchecked","rawtypes"})
+		Databases(AForkableCursor<?> cursor) { super((AForkableCursor)cursor); }
+
+		KVDatabase database(String name) {
+			AString dbName=Strings.create(name);
+			return KVDatabase.connect(entry(dbName),dbName);
+		}
+
+		KVDatabase database(String name,AString replicaID) {
+			AString dbName=Strings.create(name);
+			return KVDatabase.connect(entry(dbName),dbName,replicaID);
+		}
+	}
+
+	private static KVDatabase connect(AForkableCursor<?> databases,String name,boolean explicitReplica) {
+		var owner=new Databases(databases);
+		return explicitReplica?owner.database(name,Strings.create("replica")):owner.database(name);
+	}
+
 	@Test void namedDatabaseAccessRejectsIncompatibleParentsAndPreservesSiblings() {
 		for (boolean explicitReplica:new boolean[] {false,true}) {
 			var root=new Root<ACell>();
-			var db=explicitReplica?KVDatabase.connect(root,"db",Strings.intern("replica")):KVDatabase.connect(root,"db");
+			var db=connect(root,"db",explicitReplica);
 			for (ACell bad:new ACell[] {Strings.intern("not a map"),Index.none()}) {
 				root.set(bad);
 				assertThrows(IllegalStateException.class,() -> db.kv().get("key"));
@@ -54,9 +76,9 @@ public class KVDatabaseTest {
 			var local=KVDatabase.create("db",recipient);
 			var remote=source.exportReplica().dissoc(attacker.getAccountKey())
 				.assoc(claimed,source.getSignedState());
-			var before=local.kv().cursor().get();
+			var before=local.kv().value();
 			assertEquals(0,local.mergeReplicas(remote),"unknown owners must fail closed");
-			assertSame(before,local.kv().cursor().get());
+			assertSame(before,local.kv().value());
 			var unauthorised=KVDatabase.create("db",attacker,claimed,Strings.create("replica"));
 			assertThrows(IllegalStateException.class,unauthorised::exportReplica);
 		}
@@ -112,8 +134,7 @@ public class KVDatabaseTest {
 	public void testConnectingAbsentDatabaseDoesNotWrite() {
 		for (boolean explicitReplica:new boolean[]{false,true}) {
 			var parent=Root.<AHashMap<AString,Index<AString,AVector<ACell>>>>create(null);
-			var db=explicitReplica?KVDatabase.connect(parent,"db",Strings.create("replica")):
-				KVDatabase.connect(parent,"db");
+			var db=connect(parent,"db",explicitReplica);
 			assertNull(parent.get(),"connecting must not initialise or sign state");
 			assertNull(db.kv().get("missing"));
 			assertFalse(db.kv().del("missing"));
@@ -130,7 +151,7 @@ public class KVDatabaseTest {
 		var content=LatticeKV.create();
 		content.set("valuable",Strings.create("concurrent write"));
 		AHashMap<AString,Index<AString,AVector<ACell>>> populated=
-			Maps.of(Strings.create("db"),content.cursor().get());
+			Maps.of(Strings.create("db"),content.value());
 		for (boolean explicitReplica:new boolean[]{false,true}) {
 			// Deterministically publish another writer's database just after a read of
 			// absent state. A read-then-set initialisation would erase that writer.
@@ -147,8 +168,7 @@ public class KVDatabaseTest {
 					return observed;
 				}
 			};
-			var db=explicitReplica?KVDatabase.connect(parent,"db",Strings.create("replica")):
-				KVDatabase.connect(parent,"db");
+			var db=connect(parent,"db",explicitReplica);
 			parent.publish(); // A read-free connect leaves the other writer to run now.
 			assertSame(populated,parent.get());
 			db.kv().set("local",Strings.create("local write"));
@@ -262,7 +282,7 @@ public class KVDatabaseTest {
 		dbB.kv().set("legit", Strings.create("data"));
 
 		// Export B's data but tamper: sign with a different key
-		Index<AString, AVector<ACell>> bState = dbB.kv().cursor().get();
+		Index<AString, AVector<ACell>> bState = dbB.kv().value();
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		AHashMap<AString, Index<AString, AVector<ACell>>> bDbMap =
 			(AHashMap) Maps.of(Strings.create("secure"), bState);
@@ -342,7 +362,7 @@ public class KVDatabaseTest {
 			Cursors.root(dbMapLattice.zero());
 
 		// Connect a named database
-		KVDatabase db = KVDatabase.connect(root, "mydb");
+		KVDatabase db = new Databases(root).database("mydb");
 		assertNotNull(db);
 		assertEquals("mydb", db.getName().toString());
 
@@ -355,7 +375,7 @@ public class KVDatabaseTest {
 		assertTrue(rootMap.containsKey(Strings.create("mydb")));
 
 		// Connect a second instance to the same root — sees same data
-		KVDatabase db2 = KVDatabase.connect(root, "mydb");
+		KVDatabase db2 = new Databases(root).database("mydb");
 		assertEquals(Strings.create("hello"), db2.kv().get("greeting"));
 	}
 
@@ -391,7 +411,7 @@ public class KVDatabaseTest {
 			Cursors.root(dbMapLattice.zero());
 
 		// Connect and populate
-		KVDatabase db = KVDatabase.connect(root, "mydb");
+		KVDatabase db = new Databases(root).database("mydb");
 		db.kv().set("original", Strings.create("value"));
 
 		// Fork the KV store
@@ -415,7 +435,7 @@ public class KVDatabaseTest {
 			MapLattice.create(KVStoreLattice.INSTANCE);
 		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
 			Cursors.root(dbMapLattice.zero());
-		KVDatabase db = KVDatabase.connect(root, "mydb");
+		KVDatabase db = new Databases(root).database("mydb");
 
 		assertNull(db.getKeyPair());
 		assertNull(db.getOwnerKey());

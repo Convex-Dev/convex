@@ -14,7 +14,6 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.LatticeContext;
-import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerMapLattice;
@@ -38,8 +37,8 @@ import convex.lattice.generic.OwnerMapLattice;
  * <p>Two usage modes:
  * <ul>
  *   <li><b>Standalone</b> ({@link #create}): owns its own cursor, manual export/merge</li>
- *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain,
- *       signing supplied by that cursor's owner boundary and publication by its host</li>
+ *   <li><b>Connected</b> ({@link #connect}): bound to the place its owner gives it in a
+ *       cursor chain, signing supplied by that chain's owner boundary and publication by its host</li>
  * </ul>
  *
  * <p>Usage:
@@ -49,8 +48,8 @@ import convex.lattice.generic.OwnerMapLattice;
  * db.kv().set("key", value);
  * db.mergeReplicas(remoteOwnerMap);
  *
- * // Connected (e.g. from a SignedCursor in a NodeServer)
- * KVDatabase db = KVDatabase.connect(signedCursor, "mydb");
+ * // Connected, at the place the owner of the database map gives it
+ * KVDatabase db = KVDatabase.connect(databaseCursor, Strings.create("mydb"));
  * db.kv().set("key", value);
  * </pre>
  *
@@ -146,41 +145,31 @@ public class KVDatabase {
 	}
 
 	/**
-	 * Connects to a database within an existing cursor chain (e.g. from a NodeServer).
-	 * The parent cursor should be post-SignedCursor (navigated past the signing boundary).
-	 * Signing belongs to that boundary; host publication remains explicit.
-	 * Connecting does not write or sign state. Missing containers are created
-	 * atomically by the first changed KV operation.
+	 * Binds a database to the place its owner gives it in a cursor chain, such as an
+	 * entry of the owner's database map behind a signing boundary. Signing belongs to
+	 * that boundary; host publication remains explicit. Connecting writes and signs
+	 * nothing.
 	 *
-	 * @param parent Parent lattice cursor (e.g. a SignedCursor for the owner's db map)
-	 * @param name Database name to connect to
-	 * @return New KVDatabase connected to the cursor chain
+	 * @param cursor Cursor of the database's KV store, which may be absent
+	 * @param name Database name
+	 * @return New KVDatabase bound to the cursor
 	 */
-	@SuppressWarnings("unchecked")
-	public static KVDatabase connect(AForkableCursor<?> parent, String name) {
-		AString dbName = Strings.create(name);
-		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = new MapComponent<>(databases).path(dbName);
-		LatticeKV kv = LatticeKV.connect(cursor);
-		return new KVDatabase(dbName, null, null, kv);
+	public static KVDatabase connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString name) {
+		return new KVDatabase(name, null, null, LatticeKV.connect(cursor));
 	}
 
 	/**
-	 * Connects to a database within an existing cursor chain with a replica ID.
-	 * Like {@link #connect(AForkableCursor, String)}, opening the view is read-only.
+	 * Binds a database to the place its owner gives it, with a replica ID, as
+	 * {@link #connect(AForkableCursor, AString)}.
 	 *
-	 * @param parent Parent lattice cursor (e.g. a SignedCursor for the owner's db map)
-	 * @param name Database name to connect to
+	 * @param cursor Cursor of the database's KV store, which may be absent
+	 * @param name Database name
 	 * @param replicaID Replica ID for PN-counter operations
-	 * @return New KVDatabase connected to the cursor chain
+	 * @return New KVDatabase bound to the cursor
 	 */
-	@SuppressWarnings("unchecked")
-	public static KVDatabase connect(AForkableCursor<?> parent, String name, AString replicaID) {
-		AString dbName = Strings.create(name);
-		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = new MapComponent<>(databases).path(dbName);
-		LatticeKV kv = LatticeKV.connect(cursor, replicaID);
-		return new KVDatabase(dbName, null, null, kv);
+	public static KVDatabase connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString name,
+			AString replicaID) {
+		return new KVDatabase(name, null, null, LatticeKV.connect(cursor, replicaID));
 	}
 
 	/**
@@ -229,7 +218,7 @@ public class KVDatabase {
 	public SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 		AHashMap<AString, Index<AString, AVector<ACell>>> dbMap =
-			(AHashMap) Maps.of(dbName, kv.cursor().get());
+			(AHashMap) Maps.of(dbName, kv.value());
 		var signed=owners.signingFor(ownerKey).sign(dbMap,keyPair::signData);
 		if (signed==null) throw new IllegalStateException("Signing key is not authorised for KV owner");
 		return signed;
@@ -278,7 +267,7 @@ public class KVDatabase {
 
 			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
 			if (remoteState != null) {
-				kv.cursor().updateAndGet(own -> KVStoreLattice.INSTANCE.merge(own,remoteState));
+				kv.merge(remoteState);
 				merged++;
 			}
 		}

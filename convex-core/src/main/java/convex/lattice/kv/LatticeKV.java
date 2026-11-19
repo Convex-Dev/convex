@@ -501,6 +501,12 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return incrby(key, -amount);
 	}
 
+	/** Merges an incoming store into this one with the KV store lattice. */
+	@Override
+	public Index<AString, AVector<ACell>> merge(Index<AString, AVector<ACell>> incoming) {
+		return cursor().updateAndGet(own -> KVStoreLattice.INSTANCE.merge(own,incoming));
+	}
+
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
 	protected Index<AString, AVector<ACell>> reconcile(
