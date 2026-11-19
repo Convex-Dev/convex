@@ -205,10 +205,15 @@ sync, even when a write
 
 ## Component-supplied construction
 
-A plain path writes only where its entry exists. A component that wants a place in
-its own value created by its first write uses a view of its own that does so, and
-keeps that view internal: its API offers domain operations and child components,
-not cursors. These are the ways to do it properly.
+A plain path writes only where its entry exists. Creating a child's place lazily is
+the choice of the component that holds it. A component that supports lazily created
+children gives each child a way to create its own location within the component's
+value: a cursor that creates the location on a changed write, a callback that makes
+sure the location exists, or a reference to the parent whose domain operation
+creates it. Which is simplest is the implementer's choice. The component keeps that
+means internal: its API offers domain operations and child components, not cursors,
+and its `resolve`, `entry` and domain operations produce children that already
+handle a missing location. The cursor forms are below.
 
 A component whose value is a map extends `AMapComponent` and binds each child to
 `entry(key)`. Its map operations and the entry view are protected, so the component
@@ -220,7 +225,10 @@ container first if there is none. The pure `createContainer()` hook can supply
 initial contents or refuse creation. Reads and writes that change nothing leave
 missing storage absent. Where the container is missing and the hook refuses, every
 write through the entry is refused, whatever the value, so a working copy over it is
-refused at sync, changed or not, and keeps its edits.
+refused at sync, changed or not, and keeps its edits. A level that makes children
+but is not the component's own value, such as a map inside its record, can be a
+small private subclass of `MapComponent` or `IndexComponent` whose domain operation
+binds each child to its `entry`.
 
 For custom representations, a component can use
 `ProjectionCursor.create(source, read, write)` to expose a child without requiring
