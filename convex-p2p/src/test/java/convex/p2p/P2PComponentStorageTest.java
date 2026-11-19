@@ -67,6 +67,27 @@ class P2PComponentStorageTest {
 		assertNull(published.get(bob),"the record the merging application dropped stays dropped");
 	}
 
+	/** A view's published edit merges a user both sides changed and keeps another user's removal. */
+	@SuppressWarnings("unchecked")
+	@Test void viewedIdentitiesReconcileUserByUser() {
+		AccountKey bob=BOB.getAccountKey();
+		BiFunction<ACell,ACell,SignedData<ACell>> signer=(owner,value) -> (owner.equals(KEY)?ALICE:BOB).signData(value);
+		var root=new Root<Index<Keyword,ACell>>(Index.<Keyword,ACell>none());
+		var holder=new Regions(root);
+		P2PIdentities held=holder.create(P2PLattice.KEY_ID,P2PIdentities::new);
+		held.identity(KEY,signer).setIdentity(FIRST);
+		held.identity(bob,signer).setIdentity(FIRST);
+		var viewer=new Regions(root.fork());
+		P2PIdentities seen=viewer.view(P2PLattice.KEY_ID,P2PIdentities::new);
+		seen.identity(KEY,signer).setIdentity(THIRD);
+		held.identity(KEY,signer).setIdentity(SECOND);
+		// The merging application drops Bob's record
+		root.update(r -> r.assoc(P2PLattice.KEY_ID,((AHashMap<ACell,ACell>)r.get(P2PLattice.KEY_ID)).dissoc(bob)));
+		viewer.sync();
+		assertEquals(THIRD,held.identity(KEY,null).getIdentity(),"a user changed on both sides merges by the owner rule");
+		assertNull(held.identity(bob,null).getIdentity(),"the merging application's removal stays");
+	}
+
 	private static ALatticeComponent<ACell> component(P2PUser user,boolean node) {
 		return node?user.node():user.identity();
 	}
