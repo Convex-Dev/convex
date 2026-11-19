@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -44,7 +45,7 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	private final Supplier<CVMLong> clock;
-	private final MapComponent<ACell,AVector<ACell>> partitions;
+	private final Partitions partitions;
 	private final MapComponent<ACell,ACell> metadata;
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
@@ -61,8 +62,17 @@ public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	public LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor,Supplier<CVMLong> clock) {
 		super(cursor);
 		this.clock=Objects.requireNonNull(clock);
-		partitions=new MapComponent<>(path(TopicLattice.KEY_PARTITIONS));
-		metadata=new MapComponent<>(path(TopicLattice.KEY_META));
+		partitions=new Partitions(entry(TopicLattice.KEY_PARTITIONS));
+		metadata=new MapComponent<>(entry(TopicLattice.KEY_META));
+	}
+
+	/** The partition map, which binds each partition's queue to its own entry. */
+	private static final class Partitions extends MapComponent<ACell,AVector<ACell>> {
+		Partitions(AForkableCursor<AHashMap<ACell,AVector<ACell>>> cursor) { super(cursor); }
+
+		LatticeQueue partition(ACell id,Supplier<CVMLong> clock) {
+			return new LatticeQueue(entry(id),clock);
+		}
 	}
 
 	/**
@@ -85,7 +95,7 @@ public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	 * @return Queue for the specified partition
 	 */
 	public LatticeQueue partition(ACell id) {
-		return new LatticeQueue(partitions.path(id),clock);
+		return partitions.partition(id,clock);
 	}
 
 	// ===== Metadata =====

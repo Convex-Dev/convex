@@ -101,7 +101,7 @@ public class LatticeMQ extends MapComponent<ACell, Index<Keyword, ACell>> {
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return new LatticeTopic(path(name),clock);
+		return new LatticeTopic(entry(name),clock);
 	}
 
 	/**
