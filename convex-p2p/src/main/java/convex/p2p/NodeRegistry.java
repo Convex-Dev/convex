@@ -95,8 +95,10 @@ final class NodeRegistry extends ALatticeComponent<Index<Keyword,ACell>> {
 	}
 
 	/** The node records this registry holds, by node key. */
+	@SuppressWarnings("unchecked")
 	AHashMap<ACell,SignedData<ACell>> records() {
-		return nodes(cursor().getOrDefault(null));
+		ACell nodes=cursor().getOrDefault(null,P2PLattice.KEY_NODES);
+		return (nodes instanceof AHashMap<?,?> map)?(AHashMap<ACell,SignedData<ACell>>)map:Maps.empty();
 	}
 
 	/** Drops a node's record, if this node holds one. */

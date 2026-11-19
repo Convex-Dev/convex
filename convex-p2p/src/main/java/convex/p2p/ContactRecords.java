@@ -114,7 +114,7 @@ public final class ContactRecords extends ALocalComponent {
 	/** Applies an event to a node's record, making room for a new node by dropping the least useful record. */
 	private void record(AccountKey node,UnaryOperator<AHashMap<Keyword,ACell>> event) {
 		contacts.update(all -> {
-			AHashMap<AccountKey,AHashMap<Keyword,ACell>> records=all;
+			AHashMap<AccountKey,AHashMap<Keyword,ACell>> records=(all==null)?Maps.empty():all;
 			AHashMap<Keyword,ACell> record=records.get(node);
 			if (record==null && records.count()>=MAX_NODES) records=records.dissoc(leastUseful(records));
 			return records.assoc(node,event.apply((record==null)?Maps.empty():record));
@@ -148,12 +148,13 @@ public final class ContactRecords extends ALocalComponent {
 
 	/** Returns the contact record for a node, or null if this node has none. */
 	public AHashMap<Keyword,ACell> get(AccountKey node) {
-		return contacts.get().get(node);
+		return all().get(node);
 	}
 
 	/** Every contact record this node keeps, by node key. */
 	AHashMap<AccountKey,AHashMap<Keyword,ACell>> all() {
-		return contacts.get();
+		AHashMap<AccountKey,AHashMap<Keyword,ACell>> all=contacts.get();
+		return (all==null)?Maps.empty():all;
 	}
 
 	/** A snapshot of every node's standing, as {@link #standing} gives it. */
