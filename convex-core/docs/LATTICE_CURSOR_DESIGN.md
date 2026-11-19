@@ -82,12 +82,14 @@ whose place has been deleted is refused at sync and keeps its edits. Views over 
 path, such as a default, a signed view or a stamp, write through it and are
 refused with it.
 
-A cursor never creates a place. An entry is created by writing the container that
+A cursor creates a place only through construction supplied by whoever made it, as
+a lazy cursor, below. Otherwise an entry is created by writing the container that
 holds it: `assoc` and `assocIn` on the container's cursor, or an update function
 there. This is the standard, and what applications should do by default. A
-component may instead write within its own value through a view of its own whose
-write function creates the entry, and its container, atomically with a changed
-write: `AMapComponent.entry`, below, is the one Convex supplies. It suits places
+component may instead bind a child within its own value to a lazy cursor whose
+construction it supplies, which creates the entry, and its containers, atomically
+with a changed write: `AMapComponent.entry` and `LazyCursor` are the ones Convex
+supplies. It suits places
 whose absence means empty, such as regions, owner slots and fields. A record whose
 existence matters is bound by a plain path instead, so a write after the record is
 deleted is refused rather than writing it back. Such a view creates nothing on a read
@@ -208,15 +210,39 @@ sync, even when a write
 A plain path writes only where its entry exists. Creating a child's place lazily is
 the choice of the component that holds it. A component that supports lazily created
 children gives each child a way to create its own location within the component's
-value: a cursor that creates the location on a changed write, a callback that makes
-sure the location exists, or a reference to the parent whose domain operation
+value: a lazy cursor that creates the location on a changed write, a callback that
+makes sure the location exists, or a reference to the parent whose domain operation
 creates it. Which is simplest is the implementer's choice. The component keeps that
 means internal: its API offers domain operations and child components, not cursors,
 and its `resolve`, `entry` and domain operations produce children that already
-handle a missing location. The cursor forms are below.
+handle a missing location.
+
+A lazy cursor (`ALazyCursor`) is made with its construction: whoever makes one
+supplies how its location is found in the source value and how it is constructed.
+The base fixes the rest. While the location does not exist it reads as the cursor's
+default value, or as absent where there is no default, even where the source is
+absent; a stored nil is present. A changed write constructs the location and
+anything missing on the way to it, and a write that leaves the value unchanged
+constructs nothing. Where the location cannot be constructed, every write is
+refused, whatever the value. Reads never construct. Any component can be built over
+one, so binding a child to a lazy cursor makes that child lazy.
+
+`LazyCursor` is the standard implementation: one key of the data structure its
+container cursor holds, with a default. It constructs its location in the
+container's current value; where the container is absent, the container cursor's
+own default supplies it, so a chain of lazy cursors with a default at each level
+constructs a whole path in one atomic write. Where its default is a data structure,
+a stored value of another CVM type is rejected.
+
+```java
+// The record may be absent; its items field is created by the first add
+var record = cursor().withDefault(Maps.empty());
+var items = new SetComponent<>(LazyCursor.create(record, ITEMS));
+```
 
 A component whose value is a map extends `AMapComponent` and binds each child to
-`entry(key)`. Its map operations and the entry view are protected, so the component
+`entry(key)`, a lazy cursor with no default whose construction is the component's
+own. Its map operations and the entry view are protected, so the component
 chooses what to expose; `MapComponent` and `IndexComponent` expose the map
 operations for code that wants a generic map. An entry reads as a path does: a
 missing key is absent and a stored nil is present. It rejects an incompatible stored
@@ -225,10 +251,7 @@ container first if there is none. The pure `createContainer()` hook can supply
 initial contents or refuse creation. Reads and writes that change nothing leave
 missing storage absent. Where the container is missing and the hook refuses, every
 write through the entry is refused, whatever the value, so a working copy over it is
-refused at sync, changed or not, and keeps its edits. A level that makes children
-but is not the component's own value, such as a map inside its record, can be a
-small private subclass of `MapComponent` or `IndexComponent` whose domain operation
-binds each child to its `entry`.
+refused at sync, changed or not, and keeps its edits.
 
 For custom representations, a component can use
 `ProjectionCursor.create(source, read, write)` to expose a child without requiring

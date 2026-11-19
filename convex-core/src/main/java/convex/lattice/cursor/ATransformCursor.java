@@ -19,8 +19,8 @@ import convex.core.util.Utils;
  * creates no storage by default: its write receives null for absent storage, and
  * a navigating view refuses a missing entry or container with
  * {@link convex.lattice.PathWriteException}. A subclass whose definition knows how
- * to build its storage, as a default, an authoring view or a component's
- * projection does, builds it in its write.</p>
+ * to build its storage, as a default, an authoring view, a lazy cursor or a
+ * component's projection does, builds it in its write.</p>
  *
  * <p>Read and write functions must be side-effect free and may run again on a
  * conflict. The read function must accept values produced by both this view and
