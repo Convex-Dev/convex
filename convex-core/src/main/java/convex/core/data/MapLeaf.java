@@ -472,6 +472,50 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
+	public AHashMap<K, V> merge(AHashMap<K, V> b) {
+		if ((b == this) || b.isEmpty()) return this;
+		if (isEmpty()) return b;
+		if (b.count == 1) return assocEntry(b.entryAt(0));
+		if (b instanceof MapLeaf<K, V> leaf) return mergeLeaf(leaf);
+		if (b instanceof MapTree<K, V> tree) return mergeTree(tree);
+		return super.merge(b);
+	}
+
+	private AHashMap<K, V> mergeTree(MapTree<K, V> tree) {
+		// The right-hand tree already has the winning entries, including nil values.
+		AHashMap<K, V> result = tree;
+		for (MapEntry<K, V> e : entries) {
+			if (!result.containsKey(e.getKey())) result = result.assocEntry(e);
+		}
+		return result;
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> mergeLeaf(MapLeaf<K, V> leaf) {
+		int ai = 0, bi = 0, n = 0;
+		MapEntry<K, V>[] merged = null;
+		while ((ai < entries.length) || (bi < leaf.entries.length)) {
+			MapEntry<K, V> aEntry = (ai < entries.length) ? entries[ai] : null;
+			MapEntry<K, V> bEntry = (bi < leaf.entries.length) ? leaf.entries[bi] : null;
+			int c = (aEntry == null) ? 1 : ((bEntry == null) ? -1
+					: aEntry.getKeyHash().compareTo(bEntry.getKeyHash()));
+			MapEntry<K, V> entry = (c < 0) ? aEntry : bEntry;
+			if ((c == 0) && aEntry.equals(bEntry)) entry = aEntry;
+			if ((merged == null) && ((c > 0) || (entry != aEntry))) {
+				merged = (MapEntry<K, V>[]) new MapEntry<?, ?>[entries.length + leaf.entries.length];
+				System.arraycopy(entries, 0, merged, 0, ai);
+			}
+			if (merged != null) merged[n] = entry;
+			n++;
+			if (c <= 0) ai++;
+			if (c >= 0) bi++;
+		}
+		if (merged == null) return this;
+		merged = Arrays.copyOf(merged, n);
+		return (n <= MAX_ENTRIES) ? new MapLeaf<>(merged) : MapTree.create(merged);
+	}
+
+	@Override
 	public AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func) {
 		return mergeWith(b, func, 0);
 	}

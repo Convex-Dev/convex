@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Speed up ordinary hash-map merges by reusing unchanged tree branches. ([Benchmarks](convex-benchmarks/README.md#ordinary-hash-map-merge))
 - Reconcile component updates without automatically persisting intermediate working state; applications choose when to save snapshots. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking))
 - Refuse every write to a lattice entry its component cannot create; see [Component-supplied construction](convex-core/docs/LATTICE_CURSOR_DESIGN.md#component-supplied-construction) when upgrading.
 

@@ -260,6 +260,73 @@ public class MapsTest {
 		return m;
 	}
 
+	@Test
+	public void testOrdinaryMergeAcrossTreeShapes() throws Exception {
+		var shapes = TreeShapes.SHAPES;
+		for (int i = 0; i < shapes.size(); i++) {
+			for (int j = 0; j < shapes.size(); j++) {
+				var xs = shapeValues(shapes.get(i), i);
+				var ys = shapeValues(shapes.get(j), j);
+				// Presence must be distinguished from nil, on either side and at any depth.
+				xs.replaceAll((k, v) -> (k.longValue() % 3 == 0) ? null : v);
+				ys.replaceAll((k, v) -> (k.longValue() % 2 == 0) ? null : v);
+				AHashMap<CVMLong, CVMLong> x = assocAll(xs), y = assocAll(ys);
+				xs.putAll(ys);
+				assertOrdinaryMerge(assocAll(xs), x, y);
+			}
+		}
+	}
+
+	@Test
+	public void testOrdinaryMergeLeafBoundary() throws Exception {
+		for (int a : new int[] {0, 1, 7, 14, 15, 16, 17, 100}) {
+			for (int b : new int[] {0, 1, 7, 14, 15, 16, 17, 100}) {
+				for (int offset : new int[] {0, 5, 100}) {
+					AHashMap<ACell, ACell> x = Maps.empty(), y = Maps.empty();
+					for (int i = 0; i < a; i++) x = x.assoc(CVMLong.create(i), CVMLong.ONE);
+					for (int i = 0; i < b; i++) y = y.assoc(CVMLong.create(i + offset), (i % 2 == 0) ? null : CVMLong.ZERO);
+					AHashMap<ACell, ACell> expected = x;
+					for (long i = 0; i < y.count(); i++) expected = expected.assocEntry(y.entryAt(i));
+					assertOrdinaryMerge(expected, x, y);
+					// Nil keys are values too; exercise them in both leaves and trees.
+					assertOrdinaryMerge(expected.assoc(null, null), x.assoc(null, CVMLong.ONE), y.assoc(null, null));
+					assertSame(x, x.merge(x));
+					assertSame(x, x.merge(Maps.empty()));
+					assertSame(x, Maps.<ACell, ACell, AHashMap<ACell, ACell>>empty().merge(x));
+				}
+			}
+		}
+	}
+
+	private static <K extends ACell, V extends ACell> void assertOrdinaryMerge(
+			AHashMap<K, V> expected, AHashMap<K, V> x, AHashMap<K, V> y) throws Exception {
+		// Exercise dispatch through the AMap overload used by CVM merge.
+		AHashMap<K, V> result = x.merge((AMap<K, V>) y);
+		assertEquals(expected, result);
+		assertEquals(expected.getEncoding(), result.getEncoding());
+		assertEquals(expected.getHash(), result.getHash());
+		result.validate();
+		assertEquals(result, Samples.TEST_STORE.decodeMultiCell(Format.encodeMultiCell(result, true)));
+		if (expected.equals(x)) assertSame(x, result);
+	}
+
+	@Test
+	public void testOrdinaryMergeReusesUnchangedBranches() {
+		AHashMap<CVMLong, CVMLong> original = Maps.empty();
+		for (int i = 0; i < 1024; i++) original = original.assoc(CVMLong.create(i), CVMLong.ONE);
+		AHashMap<CVMLong, CVMLong> changed = original.assoc(CVMLong.ZERO, null);
+		AHashMap<CVMLong, CVMLong> merged = original.merge(changed);
+		assertEquals(changed, merged);
+		int reused = 0;
+		for (int i = 0; i < original.getRefCount(); i++) {
+			if (original.getRef(i) == changed.getRef(i)) {
+				assertSame(original.getRef(i), merged.getRef(i));
+				reused++;
+			}
+		}
+		assertEquals(original.getRefCount() - 1, reused);
+	}
+
 	private static AHashMap<CVMLong,CVMLong> assocAll(java.util.Map<CVMLong,CVMLong> m) {
 		AHashMap<CVMLong,CVMLong> result=Maps.empty();
 		for (java.util.Map.Entry<CVMLong,CVMLong> e: m.entrySet()) result=result.assoc(e.getKey(),e.getValue());

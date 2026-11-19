@@ -231,6 +231,11 @@ public class HashMergeFuzzTest {
 			for (int dir=0; dir<2; dir++) {
 				AHashMap<CVMLong,CVMLong> x=(dir==0)?xa:xb, y=(dir==0)?xb:xa;
 				Map<Integer,Long> xs=(dir==0)?ma:mb, ys=(dir==0)?mb:ma;
+				Map<Integer,Long> union=new HashMap<>(xs);
+				union.putAll(ys);
+				AHashMap<CVMLong,CVMLong> expectedUnion=Maps.empty();
+				for (var e: union.entrySet()) expectedUnion=expectedUnion.assoc(keys[e.getKey()],CVMLong.create(e.getValue()));
+				checkResult(expectedUnion,x.merge(y),x,where+" ordinary merge");
 				for (int f=0; f<FUNCTIONS.size(); f++) {
 					for (boolean differences: new boolean[] {false,true}) {
 						Map<Integer,Long> expected=new HashMap<>();

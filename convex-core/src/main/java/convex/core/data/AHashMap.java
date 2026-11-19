@@ -49,7 +49,8 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 * Merge another map into this map. Replaces existing entries if they are
 	 * different
 	 * 
-	 * O(n) in size of map to merge.
+	 * The fallback inserts each incoming entry. MapLeaf and MapTree override this
+	 * to merge their structures, preserving right-hand entries even when their values are null.
 	 * 
 	 * @param m HashMap to merge into this HashMap 
 	 * @return Merged HashMap

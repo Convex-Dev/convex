@@ -554,6 +554,54 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
+	public AHashMap<K, V> merge(AHashMap<K, V> b) {
+		if ((b == this) || b.isEmpty()) return this;
+		if (b.count == 1) return assocEntry(b.entryAt(0));
+		// A small right operand needs at most fifteen insertions, without scanning this tree.
+		if (!(b instanceof MapTree<K, V> tree)) return super.merge(b);
+		return mergeTree(tree);
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> mergeTree(MapTree<K, V> tree) {
+		int common = getFirstHash().commonHexPrefixLength(tree.getFirstHash(), Math.min(shift, tree.shift));
+		if (common < Math.min(shift, tree.shift)) return join(common, this, tree);
+		if (shift < tree.shift) {
+			int digit = tree.getFirstHash().getHexDigit(shift);
+			int i = Bits.indexForDigit(digit, mask);
+			if (i < 0) return insertChild(digit, tree.getRef());
+			AHashMap<K, V> child = children[i].getValue();
+			AHashMap<K, V> merged = child.merge(tree);
+			return (merged == child) ? this : replaceChild(i, merged.getRef());
+		}
+		if (shift > tree.shift) {
+			int digit = getFirstHash().getHexDigit(tree.shift);
+			int i = Bits.indexForDigit(digit, tree.mask);
+			if (i < 0) return tree.insertChild(digit, getRef());
+			AHashMap<K, V> child = tree.children[i].getValue();
+			AHashMap<K, V> merged = merge(child);
+			return (merged == child) ? tree : tree.replaceChild(i, merged.getRef());
+		}
+		// Equal prefixes and shifts: retain whole branches unless both sides occupy them.
+		Ref<AHashMap<K, V>>[] merged = null;
+		int fullMask = mask | tree.mask;
+		for (int digit = 0; digit < FANOUT; digit++) {
+			if ((fullMask & (1 << digit)) == 0) continue;
+			Ref<AHashMap<K, V>> aRef = childForDigit(digit);
+			Ref<AHashMap<K, V>> bRef = tree.childForDigit(digit);
+			AHashMap<K, V> aChild = aRef.getValue(), bChild = bRef.getValue();
+			AHashMap<K, V> child = aChild.merge(bChild);
+			if ((merged == null) && (child != aChild)) {
+				merged = (Ref<AHashMap<K, V>>[]) new Ref<?>[FANOUT];
+				for (int i = 0; i < digit; i++) merged[i] = childForDigit(i);
+			}
+			if (merged != null) merged[digit] = (child == aChild) ? aRef
+					: ((child == bChild) ? bRef : child.getRef());
+		}
+		return (merged == null) ? this : createFull(merged, shift);
+	}
+
+	@Override
 	public AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func) {
 		return mergeWith(b, func, 0);
 	}

@@ -191,6 +191,60 @@ These cases hold the value in memory and exercise `checkCache` and `decode`,
 including their hit counters. They measure L1 hit overhead, not disk access or
 contention between threads.
 
+### Ordinary hash-map merge
+
+Compare structural right-biased merge with the previous per-entry insertion loop:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main HashMapMergeBenchmark -prof gc
+```
+
+Both methods return the result to JMH and use the same immutable resident inputs.
+Setup checks their results agree, outside the timed section. Parameters cover
+8, 1,024 and 65,536 entries, with identical operands, a shared version with one
+value changed to `nil`, independently built half-overlapping or disjoint maps,
+a single incoming entry, and a single-entry receiver with a large incoming map.
+These measure warm merge traversal and allocation, excluding construction and
+store I/O. The insertion baseline retains the old algorithm in the benchmark,
+so it remains available after the production implementation changes.
+
+`MapLeaf` merges sorted entries; `MapTree` merges branches, retaining unchanged
+subtrees and joining disjoint prefixes. Small incoming maps still use individual
+insertions. Ordinary merge preserves explicit `nil` entries and right-hand
+precedence; the callback-based `mergeWith` and `mergeDifferences` contracts are
+unchanged.
+
+A local JDK 27.0.1.0.3 run on 2026-11-19 used two forks, one worker,
+`-Xms256m -Xmx512m` and `-prof gc`. The full matrix used three 300 ms warmups
+and four 300 ms measurements. Single-entry cases used four 500 ms warmups
+and five 500 ms measurements; a focused repeat of the large overlapping and
+disjoint cases used four 500 ms warmups and five one-second measurements.
+
+Timings varied substantially between some forks. These are **medians of the
+per-iteration average times**, using the focused repeats where available, not
+JMH's arithmetic means or guaranteed speedups. At 65,536 entries:
+
+| Incoming map | Insertion loop | Structural merge |
+|---|---:|---:|
+| Shared version, one value changed | 12.94 ms | 0.53 microseconds |
+| Independently built, half-overlapping keys | 27.87 ms | 8.56 ms |
+| Independently built, disjoint keys | 21.73 ms | 10.67 ms |
+| Single changed entry | 144 ns | 144 ns |
+
+Allocation was more consistent: the large overlapping case fell from 44.49 MB
+to 6.66 MB per merge, and the disjoint case from 45.24 MB to 8.78 MB. Not every
+case saves allocation: an eight-entry shared version with one changed value
+uses 168 bytes instead of 88, because the leaf merge builds a temporary entry
+array. Single-entry merge allocation was unchanged at every measured size.
+Identical operands return immediately, without traversing their entries.
+
+Five alternating baseline/updated aggregate pairs also exercised block execution,
+Etch writes, lattice path updates and local peer transactions, including a final
+pair after refining the small-operand dispatch. They showed no consistent overall
+slowdown; these short runs do not establish an application-wide speedup. Rerun on
+the deployment JVM and workload, particularly for cold store-backed maps.
+
 ### With Profiling (Java Flight Recorder)
 
 Generate profiling data for analysis:
