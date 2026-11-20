@@ -235,8 +235,9 @@ peers. Two envelopes under one key are the same envelope.
 At the map level `Mail` unions mailboxes, admitting only canonical base DID keys,
 and merges each mailbox by its DID-bound rule. `mergeDifferences` visits only keys
 that differ, and `SignedData` caches signature verification, so a merge costs
-O(delta) as in CAD038. A mailbox or region that takes nothing from a merge is left
-as it was, and an absent one stays absent.
+O(delta) as in CAD038. An absent mailbox or region merges as an empty one, so an
+empty mailbox merges alike whether held or incoming, and one held that takes
+nothing from a merge is left as it was.
 
 The per-key rule needs the entry key and the mailbox DID, so the mailbox applies
 it to each differing entry with that entry's key, rather than one rule shared by

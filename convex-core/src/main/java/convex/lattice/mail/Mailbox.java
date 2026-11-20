@@ -195,7 +195,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	 * register rule.
 	 *
 	 * @param incoming Incoming mailbox value
-	 * @return Current working value, absent if nothing has been accepted
+	 * @return Current working value
 	 * @throws IllegalArgumentException If an incoming entry is not signed data
 	 */
 	@Override
@@ -239,8 +239,8 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	/**
 	 * Merges an incoming mailbox value into a held one under a mailbox DID and receipt
-	 * signer rule. Only entries that differ are visited. A held value that takes
-	 * nothing is returned itself, and an absent one stays absent.
+	 * signer rule. Only entries that differ are visited. An absent held value merges as
+	 * an empty mailbox, and a held value that takes nothing is returned itself.
 	 *
 	 * @throws IllegalArgumentException If the incoming value is not an index, or an
 	 *         entry to be merged is not signed data
@@ -252,7 +252,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 		if (!(incoming instanceof Index<?,?> other)) throw new IllegalArgumentException("Mailbox must be an index");
 		// An absent mailbox is merged against an empty one, so every incoming entry meets the rule
 		Index<ABlob,SignedData<ACell>> held=(own==null)?Index.none():own;
-		Index<ABlob,SignedData<ACell>> merged=((Index)held).mergeDifferences(other,new MergeFunction<ACell>() {
+		return ((Index)held).mergeDifferences(other,new MergeFunction<ACell>() {
 			@Override
 			public ACell merge(ACell a,ACell b) {
 				throw new IllegalStateException("Mailbox merge requires the entry key");
@@ -265,7 +265,6 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 				return mergeEntry(did,(ABlob)key,authorizer,(SignedData<ACell>)a,(SignedData<ACell>)b);
 			}
 		});
-		return (own==null && merged.isEmpty())?null:merged;
 	}
 
 	/** True iff a key has the shape of an entry key. */

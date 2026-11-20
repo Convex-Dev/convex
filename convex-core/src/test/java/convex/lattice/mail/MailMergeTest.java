@@ -1,7 +1,6 @@
 package convex.lattice.mail;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -302,30 +301,31 @@ public class MailMergeTest {
 	}
 
 	@Test
-	public void testRejectedDeliveryLeavesAnAbsentMailboxAbsent() {
-		MailEnvelope e=toBob(1000,"hello");
-		Mail mail=Mail.create();
-		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> region=mail.value();
-		Mailbox mailbox=mail.mailbox(BOB_DID);
-		assertNull(mailbox.merge(entries(receipt(CAROL,BOB_DID,e))));
-		assertNull(mailbox.merge(Index.none()));
-		assertFalse(mailbox.exists());
-		assertSame(region,mail.value());
-		assertEquals(entries(e),mailbox.merge(entries(e)));
+	public void testEmptyMailboxesMergeAlikeHeldOrIncoming() {
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> empty=Maps.empty();
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> emptyMailbox=Maps.of(BOB_DID,Index.none());
+		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(emptyMailbox,empty));
+		checkMergeLaws(MailMergeTest::mergeRegion,empty,emptyMailbox,Maps.of(BOB_DID,entries(toBob(1000,"hello"))));
+
+		// A delivery whose every entry is rejected merges as the empty mailbox does
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> forged=Maps.of(BOB_DID,entries(receipt(CAROL,BOB_DID,toBob(1000,"hello"))));
+		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(empty,forged));
+		assertSame(emptyMailbox,mergeRegion(emptyMailbox,forged));
 	}
 
 	@Test
 	public void testEntryDeliveryBindsKey() {
 		MailEnvelope e1=toBob(1000,"one");
 		MailEnvelope e2=toBob(1001,"two");
-		Mailbox mailbox=bobsMailbox(DIDKeyAuthorizer.CONVEX,null);
+		Index<ABlob,SignedData<ACell>> empty=Index.none();
+		Mailbox mailbox=bobsMailbox(DIDKeyAuthorizer.CONVEX,empty);
 
 		// The register at one key accepts only entries that belong there
-		assertNull(mailbox.mergeAt(e2.signed(),e1.key()));
-		assertNull(mailbox.mergeAt(receipt(BOB,BOB_DID,e2).signed(),e1.key()));
-		assertNull(mailbox.mergeAt(e1.signed(),Blob.fromHex("ff")));
-		assertNull(mailbox.mergeAt(e1.signed(),BOB_DID));
-		assertNull(mailbox.mergeAt(e1.signed(),e1.key(),e1.key()));
+		assertSame(empty,mailbox.mergeAt(e2.signed(),e1.key()));
+		assertSame(empty,mailbox.mergeAt(receipt(BOB,BOB_DID,e2).signed(),e1.key()));
+		assertSame(empty,mailbox.mergeAt(e1.signed(),Blob.fromHex("ff")));
+		assertSame(empty,mailbox.mergeAt(e1.signed(),BOB_DID));
+		assertSame(empty,mailbox.mergeAt(e1.signed(),e1.key(),e1.key()));
 		assertEquals(entries(e1),mailbox.mergeAt(e1.signed(),e1.key()));
 
 		// An entry that is not signed data fails the delivery

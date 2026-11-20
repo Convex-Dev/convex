@@ -369,7 +369,8 @@ public class MailTest {
 		// Nor does it take root where no mailbox is held
 		Mail fresh=Mail.create();
 		fresh.merge(attack);
-		assertFalse(fresh.mailbox(BOB_DID).exists());
+		assertTrue(fresh.mailbox(BOB_DID).deposited().isEmpty());
+		assertTrue(fresh.mailbox(BOB_DID).receipts().isEmpty());
 	}
 
 	@Test

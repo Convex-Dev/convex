@@ -147,7 +147,7 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 	 * Merges an incoming region into this one, mailbox by mailbox.
 	 *
 	 * @param incoming Incoming region value
-	 * @return Current working value, absent if nothing has been accepted
+	 * @return Current working value
 	 * @throws IllegalArgumentException If an incoming mailbox is not an index, or an
 	 *         entry is not signed data
 	 */
@@ -189,8 +189,8 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 
 	/**
 	 * Merges an incoming region into a held one. Only mailboxes that differ are
-	 * visited. A held region that takes nothing is returned itself, and an absent one
-	 * stays absent.
+	 * visited. An absent held region merges as an empty one, and a held region that
+	 * takes nothing is returned itself.
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	private AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergeMailboxes(
@@ -199,7 +199,7 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 		if (incoming==null) return own;
 		// An absent region is merged against an empty one, so every incoming mailbox meets the rule
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> held=(own==null)?Maps.empty():own;
-		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> merged=((AHashMap)held).mergeDifferences(incoming,new MergeFunction<ACell>() {
+		return ((AHashMap)held).mergeDifferences(incoming,new MergeFunction<ACell>() {
 			@Override
 			public ACell merge(ACell a,ACell b) {
 				throw new IllegalStateException("Mail merge requires the mailbox key");
@@ -211,7 +211,6 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 				return Mailbox.mergeEntries((AString)key,authorizer,(Index<ABlob,SignedData<ACell>>)a,b);
 			}
 		});
-		return (own==null && merged.isEmpty())?null:merged;
 	}
 
 	/** True iff a key is a canonical base DID, which alone has a mailbox. */
