@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
@@ -17,6 +18,7 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
@@ -32,9 +34,10 @@ import convex.lattice.cursor.AForkableCursor;
  * envelope, and of two valid receipts the one whose signed value has the lower hash.
  * An envelope is valid at its key when its signature verifies, it is addressed to
  * this mailbox and the key is its own; a receipt when, in addition, it names this
- * mailbox and its signer is authorised for the mailbox DID. Invalid values are
- * dropped, an entry under a key of the wrong shape is dropped, and a mailbox value
- * that is not an index or an entry that is not signed data fails the merge.</p>
+ * mailbox and its signer is authorised for the mailbox DID. Each received entry is
+ * judged alone: one that is invalid, is not signed data, sits under a key of the wrong
+ * shape or fails its check with a data error is dropped, and the rest merge. A
+ * received mailbox that is not an index is dropped.</p>
  *
  * <p>Anyone holding this view may {@link #deposit}. Opening and receiving are the
  * recipient's: {@link #open} needs the decryptors for the recipient's keys and
@@ -196,24 +199,27 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	 *
 	 * @param incoming Incoming mailbox value
 	 * @return Current working value
-	 * @throws IllegalArgumentException If an incoming entry is not signed data
 	 */
 	@Override
 	public Index<ABlob,SignedData<ACell>> merge(Index<ABlob,SignedData<ACell>> incoming) {
 		return cursor().updateAndGet(held -> mergeEntries(did,authorizer,held,incoming));
 	}
 
+	/** Drops a delivered mailbox that is not an index; routes other deliveries as every component does. */
+	@Override
+	public Index<ABlob,SignedData<ACell>> mergeAt(ACell value,ACell... path) {
+		if (path.length==0 && value!=null && !(value instanceof Index)) return cursor().getOrDefault(null);
+		return super.mergeAt(value,path);
+	}
+
 	/**
 	 * Merges a delivery of one entry at its key; any other path names nothing here and
-	 * is dropped.
-	 *
-	 * @throws IllegalArgumentException If an entry delivered at a key is not signed data
+	 * is dropped, as is an entry that is not signed data.
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	protected Index<ABlob,SignedData<ACell>> mergeAtPath(ACell value,ACell... path) {
-		if (path.length==1 && isKey(path[0]) && value!=null) {
-			if (!(value instanceof SignedData<?> entry)) throw new IllegalArgumentException("Mailbox entry must be signed data");
+		if (path.length==1 && isKey(path[0]) && value instanceof SignedData<?> entry) {
 			return merge(Index.create((ABlob)path[0],(SignedData<ACell>)entry));
 		}
 		return cursor().getOrDefault(null);
@@ -240,16 +246,13 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	/**
 	 * Merges an incoming mailbox value into a held one under a mailbox DID and receipt
 	 * signer rule. Only entries that differ are visited. An absent held value merges as
-	 * an empty mailbox, and a held value that takes nothing is returned itself.
-	 *
-	 * @throws IllegalArgumentException If the incoming value is not an index, or an
-	 *         entry to be merged is not signed data
+	 * an empty mailbox, and a held value that takes nothing is returned itself. An
+	 * incoming value that is not an index is dropped.
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	static Index<ABlob,SignedData<ACell>> mergeEntries(AString did, DIDKeyAuthorizer authorizer,
 			Index<ABlob,SignedData<ACell>> own, ACell incoming) {
-		if (incoming==null) return own;
-		if (!(incoming instanceof Index<?,?> other)) throw new IllegalArgumentException("Mailbox must be an index");
+		if (!(incoming instanceof Index<?,?> other)) return own;
 		// An absent mailbox is merged against an empty one, so every incoming entry meets the rule
 		Index<ABlob,SignedData<ACell>> held=(own==null)?Index.none():own;
 		return ((Index)held).mergeDifferences(other,new MergeFunction<ACell>() {
@@ -260,11 +263,26 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 			@Override
 			public ACell merge(Object key,ACell a,ACell b) {
-				if (b==null || !isKey(key)) return a;
-				if (!(b instanceof SignedData<?>)) throw new IllegalArgumentException("Mailbox entry must be signed data");
-				return mergeEntry(did,(ABlob)key,authorizer,(SignedData<ACell>)a,(SignedData<ACell>)b);
+				if (b==null || !isKey(key) || !(b instanceof SignedData<?> entry)) return a;
+				return mergeReceived(a,() -> mergeEntry(did,(ABlob)key,authorizer,(SignedData<ACell>)a,(SignedData<ACell>)entry));
 			}
 		});
+	}
+
+	/**
+	 * Merges one received item, keeping the held value where the received item has a
+	 * data error. Incomplete local data is not a data error in the item and propagates.
+	 */
+	static <T> T mergeReceived(T held,Supplier<T> merge) {
+		try {
+			return merge.get();
+		} catch (MissingDataException e) {
+			// Received values arrive complete, so missing data is this store's and says nothing about the item
+			throw e;
+		} catch (RuntimeException | StackOverflowError e) {
+			// A malformed received item, a deeply nested one included, is dropped alone
+			return held;
+		}
 	}
 
 	/** True iff a key has the shape of an entry key. */

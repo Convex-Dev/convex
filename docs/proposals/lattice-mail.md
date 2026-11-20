@@ -248,9 +248,12 @@ may handle multiple DIDs.
 
 Incoming values reach the components by the usual routing (CAD045): a whole
 region is merged by `Mail`, a delivery at `[:mail did]` by that DID's mailbox, and
-one at `[:mail did key]` as a single entry. A delivery beneath a key that is not a
-mailbox or an entry key is dropped. A mailbox value that is not an index, or an
-entry that is not signed data, fails the merge.
+one at `[:mail did key]` as a single entry. Each received mailbox and entry is
+judged alone, so whatever is wrong is dropped and the rest merges: a key that is
+not a DID or an entry key, a delivery beneath one, a mailbox that is not an index,
+an entry that is not signed data, and an item whose check fails with a data error.
+A delivered region that is not a map is dropped. Missing local data is not a data
+error in the item: the merge fails and changes nothing.
 
 **Why it is a lattice.** Per key the values form a chain, absent below Deposited
 below Received, with Received made canonical by the tiebreak; join is the

@@ -24,11 +24,14 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Maps;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
+import convex.core.store.MemoryStore;
 import convex.lattice.cursor.Root;
 
 /** Merge rules of the mail region: the entry register, the mailbox index and the DID map. */
@@ -328,9 +331,8 @@ public class MailMergeTest {
 		assertSame(empty,mailbox.mergeAt(e1.signed(),e1.key(),e1.key()));
 		assertEquals(entries(e1),mailbox.mergeAt(e1.signed(),e1.key()));
 
-		// An entry that is not signed data fails the delivery
-		assertThrows(IllegalArgumentException.class,() -> mailbox.mergeAt(Strings.create("junk"),e2.key()));
-		assertEquals(entries(e1),mailbox.value());
+		// An entry that is not signed data is dropped
+		assertEquals(entries(e1),mailbox.mergeAt(Strings.create("junk"),e2.key()));
 	}
 
 	@Test
@@ -365,17 +367,39 @@ public class MailMergeTest {
 		assertEquals(mail.value(),other.value());
 	}
 
+	@SuppressWarnings({"unchecked","rawtypes"})
 	@Test
-	public void testWrongKindsFailTheMerge() {
-		MailEnvelope e=toBob(1000,"hello");
+	public void testWrongKindsAreDroppedAlone() {
+		MailEnvelope e1=toBob(1000,"one");
+		MailEnvelope e2=toBob(1001,"two");
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> expected=Maps.of(BOB_DID,entries(e1));
+
+		// A mailbox that is not an index is dropped, and the other mailboxes merge
+		AHashMap badMailbox=Maps.of(ALICE_DID,Strings.create("not an index"),BOB_DID,entries(e1));
+		assertEquals(expected,mergeRegion(Maps.empty(),badMailbox));
+
+		// An entry that is not signed data is dropped, and the other entries merge
+		AHashMap badEntry=Maps.of(BOB_DID,((Index)entries(e1)).assoc(e2.key(),Strings.create("junk")));
+		assertEquals(expected,mergeRegion(Maps.empty(),badEntry));
+
+		// A delivered region or mailbox of the wrong kind is dropped
 		Mail mail=Mail.create();
-		AHashMap<ACell,ACell> notAnIndex=Maps.of(BOB_DID,Strings.create("not an index"));
-		AHashMap<ACell,ACell> notSigned=Maps.of(BOB_DID,Index.create(e.key(),Strings.create("junk")));
-		for (AHashMap<ACell,ACell> bad:List.of(notAnIndex,notSigned)) {
-			@SuppressWarnings({"unchecked","rawtypes"})
-			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> incoming=(AHashMap)bad;
-			assertThrows(IllegalArgumentException.class,() -> mail.merge(incoming));
-			assertEquals(0,mail.value().count());
-		}
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> before=mail.value();
+		assertSame(before,mail.mergeAt(Strings.create("not a map")));
+		assertSame(before,mail.mergeAt(Strings.create("not an index"),BOB_DID));
+		assertSame(before,mail.value());
+	}
+
+	@Test
+	public void testIncompleteLocalDataFailsTheMergeAndChangesNothing() {
+		MailEnvelope e1=toBob(1000,"one");
+		MailEnvelope e2=toBob(1001,"two");
+		// An entry whose payload this store cannot read is not a data error in the entry
+		SignedData<ACell> incomplete=SignedData.create(ALICE.getAccountKey(),Ed25519Signature.ZERO,
+			Ref.forHash(e2.signed().getValueRef().getHash(),new MemoryStore()));
+		Index<ABlob,SignedData<ACell>> held=entries(e1);
+		Mailbox mailbox=bobsMailbox(DIDKeyAuthorizer.CONVEX,held);
+		assertThrows(MissingDataException.class,() -> mailbox.merge(Index.create(e2.key(),incomplete)));
+		assertSame(held,mailbox.value());
 	}
 }

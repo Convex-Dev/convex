@@ -33,8 +33,10 @@ import convex.lattice.cursor.Cursors;
  *
  * <p>An incoming region merges mailbox by mailbox, each by its mailbox's rule. A key
  * that is not a canonical base DID has no mailbox and is dropped, as is a delivery
- * at a path beneath one. The authoriser bound here decides which signers may issue
- * receipts for each DID; without one, only a {@code did:key} owner may.</p>
+ * at a path beneath one, a received mailbox that is not an index, and one whose merge
+ * fails with a data error. A delivered region that is not a hash map is dropped. The
+ * authoriser bound here decides which signers may issue receipts for each DID;
+ * without one, only a {@code did:key} owner may.</p>
  *
  * <p>Sends participate in an enclosing transaction or fork through their supplied
  * cursor. Sync has the ordinary component behaviour: a live view does nothing,
@@ -148,12 +150,17 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 	 *
 	 * @param incoming Incoming region value
 	 * @return Current working value
-	 * @throws IllegalArgumentException If an incoming mailbox is not an index, or an
-	 *         entry is not signed data
 	 */
 	@Override
 	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> merge(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> incoming) {
 		return cursor().updateAndGet(held -> mergeMailboxes(held,incoming));
+	}
+
+	/** Drops a delivered region that is not a hash map; routes other deliveries as every component does. */
+	@Override
+	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergeAt(ACell value,ACell... path) {
+		if (path.length==0 && value!=null && !(value instanceof AHashMap)) return cursor().getOrDefault(null);
+		return super.mergeAt(value,path);
 	}
 
 	/** Resolves the mailbox at a canonical base DID, for deliveries beneath it. */
@@ -207,8 +214,8 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 
 			@Override
 			public ACell merge(Object key,ACell a,ACell b) {
-				if (b==null || !isMailbox(key)) return a;
-				return Mailbox.mergeEntries((AString)key,authorizer,(Index<ABlob,SignedData<ACell>>)a,b);
+				if (b==null || !isMailbox(key) || !(b instanceof Index)) return a;
+				return Mailbox.mergeReceived(a,() -> Mailbox.mergeEntries((AString)key,authorizer,(Index<ABlob,SignedData<ACell>>)a,b));
 			}
 		});
 	}
