@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import convex.core.data.ACell;
@@ -18,6 +19,8 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.lattice.AccessList;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
 import convex.net.PeerName;
 
 /**
@@ -62,17 +65,26 @@ final class Seeds {
 	 * @throws IllegalStateException if {@link #MAX_SEEDS} seeds at other URIs are listed
 	 * @throws IllegalArgumentException if its URI is too long to list
 	 */
-	synchronized boolean add(PeerName name) {
+	boolean add(PeerName name) {
 		AString uri=uri(name);
-		if (list.get(uri)==null && count()>=MAX_SEEDS) {
-			throw new IllegalStateException("At most "+MAX_SEEDS+" seeds may be listed");
-		}
 		AHashMap<Keyword,ACell> entry=(name.key()==null)?Maps.empty():Maps.of(EXPECTED_KEY,name.key());
-		return list.add(uri,entry);
+		// Set by every run of the update function, so it reflects the run that landed
+		AtomicBoolean added=new AtomicBoolean();
+		cells().update(stored -> {
+			// The list's own edit of the value this update holds, so the count and the addition land together
+			Root<ACell> draft=Cursors.root(stored);
+			AccessList<AString> seeds=listOver(draft);
+			if (seeds.get(uri)==null && count(stored,seeds)>=MAX_SEEDS) {
+				throw new IllegalStateException("At most "+MAX_SEEDS+" seeds may be listed");
+			}
+			added.set(seeds.add(uri,entry));
+			return draft.get();
+		});
+		return added.get();
 	}
 
 	/** Removes the seed at a name's URI, whatever key it names. Returns whether one was listed. */
-	synchronized boolean remove(PeerName name) {
+	boolean remove(PeerName name) {
 		return list.remove(uri(name));
 	}
 
@@ -85,24 +97,35 @@ final class Seeds {
 	/** The seeds listed, in the list's order. */
 	List<PeerName> all() {
 		List<PeerName> names=new ArrayList<>();
-		for (AString uri:uris()) {
+		for (AString uri:uris(cursor.getOrDefault(null))) {
 			PeerName name=read(uri,list.get(uri));
 			if (name!=null) names.add(name);
 		}
 		return names;
 	}
 
-	/** Seeds listed, readable or not. */
-	private int count() {
+	// The storage as cells: what it holds need not be an index
+	@SuppressWarnings("unchecked")
+	private AForkableCursor<ACell> cells() {
+		return (AForkableCursor<ACell>)(AForkableCursor<?>)cursor;
+	}
+
+	/** The list over a draft of its storage, which the list checks holds an index. */
+	@SuppressWarnings("unchecked")
+	private AccessList<AString> listOver(Root<ACell> draft) {
+		return list.rebind((AForkableCursor<Index<AString,ACell>>)(AForkableCursor<?>)draft);
+	}
+
+	/** Seeds listed in a stored value, readable or not, as the list over it reads them. */
+	private static int count(ACell stored,AccessList<AString> seeds) {
 		int n=0;
-		for (AString uri:uris()) if (list.get(uri)!=null) n++;
+		for (AString uri:uris(stored)) if (seeds.get(uri)!=null) n++;
 		return n;
 	}
 
-	/** The URIs stored, including expired and unreadable entries. */
-	private List<AString> uris() {
+	/** The URIs in a stored value, including expired and unreadable entries. */
+	private static List<AString> uris(ACell stored) {
 		List<AString> uris=new ArrayList<>();
-		ACell stored=cursor.getOrDefault(null);
 		if (!(stored instanceof Index<?,?> index)) return uris;
 		long n=index.count();
 		for (long i=0; i<n; i++) {

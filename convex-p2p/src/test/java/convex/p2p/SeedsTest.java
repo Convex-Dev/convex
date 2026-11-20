@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +24,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
 import convex.lattice.Timestamped;
+import convex.lattice.cursor.Root;
 import convex.net.PeerName;
 
 /** A node's seed list is local state: one entry per peer URI, bounded, kept by the host. */
@@ -72,6 +76,28 @@ public class SeedsTest {
 		assertThrows(IllegalStateException.class,() -> seeds.add(extra));
 		assertFalse(seeds.add(name("tcp://seed0.example:18888",HUB)),"a listed seed may still change");
 		assertEquals(Seeds.MAX_SEEDS,seeds.all().size());
+	}
+
+	@Test void aSeedListedThroughAnotherViewDuringAnAdditionCountsAgainstTheLimit() {
+		Supplier<CVMLong> clock=() -> CVMLong.create(100);
+		PeerName last=name("tcp://last.example:18888",null);
+		var other=new AtomicReference<Seeds>();
+		var interleaved=new AtomicBoolean();
+		// Another view of the same storage takes the last place after the addition has counted, before it commits
+		var storage=new Root<Index<AString,ACell>>() {
+			@Override protected boolean install(Index<AString,ACell> held,Index<AString,ACell> next) {
+				if (other.get()!=null && interleaved.compareAndSet(false,true)) other.get().add(last);
+				return super.install(held,next);
+			}
+		};
+		Seeds seeds=new Seeds(storage,clock);
+		for (int i=0; i<Seeds.MAX_SEEDS-1; i++) seeds.add(name("tcp://seed"+i+".example:18888",null));
+		other.set(new Seeds(storage,clock));
+
+		assertThrows(IllegalStateException.class,() -> seeds.add(name("tcp://extra.example:18888",null)));
+		assertTrue(interleaved.get());
+		assertEquals(Seeds.MAX_SEEDS,seeds.all().size());
+		assertTrue(seeds.contains(last));
 	}
 
 	@Test void anEntryThatIsNotAPeerNameIsSkipped() {
