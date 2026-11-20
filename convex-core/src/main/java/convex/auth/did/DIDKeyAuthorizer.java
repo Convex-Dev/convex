@@ -71,6 +71,7 @@ public interface DIDKeyAuthorizer {
 					if (aliasKey!=null && aliasKey.equals(key)) return true;
 				}
 			} catch (Throwable t) {
+				Utils.checkRequestFailure(t);
 				return false;
 			}
 			return false;

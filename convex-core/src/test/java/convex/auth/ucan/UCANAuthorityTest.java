@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -401,6 +402,11 @@ public class UCANAuthorityTest {
 		assertNull(UCANValidator.validate(grant, NOW, broken));
 		// Composition survives a throwing left-hand verifier
 		assertNotNull(UCANValidator.validate(grant, NOW, broken.or(DIDVerifier.CONVEX)));
+		// A failure of the JVM itself is not a denial
+		DIDVerifier jvmFailure = (did, message, signature) -> { throw new InternalError("JVM failure"); };
+		assertThrows(InternalError.class, () -> UCANValidator.validate(grant, NOW, jvmFailure));
+		assertThrows(InternalError.class,
+			() -> UCANValidator.validate(grant, NOW, jvmFailure.or(DIDVerifier.CONVEX)));
 	}
 
 	@Test
@@ -413,6 +419,12 @@ public class UCANAuthorityTest {
 		// Composition survives a throwing left-hand policy
 		assertTrue(UCANValidator.isAuthorised(present(grant), AGENT_A_DID, NOTES_ITEM,
 			READ, broken.or(RootAuthorityPolicy.SELF_SOVEREIGN), NOW));
+		// A failure of the JVM itself is not a denial
+		RootAuthorityPolicy jvmFailure = (rootIss, with) -> { throw new InternalError("JVM failure"); };
+		assertThrows(InternalError.class, () -> UCANValidator.isAuthorised(present(grant), AGENT_A_DID,
+			NOTES_ITEM, READ, jvmFailure, NOW));
+		assertThrows(InternalError.class, () -> UCANValidator.isAuthorised(present(grant), AGENT_A_DID,
+			NOTES_ITEM, READ, jvmFailure.or(RootAuthorityPolicy.SELF_SOVEREIGN), NOW));
 	}
 
 	@Test
@@ -506,5 +518,10 @@ public class UCANAuthorityTest {
 			}));
 		assertTrue(UCANValidator.isAuthorised(present(delegated), AGENT_B_DID, NOTES_ITEM,
 			READ, RootAuthorityPolicy.SELF_SOVEREIGN, NOW, null));
+		// A failure of the JVM itself is not a denial
+		assertThrows(InternalError.class, () -> UCANValidator.isAuthorised(present(delegated),
+			AGENT_B_DID, NOTES_ITEM, READ, RootAuthorityPolicy.SELF_SOVEREIGN, NOW, path -> {
+				throw new InternalError("JVM failure");
+			}));
 	}
 }

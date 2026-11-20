@@ -13,6 +13,7 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Vectors;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 /**
  * Validates UCAN tokens in two separated layers:
@@ -34,6 +35,10 @@ import convex.core.lang.RT;
  * RootAuthorityPolicy, long)}, {@link #isAuthorised}) — per requested resource + ability:
  * capability coverage first (cheap), then per-hop delegation attenuation, then root
  * authority via an injected {@link RootAuthorityPolicy}. Fail-closed throughout.</p>
+ *
+ * <p>In both layers, an injected verifier, policy or predicate that throws, or a
+ * capability too malformed to check, counts as a denial; only a failure of the JVM
+ * itself propagates.</p>
  *
  * <p><b>Not checked here — by design.</b> convex-core provides primitives that every
  * UCAN consumer needs identically; stateful or application-specific policy is left to
@@ -500,6 +505,7 @@ public class UCANValidator {
 			try {
 				if (!policy.acceptsRoot(token.getIssuer(), grantWith)) return false;
 			} catch (Throwable t) {
+				Utils.checkRequestFailure(t);
 				return false; // defective policy fails closed
 			}
 			return testsSafely(pathPredicate, path);
@@ -541,6 +547,7 @@ public class UCANValidator {
 		try {
 			return Capability.covers(cap, requestWith, requestCan);
 		} catch (Throwable t) {
+			Utils.checkRequestFailure(t);
 			return false; // malformed capability grants nothing
 		}
 	}
@@ -551,6 +558,7 @@ public class UCANValidator {
 		try {
 			return predicate.test(path);
 		} catch (Throwable t) {
+			Utils.checkRequestFailure(t);
 			return false; // throwing predicate denies this path
 		}
 	}
@@ -560,6 +568,7 @@ public class UCANValidator {
 		try {
 			return verifier.verifies(did, message, signature);
 		} catch (Throwable t) {
+			Utils.checkRequestFailure(t);
 			return false; // defective verifier fails closed
 		}
 	}

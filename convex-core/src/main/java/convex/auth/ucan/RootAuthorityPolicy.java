@@ -2,6 +2,7 @@ package convex.auth.ucan;
 
 import convex.auth.did.DID;
 import convex.core.data.AString;
+import convex.core.util.Utils;
 
 /**
  * Predicate answering: may {@code rootIssuer} root a delegation grant over resource
@@ -14,7 +15,8 @@ import convex.core.data.AString;
  * <p><b>Fail-closed contract:</b> a resource with no derivable owner (non-DID scheme,
  * malformed URI) yields {@code false} — the capability grants nothing, without rejecting
  * the token it appears in. Implementations should never throw; enforcement points wrap
- * calls so a defective policy is still treated as a denial.</p>
+ * calls so a defective policy is still treated as a denial, unless the JVM itself has
+ * failed.</p>
  */
 @FunctionalInterface
 public interface RootAuthorityPolicy {
@@ -47,8 +49,9 @@ public interface RootAuthorityPolicy {
 	};
 
 	/**
-	 * Compose this policy with a fallback: accept iff either accepts. A throwing
-	 * left-hand policy is treated as {@code false} so it cannot block the fallback.
+	 * Compose this policy with a fallback: accept iff either accepts. A left-hand policy
+	 * that throws is treated as {@code false}, so it cannot block the fallback; a failure
+	 * of the JVM itself propagates.
 	 *
 	 * @param other Fallback policy (null returns this policy unchanged)
 	 * @return Composed policy
@@ -60,6 +63,7 @@ public interface RootAuthorityPolicy {
 			try {
 				first = this.acceptsRoot(rootIssuer, with);
 			} catch (Throwable t) {
+				Utils.checkRequestFailure(t);
 				first = false;
 			}
 			return first || other.acceptsRoot(rootIssuer, with);

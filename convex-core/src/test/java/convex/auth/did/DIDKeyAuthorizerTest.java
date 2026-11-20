@@ -49,6 +49,12 @@ public class DIDKeyAuthorizerTest {
 
 		assertTrue(authorizer.safeAuthorises(web,current.getAccountKey()));
 		assertFalse(authorizer.safeAuthorises(web,AKeyPair.generate().getAccountKey()));
+
+		// A failing alias lookup is no alias, but a failure of the JVM itself propagates
+		DIDKeyAuthorizer failing=DIDKeyAuthorizer.fromAlsoKnownAs(did -> { throw new IllegalStateException("lookup failed"); });
+		assertFalse(failing.authorises(web,current.getAccountKey()));
+		DIDKeyAuthorizer broken=DIDKeyAuthorizer.fromAlsoKnownAs(did -> { throw new InternalError("JVM failure"); });
+		assertThrows(InternalError.class,() -> broken.authorises(web,current.getAccountKey()));
 	}
 
 	@Test

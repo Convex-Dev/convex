@@ -5,6 +5,7 @@ import convex.core.cvm.State;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.util.Utils;
 
 /**
  * Predicate answering: does {@code signature} verify as a signature by the subject of
@@ -16,7 +17,8 @@ import convex.core.data.Blob;
  *
  * <p><b>Fail-closed contract:</b> an implementation should return {@code false} for any
  * DID or scheme it cannot verify, and should never throw. Enforcement points additionally
- * wrap calls so a defective implementation is still treated as a denial.</p>
+ * wrap calls so a defective implementation is still treated as a denial, unless the JVM
+ * itself has failed.</p>
  *
  * <p>The {@code message} is exactly the bytes that were signed — the caller supplies the
  * correct signing input for the token encoding in use (CAD3 {@code Ref} encoding for
@@ -65,8 +67,9 @@ public interface DIDVerifier {
 	}
 
 	/**
-	 * Compose this verifier with a fallback: accept iff either accepts. A throwing
-	 * left-hand verifier is treated as {@code false} so it cannot block the fallback.
+	 * Compose this verifier with a fallback: accept iff either accepts. A left-hand
+	 * verifier that throws is treated as {@code false}, so it cannot block the fallback;
+	 * a failure of the JVM itself propagates.
 	 *
 	 * @param other Fallback verifier (null returns this verifier unchanged)
 	 * @return Composed verifier
@@ -78,6 +81,7 @@ public interface DIDVerifier {
 			try {
 				first = this.verifies(did, message, signature);
 			} catch (Throwable t) {
+				Utils.checkRequestFailure(t);
 				first = false;
 			}
 			return first || other.verifies(did, message, signature);
@@ -91,6 +95,7 @@ public interface DIDVerifier {
 			if (sig == null) return false;
 			return sig.verify(message, key);
 		} catch (Throwable t) {
+			Utils.checkRequestFailure(t);
 			return false;
 		}
 	}
