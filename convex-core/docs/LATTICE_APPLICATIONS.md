@@ -590,8 +590,7 @@ signed destination; intermediate drafts remain private.
 
 Clocks apply to local writes. Incoming values retain their signed timestamps;
 merging does not re-stamp them. Resolve authority data outside atomic operations
-so verification uses locally available information. Updating that information
-affects later checks, without retroactively deleting previously accepted state.
+so verification uses locally available information.
 
 An operation that chooses its own timestamp keeps it through atomic retries,
 while a `StampedCursor` reads its clock on each attempt. Reusing a timestamp
@@ -601,9 +600,13 @@ recreate operations must supply timestamps that express that order.
 
 Merge is the acceptance boundary for incoming data. Recognising the shape of a
 candidate accepts neither its signature, its owner nor its contents, so each
-component's merge enforces its own rules. Raw cursor access remains trusted
-application code; component boundaries are not a sandbox between code sharing a
-process.
+component's merge enforces its own rules, on the incoming value only. Held state
+passed those rules when it was admitted and is not checked again, so updating
+authority data affects later checks without removing or displacing anything
+accepted before ([CAD038](https://docs.convex.world/docs/cad/lattice_auth)).
+Reconciling a fork combines two held values and checks neither. Raw cursor access
+remains trusted application code; component boundaries are not a sandbox between
+code sharing a process.
 
 ## Retention, durability and networking
 

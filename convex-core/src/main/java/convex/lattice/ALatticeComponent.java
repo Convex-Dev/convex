@@ -110,7 +110,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Resolves a working snapshot that conflicts with a concurrently changed
 	 * destination. Called by {@link #reconcile(ACell,ACell,ACell)} only when both sides
 	 * changed, within the destination's atomic update. Implementations must use the
-	 * supplied values without mutating working state. A component that can merge the
+	 * supplied values without mutating working state. Both are held values, already
+	 * accepted, so implementations check neither. A component that can merge the
 	 * destination's changes, such as a CRDT, overrides this; by default a change on both
 	 * sides is a conflict.
 	 *
@@ -342,8 +343,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * is the component's own behaviour: a lattice offers a default merge for the shape
 	 * it declares, and the component delegates to it, in whole or in part, or applies
 	 * another rule. Merge is the acceptance boundary for incoming data, so it enforces
-	 * any ownership, validity or limits itself. A component that receives nothing need
-	 * not define one; the base refuses, so a delivery routed to it fails rather than vanishing.
+	 * any ownership, validity or limits itself, on the incoming value only: held state
+	 * was accepted when it arrived and is not checked again. A component that receives
+	 * nothing need not define one; the base refuses, so a delivery routed to it fails
+	 * rather than vanishing.
 	 *
 	 * @param other Incoming value at this level
 	 * @return Current working value
