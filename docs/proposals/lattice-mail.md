@@ -213,7 +213,7 @@ turns up.
 ## Merge rule
 
 `Mailbox` merges its index entry by entry, each entry by the register rule.
-Writing `own` and `other` for the two values under one key:
+Writing `own` for the held value under one key and `other` for the received one:
 
 ```
 valid(e)  envelope: signature valid; context known; to == mailbox DID;
@@ -221,10 +221,16 @@ valid(e)  envelope: signature valid; context known; to == mailbox DID;
 valid(r)  receipt:  signature valid; signer authorised for did under the bound verifier;
           did == mailbox DID; key == t‖hash from its own fields
 
-join      Received  if either side is a valid receipt
-          Deposited otherwise, if either side is a valid envelope
+admit     other only if it is a valid envelope or receipt; otherwise own is kept
+join      Received  if either side is a receipt
+          Deposited otherwise, if either side is an envelope
           absent    otherwise
 ```
+
+Only the received value is checked, as CAD038 has it: a held value was checked
+when it was admitted, so a receipt accepted under a key that is later rotated or
+revoked stays held. A fork reconciles with its parent by the join alone, since
+both sides are held values.
 
 Two receipts under one key, from two of the recipient's devices, resolve by the
 canonical symmetric tiebreak that CAD045 allows: the lower hash of the signed

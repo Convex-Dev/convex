@@ -32,7 +32,9 @@ import convex.lattice.cursor.AForkableCursor;
  * envelope, and of two valid receipts the one whose signed value has the lower hash.
  * An envelope is valid at its key when its signature verifies, it is addressed to
  * this mailbox and the key is its own; a receipt when, in addition, it names this
- * mailbox and its signer is authorised for the mailbox DID. Each received entry is
+ * mailbox and its signer is authorised for the mailbox DID. Only received entries
+ * are checked: a held entry was checked when it was admitted, so a receipt stays
+ * held even if its signer is later no longer authorised. Each received entry is
  * judged alone: one that is invalid, is not signed data or sits under a key of the
  * wrong shape is dropped, and the rest merge. A received mailbox that is not an index
  * is dropped.</p>
@@ -233,19 +235,20 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 		return new Mailbox(cursor,did,authorizer,signer);
 	}
 
-	/** Reconciles this component's draft by the register rule. */
+	/** Reconciles this component's draft by the register alone: both sides are held values. */
 	@Override
 	protected Index<ABlob,SignedData<ACell>> reconcile(
 			Index<ABlob,SignedData<ACell>> own,
 			Index<ABlob,SignedData<ACell>> other) {
-		return mergeEntries(did,authorizer,own,other);
+		return mergeHeld(own,other);
 	}
 
 	/**
 	 * Merges an incoming mailbox value into a held one under a mailbox DID and receipt
-	 * signer rule. Only entries that differ are visited. An absent held value merges as
-	 * an empty mailbox, and a held value that takes nothing is returned itself. An
-	 * incoming value that is not an index is dropped.
+	 * signer rule. Only the incoming entries are checked, and only entries that differ
+	 * are visited. An absent held value merges as an empty mailbox, and a held value
+	 * that takes nothing is returned itself. An incoming value that is not an index is
+	 * dropped.
 	 */
 	@SuppressWarnings({"unchecked","rawtypes"})
 	static Index<ABlob,SignedData<ACell>> mergeEntries(AString did, DIDKeyAuthorizer authorizer,
@@ -267,25 +270,42 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 		});
 	}
 
+	/**
+	 * Merges two held mailbox values entry by entry by the register alone. Only entries
+	 * that differ are visited, and a value that takes nothing is returned itself.
+	 */
+	static Index<ABlob,SignedData<ACell>> mergeHeld(Index<ABlob,SignedData<ACell>> own,
+			Index<ABlob,SignedData<ACell>> other) {
+		if (other==null) return own;
+		if (own==null) return other;
+		return own.mergeDifferences(other,Mailbox::register);
+	}
+
 	/** True iff a key has the shape of an entry key. */
 	private static boolean isKey(Object key) {
 		return (key instanceof ABlob b) && b.count()==KEY_LENGTH;
 	}
 
-	/** The register at one entry: the value kept from two, either of which may be invalid or absent. */
+	/** The register at one entry, taking a received value only if it is valid there. */
 	private static SignedData<ACell> mergeEntry(AString did, ABlob key, DIDKeyAuthorizer authorizer,
-			SignedData<ACell> own, SignedData<ACell> other) {
-		SignedData<ACell> ownReceipt=receipt(did,key,authorizer,own);
-		SignedData<ACell> otherReceipt=receipt(did,key,authorizer,other);
-		if (ownReceipt!=null && otherReceipt!=null) return lowerHash(ownReceipt,otherReceipt);
-		if (ownReceipt!=null) return ownReceipt;
-		if (otherReceipt!=null) return otherReceipt;
-		SignedData<ACell> ownEnvelope=envelope(did,key,own);
-		SignedData<ACell> otherEnvelope=envelope(did,key,other);
-		// Two valid envelopes under one key are one envelope, since the key holds its
+			SignedData<ACell> held, SignedData<ACell> received) {
+		// The held value was checked when it was admitted, so only the received one is
+		if (receipt(did,key,authorizer,received)==null && envelope(did,key,received)==null) return held;
+		return register(held,received);
+	}
+
+	/**
+	 * The register between two admitted values, either of which may be absent: a
+	 * receipt beats an envelope, and of two of a kind the lower hash is kept.
+	 */
+	private static SignedData<ACell> register(SignedData<ACell> a, SignedData<ACell> b) {
+		if (a==null) return b;
+		if (b==null) return a;
+		boolean aReceipt=MailReceipt.parse(a)!=null;
+		if (aReceipt!=(MailReceipt.parse(b)!=null)) return aReceipt?a:b;
+		// Two admitted envelopes under one key are one envelope, since the key holds its
 		// hash; the tiebreak only keeps the rule total
-		if (ownEnvelope!=null && otherEnvelope!=null) return lowerHash(ownEnvelope,otherEnvelope);
-		return (ownEnvelope!=null)?ownEnvelope:otherEnvelope;
+		return lowerHash(a,b);
 	}
 
 	/**

@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep a mail receipt once accepted, even after its signer is no longer authorised, instead of letting a redelivered envelope replace it. ([Lattice mail](docs/proposals/lattice-mail.md#merge-rule))
+
 ## [0.8.20] - 2026-11-18
 
 ### Added

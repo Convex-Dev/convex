@@ -186,12 +186,14 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 		return new Mail(cursor,authorizer,signer);
 	}
 
-	/** Reconciles this component's draft mailbox by mailbox. */
+	/** Reconciles this component's draft mailbox by mailbox, by the register alone: both sides are held values. */
 	@Override
 	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> reconcile(
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
-		return mergeMailboxes(own,other);
+		if (other==null) return own;
+		if (own==null) return other;
+		return own.mergeDifferences(other,Mailbox::mergeHeld);
 	}
 
 	/**

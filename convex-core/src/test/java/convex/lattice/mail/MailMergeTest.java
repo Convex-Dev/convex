@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BinaryOperator;
 
 import org.junit.jupiter.api.Test;
@@ -165,6 +166,32 @@ public class MailMergeTest {
 	}
 
 	@Test
+	public void testHeldEntriesAreNotCheckedAgain() {
+		// Bob's phone signs receipts until its key is revoked
+		AtomicBoolean phoneAuthorised=new AtomicBoolean(true);
+		DIDKeyAuthorizer revocable=(did,key) -> did.equals(BOB_DID)
+			&& (key.equals(BOB.getAccountKey()) || (phoneAuthorised.get() && key.equals(BOB_PHONE.getAccountKey())));
+		MailEnvelope e1=toBob(1000,"one");
+		MailEnvelope e2=toBob(2000,"two");
+		MailReceipt byPhone=receipt(BOB_PHONE,BOB_DID,e1);
+
+		Mailbox mailbox=bobsMailbox(revocable,entries(e1));
+		Mailbox fork=mailbox.fork();
+		fork.merge(entries(byPhone));
+		mailbox.deposit(e2);
+		phoneAuthorised.set(false);
+
+		// A fork reconciles with its parent without checking either side again
+		fork.sync();
+		Index<ABlob,SignedData<ACell>> held=mailbox.value();
+		assertEquals(entries(byPhone,e2),held);
+		// A redelivered envelope does not displace the receipt accepted before the revocation
+		assertSame(held,mailbox.merge(entries(e1)));
+		// The revoked key's receipts are refused from now on
+		assertSame(held,mailbox.merge(entries(receipt(BOB_PHONE,BOB_DID,e2))));
+	}
+
+	@Test
 	public void testMergeLaws() {
 		MailEnvelope e1=toBob(1000,"one");
 		MailEnvelope e2=toBob(2000,"two");
@@ -227,8 +254,6 @@ public class MailMergeTest {
 		// Dropped whether or not the envelope is already held
 		assertEquals(0,merge(Index.none(),forged).count());
 		assertSame(deposited,merge(deposited,forged));
-		// A forged entry held locally cannot suppress the envelope either
-		assertEquals(deposited,merge(forged,deposited));
 	}
 
 	@Test
@@ -275,7 +300,6 @@ public class MailMergeTest {
 
 		assertEquals(0,merge(Index.none(),misfiled).count());
 		assertSame(deposited,merge(deposited,misfiled));
-		assertEquals(deposited,merge(misfiled,deposited));
 
 		// Under its own key the same receipt replaces its own envelope and nothing else
 		Index<ABlob,SignedData<ACell>> both=entries(e1,e2);
@@ -296,7 +320,6 @@ public class MailMergeTest {
 
 		assertEquals(0,merge(Index.none(),misfiled).count());
 		assertSame(honest,merge(honest,misfiled));
-		assertEquals(honest,merge(misfiled,honest));
 
 		// A key of the wrong shape has no register at all
 		Index<ABlob,SignedData<ACell>> badKey=Index.create(Blob.fromHex("ff"),e1.signed());
