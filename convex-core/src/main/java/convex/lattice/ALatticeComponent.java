@@ -32,6 +32,10 @@ import convex.lattice.cursor.ThreeWayMerge;
  * Merge and publication policy remain in components: {@link #merge} is a component's
  * own behaviour for an incoming value at its level, delegating to a lattice or not.</p>
  *
+ * <p>Subclasses write each operation as one atomic update or a transaction and take
+ * no locks; see "Concurrency without locks" in
+ * {@code convex-core/docs/LATTICE_APPLICATIONS.md}.</p>
+ *
  * <p>No abstract lattice definition is required. Domain components may call lattice
  * rules as implementation details. {@link LatticeComponent} adapts a supplied lattice
  * when its generic merge and navigation are the intended component behaviour.</p>
