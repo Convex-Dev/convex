@@ -205,7 +205,7 @@ shares its component's publication and claim boundary, and the component's merge
 rule covers it. A child needs to be a region only for a boundary of its own:
 separate publication, staging or exclusive transactions. A transaction reads its
 component's value, so whoever makes a component at a place that may still be
-absent gives it a default there, such as `cursor.withDefault(Index.none())`.
+absent gives it a default there, such as `DefaultCursor.create(cursor, Index.none())`.
 
 A root application made only of regions extends a region container and is registered
 with the host as it is. One with root-level behaviour of its own, such as a merge

@@ -15,6 +15,7 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
@@ -52,7 +53,7 @@ class ComponentSyncTest {
 		Record(AForkableCursor<AHashMap<Keyword,ACell>> cursor,Supplier<CVMLong> clock) {
 			super(cursor);
 			this.clock=clock;
-			edits=Timestamped.create(cursor.withDefault(Maps.empty()),clock);
+			edits=Timestamped.create(DefaultCursor.create(cursor,Maps.empty()),clock);
 			items=new SetComponent<>(new MapComponent<>(cursor()).entry(VALUE));
 		}
 
@@ -191,10 +192,10 @@ class ComponentSyncTest {
 		var signed=SignedCursor.create(root,value -> {
 			throw new AssertionError("Sync of a live view must not sign");
 		});
-		var record=Timestamped.create(signed.withDefault(Maps.empty()),() -> {
+		var record=Timestamped.create(DefaultCursor.create(signed,Maps.empty()),() -> {
 			throw new AssertionError("Sync of a live view must not read the clock");
 		});
-		var items=record.cursor().path(VALUE).withDefault(Sets.empty());
+		var items=DefaultCursor.create(record.cursor().path(VALUE),Sets.empty());
 		var view=new ALatticeComponent<>(items) {};
 		assertSame(items.get(),view.sync());
 		assertSame(items.get(),view.sync());

@@ -19,7 +19,7 @@ class DefaultCursorTest {
 
 	@Test void defaultsDoNotMaterialiseUntilADescendantChanges() {
 		var root=new Root<AHashMap<Keyword,ACell>>();
-		var cursor=root.withDefault(Maps.empty());
+		var cursor=DefaultCursor.create(root,Maps.empty());
 		assertEquals(Maps.empty(),cursor.get());
 		cursor.set(Maps.empty());
 		cursor.updateAndGet(value -> {
@@ -40,7 +40,7 @@ class DefaultCursorTest {
 
 	@Test void atomicOperationsCompareAndReturnTheDefaultView() {
 		var root=new Root<CVMLong>();
-		var cursor=root.withDefault(CVMLong.ZERO);
+		var cursor=DefaultCursor.create(root,CVMLong.ZERO);
 		assertFalse(cursor.compareAndSet(null,CVMLong.ONE));
 		assertTrue(cursor.compareAndSet(CVMLong.ZERO,CVMLong.ZERO));
 		assertNull(root.get());

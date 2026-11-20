@@ -22,6 +22,7 @@ import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.SignedLattice;
@@ -233,7 +234,7 @@ public final class FavouritesExample {
 		/** The record's editing view, which stamps every changed write; an absent record reads as empty */
 		private static AForkableCursor<AHashMap<Keyword,ACell>> stamped(AForkableCursor<AHashMap<Keyword,ACell>> record,
 				Supplier<CVMLong> getTimestamp) {
-			return StampedCursor.create(record.withDefault(Maps.empty()),getTimestamp,
+			return StampedCursor.create(DefaultCursor.create(record,Maps.empty()),getTimestamp,
 				(value,time) -> value.assoc(Timestamped.TIMESTAMP,time));
 		}
 

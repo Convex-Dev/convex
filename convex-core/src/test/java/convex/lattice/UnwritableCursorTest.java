@@ -25,6 +25,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ReadOnlyCursorException;
@@ -81,9 +82,9 @@ public class UnwritableCursorTest {
 	/** Places that do not exist, read through a view that supplies a default. */
 	static Stream<Place> defaultedWithNowhereToWrite() {
 		return Stream.of(
-			new Place("default view over a missing entry",Maps.empty(),source -> source.<ACell>path(A).withDefault(CVMLong.ZERO)),
+			new Place("default view over a missing entry",Maps.empty(),source -> DefaultCursor.create(source.<ACell>path(A),CVMLong.ZERO)),
 			new Place("default view over a path through a missing container",Maps.empty(),
-				source -> source.<ACell>path(A,B).withDefault(CVMLong.ZERO)));
+				source -> DefaultCursor.create(source.<ACell>path(A,B),CVMLong.ZERO)));
 	}
 
 	/** Places that do not exist. */
@@ -101,7 +102,7 @@ public class UnwritableCursorTest {
 	/** A place holding nothing that its view creates when written, read through a view that supplies a default. */
 	static Stream<Place> defaultedAndCreatedWhenWritten() {
 		return Stream.of(
-			new Place("default view over the entry of a map component",Maps.empty(),source -> mapEntry(source).withDefault(CVMLong.ZERO)));
+			new Place("default view over the entry of a map component",Maps.empty(),source -> DefaultCursor.create(mapEntry(source),CVMLong.ZERO)));
 	}
 
 	/** Places holding nothing that their view creates when written. */

@@ -14,8 +14,8 @@ import convex.core.util.Utils;
  *
  * <p>A transform behaves as any cursor does for its consumers. It is absent where it
  * finds no value: where its source is absent, or where its view finds nothing in a
- * stored value. A view that should hold a value when nothing is stored is built
- * over a source with a default ({@link AForkableCursor#withDefault}). A transform
+ * stored value. A view that should hold a value when nothing is stored is a lazy
+ * cursor with a default ({@link ALazyCursor}). A transform
  * creates no storage by default: its write receives null for absent storage, and
  * a navigating view refuses a missing entry or container with
  * {@link convex.lattice.PathWriteException}. A subclass whose definition knows how

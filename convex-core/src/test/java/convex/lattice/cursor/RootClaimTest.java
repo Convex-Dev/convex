@@ -115,7 +115,7 @@ class RootClaimTest {
 		AHashMap<Keyword,ACell> record=Maps.of(X,CVMLong.ZERO,Y,CVMLong.ZERO);
 		var root=new Root<AHashMap<Keyword,ACell>>(Maps.of(A,KEY.signData(record),B,CVMLong.ZERO));
 		AForkableCursor<AHashMap<Keyword,ACell>> signed=SignedCursor.create(root.<SignedData<AHashMap<Keyword,ACell>>>path(A),KEY);
-		AForkableCursor<AInteger> claimed=signed.withDefault(Maps.empty()).path(X);
+		AForkableCursor<AInteger> claimed=DefaultCursor.create(signed,Maps.empty()).path(X);
 		Thread[] writers=new Thread[2];
 		Transactions.executeExclusively(claimed,draft -> {
 			writers[0]=Thread.ofPlatform().start(() -> signed.<AInteger>path(Y).set(CVMLong.ONE));

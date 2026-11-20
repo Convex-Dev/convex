@@ -24,6 +24,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -199,8 +200,8 @@ public class ALatticeApplicationTest {
 			owners.signingFor(alice.getAccountKey()),alice::signData) {};
 		var bobRecord=new ASignedComponent<>(new IndexComponent<>(second.cursor()).entry(bob.getAccountKey()),
 			owners.signingFor(bob.getAccountKey()),bob::signData) {};
-		var aliceEdits=Timestamped.create(aliceRecord.cursor().withDefault(Maps.empty()),first.getContext()::currentTimestamp);
-		var bobEdits=Timestamped.create(bobRecord.cursor().withDefault(Maps.empty()),second.getContext()::currentTimestamp);
+		var aliceEdits=Timestamped.create(DefaultCursor.create(aliceRecord.cursor(),Maps.empty()),first.getContext()::currentTimestamp);
+		var bobEdits=Timestamped.create(DefaultCursor.create(bobRecord.cursor(),Maps.empty()),second.getContext()::currentTimestamp);
 		var aliceItems=new SetComponent<CVMLong>(new MapComponent<>(aliceEdits.cursor()).entry(ITEMS));
 		var bobItems=new SetComponent<CVMLong>(new MapComponent<>(bobEdits.cursor()).entry(ITEMS));
 		aliceItems.add(CVMLong.ONE);

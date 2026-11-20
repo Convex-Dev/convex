@@ -50,7 +50,7 @@ class ReadOnlyCursorTest {
 		assertFalse(view.path(C).exists());
 		assertThrows(MissingValueException.class,() -> view.path(C).get());
 		assertEquals(CVMLong.TWO,view.getOrDefault(CVMLong.TWO,C));
-		assertEquals(Maps.empty(),view.path(C).withDefault(Maps.empty()).get());
+		assertEquals(Maps.empty(),DefaultCursor.create(view.path(C),Maps.empty()).get());
 		root.set(Maps.of(A,CVMLong.TWO));
 		assertEquals(CVMLong.TWO,view.get(A));
 	}
@@ -73,7 +73,7 @@ class ReadOnlyCursorTest {
 		assertRefused(() -> view.persist(Persisters.UNCHANGED));
 		assertRefused(() -> view.path(A).set(CVMLong.ONE));
 		assertRefused(() -> view.path(A).set(CVMLong.TWO));
-		assertRefused(() -> view.withDefault(Maps.empty()).path(B).set(CVMLong.TWO));
+		assertRefused(() -> DefaultCursor.create(view,Maps.empty()).path(B).set(CVMLong.TWO));
 		assertRefused(() -> Transactions.execute(view,draft -> draft.path(A).set(CVMLong.TWO)));
 		assertSame(value,root.get());
 		assertEquals(0,root.writes.get());
@@ -98,7 +98,7 @@ class ReadOnlyCursorTest {
 		assertRefused(() -> view.reconcile(merge));
 		assertRefused(() -> view.<AHashMap<Keyword,ACell>>path().reconcile(merge)); // an empty path is the view itself
 		assertEquals(CVMLong.ONE,view.path(A).reconcile((base,own,other) -> own));
-		assertEquals(root.get(),view.withDefault(Maps.empty()).reconcile((base,own,other) -> own));
+		assertEquals(root.get(),DefaultCursor.create(view,Maps.empty()).reconcile((base,own,other) -> own));
 		assertEquals(0,merges.get());
 		assertEquals(0,root.writes.get());
 	}

@@ -23,6 +23,7 @@ import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.StampedCursor;
@@ -41,7 +42,7 @@ class TimestampedTest {
 	@Test void constructionReadsSyncAndNoOpEditsAreInert() {
 		var root=new Root<AHashMap<Keyword,ACell>>();
 		var calls=new AtomicInteger();
-		var component=Timestamped.create(root.withDefault(Maps.empty()),
+		var component=Timestamped.create(DefaultCursor.create(root,Maps.empty()),
 			() -> CVMLong.create(calls.incrementAndGet()));
 		assertInstanceOf(StampedCursor.class,component.cursor());
 		assertTrue(component.cursor().get().isEmpty());
@@ -74,7 +75,7 @@ class TimestampedTest {
 		assertSame(tied,rule.merge(tied,newer));
 		assertSame(newer,rule.merge(newer,null));
 		var root=new Root<AHashMap<Keyword,ACell>>();
-		var component=Timestamped.create(root.withDefault(Maps.empty()),() -> {
+		var component=Timestamped.create(DefaultCursor.create(root,Maps.empty()),() -> {
 			throw new AssertionError("Incoming merges must not read the clock");
 		});
 		for (var incoming:List.of(older,newer,older,newer,tied)) component.merge(incoming);
@@ -103,7 +104,7 @@ class TimestampedTest {
 
 	@Test void malformedRecordsAreIgnoredAndAllLongTimestampsAreSupported() {
 		var root=new Root<AHashMap<Keyword,ACell>>();
-		var component=Timestamped.create(root.withDefault(Maps.empty()),() -> CVMLong.ZERO);
+		var component=Timestamped.create(DefaultCursor.create(root,Maps.empty()),() -> CVMLong.ZERO);
 		component.merge(Maps.empty());
 		component.merge(Maps.of(TS,Strings.create("invalid")));
 		assertNull(root.get());
@@ -158,7 +159,7 @@ class TimestampedTest {
 			assertSame(valid,rule.merge(valid,malformed));
 			assertSame(valid,rule.merge(malformed,valid));
 			var root=new Root<AHashMap<Keyword,ACell>>();
-			var component=Timestamped.create(root.withDefault(Maps.empty()),() -> {
+			var component=Timestamped.create(DefaultCursor.create(root,Maps.empty()),() -> {
 				throw new AssertionError("Incoming merges must not read the clock");
 			});
 			component.mergeAt(malformed);
@@ -185,7 +186,7 @@ class TimestampedTest {
 		var root=new Root<Index<Keyword,ACell>>();
 		var ordering=convex.lattice.generic.LWWLattice.<Index<Keyword,ACell>>create(
 			value -> ((CVMLong)value.get(TS)).longValue());
-		var component=new Timestamped<>(root.withDefault(Index.none()),ordering,
+		var component=new Timestamped<>(DefaultCursor.create(root,Index.none()),ordering,
 			() -> CVMLong.ONE,(value,time) -> value.assoc(TS,time));
 		component.cursor().assoc(A,CVMLong.ONE);
 		assertEquals(Index.of(TS,CVMLong.ONE,A,CVMLong.ONE),root.get());
@@ -223,7 +224,7 @@ class TimestampedTest {
 			signatures.incrementAndGet();
 			return key.signData(value);
 		}) {};
-		var component=Timestamped.create(signed.cursor().withDefault(Maps.empty()),() -> CVMLong.ONE);
+		var component=Timestamped.create(DefaultCursor.create(signed.cursor(),Maps.empty()),() -> CVMLong.ONE);
 		component.cursor().assoc(A,CVMLong.ONE);
 		assertEquals(record(1,1),root.get().getValue());
 		assertTrue(root.get().checkSignature());

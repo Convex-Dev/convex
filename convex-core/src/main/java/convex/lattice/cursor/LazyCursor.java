@@ -8,7 +8,7 @@ import convex.core.data.type.AType;
  * The standard lazy cursor: one key of the data structure its container cursor
  * holds, with a default value. The location is constructed in the container's
  * current value; where the container is absent, that is the container cursor's own
- * default, such as another lazy cursor's or {@link AForkableCursor#withDefault}'s,
+ * default, such as another lazy cursor's or a {@link DefaultCursor}'s,
  * and with no default there the location cannot be constructed. A chain of lazy
  * cursors with a default at each level therefore constructs a whole path in one
  * atomic write.

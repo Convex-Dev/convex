@@ -31,6 +31,7 @@ import convex.lattice.LatticeHost;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.IndexLattice;
@@ -125,7 +126,7 @@ class TaskBoardApplicationTest {
 	/** Local operations on one timestamped record; no extra fork or publication step. */
 	static final class Task extends ALatticeComponent<AHashMap<Keyword,ACell>> {
 		Task(AForkableCursor<AHashMap<Keyword,ACell>> storage,Supplier<CVMLong> getTimestamp) {
-			super(StampedCursor.create(storage.withDefault(Maps.empty()),getTimestamp,
+			super(StampedCursor.create(DefaultCursor.create(storage,Maps.empty()),getTimestamp,
 				(record,time) -> record.assoc(Timestamped.TIMESTAMP,time)));
 		}
 

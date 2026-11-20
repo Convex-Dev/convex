@@ -13,6 +13,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.Persister;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -74,7 +75,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	protected ALocalComponent(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
 			Supplier<CVMLong> clock,Persister persister) {
 		super(cursor,persister);
-		record=Timestamped.create(storage.withDefault(Maps.empty()),clock);
+		record=Timestamped.create(DefaultCursor.create(storage,Maps.empty()),clock);
 	}
 
 	private static AForkableCursor<AHashMap<Keyword,ACell>> recordPath(AForkableCursor<Index<Keyword,ACell>> root,

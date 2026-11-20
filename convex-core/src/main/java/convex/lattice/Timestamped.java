@@ -27,7 +27,7 @@ import convex.lattice.generic.LWWLattice;
  * wrapper never re-stamps incoming records or accepts partial incoming paths.</p>
  *
  * <p>The caller supplies any default container through its storage cursor, for
- * example {@code storage.withDefault(Maps.empty())}. Construction and no-op edits
+ * example {@code DefaultCursor.create(storage, Maps.empty())}. Construction and no-op edits
  * leave absent storage absent. Clearing the whole record to null is a local
  * removal, not a replicated tombstone; publish a stamped empty record to retain
  * deletion under merge.</p>

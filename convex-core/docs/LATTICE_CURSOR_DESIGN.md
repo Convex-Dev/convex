@@ -22,7 +22,9 @@ ACursor<V>                                get / atomic update / persist / path
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
         ├── StampedCursor<V>              explicit clock and stamp function
         ├── SignedCursor<V>               explicit signing function
-        └── DefaultCursor<V>              explicit default for absent storage
+        └── ALazyCursor<V>                location constructed by its first changed write
+            ├── LazyCursor<V>             one key of its container, with a default
+            └── DefaultCursor<V>          its source's whole value, with a default
 AView<T>                                  read-only cursor views
 Transactions                              optimistic and exclusive subtree transactions
 ```
@@ -101,9 +103,10 @@ be written.
 Transformations propagate source absence without applying their read function.
 A projection over present storage returns the value its supplied function defines,
 including nil; it cannot infer entry presence from that function. Time caches retain
-presence together with the cached value. `withDefault(value)` explicitly substitutes
-for both missing storage and nil, unlike `getOrDefault`, which substitutes only for
-absence. Its reads and unchanged writes still create no state.
+presence together with the cached value. A plain cursor has no default: a required
+read of a missing location fails. A `DefaultCursor` substitutes its default for both
+a missing and a nil source, unlike `getOrDefault`, which substitutes only for
+absence; its reads and unchanged writes still create no state.
 
 When migrating callers, retain required reads where absence is a defect. Use
 `getOrDefault(null)` only where missing state is expected, or `exists()` when only
@@ -244,7 +247,7 @@ container (`create` or `view`), never from a lazy cursor over the root.
 
 ```java
 // The record may be absent; its items field is created by the first add
-var record = cursor().withDefault(Maps.empty());
+var record = DefaultCursor.create(cursor(), Maps.empty());
 var items = new SetComponent<>(LazyCursor.create(record, ITEMS));
 ```
 
@@ -286,7 +289,7 @@ back leaves the source unchanged by value equality. Construction and the child e
 commit in the same atomic source update. Exceptions commit nothing. Obtaining a view
 or reading it has no state-changing effects.
 
-`cursor.withDefault(emptyContainer)` supplies a known container type for reads
+`DefaultCursor.create(cursor, emptyContainer)` supplies a known container for reads
 and for update functions, without any merge definition; a plain path below it
 still writes only to an entry that exists. `LatticeComponent.assocIn` writes a
 value at a path, constructing only an absent base from the lattice's zero.
@@ -400,8 +403,9 @@ be separately visible in storage before these transformations.
 A transaction starts with a required read of its cursor, so a place that does not
 exist throws `MissingValueException` before the callback runs, also through an
 entry view that an ordinary write would create. An ordinary write creates the
-place first. A default view is present wherever it is read, so a transaction
-through one starts from the default and its commit is a write like any other.
+place first. A lazy cursor with a default reads as it wherever its location is
+missing, so a transaction through one starts from the default and its commit is a
+write like any other.
 The commit is refused like any other write: if the place is deleted while the
 transaction runs, a path, or an entry view that cannot create its place, refuses
 even a run that changed nothing, while an entry view that can create commits that
@@ -502,7 +506,7 @@ stamping. Read functions must accept the values that policy can produce.
 
 A transform behaves as any cursor does for its consumers. It is absent where it
 finds no value, including wherever its source is absent; a view that should hold a
-value when nothing is stored is built over `withDefault`. A transform creates no
+value when nothing is stored is a lazy cursor with a default. A transform creates no
 place by default: a navigating view refuses a missing entry or container with
 `PathWriteException`. A transform whose definition knows how to build its storage
 builds it in its write: a default from its default, an authoring view its envelope

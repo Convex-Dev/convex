@@ -22,6 +22,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.ReadOnlyCursorException;
@@ -107,7 +108,7 @@ public class CompareAndSetContractTest {
 	static Stream<Kind> kinds() {
 		return Stream.of(
 			plainKind("path",false,(source,authored) -> source.path(KEY)),
-			plainKind("default view over a path",false,(source,authored) -> source.<ACell>path(KEY).withDefault(DEFAULT)),
+			plainKind("default view over a path",false,(source,authored) -> DefaultCursor.create(source.<ACell>path(KEY),DEFAULT)),
 			plainKind("projection",true,(source,authored) -> ProjectionCursor.<AHashMap<Keyword,ACell>,ACell>create(source,
 				map -> map==null?null:map.get(KEY),(map,value) -> map.assoc(KEY,value))),
 			new Kind("signed view over a path",(source,authored) -> signed(source.path(KEY),authored),

@@ -22,6 +22,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Claim;
 import convex.lattice.cursor.MissingValueException;
@@ -76,7 +77,7 @@ class TransactionBehaviourTest {
 		Ledger(AForkableCursor<AHashMap<Keyword,ACell>> cursor,Supplier<CVMLong> clock) {
 			super(cursor);
 			this.clock=clock;
-			stamped=Timestamped.create(cursor.withDefault(Maps.empty()),clock);
+			stamped=Timestamped.create(DefaultCursor.create(cursor,Maps.empty()),clock);
 		}
 
 		@Override protected AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return stamped.cursor(); }

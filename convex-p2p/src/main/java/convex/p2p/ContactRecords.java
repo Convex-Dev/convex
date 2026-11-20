@@ -16,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALocalComponent;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.LazyCursor;
 
@@ -82,7 +83,7 @@ public final class ContactRecords extends ALocalComponent {
 
 	/** A field of this record, which its first changed write creates with the record. */
 	private <T extends ACell> AForkableCursor<T> field(Keyword key,T defaultValue) {
-		return LazyCursor.create(cursor().withDefault(Maps.empty()),key,defaultValue);
+		return LazyCursor.create(DefaultCursor.create(cursor(),Maps.empty()),key,defaultValue);
 	}
 
 	/** Records authenticated contact with a node, clearing its failures. */

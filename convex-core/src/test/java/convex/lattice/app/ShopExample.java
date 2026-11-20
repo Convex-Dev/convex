@@ -13,6 +13,7 @@ import convex.lattice.MapComponent;
 import convex.lattice.Regions;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.UnionSet;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.SetLattice;
@@ -101,7 +102,7 @@ public final class ShopExample {
 		public AppRegion(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			super(cursor);
 			// A new shop starts empty: its place reads as an empty index until it first changes
-			create(SHOP,(AForkableCursor<Index<Keyword,ACell>> c) -> new Shop(c.withDefault(Index.none())));
+			create(SHOP,(AForkableCursor<Index<Keyword,ACell>> c) -> new Shop(DefaultCursor.create(c,Index.none())));
 		}
 		private AppRegion(AForkableCursor<Index<Keyword,ACell>> cursor,AppRegion source) { super(cursor,source); }
 		@Override public AppRegion rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new AppRegion(cursor,this); }

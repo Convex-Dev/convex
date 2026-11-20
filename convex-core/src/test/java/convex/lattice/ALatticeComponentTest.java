@@ -30,6 +30,7 @@ import convex.core.data.RefSoft;
 import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
 import convex.core.store.Persister;
+import convex.lattice.cursor.DefaultCursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -232,7 +233,7 @@ public class ALatticeComponentTest {
 		var marker=Blob.fromHex("abcd");
 		var host=LatticeHost.create(Index.<Keyword,ACell>none().assoc(unrelated,marker),null);
 		var regions=new Regions(host.cursor());
-		regions.create(key,(AForkableCursor<ASet<ACell>> region) -> new TestComponent(region.withDefault(Sets.empty())).fork());
+		regions.create(key,(AForkableCursor<ASet<ACell>> region) -> new TestComponent(DefaultCursor.create(region,Sets.empty())).fork());
 		regions.mergeAt(Sets.of(marker),key);
 		assertNull(host.cursor().get().get(key));
 		regions.mergeAt(Sets.of(marker),unrelated);

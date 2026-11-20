@@ -151,7 +151,7 @@ class CursorPresenceTest {
 	@Test void defaultsAndPathsWriteOnlyWhereTheirEntryExists() {
 		Root<AHashMap<Keyword,ACell>> root=Root.create(Maps.empty());
 		var path=root.<ACell>path(A);
-		var defaulted=path.withDefault(CVMLong.ZERO);
+		var defaulted=DefaultCursor.create(path,CVMLong.ZERO);
 		assertTrue(defaulted.exists());
 		assertEquals(CVMLong.ZERO,defaulted.get());
 		// A default supplies a value to read, not a place to write
@@ -170,7 +170,7 @@ class CursorPresenceTest {
 		// A component's entry view creates its entry when a write changes it
 		root.set(Maps.empty());
 		AForkableCursor<ACell> entry=ComponentTestSupport.entry(root,A,Maps.empty());
-		var entryDefault=entry.withDefault(CVMLong.ZERO);
+		var entryDefault=DefaultCursor.create(entry,CVMLong.ZERO);
 		entryDefault.set(CVMLong.ZERO);
 		assertFalse(path.exists());
 		assertTrue(entryDefault.compareAndSet(CVMLong.ZERO,CVMLong.ONE));

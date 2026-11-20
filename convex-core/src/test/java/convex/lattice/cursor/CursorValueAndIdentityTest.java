@@ -55,7 +55,7 @@ public class CursorValueAndIdentityTest {
 			new Storage("fork",value -> Root.create(value).fork()),
 			new Storage("path",value -> pathOver(root -> root,value)),
 			new Storage("path over a fork",value -> pathOver(Root::fork,value)),
-			new Storage("default view",value -> Root.create(value).withDefault(blob(99))));
+			new Storage("default view",value -> DefaultCursor.create(Root.create(value),blob(99))));
 	}
 
 	// ===== Ways of writing a value =====

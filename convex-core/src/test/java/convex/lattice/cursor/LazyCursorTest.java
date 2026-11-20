@@ -35,7 +35,7 @@ class LazyCursorTest {
 
 	@Test void aMissingLocationReadsAsItsDefaultEvenWhereTheSourceIsAbsent() {
 		var root=new Root<ACell>();
-		LazyCursor<CVMLong> lazy=LazyCursor.create(root.withDefault(Maps.empty()),A,DEFAULT);
+		LazyCursor<CVMLong> lazy=LazyCursor.create(DefaultCursor.create(root,Maps.empty()),A,DEFAULT);
 		assertTrue(lazy.exists());
 		assertEquals(DEFAULT,lazy.get());
 		LazyCursor<CVMLong> overAbsent=LazyCursor.create(root,A,DEFAULT);
@@ -66,7 +66,7 @@ class LazyCursorTest {
 				return super.getAndUpdate(update);
 			}
 		};
-		LazyCursor<AHashMap<Keyword,ACell>> record=LazyCursor.create(root.withDefault(Index.none()),A,Maps.empty());
+		LazyCursor<AHashMap<Keyword,ACell>> record=LazyCursor.create(DefaultCursor.create(root,Index.none()),A,Maps.empty());
 		LazyCursor<ACell> field=LazyCursor.create(record,B);
 		field.set(null);
 		assertNull(root.get(),"an unchanged write constructs no level");
