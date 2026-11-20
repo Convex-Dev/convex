@@ -7,10 +7,13 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.data.ACell;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
@@ -19,6 +22,11 @@ import convex.lattice.generic.SetLattice;
 class LatticeComponentTest {
 	private static final Keyword ITEMS=Keyword.intern("items");
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
+
+	@Test void keepsTheComponentMergeRules() {
+		var component=new LatticeComponent<>(LATTICE,new Root<Index<Keyword,ACell>>());
+		ComponentsTest.doJoinTests(component,Index.<Keyword,ACell>of(ITEMS,Sets.of(1,2)),Index.<Keyword,ACell>of(ITEMS,Sets.of(2,3)));
+	}
 
 	@Test void stagedRootAcceptsPathsButWaitsForPublication() {
 		var host=LatticeHost.create();

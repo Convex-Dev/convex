@@ -1,7 +1,6 @@
 package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -183,13 +182,12 @@ public class ComponentsTest {
 		}
 	}
 
-	/** An equal value with none of the original's objects, as decoded from its encoding. */
+	/** An equal value decoded from its encoding: new objects, except cells the decoder shares, such as small integers. */
 	@SuppressWarnings("unchecked")
 	static <V extends ACell> V copy(V value) {
 		try {
 			V copy=(V)CAD3Encoder.INSTANCE.decodeMultiCell(Format.encodeMultiCell(value,true));
 			assertEquals(value,copy);
-			assertNotSame(value,copy);
 			return copy;
 		} catch (BadFormatException e) {
 			throw new AssertionError("Value must decode from its own encoding",e);

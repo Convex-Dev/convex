@@ -21,6 +21,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ComponentsTest;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -56,6 +57,19 @@ public class LatticeKVTest {
 		kv.set("a", Strings.create("v"));
 		AVector<ACell> entry = cursor.get().get(Strings.create("a"));
 		assertEquals(fixed, KVEntry.getUTime(entry), "utime should be the injected clock timestamp");
+	}
+
+	@Test public void keepsTheComponentMergeRules() {
+		LatticeKV kv=LatticeKV.create(Strings.create("replica"),() -> CVMLong.create(5000));
+		AString a=Strings.create("a");
+		AString b=Strings.create("b");
+		ComponentsTest.doJoinTests(kv,
+			Index.of(a,KVEntry.createValue(Strings.create("x"),CVMLong.create(1000)),b,KVEntry.createValue(Strings.create("y"),CVMLong.create(1000))),
+			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(2000))));
+		// Equal timestamps tie: the held entry stays
+		ComponentsTest.doMergeTests(kv,
+			Index.of(a,KVEntry.createValue(Strings.create("x"),CVMLong.create(1000))),
+			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(1000))));
 	}
 
 	@Test public void forksRetainTheClockForWritesAndExpiry() {

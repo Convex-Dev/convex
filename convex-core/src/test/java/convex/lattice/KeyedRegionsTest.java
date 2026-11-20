@@ -273,6 +273,17 @@ class KeyedRegionsTest {
 		assertEquals(Index.of(A,CVMLong.create(3)),root.get(),"exclusive use needs nothing special of the root");
 	}
 
+	@Test void containersKeepTheComponentMergeRules() {
+		var app=new Regions(emptyRoot());
+		app.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		app.create(B,(AForkableCursor<ASet<CVMLong>> cursor) -> new Members(cursor));
+		ComponentsTest.doJoinTests(app,Index.<Keyword,ACell>of(A,CVMLong.create(300),B,Sets.of(1)),Index.<Keyword,ACell>of(A,CVMLong.create(500),B,Sets.of(2)));
+		ComponentsTest.doRefusalTests(app,Index.<Keyword,ACell>of(A,CVMLong.create(300)),Index.<Keyword,ACell>of(UNKNOWN,CVMLong.create(900)));
+
+		var single=SingleRegion.create(emptyRoot(),A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		ComponentsTest.doJoinTests(single,Index.<Keyword,ACell>of(A,CVMLong.create(300)),Index.<Keyword,ACell>of(A,CVMLong.create(500)));
+	}
+
 	@Test void containerForksLikeAnyComponentThatRebinds() {
 		var root=emptyRoot();
 		var app=new Regions(root);

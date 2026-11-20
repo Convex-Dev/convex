@@ -10,6 +10,10 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.Root;
 
 class UnionSetTest {
+	@Test void keepsTheComponentMergeRules() {
+		ComponentsTest.doJoinTests(new UnionSet<>(Root.<ASet<CVMLong>>create(null)),Sets.<CVMLong>of(1,2),Sets.<CVMLong>of(2,3));
+	}
+
 	@Test void independentDraftsConvergeAndRepeatedSyncIsInert() {
 		var root=Root.<ASet<CVMLong>>create(null);
 		var live=new UnionSet<>(root);

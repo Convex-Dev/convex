@@ -267,6 +267,35 @@ class OwnedComponentsTest {
 		}
 	}
 
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test void ownedCollectionsKeepTheComponentMergeRules() {
+		var alice=ALICE.signData(CVMLong.ONE);
+		var bob=BOB.signData(CVMLong.TWO);
+		var higher=DELEGATE.signData(CVMLong.create(3));
+		// Another authorised signer with the same payload ties with Alice's envelope
+		var tied=DELEGATE.signData(CVMLong.ONE);
+		var wrongSigner=BOB.signData(CVMLong.create(9));
+		var unknownOwner=ALICE.signData(CVMLong.create(9));
+		var wrongPayload=ALICE.signData(Strings.create("wrong payload"));
+
+		var index=new OwnedIndex<AString,AInteger>(new Root<>(),MaxLattice.INSTANCE,VERIFIER);
+		ComponentsTest.doJoinTests(index,Index.of(A,alice,B,bob),Index.of(A,higher));
+		ComponentsTest.doMergeTests(index,Index.of(A,alice),Index.of(A,tied));
+		ComponentsTest.doRefusalTests(index,Index.of(A,alice),
+			(Index)Index.of(A,wrongSigner),(Index)Index.of(UNKNOWN,unknownOwner),(Index)Index.of(A,wrongPayload),(Index)Index.of(A,CVMLong.create(9)));
+
+		var map=new OwnedMap<AString,AInteger>(new Root<>(),MaxLattice.INSTANCE,VERIFIER);
+		ComponentsTest.doJoinTests(map,Maps.of(A,alice,B,bob),Maps.of(A,higher));
+		ComponentsTest.doMergeTests(map,Maps.of(A,alice),Maps.of(A,tied));
+		ComponentsTest.doRefusalTests(map,Maps.of(A,alice),
+			(AHashMap)Maps.of(A,wrongSigner),(AHashMap)Maps.of(UNKNOWN,unknownOwner),(AHashMap)Maps.of(A,wrongPayload),(AHashMap)Maps.of(A,CVMLong.create(9)));
+
+		var keyed=new KeyOwnedIndex<AInteger>(new Root<>(),MaxLattice.INSTANCE);
+		AccountKey aliceKey=ALICE.getAccountKey();
+		ComponentsTest.doJoinTests(keyed,Index.of(aliceKey,alice,BOB.getAccountKey(),bob),Index.of(aliceKey,ALICE.signData(CVMLong.create(3))));
+		ComponentsTest.doRefusalTests(keyed,Index.of(aliceKey,alice),(Index)Index.of(aliceKey,wrongSigner));
+	}
+
 	@Test void independentOwnersCommuteAndRepeatedDeliveryIsIdempotent() {
 		for (boolean indexed:new boolean[] {false,true}) {
 			var forward=collection(indexed);

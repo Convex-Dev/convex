@@ -25,6 +25,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.ComponentsTest;
 import convex.lattice.LatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
@@ -32,6 +33,7 @@ import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.DefaultCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.IndexLattice;
@@ -154,6 +156,19 @@ class TaskBoardApplicationTest {
 	}
 
 	/** Completion does not require interpreting a remote title or unrelated fields. */
+	@Test void boardKeepsTheComponentMergeRules() {
+		var board=new Board(new Root<>(),() -> CVMLong.create(50));
+		var t1=Strings.create("t1");
+		var t2=Strings.create("t2");
+		ComponentsTest.doJoinTests(board,
+			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("one")),t2,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("two"))),
+			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(6),TITLE,Strings.create("one, renamed"))));
+		// Two versions of a task at one timestamp tie: the held version stays
+		ComponentsTest.doMergeTests(board,
+			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("one"))),
+			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("other"))));
+	}
+
 	@Test void taskOperationsPreserveUnfamiliarFields() {
 		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.TWO).board();
 		assertNull(board.pending());

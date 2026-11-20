@@ -13,8 +13,11 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALocalComponent;
+import convex.lattice.ComponentsTest;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -54,6 +57,13 @@ class LocalComponentRebindTest {
 
 		/** The storage this component is bound to, beneath its stamping view */
 		AForkableCursor<AHashMap<Keyword,ACell>> bound() { return storage(); }
+	}
+
+	@Test void notesKeepTheComponentMergeRules() {
+		var notes=new Notes(new Root<AHashMap<Keyword,ACell>>(),() -> CVMLong.create(5000));
+		ComponentsTest.doJoinTests(notes,
+			Maps.of(Timestamped.TIMESTAMP,CVMLong.create(1000),VALUE,Strings.create("first")),
+			Maps.of(Timestamped.TIMESTAMP,CVMLong.create(2000),VALUE,Strings.create("second")));
 	}
 
 	@Test void nestedForkReinstallsStampingAndStopsAtItsDestination() {
