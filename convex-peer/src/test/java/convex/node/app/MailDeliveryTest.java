@@ -24,12 +24,9 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.etch.EtchStore;
-import convex.lattice.ALatticeApplication;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.Regions;
+import convex.lattice.SingleRegion;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.generic.KeyedLattice;
 import convex.lattice.mail.Mail;
 import convex.lattice.mail.MailEnvelope;
 import convex.lattice.mail.MailMessage;
@@ -37,7 +34,6 @@ import convex.lattice.mail.Mailbox;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
-import convex.lattice.LatticeComponent;
 
 /**
  * Mail delivered between two nodes: Alice deposits on her node, Bob's node pulls only
@@ -46,7 +42,6 @@ import convex.lattice.LatticeComponent;
  * future; nothing sleeps.
  */
 class MailDeliveryTest {
-	private static final KeyedLattice ROOT=KeyedLattice.create(Mail.KEY_MAIL,Mail.LATTICE);
 	private static final AKeyPair ALICE_NODE=AKeyPair.createSeeded(9290);
 	private static final AKeyPair BOB_NODE=AKeyPair.createSeeded(9291);
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(9292);
@@ -57,29 +52,25 @@ class MailDeliveryTest {
 	private static final AString CAROL_DID=DID.forKey(CAROL.getAccountKey());
 
 	/**
-	 * The application delegates every incoming value, a pulled mailbox included, to its
-	 * lattice; a mail replication policy would first project it to the mailboxes a node
-	 * desires.
+	 * The application holds the mail region, signing receipts as the user. Incoming
+	 * values, a pulled mailbox included, go to the mail region's component, which
+	 * merges each mailbox by its own rule; a mail replication policy would first
+	 * project them to the mailboxes a node desires. Registered as a fork, its working
+	 * state takes incoming mail and its sync publishes to the host.
 	 */
-	static final class MailApp extends ALatticeApplication<Index<Keyword,ACell>> {
-		/** The application's mail region, created by its first send, signing receipts as the user */
-		final Mail mail;
-		MailApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user) {
-			super(host.cursor().fork(),host::persist);
-			// A region container binds the mail region at its root key; this application merges the root itself
-			mail=new Regions(cursor()).create(Mail.KEY_MAIL,(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> region) ->
-				Mail.connect(region,Mail.LATTICE,(owner,value) -> user.signData(value)));
+	static final class MailApp extends SingleRegion<Mail> {
+		MailApp(AForkableCursor<Index<Keyword,ACell>> cursor,AKeyPair user) {
+			super(cursor,Mail.KEY_MAIL,(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> region) ->
+				Mail.connect(region,(owner,value) -> user.signData(value)));
 		}
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> ROOT.merge(own,other));
+		private MailApp(AForkableCursor<Index<Keyword,ACell>> cursor,MailApp source) {
+			super(cursor,source);
 		}
-		/** A pulled mailbox arrives at its path and is reduced to a root by the lattice. */
-		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
-			Index<Keyword,ACell> reduced=LatticeComponent.reduce(ROOT,value,path);
-			return reduced==null?cursor().get():merge(reduced);
+		@Override public MailApp rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+			return new MailApp(cursor,this);
 		}
-		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			return LatticeComponent.reconcile(ROOT,LatticeContext.EMPTY,own,other);
+		@Override public MailApp fork() {
+			return (MailApp)super.fork();
 		}
 	}
 
@@ -92,8 +83,7 @@ class MailDeliveryTest {
 
 		RunningNode(EtchStore store,AKeyPair transportKey,AKeyPair user) throws Exception {
 			host=LatticeHost.open(store);
-			app=new MailApp(host,user);
-			host.addApplication(app);
+			app=host.addApplication(new MailApp(host.cursor(),user).fork());
 			network=new LatticeNode<>(host,NodeConfig.localNetwork());
 			// The node's transport identity is independent of the users signing mail.
 			network.setIdentity(DID.forKey(transportKey.getAccountKey()),transportKey);
@@ -141,7 +131,7 @@ class MailDeliveryTest {
 				var bobStore=EtchStore.createTemp("mail-bob");
 				var alice=new RunningNode(aliceStore,ALICE_NODE,ALICE);
 				var bob=new RunningNode(bobStore,BOB_NODE,BOB)) {
-			Mail aliceMail=alice.app.mail;
+			Mail aliceMail=alice.app.component();
 			MailEnvelope toBob=MailEnvelope.seal(ALICE,BOB_DID,BOB.getAccountKey(),ALICE_DID,1000,
 				Maps.of(MailEnvelope.CONTENT,Strings.create("hello bob")));
 			MailEnvelope toCarol=MailEnvelope.seal(ALICE,CAROL_DID,CAROL.getAccountKey(),ALICE_DID,1001,
@@ -163,7 +153,7 @@ class MailDeliveryTest {
 			assertNull(bob.region().get(CAROL_DID));
 			assertNull(bob.publishedRegion());
 
-			Mail bobMail=bob.app.mail;
+			Mail bobMail=bob.app.component();
 			Mailbox inbox=bobMail.mailbox(BOB_DID);
 			List<MailMessage> messages=inbox.open(ECIES.createDecryptor(BOB));
 			assertEquals(1,messages.size());

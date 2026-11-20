@@ -107,23 +107,24 @@ offsets.
 ### Region shape
 
 ```
-:mail → MailLattice                                  Map<DID, mailbox>
-  <recipient-did> → MailboxLattice (bound to the DID)  Index<t‖hash, Entry>
-     <t‖hash> → SignedData<Envelope>                   Deposited
-              | SignedData<Receipt>                    Received
+:mail → Mail                                     Map<DID, mailbox>
+  <recipient-did> → Mailbox (bound to the DID)     Index<t‖hash, Entry>
+     <t‖hash> → SignedData<Envelope>               Deposited
+              | SignedData<Receipt>                Received
 ```
 
 Only canonical base DIDs (`DID.isCanonicalBase`) are mailbox keys, as for social
-owners. `MailLattice.path(did)` returns a `MailboxLattice` bound to that DID, so
-the entry rule knows which recipient it serves: it rejects an envelope addressed
-elsewhere and verifies that a receipt's signer is authorised for that DID.
+owners. `Mail.mailbox(did)` returns a `Mailbox` bound to that DID, so the entry
+rule knows which recipient it serves: it rejects an envelope addressed elsewhere
+and verifies that a receipt's signer is authorised for that DID.
 
-Signer authorisation follows the bound-verifier pattern in
-`LATTICE_APPLICATIONS.md`: `MailLattice.create(DIDKeyAuthorizer)` binds the rule
-to the lattice instance. `Mail.LATTICE` is the `did:key`-only default
-(`DIDKeyAuthorizer.CONVEX`), which fails closed for indirect DIDs. A node with a
-richer authoriser composes `MailLattice.create(authorizer)` into its root. Nodes
-with different authorisers interoperate on every DID both can resolve.
+Signer authorisation is a bound rule, as *Ownership and authoring* in
+`LATTICE_APPLICATIONS.md` describes: `Mail.connect(region, authorizer, signer)`
+binds it to the component, and its mailboxes and forks keep it. Without an
+authoriser, `Mail` uses the `did:key`-only rule (`DIDKeyAuthorizer.CONVEX`), which fails closed for
+indirect DIDs. A node with a richer authoriser binds it when it makes its mail
+region. Nodes with different authorisers interoperate on every DID both can
+resolve.
 
 ### Entry key
 
@@ -211,8 +212,8 @@ turns up.
 
 ## Merge rule
 
-`MailboxLattice` is an index lattice whose per-key rule is the register. Writing
-`own` and `other` for the two values under one key:
+`Mailbox` merges its index entry by entry, each entry by the register rule.
+Writing `own` and `other` for the two values under one key:
 
 ```
 valid(e)  envelope: signature valid; context known; to == mailbox DID;
@@ -231,20 +232,24 @@ value wins. Nothing is lost by picking either, because coverage is the state and
 not the signer, and picking deterministically avoids a stable CAD024 tie between
 peers. Two envelopes under one key are the same envelope.
 
-At the map level `MailLattice` unions mailboxes, admitting only canonical base DID
-keys, and merges each mailbox with its DID-bound `MailboxLattice`.
-`Index.mergeDifferences` visits only keys that differ, and `SignedData` caches
-signature verification, so a merge costs O(delta) as in CAD038.
+At the map level `Mail` unions mailboxes, admitting only canonical base DID keys,
+and merges each mailbox by its DID-bound rule. `mergeDifferences` visits only keys
+that differ, and `SignedData` caches signature verification, so a merge costs
+O(delta) as in CAD038. A mailbox or region that takes nothing from a merge is left
+as it was, and an absent one stays absent.
 
-The per-key rule needs the key, so `MailboxLattice` is a union lattice
-(`AUnionLattice`, the base the map, index and owner lattices share) whose
-`path(key)` returns a register bound to that key and to the mailbox DID, as
-`signingFor` returns an owner-bound `SignedLattice`; the base merges each entry
-with that child, rather than with the one shared child a plain `IndexLattice`
-has. Receipts are authored through
-an explicit owner-aware signer `(did, receipt) -> SignedData`. The mailbox
-checks the returned payload, signature and DID authority using the same bound
-rule as incoming receipt merge. A signer may handle multiple DIDs.
+The per-key rule needs the entry key and the mailbox DID, so the mailbox applies
+it to each differing entry with that entry's key, rather than one rule shared by
+every key. Receipts are authored through an explicit owner-aware signer
+`(did, receipt) -> SignedData`. The mailbox checks the returned payload, signature
+and DID authority using the same bound rule as incoming receipt merge. A signer
+may handle multiple DIDs.
+
+Incoming values reach the components by the usual routing (CAD045): a whole
+region is merged by `Mail`, a delivery at `[:mail did]` by that DID's mailbox, and
+one at `[:mail did key]` as a single entry. A delivery beneath a key that is not a
+mailbox or an entry key is dropped. A mailbox value that is not an index, or an
+entry that is not signed data, fails the merge.
 
 **Why it is a lattice.** Per key the values form a chain, absent below Deposited
 below Received, with Received made canonical by the tiebreak; join is the
@@ -302,7 +307,7 @@ store of envelopes. Match local signing keys, not an unverified `from` claim.
 
 The mail application takes `[:mail <did> ...]` values only for desired DIDs,
 selecting the desired mailboxes from a root or region value, and applies the
-checks the lattice cannot before calling its merge:
+checks the merge rule cannot make before calling `Mail.merge`:
 
 - complete value with each envelope within the envelope bound;
 - `issued-at` within `[now - window, now + clock-lead]`;
@@ -394,36 +399,33 @@ semantics.
 ### `convex.lattice.mail` (convex-core)
 
 ```java
-public final class MailLattice extends AUnionLattice<ACell, Index<ABlob, SignedData<ACell>>, AHashMap<...>>
-    static MailLattice create(DIDKeyAuthorizer authorizer)   // binds the receipt signer rule
-    MailboxLattice forMailbox(AString did)                   // DID-bound mailbox lattice; also returned by path(did)
-
-public final class MailboxLattice extends AUnionLattice<ABlob, SignedData<ACell>, Index<ABlob, SignedData<ACell>>>
-    // union of entries, each merged with the register bound to its key; zero() = Index.EMPTY
-    MailEntryLattice entry(ACell key)                        // key-bound register; also returned by path(key)
-
-public final class MailEntryLattice extends AValueLattice<SignedData<ACell>>
-    // the per-key register as specified above, bound to the mailbox DID and the entry key
-    static ABlob key(long issuedAt, Hash envelopeHash)       // t‖hash
-
 public final class Mail extends AMapComponent<ACell, Index<ABlob, SignedData<ACell>>, AHashMap<...>>
         implements TransactionalComponent<..., Mail>
     static Keyword KEY_MAIL                                  // :mail
-    static MailLattice LATTICE                               // did:key-only default
-    static Mail create(BiFunction<ACell,ACell,SignedData<ACell>> signer) // standalone root
-    static Mail connect(AForkableCursor<AHashMap<...>> region, MailLattice lattice,
+    static Mail create(BiFunction<ACell,ACell,SignedData<ACell>> signer) // standalone root, did:key-only receipts
+    static Mail create(DIDKeyAuthorizer authorizer, BiFunction<ACell,ACell,SignedData<ACell>> signer)
+    static Mail connect(AForkableCursor<AHashMap<...>> region,
         BiFunction<ACell,ACell,SignedData<ACell>> signer)    // at the place the application gives it
+    static Mail connect(AForkableCursor<AHashMap<...>> region, DIDKeyAuthorizer authorizer,
+        BiFunction<ACell,ACell,SignedData<ACell>> signer)    // with an explicit receipt signer rule
     Mailbox mailbox(AString did)                             // view of any mailbox
     Hash send(MailEnvelope envelope)                         // one atomic deposit in the recipient mailbox
-    Mail fork(); void sync();
+    AHashMap<...> merge(AHashMap<...> incoming)              // mailbox by mailbox; other keys dropped
+    Mail fork()
 
 public final class Mailbox extends ALatticeComponent<Index<ABlob, SignedData<ACell>>>
+        implements TransactionalComponent<..., Mailbox>
+    static int KEY_LENGTH                                    // 8 + 32
+    static ABlob key(long issuedAt, Hash envelopeHash)       // t‖hash
     AString did()
+    void deposit(MailEnvelope envelope)                      // anyone; addressed to did()
     List<MailEnvelope> deposited()                           // Deposited entries in time order, undecrypted
-    boolean isReceived(Hash envelopeHash, long issuedAt)     // a Received entry exists under the key
+    List<MailReceipt> receipts()                             // Received entries in time order
+    boolean isReceived(MailEnvelope envelope)                // a Received entry exists under its key
     List<MailMessage> open(ECIES.Decryptor... decryptors)    // decrypt, bind, authorise from; skips what it cannot open
     // owner operation: the supplied signer must be authorised for did()
-    void receive(Collection<MailEnvelope> envelopes)         // writes one Received entry per envelope
+    List<MailReceipt> receive(Collection<MailEnvelope> envelopes) // writes one Received entry per envelope
+    Index<...> merge(Index<...> incoming)                    // entry by entry, by the register rule
 
 public final class MailEnvelope                              // parse(ACell) returns null when malformed
     Hash hash(); ABlob key(); AccountKey signer(); AString to(); AString from()
@@ -453,8 +455,8 @@ P2PNode
     void pinMailbox(AString did)                 // retain a mailbox independently of local users
     P2PNode storeMailForPeers(boolean enabled)   // include did:key of authenticated peers in the desired set
 
-P2PLattice
-    NODE_ROOT  gains  :mail → Mail.LATTICE       // a node with an authoriser composes MailLattice.create(authorizer)
+P2PApplication
+    regions gain :mail                           // Mail.connect(region, authorizer, signer) with the node's authoriser
 
 MailReplicationPolicy (package-private)          // desired set, ingress and publication filters, mailbox courier, retention
 ```
@@ -465,7 +467,7 @@ MailReplicationPolicy (package-private)          // desired set, ingress and pub
 
 | Region | Lattice | Path | Notes |
 |---|---|---|---|
-| `:mail` | `MailLattice` (`Map<DID, Index<t‖hash, Entry>>`) | `[:mail <did> <t‖hash>]` | Per-DID inbox. Each entry is a two-state register: a signed envelope deposited by anyone, replaced by the recipient's signed receipt. Union merge; retention by policy. |
+| `:mail` | `Mail` (`Map<DID, Index<t‖hash, Entry>>`) | `[:mail <did> <t‖hash>]` | Per-DID inbox. Each entry is a two-state register: a signed envelope deposited by anyone, replaced by the recipient's signed receipt. Union merge; retention by policy. |
 
 ## Policy defaults
 
@@ -525,9 +527,9 @@ unattributed envelope with identity, if any, inside the ciphertext.
 
 Lattice laws, in `convex-core`:
 
-- `LatticeTest.doLatticeTest(MailboxLattice.forMailbox(did), v1, v2)` over
-  generated indexes mixing envelopes and receipts from several keys, plus a
-  seeded random-order merge check over three or more slots.
+- the merge laws through `Mailbox` and `Mail` over generated indexes mixing
+  envelopes and receipts from several keys, plus a seeded random-order merge
+  check over three or more slots.
 - Received dominates Deposited in both operand orders; a receipt that arrives
   first is a stable tombstone that absorbs the envelope when it arrives; two
   receipts for one key converge to the lower-hash one in every merge order.
@@ -566,8 +568,8 @@ Network, in `convex-integration` alongside the social and DLFS stories:
 
 ## Anticipated code changes
 
-- `convex-core`: package `convex.lattice.mail` (lattices, components, envelope and
-  receipt helpers), `DIDKeyResolver` in `convex.auth.did`, tests in
+- `convex-core`: package `convex.lattice.mail` (components, envelope and receipt
+  helpers), `DIDKeyResolver` in `convex.auth.did`, tests in
   `convex.lattice.mail`, catalogue row in `LATTICE_REGIONS.md`, a paragraph in
   `LATTICE_APPLICATIONS.md` under *Deletes* describing the receipt-as-tombstone
   register as the pattern for multi-writer inboxes.
@@ -655,8 +657,8 @@ can later wake a recipient's node when mail arrives.
 ### Context owner verifier, as the social region does today
 
 Works, and keeps a single static lattice instance, but `LATTICE_APPLICATIONS.md`
-directs new regions to bind the authorisation rule to the lattice. The design
-follows that guidance and keeps a `did:key`-only default for callers without an
+directs new regions to bind the authorisation rule to the component that
+verifies. The design follows that guidance and keeps a `did:key`-only default for callers without an
 authoriser.
 
 ### A separate `convex-mail` module

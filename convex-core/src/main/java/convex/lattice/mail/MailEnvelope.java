@@ -171,7 +171,7 @@ public final class MailEnvelope {
 	public Hash hash() { return signed.getHash(); }
 
 	/** The mailbox entry key, {@code issued-at ‖ hash}. */
-	public ABlob key() { return MailEntryLattice.key(issuedAt,hash()); }
+	public ABlob key() { return Mailbox.key(issuedAt,hash()); }
 
 	public AccountKey signer() { return signed.getAccountKey(); }
 	public AString to() { return to; }

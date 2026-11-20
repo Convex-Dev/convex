@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reconcile component updates without automatically persisting intermediate working state; applications choose when to save snapshots. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking))
 - Refuse every write to a lattice entry its component cannot create; see [Component-supplied construction](convex-core/docs/LATTICE_CURSOR_DESIGN.md#component-supplied-construction) when upgrading.
 - Keep each lattice component's storage behind its domain operations, and give defaults only through lazy cursors; see [Composition and sharing](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing) when upgrading.
+- Merge mail through its `Mail` and `Mailbox` components, which take the receipt authoriser; the mail lattice classes are removed. ([Lattice mail](docs/proposals/lattice-mail.md#merge-rule))
 
 ### Fixed
 

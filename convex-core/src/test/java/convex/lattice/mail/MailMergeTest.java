@@ -1,6 +1,7 @@
 package convex.lattice.mail;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -9,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Random;
+import java.util.function.BinaryOperator;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,11 +30,10 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeTest;
+import convex.lattice.cursor.Root;
 
 /** Merge rules of the mail region: the entry register, the mailbox index and the DID map. */
-public class MailLatticeTest {
+public class MailMergeTest {
 
 	static final AKeyPair ALICE=AKeyPair.createSeeded(41001);
 	static final AKeyPair BOB=AKeyPair.createSeeded(41002);
@@ -41,8 +42,6 @@ public class MailLatticeTest {
 
 	static final AString ALICE_DID=DID.forKey(ALICE.getAccountKey());
 	static final AString BOB_DID=DID.forKey(BOB.getAccountKey());
-
-	static final MailboxLattice BOB_MAILBOX=Mail.LATTICE.forMailbox(BOB_DID);
 
 	static MailEnvelope envelope(AKeyPair signer, AString from, AString to, AKeyPair recipient, long issuedAt, String text) {
 		return MailEnvelope.seal(signer,to,recipient.getAccountKey(),from,issuedAt,
@@ -67,6 +66,44 @@ public class MailLatticeTest {
 		return MailReceipt.sign(signer,did,envelope.hash(),envelope.issuedAt());
 	}
 
+	/** Bob's mailbox holding a value, admitting receipts by the given rule. */
+	static Mailbox bobsMailbox(DIDKeyAuthorizer authorizer, Index<ABlob,SignedData<ACell>> held) {
+		return new Mailbox(new Root<>(held),BOB_DID,authorizer,null);
+	}
+
+	/** Merges an incoming value into Bob's mailbox holding another, under the did:key-only rule. */
+	static Index<ABlob,SignedData<ACell>> merge(Index<ABlob,SignedData<ACell>> own, Index<ABlob,SignedData<ACell>> other) {
+		return bobsMailbox(DIDKeyAuthorizer.CONVEX,own).merge(other);
+	}
+
+	/** Merges an incoming region into a region holding another, under the did:key-only rule. */
+	static AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergeRegion(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
+			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
+		return Mail.connect(new Root<>(own),null).merge(other);
+	}
+
+	/**
+	 * The laws a replicated merge keeps: the empty value and an absent incoming value
+	 * change nothing, merging is commutative, and replaying either input leaves the
+	 * result as it is.
+	 */
+	static <V extends ACell> void checkMergeLaws(BinaryOperator<V> merge, V empty, V v1, V v2) {
+		for (V v:List.of(v1,v2)) {
+			assertEquals(v,merge.apply(empty,v));
+			assertSame(v,merge.apply(v,empty));
+			assertSame(v,merge.apply(v,null));
+			assertEquals(v,merge.apply(null,v));
+		}
+		V merged=merge.apply(v1,v2);
+		assertEquals(merged,merge.apply(v2,v1));
+		assertEquals(merged,merge.apply(empty,merged));
+		assertSame(merged,merge.apply(merged,empty));
+		assertSame(merged,merge.apply(merged,v1));
+		assertSame(merged,merge.apply(merged,v2));
+		assertEquals(merged,merge.apply(v1,merged));
+		assertEquals(merged,merge.apply(v2,merged));
+	}
+
 	@Test
 	public void testEnvelopeAndReceiptRoundTrip() {
 		MailEnvelope e=toBob(1000,"hello");
@@ -75,7 +112,7 @@ public class MailLatticeTest {
 		assertEquals(ALICE_DID,e.from());
 		assertEquals(ALICE.getAccountKey(),e.signer());
 		assertTrue(e.encrypted());
-		assertEquals(MailEntryLattice.KEY_LENGTH,e.key().count());
+		assertEquals(Mailbox.KEY_LENGTH,e.key().count());
 		assertNull(MailReceipt.parse(e.signed()));
 
 		MailReceipt r=receipt(BOB,BOB_DID,e);
@@ -94,13 +131,13 @@ public class MailLatticeTest {
 		Index<ABlob,SignedData<ACell>> deposited=entries(e);
 		Index<ABlob,SignedData<ACell>> received=entries(receipt(BOB,BOB_DID,e));
 
-		assertEquals(received,BOB_MAILBOX.merge(deposited,received));
-		assertEquals(received,BOB_MAILBOX.merge(received,deposited));
+		assertEquals(received,merge(deposited,received));
+		assertEquals(received,merge(received,deposited));
 		// A receipt that arrives first is a tombstone which absorbs the envelope
-		Index<ABlob,SignedData<ACell>> tombstone=BOB_MAILBOX.merge(BOB_MAILBOX.zero(),received);
+		Index<ABlob,SignedData<ACell>> tombstone=merge(Index.none(),received);
 		assertEquals(received,tombstone);
-		assertSame(tombstone,BOB_MAILBOX.merge(tombstone,deposited));
-		assertEquals(1,BOB_MAILBOX.merge(deposited,received).count());
+		assertSame(tombstone,merge(tombstone,deposited));
+		assertEquals(1,merge(deposited,received).count());
 	}
 
 	@Test
@@ -108,7 +145,7 @@ public class MailLatticeTest {
 		// Bob's DID has two authorised devices under this rule
 		DIDKeyAuthorizer twoDevices=(did,key) -> did.equals(BOB_DID)
 			&& (key.equals(BOB.getAccountKey()) || key.equals(BOB_PHONE.getAccountKey()));
-		MailboxLattice mailbox=MailLattice.create(twoDevices).forMailbox(BOB_DID);
+		BinaryOperator<Index<ABlob,SignedData<ACell>>> mailbox=(own,other) -> bobsMailbox(twoDevices,own).merge(other);
 
 		MailEnvelope e=toBob(1000,"hello");
 		MailReceipt r1=receipt(BOB,BOB_DID,e);
@@ -117,24 +154,24 @@ public class MailLatticeTest {
 
 		Index<ABlob,SignedData<ACell>> a=entries(r1);
 		Index<ABlob,SignedData<ACell>> b=entries(r2);
-		assertEquals(expected,mailbox.merge(a,b).get(e.key()));
-		assertEquals(expected,mailbox.merge(b,a).get(e.key()));
-		assertEquals(expected,mailbox.merge(mailbox.merge(entries(e),a),b).get(e.key()));
+		assertEquals(expected,mailbox.apply(a,b).get(e.key()));
+		assertEquals(expected,mailbox.apply(b,a).get(e.key()));
+		assertEquals(expected,mailbox.apply(mailbox.apply(entries(e),a),b).get(e.key()));
 
 		// The phone's receipt is not accepted under the did:key-only rule
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),b).count());
+		assertEquals(0,merge(Index.none(),b).count());
 	}
 
 	@Test
-	public void testLatticeLaws() {
+	public void testMergeLaws() {
 		MailEnvelope e1=toBob(1000,"one");
 		MailEnvelope e2=toBob(2000,"two");
 		MailEnvelope e3=toBob(3000,"three");
 		Index<ABlob,SignedData<ACell>> v1=entries(e1,e2);
 		Index<ABlob,SignedData<ACell>> v2=entries(receipt(BOB,BOB_DID,e1),e3);
-		LatticeTest.doLatticeTest(BOB_MAILBOX,v1,v2,e2.key());
+		checkMergeLaws(MailMergeTest::merge,Index.none(),v1,v2);
 
-		Index<ABlob,SignedData<ACell>> merged=BOB_MAILBOX.merge(v1,v2);
+		Index<ABlob,SignedData<ACell>> merged=merge(v1,v2);
 		assertEquals(3,merged.count());
 		assertNotNull(MailReceipt.parse(merged.get(e1.key())));
 		assertNotNull(MailEnvelope.parse(merged.get(e2.key())));
@@ -144,8 +181,8 @@ public class MailLatticeTest {
 		MailEnvelope toAlice=envelope(BOB,BOB_DID,ALICE_DID,ALICE,1500,"reply");
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m1=Maps.of(BOB_DID,v1);
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m2=Maps.of(BOB_DID,v2,ALICE_DID,entries(toAlice));
-		LatticeTest.doLatticeTest(Mail.LATTICE,m1,m2,BOB_DID);
-		assertEquals(merged,Mail.LATTICE.merge(m1,m2).get(BOB_DID));
+		checkMergeLaws(MailMergeTest::mergeRegion,Maps.empty(),m1,m2);
+		assertEquals(merged,mergeRegion(m1,m2).get(BOB_DID));
 	}
 
 	@Test
@@ -163,8 +200,8 @@ public class MailLatticeTest {
 		assertEquals(expected,fold(List.of(b,c,a)));
 		assertEquals(expected,fold(List.of(c,a,b)));
 		assertEquals(expected,fold(List.of(c,b,a)));
-		assertEquals(expected,BOB_MAILBOX.merge(a,BOB_MAILBOX.merge(b,c)));
-		assertEquals(expected,BOB_MAILBOX.merge(BOB_MAILBOX.merge(a,b),c));
+		assertEquals(expected,merge(a,merge(b,c)));
+		assertEquals(expected,merge(merge(a,b),c));
 
 		assertEquals(3,expected.count());
 		assertNotNull(MailReceipt.parse(expected.get(e1.key())));
@@ -172,10 +209,11 @@ public class MailLatticeTest {
 		assertNotNull(MailEnvelope.parse(expected.get(e3.key())));
 	}
 
+	/** Delivers each value in turn to one mailbox. */
 	private static Index<ABlob,SignedData<ACell>> fold(List<Index<ABlob,SignedData<ACell>>> slots) {
-		Index<ABlob,SignedData<ACell>> result=BOB_MAILBOX.zero();
-		for (Index<ABlob,SignedData<ACell>> slot:slots) result=BOB_MAILBOX.merge(result,slot);
-		return result;
+		Mailbox mailbox=bobsMailbox(DIDKeyAuthorizer.CONVEX,null);
+		for (Index<ABlob,SignedData<ACell>> slot:slots) mailbox.merge(slot);
+		return mailbox.value();
 	}
 
 	@Test
@@ -185,10 +223,10 @@ public class MailLatticeTest {
 		Index<ABlob,SignedData<ACell>> forged=entries(receipt(CAROL,BOB_DID,e));
 
 		// Dropped whether or not the envelope is already held
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),forged).count());
-		assertSame(deposited,BOB_MAILBOX.merge(deposited,forged));
+		assertEquals(0,merge(Index.none(),forged).count());
+		assertSame(deposited,merge(deposited,forged));
 		// A forged entry held locally cannot suppress the envelope either
-		assertEquals(deposited,BOB_MAILBOX.merge(forged,deposited));
+		assertEquals(deposited,merge(forged,deposited));
 	}
 
 	@Test
@@ -196,16 +234,16 @@ public class MailLatticeTest {
 		MailEnvelope e=toBob(1000,"hello");
 		// Bob signs a receipt naming Alice's mailbox; it is not valid in his own
 		Index<ABlob,SignedData<ACell>> misbound=entries(receipt(BOB,ALICE_DID,e));
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),misbound).count());
+		assertEquals(0,merge(Index.none(),misbound).count());
 		Index<ABlob,SignedData<ACell>> deposited=entries(e);
-		assertSame(deposited,BOB_MAILBOX.merge(deposited,misbound));
+		assertSame(deposited,merge(deposited,misbound));
 	}
 
 	@Test
 	public void testRejectsEnvelopeAddressedElsewhere() {
 		MailEnvelope toAlice=envelope(BOB,BOB_DID,ALICE_DID,ALICE,1000,"for alice");
 		Index<ABlob,SignedData<ACell>> misplaced=entries(toAlice);
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),misplaced).count());
+		assertEquals(0,merge(Index.none(),misplaced).count());
 	}
 
 	@Test
@@ -213,13 +251,13 @@ public class MailLatticeTest {
 		MailEnvelope e=toBob(1000,"hello");
 		SignedData<ACell> tampered=SignedData.create(ALICE.getAccountKey(),Ed25519Signature.ZERO,e.signed().getValueRef());
 		Index<ABlob,SignedData<ACell>> bad=Index.create(e.key(),tampered);
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),bad).count());
+		assertEquals(0,merge(Index.none(),bad).count());
 
 		MailReceipt r=receipt(BOB,BOB_DID,e);
 		SignedData<ACell> tamperedReceipt=SignedData.create(BOB.getAccountKey(),Ed25519Signature.ZERO,r.signed().getValueRef());
 		Index<ABlob,SignedData<ACell>> badReceipt=Index.create(r.key(),tamperedReceipt);
 		Index<ABlob,SignedData<ACell>> deposited=entries(e);
-		assertSame(deposited,BOB_MAILBOX.merge(deposited,badReceipt));
+		assertSame(deposited,merge(deposited,badReceipt));
 	}
 
 	@Test
@@ -233,13 +271,13 @@ public class MailLatticeTest {
 		Index<ABlob,SignedData<ACell>> deposited=entries(e2);
 		Index<ABlob,SignedData<ACell>> misfiled=Index.create(e2.key(),r1.signed());
 
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),misfiled).count());
-		assertSame(deposited,BOB_MAILBOX.merge(deposited,misfiled));
-		assertEquals(deposited,BOB_MAILBOX.merge(misfiled,deposited));
+		assertEquals(0,merge(Index.none(),misfiled).count());
+		assertSame(deposited,merge(deposited,misfiled));
+		assertEquals(deposited,merge(misfiled,deposited));
 
 		// Under its own key the same receipt replaces its own envelope and nothing else
 		Index<ABlob,SignedData<ACell>> both=entries(e1,e2);
-		Index<ABlob,SignedData<ACell>> merged=BOB_MAILBOX.merge(both,entries(r1));
+		Index<ABlob,SignedData<ACell>> merged=merge(both,entries(r1));
 		assertEquals(2,merged.count());
 		assertEquals(r1.signed(),merged.get(e1.key()));
 		assertEquals(e2.signed(),merged.get(e2.key()));
@@ -254,32 +292,45 @@ public class MailLatticeTest {
 		Index<ABlob,SignedData<ACell>> honest=entries(e1);
 		Index<ABlob,SignedData<ACell>> misfiled=Index.create(e1.key(),e2.signed());
 
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),misfiled).count());
-		assertSame(honest,BOB_MAILBOX.merge(honest,misfiled));
-		assertEquals(honest,BOB_MAILBOX.merge(misfiled,honest));
+		assertEquals(0,merge(Index.none(),misfiled).count());
+		assertSame(honest,merge(honest,misfiled));
+		assertEquals(honest,merge(misfiled,honest));
 
 		// A key of the wrong shape has no register at all
 		Index<ABlob,SignedData<ACell>> badKey=Index.create(Blob.fromHex("ff"),e1.signed());
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),badKey).count());
+		assertEquals(0,merge(Index.none(),badKey).count());
 	}
 
 	@Test
-	public void testPathBindsKey() {
+	public void testRejectedDeliveryLeavesAnAbsentMailboxAbsent() {
+		MailEnvelope e=toBob(1000,"hello");
+		Mail mail=Mail.create();
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> region=mail.value();
+		Mailbox mailbox=mail.mailbox(BOB_DID);
+		assertNull(mailbox.merge(entries(receipt(CAROL,BOB_DID,e))));
+		assertNull(mailbox.merge(Index.none()));
+		assertFalse(mailbox.exists());
+		assertSame(region,mail.value());
+		assertEquals(entries(e),mailbox.merge(entries(e)));
+	}
+
+	@Test
+	public void testEntryDeliveryBindsKey() {
 		MailEnvelope e1=toBob(1000,"one");
 		MailEnvelope e2=toBob(1001,"two");
-		ALattice<SignedData<ACell>> at1=BOB_MAILBOX.path(e1.key());
-		assertNotNull(at1);
-		assertEquals(e1.key(),((MailEntryLattice)at1).getKey());
-		assertEquals(BOB_DID,((MailEntryLattice)at1).getDID());
-		assertNull(BOB_MAILBOX.path(Blob.fromHex("ff")));
-		assertNull(BOB_MAILBOX.path(BOB_DID));
+		Mailbox mailbox=bobsMailbox(DIDKeyAuthorizer.CONVEX,null);
 
 		// The register at one key accepts only entries that belong there
-		assertEquals(e1.signed(),at1.merge(null,e1.signed()));
-		assertNull(at1.merge(null,e2.signed()));
-		assertNull(at1.merge(null,receipt(BOB,BOB_DID,e2).signed()));
-		assertThrows(IllegalArgumentException.class,
-			() -> MailEntryLattice.create(BOB_DID,Blob.fromHex("ff"),DIDKeyAuthorizer.CONVEX));
+		assertNull(mailbox.mergeAt(e2.signed(),e1.key()));
+		assertNull(mailbox.mergeAt(receipt(BOB,BOB_DID,e2).signed(),e1.key()));
+		assertNull(mailbox.mergeAt(e1.signed(),Blob.fromHex("ff")));
+		assertNull(mailbox.mergeAt(e1.signed(),BOB_DID));
+		assertNull(mailbox.mergeAt(e1.signed(),e1.key(),e1.key()));
+		assertEquals(entries(e1),mailbox.mergeAt(e1.signed(),e1.key()));
+
+		// An entry that is not signed data fails the delivery
+		assertThrows(IllegalArgumentException.class,() -> mailbox.mergeAt(Strings.create("junk"),e2.key()));
+		assertEquals(entries(e1),mailbox.value());
 	}
 
 	@Test
@@ -290,8 +341,8 @@ public class MailLatticeTest {
 		// A hand-built oversized envelope is dropped by the merge before any verification
 		SignedData<ACell> oversized=ALICE.signData(Vectors.of(MailEnvelope.CONTEXT,BOB_DID,ALICE_DID,
 			CVMLong.create(1000),CVMBool.FALSE,big));
-		ABlob key=MailEntryLattice.key(1000,oversized.getHash());
-		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),Index.create(key,oversized)).count());
+		ABlob key=Mailbox.key(1000,oversized.getHash());
+		assertEquals(0,merge(Index.none(),Index.create(key,oversized)).count());
 	}
 
 	@Test
@@ -300,9 +351,31 @@ public class MailLatticeTest {
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> junk=Maps.of(
 			Strings.create("not a did"),entries(e),
 			Strings.create("did:key"),entries(e));
-		assertEquals(0,Mail.LATTICE.merge(Mail.LATTICE.zero(),junk).count());
-		ALattice<ACell> child=Mail.LATTICE.path(BOB_DID);
-		assertNotNull(child);
-		assertNull(Mail.LATTICE.path(Strings.create("nope")));
+		assertEquals(0,mergeRegion(Maps.empty(),junk).count());
+
+		// Deliveries beneath a key route only to a mailbox
+		Mail mail=Mail.create();
+		mail.mergeAt(entries(e),Strings.create("nope"));
+		mail.mergeAt(e.signed(),Strings.create("nope"),e.key());
+		assertEquals(0,mail.value().count());
+		mail.mergeAt(entries(e),BOB_DID);
+		assertEquals(List.of(e),mail.mailbox(BOB_DID).deposited());
+		Mail other=Mail.create();
+		other.mergeAt(e.signed(),BOB_DID,e.key());
+		assertEquals(mail.value(),other.value());
+	}
+
+	@Test
+	public void testWrongKindsFailTheMerge() {
+		MailEnvelope e=toBob(1000,"hello");
+		Mail mail=Mail.create();
+		AHashMap<ACell,ACell> notAnIndex=Maps.of(BOB_DID,Strings.create("not an index"));
+		AHashMap<ACell,ACell> notSigned=Maps.of(BOB_DID,Index.create(e.key(),Strings.create("junk")));
+		for (AHashMap<ACell,ACell> bad:List.of(notAnIndex,notSigned)) {
+			@SuppressWarnings({"unchecked","rawtypes"})
+			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> incoming=(AHashMap)bad;
+			assertThrows(IllegalArgumentException.class,() -> mail.merge(incoming));
+			assertEquals(0,mail.value().count());
+		}
 	}
 }

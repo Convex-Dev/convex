@@ -90,7 +90,7 @@ public final class MailReceipt {
 	public SignedData<ACell> signed() { return signed; }
 
 	/** The entry key this receipt occupies, {@code issued-at ‖ hash}. */
-	public ABlob key() { return MailEntryLattice.key(issuedAt,hash); }
+	public ABlob key() { return Mailbox.key(issuedAt,hash); }
 
 	public AString did() { return did; }
 	public Hash hash() { return hash; }
