@@ -452,7 +452,11 @@ the fork" or "published into the container".
 A component fork is a reusable private working copy. Publication compares it
 with its destination and their last reconciled value. If only one side changed,
 that side is adopted. If both changed, the component's merge rule reconciles
-them. Local edits occupy the local side of directional tie-breaking rules.
+them. Where that rule cannot rank the two values, the component chooses: it reports
+a conflict, or it keeps one side, as the generic lattice adapter keeps the working
+copy's value on an exact tie. Keeping a side makes the result depend on which side
+is the working copy: a tied edit then displaces a concurrent tied value without a
+conflict.
 Reconciliation and signing must succeed before the destination changes.
 
 Forks support work that has its own lifetime: editing a draft, importing data,

@@ -112,7 +112,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * changed, within the destination's atomic update. Implementations must use the
 	 * supplied values without mutating working state. Both are accepted values, for
 	 * which the result must equal merging the two, so their admission checks need not
-	 * run again. A component that can merge the destination's changes, such as a CRDT,
+	 * run again. Where the two cannot be ranked, the component chooses between a conflict
+	 * and keeping one side, which makes the result depend on which value is {@code own}.
+	 * A component that can merge the destination's changes, such as a CRDT,
 	 * overrides this; by default a change on both sides is a conflict.
 	 *
 	 * @param own Working value
