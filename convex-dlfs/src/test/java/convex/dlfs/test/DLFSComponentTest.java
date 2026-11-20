@@ -49,8 +49,8 @@ import convex.lattice.LatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.MapComponent;
-import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
@@ -71,7 +71,7 @@ public class DLFSComponentTest {
 			var working=root.cursor().fork();
 			var app=new LatticeComponent<>(lattice,working);
 			var key=AKeyPair.generate();
-			var attached=new Regions(working).view(projects,Projects::new)
+			var attached=new Projects(LazyCursor.create(working,projects))
 				.workspace(project).documents(null,key::signData,() -> CVMLong.create(123));
 			var files=attached.fork();
 			var liveDrive=files.drives(key.getAccountKey()).getOrCreateDrive("home");
@@ -91,7 +91,7 @@ public class DLFSComponentTest {
 			org.junit.jupiter.api.Assertions.assertNull(store.getRootData());
 			root.sync();
 			assertEquals(root.cursor().get(),store.getRootData());
-			var restored=new Regions(root.cursor()).view(projects,Projects::new)
+			var restored=new Projects(LazyCursor.create(root.cursor(),projects))
 				.workspace(project).documents(store,null,Utils::getCurrentTimestampCell);
 			assertEquals("embedded subsystem",Files.readString(restored.drives(key.getAccountKey())
 				.drive("home").fileSystem().getPath("/draft.txt")));

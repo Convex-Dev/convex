@@ -27,11 +27,9 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
-import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.Regions;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
@@ -139,8 +137,8 @@ public class P2PLatticeTest {
 
 	/** Merges Alice's signed identity into the root's identity region by the identity lattice */
 	private static void mergeIdentity(Root<Index<Keyword,ACell>> root,AHashMap<Keyword,ACell> identity) {
-		new Regions(root).create(P2PLattice.KEY_ID,(AForkableCursor<AHashMap<ACell,SignedData<ACell>>> region) ->
-			new LatticeComponent<>(P2PLattice.ID_LATTICE,region)).merge(P2PLattice.createSignedIdentity(KP,identity));
+		LazyCursor.<AHashMap<ACell,SignedData<ACell>>>create(root,P2PLattice.KEY_ID)
+			.updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own,P2PLattice.createSignedIdentity(KP,identity)));
 	}
 	@Test
 	public void testIdentityMergeAndRead() {

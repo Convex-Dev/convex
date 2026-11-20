@@ -242,8 +242,9 @@ container only for being a data structure. A chain of lazy cursors therefore sta
 in a container whose kind its component already assures, such as a record the
 component only ever accepts as a map. Where a level's kind is not assured, the
 component binds it through a component of that kind, an `AMapComponent` whose
-`entry` refuses a map of the wrong kind. A root-level place comes from a region
-container (`create` or `view`), never from a lazy cursor over the root.
+`entry` refuses a map of the wrong kind. A root-level place is a lazy cursor over a
+host's root at the place's key, since a host's root is always an index, or a region
+container's region (`create` or `view`).
 
 ```java
 // The record may be absent; its items field is created by the first add

@@ -23,6 +23,7 @@ import convex.core.util.Shutdown;
 import convex.dlfs.DLFSApplication;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.LazyCursor;
 import convex.lattice.fs.DLFSLattice;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
@@ -64,8 +65,7 @@ public final class SharedApplicationsExample {
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
 			super(host.cursor());
-			published=new Regions(host.cursor()).view(Social.KEY_SOCIAL,
-				(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region) -> Social.connect(region));
+			published=Social.connect(LazyCursor.create(host.cursor(),Social.KEY_SOCIAL));
 			// The region is the host index's entry, created by its first publication. This
 			// application makes it over a fork, so its sync publishes it.
 			createRegion(Social.KEY_SOCIAL,(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> region) ->
