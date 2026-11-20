@@ -25,6 +25,8 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	private volatile boolean isOpen=true;
 	private boolean readOnly=true;
+	// The channel's monitor guards its position and persist countdown. The drive's
+	// state needs no lock: each chunk of a write installs by one atomic update.
 	private long position=0;
 	private int bytesUntilPersist=DLFileSystem.BLOB_PERSIST_INTERVAL;
 	private DLPath path;
@@ -99,8 +101,7 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	@Override
 	public int write(ByteBuffer src) throws IOException {
-		// Coordinate writes from distinct channels with filesystem-level mutations.
-		synchronized(fileSystem) {
+		synchronized(this) {
 			checkOpen();
 			if (readOnly) throw new NonWritableChannelException();
 			int written=src.remaining();
@@ -140,13 +141,13 @@ public class DLFileChannel implements SeekableByteChannel {
 	}
 
 	@Override
-	public long position() throws IOException {
+	public synchronized long position() throws IOException {
 		checkOpen();
 		return position;
 	}
 
 	@Override
-	public SeekableByteChannel position(long newPosition) throws IOException {
+	public synchronized SeekableByteChannel position(long newPosition) throws IOException {
 		checkOpen();
 		if (newPosition<0) throw new IllegalArgumentException("Negative position");
 		position=newPosition;
@@ -155,11 +156,9 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	@Override
 	public long size() throws IOException {
-		synchronized(fileSystem) {
-			checkOpen();
-			ABlob data=getData();
-			return data.count();
-		}
+		checkOpen();
+		ABlob data=getData();
+		return data.count();
 	}
 
 	private void checkOpen() throws ClosedChannelException {
@@ -195,7 +194,7 @@ public class DLFileChannel implements SeekableByteChannel {
 		if (readOnly) throw new NonWritableChannelException();
 		if (size<0) throw new IllegalArgumentException("Negative position");
 
-		synchronized(fileSystem) {
+		synchronized(this) {
 			fileSystem.updateFileData(path,data -> data.slice(0,Math.min(size,data.count())),
 				fileSystem.currentTimestamp(),false);
 			position=0;

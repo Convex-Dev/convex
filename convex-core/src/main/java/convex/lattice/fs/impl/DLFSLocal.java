@@ -294,14 +294,14 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	protected synchronized DLPath createDirectory(DLPath dir, FileAttribute<?>[] attrs) throws IOException {
+	protected DLPath createDirectory(DLPath dir, FileAttribute<?>[] attrs) throws IOException {
 		CVMLong operationTime=currentTimestamp();
 		createNode(dir,DLFSNode.createDirectory(operationTime),operationTime);
 		return dir;
 	}
 	
 	@Override
-	public synchronized AVector<ACell> createFile(DLPath path) throws IOException {
+	public AVector<ACell> createFile(DLPath path) throws IOException {
 		CVMLong operationTime=currentTimestamp();
 		AVector<ACell> newNode=DLFSNode.createEmptyFile(operationTime);
 		createNode(path,newNode,operationTime);
@@ -326,7 +326,7 @@ public class DLFSLocal extends DLFileSystem {
 	
 
 	@Override
-	public synchronized void delete(DLPath path) throws IOException {
+	public void delete(DLPath path) throws IOException {
 		checkOpen();
 		final DLPath p=path.toAbsolutePath();
 		if (p.getNameCount()==0) {
@@ -518,12 +518,12 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	public synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) throws IOException {
+	public AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) throws IOException {
 		return updateNode(dir,newNode,currentTimestamp());
 	}
 
 	/** Updates a node using one timestamp already resolved for the logical operation. */
-	synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode,
+	AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode,
 			CVMLong operationTime) throws IOException {
 		checkOpen();
 		if (newNode!=null && !DLFSNode.isValidNodeShallow(newNode)) throw new IllegalArgumentException("Invalid replacement DLFS node");
