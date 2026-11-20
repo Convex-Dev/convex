@@ -66,6 +66,93 @@ with a controlled clock to use the same component design. Merely moving a
 component under another host must not grant it new signing authority or change
 its interpretation of incoming data.
 
+## Concurrency without locks
+
+Application code on the lattice takes no locks. Each cursor write atomically
+transforms the latest value, and a component transaction commits several reads and
+writes as one change, merging or repeating its run when the value changed meanwhile.
+Components built this way can be called from any number of threads at once, and
+reads never wait. Correctness comes from how each operation is written, not from a
+lock around it.
+
+A Java lock is the wrong tool as well as an unnecessary one. `synchronized` on a
+component orders only the callers of that Java object. Other views of the same
+storage, a fork publishing into it, a transaction on an enclosing component and
+incoming merges all change the value without taking that lock, so it does not give
+the protection it appears to. A lock held across a component call can also deadlock
+with the claims that transactions take.
+
+Each operation takes one of three forms:
+
+| Operation | Form |
+|---|---|
+| One edit computed from the current value | An update function, `cursor().updateAndGet(v -> ...)`, or a domain operation built on one |
+| A decision on values it reads, or edits that must land together | `execute`, or `transact` for a result, on a component holding everything it reads and writes |
+| Work too expensive to repeat, or with side effects | `exclusive().execute(...)`, whose callback runs once |
+
+```java
+// Wrong: the lock covers only callers of this object, and each call is its own step
+synchronized void book(Keyword seat, AString guest) {
+    if (bookings().get(seat) != null) throw new IllegalStateException("Taken: " + seat);
+    bookings().put(seat, guest);
+    guests().add(guest);
+}
+
+// Right: one transaction on the component holding both bookings and guests
+void book(Keyword seat, AString guest) {
+    execute(venue -> {
+        if (venue.bookings().get(seat) != null) throw new IllegalStateException("Taken: " + seat);
+        venue.bookings().put(seat, guest);
+        venue.guests().add(guest);
+    });
+}
+```
+
+**Read and write in one step.** Reading `value()` and later writing something
+computed from it loses any change made in between. Two live views editing different
+fields of one register both keep their changes only because each edit transforms the
+latest enclosing value; this local guarantee does not turn a whole-record replica
+merge into a field-wise merge. For a consistent read of several values, take one
+snapshot of a component holding them all rather than separate reads, which may see
+different versions.
+
+**Keep callbacks pure.** An update function or transaction callback may run more
+than once and works only on the value or private view it is given; one that throws
+commits nothing. External effects, such as sending a message, happen after the call
+returns.
+
+**Choose the component by what the operation reads.** A transaction records no
+reads: it learns of a concurrent change only through its component's `reconcile`.
+Because a conflict repeats the run against the current value
+([forks and transactions](#forks-and-transactions)), a check in the callback holds at
+commit wherever that `reconcile` treats the concurrent change as a conflict, as the
+default `reconcile` does whenever both the run and another writer changed the
+component's value. A check against a value outside the component is not protected.
+Separate component calls and separate publications are not one transaction.
+
+**A merging `reconcile` narrows what a check protects.** A component that overrides
+`reconcile` to combine concurrent changes commits its run together with changes made
+meanwhile, without repeating it. A region container combines them region by region:
+a transaction on a root application is atomic across its regions, but repeats only
+when a region it changed was changed meanwhile and that region's `reconcile` refuses
+both changes. A check against one region that guards a write to another can
+therefore pass on a value that changed during the run. In the same way, a stock count
+that merges by adding each side's change lets two orders that each saw the last item
+both commit.
+
+Put the check and the write it guards where concurrent change is
+refused: in one component with the default `reconcile`, or under a merge that
+enforces the invariant itself, such as one that throws `MergeConflictException`
+rather than produce a negative count, so that the later order repeats and fails its
+check. Where neither fits, use `exclusive()` on a component holding both. A
+component's merge must preserve any invariant the component promises; a check made
+only in the callback does not constrain it.
+
+**Claims are taken for you.** Transactions and `exclusive()` take the claims they
+need ([forks and transactions](#forks-and-transactions)). Application code takes one
+of its own only by nesting exclusive transactions, to commit a staged copy together
+with other changes.
+
 ## Data and merge boundaries
 
 Design the state tree around independently mergeable values. Choose a rule for
@@ -157,7 +244,7 @@ The main design choices for a component are:
 | Live or staged state | Whether edits are immediately shared or remain private until publication |
 | Merge and acceptance | Which incoming values are meaningful and how competing versions reconcile |
 | Authoring boundary | Which complete value is stamped or signed, and whether each happens per edit or once per commit or publication |
-| Atomicity | Which related operations must commit together |
+| Atomicity | Which related operations must commit together; see [concurrency without locks](#concurrency-without-locks) |
 | Dependencies | Which authority information, signers, clocks and large-data storage it needs |
 
 Typical publication boundaries are a whole application, a domain region and an
@@ -405,19 +492,12 @@ required reconciliation and authoring, then atomically installs the resulting
 state. These additional transformations do not change the execution's return
 value. The transaction value need not be separately visible in storage before
 these transformations. Successful completion means that the commit into the
-component's bound storage succeeded. A component's merge determines which changes
-survive and must preserve any invariants that component promises across merges. A check made
-only during callback execution does not constrain subsequent merge decisions.
+component's bound storage succeeded; it does not promise replication or durability.
+A component's merge determines which changes survive.
 
 A transaction reads the component's stored value first, so on a component that
 nothing has written yet it throws `MissingValueException` before the callback
 runs. An ordinary edit creates the record; transactions follow.
-
-Transaction callbacks operate only on their private view and must be safe to
-retry. External effects happen after commit. Decisions spanning several paths
-belong in a transaction at their common ancestor. Separate component calls and
-separate publications are not one transaction. Local commit does not promise
-replication or durability.
 
 A component normally leaves its children alone, at sync and in transactions. A
 child over a live path writes straight into its parent, and a child with a fork
@@ -452,13 +532,6 @@ until that component publishes, and its publication carries both changes. Claims
 taken in another order, or a region claim left out, can deadlock with another
 thread syncing the copy or transacting on that region; see
 [claims](LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
-
-Even a single local edit must atomically transform the latest enclosing value.
-Two live views editing different fields of one register should preserve both
-changes; reading an old record and replacing it later would lose one. This local
-guarantee does not turn a whole-record replica merge into a field-wise merge.
-For a consistent read across several published paths, use one immutable root
-snapshot rather than separate reads that may span different versions.
 
 A host fork has a different purpose: it is a detached host with its own
 applications and optional store. It has no host-level merge rule. Synchronising

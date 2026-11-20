@@ -427,43 +427,26 @@ transaction takes the claim of its nearest boundary and finishes under it. Claim
 on the same boundary run one at a time, and a callback runs at most twice. An exclusive transaction starts with that claim and runs
 once, for work too expensive to repeat or with side effects.
 
-A claim locks a transactional boundary, wherever in a cursor tree it is taken:
-the nearest `BoundaryCursor` beneath the claiming cursor, or else the root, which is
-the outermost boundary. Derived views pass the claim down through their source
-links, so a boundary needs to know nothing about paths or views. A boundary holds at
-most one claim, owned by one thread, which may take it again; it stays held until
-the outermost is closed. It covers everything under the boundary: while it is held, a
-write through the boundary from another thread that would change its value waits
-for the release and recalculates, and a write that leaves the value equal carries
-on. Persisting leaves the value equal, so it proceeds during a claim and the root
-then holds the persisted cells; an exclusive transaction that changes nothing writes
-nothing over them.
-Reads never wait. Without a claim, each read or compare-and-set of the root
-adds one type check, and nothing is recorded per transaction.
+A claim reserves a transactional boundary for one thread: the nearest
+`BoundaryCursor` beneath the claiming cursor, or else the root, which is the
+outermost boundary. While it is held, a write through the boundary from another
+thread that would change its value waits, then recalculates; reads, persisting and
+writes that leave the value equal carry on. A `BoundaryCursor` passes reads and
+writes straight through and stops claims, so exclusive transactions under separate
+boundaries, such as the regions of one container, run at the same time, while a
+claim on an enclosing boundary or the root stops writes through it too. A write that
+reaches a claimed boundary's storage without passing through it, such as a
+whole-container commit over one of its regions, or a write the claiming thread makes
+outside its draft, is merged into the claimed commit as a fork's sync is; the commit
+fails where that merge refuses it, or where there is no merge. Without a claim, each
+read or compare-and-set of the root adds one type check, and nothing is recorded per
+transaction.
 
-A `BoundaryCursor` wraps any cursor, and writes pass straight through it. Claims
-from cursors over it stop there instead of reaching the root, so exclusive
-transactions under separate boundaries, such as the regions of one container, run
-at the same time. A claim beneath a boundary, on the root or an enclosing boundary,
-stops writes through it too, since they pass through. A write that reaches a
-boundary's storage without passing through it, while the boundary is claimed, such
-as a whole-container commit over one of its regions, or a write the claiming thread
-makes outside its draft, is reconciled as a fork's sync
-is: given a three-way merge, the claimed commit merges its run's value, as `own`,
-with that write, as `other`, from the value the run started with. Without a merge
-the commit fails rather than overwrite the write. A component's transactions pass
-its `reconcile`, so a conflict there fails the commit.
-Each write through a boundary holds the read side of its read-write lock, and its
-claim holds the write side.
-
-Claims are taken in one order: a fork's claim before the claim over its destination,
-and a boundary's before those enclosing it. A fork's sync holds the fork's claim while
-it writes the destination, which waits for any claim held there, and a region's
-claimed commit holds the region's boundary while it writes the container's root. Work
-that holds a claim and then writes through another fork or boundary, as a callback
-syncing a fork or writing through a captured region does, must already hold that
-one's claim, taken first; otherwise it can deadlock with a thread taking them in this
-order.
+Transactions and forks take the claims they need; application code takes none
+directly. A callback that writes through another fork or boundary while holding a
+claim must already hold that one's claim, in the order the `ExclusiveComponent`
+Javadoc gives, or it can deadlock. The application side is in
+[concurrency without locks](LATTICE_APPLICATIONS.md#concurrency-without-locks).
 
 Typed domain
 transactions use `rebind` to retain component policy; a component opts in by
