@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -279,6 +280,28 @@ public class DLFSDriveManagerTest {
 			assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS),"drive creators did not stop");
 		}
 		assertEquals(List.of("same"), first.listDrives(null));
+	}
+
+	@Test
+	public void aDriveCreatedMeanwhileThroughTheManagerCountsAgainstTheLimit() {
+		var manager=new AtomicReference<DLFSDriveManager>();
+		var interleaved=new AtomicBoolean();
+		// Another creation lands after this one has counted the drives, before it commits
+		var cursor=new Root<AHashMap<AString,AVector<ACell>>>(LATTICE.zero()) {
+			@Override protected boolean install(AHashMap<AString,AVector<ACell>> held,AHashMap<AString,AVector<ACell>> next) {
+				if (manager.get()!=null && interleaved.compareAndSet(false,true)) manager.get().createDrive(null,"other");
+				return super.install(held,next);
+			}
+		};
+		DLFSDriveManager drives=new DLFSDriveManager(cursor);
+		for (int i=0; i<DLFSDriveManager.MAX_DRIVES_PER_IDENTITY-1; i++) assertTrue(drives.createDrive(null,"drive"+i));
+		manager.set(drives);
+
+		assertFalse(drives.createDrive(null,"last"));
+		assertTrue(interleaved.get());
+		List<String> names=drives.listDrives(null);
+		assertEquals(DLFSDriveManager.MAX_DRIVES_PER_IDENTITY,names.size());
+		assertTrue(names.contains("other"));
 	}
 
 	@Test

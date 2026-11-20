@@ -33,6 +33,10 @@ public class DLFSDriveManager {
 	private static final Object ANONYMOUS_IDENTITY=new Object();
 
 	private final ConcurrentHashMap<String, FileSystem> drives = new ConcurrentHashMap<>();
+	// Every change to the ephemeral registry above holds this lock, so its count-then-add
+	// and two-step rename are single operations; reads take no lock and may see a rename
+	// half done. Mounted components are lattice state and need no lock.
+	private final Object registryLock=new Object();
 	private final ConcurrentHashMap<Object,DLFSDrives> componentRoutes=new ConcurrentHashMap<>();
 	private final boolean ephemeralFallback;
 	private final Runnable afterSync;
@@ -170,15 +174,17 @@ public class DLFSDriveManager {
 	 * @param driveName Drive name
 	 * @return true if created, false if drive already exists
 	 */
-	public synchronized boolean createDrive(String identity, String driveName) {
+	public boolean createDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
 		if (componentDrives!=null) return componentDrives.createDrive(driveName,MAX_DRIVES_PER_IDENTITY)!=null;
 		if (!ephemeralFallback) return false;
 		String key = driveKey(identity, driveName);
-		if (listDrives(identity).size() >= MAX_DRIVES_PER_IDENTITY) return false;
-		FileSystem existing = drives.putIfAbsent(key, DLFS.createLocal());
-		return existing == null;
+		synchronized (registryLock) {
+			if (listDrives(identity).size() >= MAX_DRIVES_PER_IDENTITY) return false;
+			FileSystem existing = drives.putIfAbsent(key, DLFS.createLocal());
+			return existing == null;
+		}
 	}
 
 	/**
@@ -188,12 +194,14 @@ public class DLFSDriveManager {
 	 * @param driveName Drive name
 	 * @return true if deleted, false if drive didn't exist
 	 */
-	public synchronized boolean deleteDrive(String identity, String driveName) {
+	public boolean deleteDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
 		if (componentDrives!=null) return componentDrives.deleteDrive(driveName);
 		if (!ephemeralFallback) return false;
-		return drives.remove(driveKey(identity, driveName)) != null;
+		synchronized (registryLock) {
+			return drives.remove(driveKey(identity, driveName)) != null;
+		}
 	}
 
 	/**
@@ -225,7 +233,7 @@ public class DLFSDriveManager {
 	 * @param newName New drive name
 	 * @return true if renamed, false if source doesn't exist or target already exists
 	 */
-	public synchronized boolean renameDrive(String identity, String oldName, String newName) {
+	public boolean renameDrive(String identity, String oldName, String newName) {
 		if (!DLFSPathValidator.isValidDriveName(oldName) || !DLFSPathValidator.isValidDriveName(newName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
 		if (componentDrives!=null) return componentDrives.renameDrive(oldName,newName);
@@ -233,15 +241,13 @@ public class DLFSDriveManager {
 		if (oldName.equals(newName)) return getDrive(identity, oldName) != null;
 		String oldKey = driveKey(identity, oldName);
 		String newKey = driveKey(identity, newName);
-		FileSystem fs = drives.get(oldKey);
-		if (fs == null) return false;
-		// The method lock makes the two map mutations one registry operation.
-		if (drives.putIfAbsent(newKey, fs) != null) return false;
-		if (!drives.remove(oldKey, fs)) {
-			drives.remove(newKey, fs);
-			return false;
+		synchronized (registryLock) {
+			FileSystem fs = drives.get(oldKey);
+			if (fs == null) return false;
+			if (drives.putIfAbsent(newKey, fs) != null) return false;
+			drives.remove(oldKey);
+			return true;
 		}
-		return true;
 	}
 
 	/**
@@ -278,7 +284,7 @@ public class DLFSDriveManager {
 	 * @param driveName Drive name
 	 * @param fs The filesystem to use for this drive
 	 */
-	public synchronized void seedDrive(String identity, String driveName, FileSystem fs) {
+	public void seedDrive(String identity, String driveName, FileSystem fs) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) {
 			throw new IllegalArgumentException("Invalid drive name: " + driveName);
 		}
@@ -289,7 +295,9 @@ public class DLFSDriveManager {
 		if (!ephemeralFallback) {
 			throw new UnsupportedOperationException("Cannot seed an unmounted identity on a routing manager");
 		}
-		drives.put(driveKey(identity, driveName), fs);
+		synchronized (registryLock) {
+			drives.put(driveKey(identity, driveName), fs);
+		}
 	}
 
 	private static String driveKey(String identity, String driveName) {
