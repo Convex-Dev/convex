@@ -192,12 +192,12 @@ public class DLFileChannel implements SeekableByteChannel {
 	public SeekableByteChannel truncate(long size) throws IOException {
 		checkOpen();
 		if (readOnly) throw new NonWritableChannelException();
-		if (size<0) throw new IllegalArgumentException("Negative position");
+		if (size<0) throw new IllegalArgumentException("Negative size");
 
 		synchronized(this) {
 			fileSystem.updateFileData(path,data -> data.slice(0,Math.min(size,data.count())),
 				fileSystem.currentTimestamp(),false);
-			position=0;
+			position=Math.min(position,size);
 		}
 		return this;
 	}

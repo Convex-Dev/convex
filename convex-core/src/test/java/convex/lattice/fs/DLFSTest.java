@@ -493,6 +493,29 @@ public class DLFSTest {
 	}
 
 	@Test
+	public void testTruncateMovesOnlyAPositionBeyondTheNewSize() throws IOException {
+		DLFSLocal fs=DLFS.createLocal();
+		DLPath file=fs.getPath("/truncated");
+		Files.write(file,new byte[] {1,2,3,4,5,6});
+		try (SeekableByteChannel fc=Files.newByteChannel(file,StandardOpenOption.WRITE)) {
+			fc.position(2);
+			fc.truncate(4);
+			assertEquals(4,fc.size());
+			assertEquals(2,fc.position(),"a position within the new size stays");
+
+			fc.position(4);
+			fc.truncate(10);
+			assertEquals(4,fc.size(),"a larger size leaves the file alone");
+			assertEquals(4,fc.position());
+
+			fc.truncate(1);
+			assertEquals(1,fc.position(),"a position beyond the new size moves to it");
+			fc.write(ByteBuffer.wrap(new byte[] {9}));
+		}
+		assertArrayEquals(new byte[] {1,9},Files.readAllBytes(file));
+	}
+
+	@Test
 	public void testContentMutationsUpdateFileTimestamp() throws IOException {
 		DLFSLocal fs=(DLFSLocal) DLFS.createLocal();
 		DLPath file=fs.getPath("/timestamped");
