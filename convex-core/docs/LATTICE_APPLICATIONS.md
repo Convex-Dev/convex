@@ -125,37 +125,16 @@ the run.
 
 **Choose the component by what the operation reads.** A transaction records no
 reads: it learns of a concurrent change only through its component's `reconcile`.
-Because a conflict repeats the run against the current value
-([forks and transactions](#forks-and-transactions)), a check in the callback holds at
-commit wherever that `reconcile` treats the concurrent change as a conflict, as the
-default `reconcile` does whenever both the run and another writer changed the
-component's value. A check against a value outside the component is not protected.
-Separate component calls and separate publications are not one transaction.
+With the default `reconcile`, a run that changes the component's value conflicts with
+any change another writer made to it meanwhile, and repeats against the current
+value, so a check in the callback holds at commit. A check against a value outside
+the component is not protected. Separate component calls and separate publications
+are not one transaction.
 
-**A merging `reconcile` narrows what a check protects.** A component that overrides
-`reconcile` to combine concurrent changes commits its run together with changes made
-meanwhile, without repeating it. A region container combines them region by region:
-a transaction on a root application is atomic across its regions, but repeats only
-when a region it changed was changed meanwhile and that region's `reconcile` refuses
-both changes. A check against one region that guards a write to another can
-therefore pass on a value that changed during the run. In the same way, a stock count
-that merges by adding each side's change lets two orders that each saw the last item
-both commit.
-
-Put the check and the write it guards where concurrent change is
-refused: in one component with the default `reconcile`, or under a merge that
-enforces the invariant itself, such as one that throws `MergeConflictException`
-rather than produce a negative count, so that the later order repeats and fails its
-check. Where neither fits, use `exclusive()` on a component holding both; on a
-staged component this orders only work on its copy, and its sync still reconciles
-with the destination by its `reconcile`. A
-component's merge must preserve any invariant the component promises; a check made
-only in the callback does not constrain it.
-
-**Claims are taken for you.** Transactions and `exclusive()` take the claims they
-need ([forks and transactions](#forks-and-transactions)). Application code takes one
-of its own only by nesting exclusive transactions, to commit a staged copy together
-with other changes.
+Transactions and `exclusive()` take the claims they need. Components whose
+`reconcile` combines concurrent changes, and decisions that span regions or working
+copies, are covered in
+[transactions across regions and working copies](#transactions-across-regions-and-working-copies).
 
 ## Data and merge boundaries
 
@@ -486,10 +465,9 @@ atomic change by the component's `reconcile`, given the value it started from,
 its own value and the current value. A concurrent change the component can
 reconcile commits with the run; a conflict, which by default is any change on both
 sides, makes the operations run once more, under a claim, against current state.
-Under a claim, a change that bypasses the claimed boundary goes through the same
-`reconcile`, and a conflict there refuses the commit. These are different ways of
-handling a concurrent change: merging resolves the resulting versions according to
-component policy, while retrying repeats the operations.
+These are different ways of handling a concurrent change: merging resolves the
+resulting versions according to component policy, while retrying repeats the
+operations.
 
 Execution produces a transaction value and a return value. Commit applies any
 required reconciliation and authoring, then atomically installs the resulting
@@ -517,12 +495,59 @@ the execution whose transaction value was used for the successful commit.
 Reconciliation does not recompute that result: it records what the execution
 produced, without promising that its changes survive a merge at commit or later updates.
 For example, an allocation result identifies what the execution allocated even
-if a merge subsequently selects a conflicting version. An operation that
-must not repeat uses the component's `exclusive()` form, whose callback runs once
-while holding the claim of its nearest transactional boundary: a `BoundaryCursor`
-its storage is built over, such as a region of a region container, or else the
-root, which is a staged component's working copy or the live host. Writes through
-that boundary wait, so keep such callbacks short.
+if a merge subsequently selects a conflicting version.
+
+A host fork has a different purpose: it is a detached host with its own
+applications and optional store. It has no host-level merge rule. Synchronising
+it exchanges roots through each host's normal application delivery, like two
+nodes without a network. Saving a private host does not perform that exchange.
+Its store must be separate from the origin's; reopening saved state does not
+restore an implicit relationship with the origin.
+
+Separate host storage is useful for large or durable drafts that must outlive a
+session. Exchanging roots must carry their reachable cells into the receiving
+store, so accepting state does not leave it dependent on a disposable draft
+store. Application publication on each side remains a separate decision.
+
+### Transactions across regions and working copies
+
+Most applications need none of this. It applies to a component whose `reconcile`
+combines concurrent changes, and to decisions that span regions or several working
+copies.
+
+A component's `reconcile` decides which concurrent changes commit together with a
+transaction's run. The default refuses a change made on both sides, so the run
+repeats. A component whose parts are independent by its own rules may instead
+combine them, committing its run together with changes made meanwhile without
+repeating it. Region containers do this by design: each region merges in its own
+area, so a transaction on a root application commits atomically across its regions,
+a change to another region made meanwhile lands beside it, and a region changed on
+both sides goes to that region's own `reconcile`.
+
+A check in the callback then holds only against the changes that `reconcile`
+refuses, so a combining merge must itself keep any invariant its component promises.
+A stock count that merges by adding each side's change lets two orders that each saw
+the last item both commit; one that throws `MergeConflictException` rather than
+produce a negative count makes the later order repeat and fail its check. In the same
+way, under a region container, a check against one region that guards a write to
+another does not repeat when the region it read changes.
+
+A decision that depends on several regions takes `exclusive()` on a container
+holding every region it reads or writes, the root application if need be. Its
+callback runs once, holding the claim that every write to those regions passes
+through: writes from other threads wait until it commits, while reads carry on. Claim
+the container rather than each region, since sibling regions have no claim order and
+two threads claiming them one by one can deadlock. Such a callback holds up every
+region beneath the container, so keep it short.
+
+`exclusive()` holds the claim of the nearest transactional boundary beneath its
+component's storage: a `BoundaryCursor` that storage is built over, such as a region
+of a region container, or else the root, which is a staged component's working copy
+or the live host. On a staged component it therefore orders only work on that copy,
+and its sync still reconciles with the destination by its `reconcile`. Under a claim,
+a change that reaches the value without passing through the claimed boundary, such as
+a whole-container commit over a region, goes through the same `reconcile`, and a
+conflict there refuses the commit.
 
 A change to a staged copy can commit together with other changes at its destination.
 Take the copy's claim first, through its `exclusive()` form, then the claim of each
@@ -536,18 +561,6 @@ until that component publishes, and its publication carries both changes. Claims
 taken in another order, or a region claim left out, can deadlock with another
 thread syncing the copy or transacting on that region; see
 [claims](LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication).
-
-A host fork has a different purpose: it is a detached host with its own
-applications and optional store. It has no host-level merge rule. Synchronising
-it exchanges roots through each host's normal application delivery, like two
-nodes without a network. Saving a private host does not perform that exchange.
-Its store must be separate from the origin's; reopening saved state does not
-restore an implicit relationship with the origin.
-
-Separate host storage is useful for large or durable drafts that must outlive a
-session. Exchanging roots must carry their reachable cells into the receiving
-store, so accepting state does not leave it dependent on a disposable draft
-store. Application publication on each side remains a separate decision.
 
 ## Ownership and authoring
 

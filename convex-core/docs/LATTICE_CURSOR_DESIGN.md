@@ -447,7 +447,7 @@ Transactions and forks take the claims they need; application code takes none
 directly. A callback that writes through another fork or boundary while holding a
 claim must already hold that one's claim, in the order the `ExclusiveComponent`
 Javadoc gives, or it can deadlock. The application side is in
-[concurrency without locks](LATTICE_APPLICATIONS.md#concurrency-without-locks).
+[transactions across regions and working copies](LATTICE_APPLICATIONS.md#transactions-across-regions-and-working-copies).
 
 Typed domain
 transactions use `rebind` to retain component policy; a component opts in by
