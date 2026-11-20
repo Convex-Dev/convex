@@ -110,10 +110,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Resolves a working snapshot that conflicts with a concurrently changed
 	 * destination. Called by {@link #reconcile(ACell,ACell,ACell)} only when both sides
 	 * changed, within the destination's atomic update. Implementations must use the
-	 * supplied values without mutating working state. Both are held values, already
-	 * accepted, so implementations check neither. A component that can merge the
-	 * destination's changes, such as a CRDT, overrides this; by default a change on both
-	 * sides is a conflict.
+	 * supplied values without mutating working state. Both are accepted values, for
+	 * which the result must equal merging the two, so their admission checks need not
+	 * run again. A component that can merge the destination's changes, such as a CRDT,
+	 * overrides this; by default a change on both sides is a conflict.
 	 *
 	 * @param own Working value
 	 * @param other Destination value

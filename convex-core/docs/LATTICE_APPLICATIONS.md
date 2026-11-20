@@ -600,13 +600,16 @@ recreate operations must supply timestamps that express that order.
 
 Merge is the acceptance boundary for incoming data. Recognising the shape of a
 candidate accepts neither its signature, its owner nor its contents, so each
-component's merge enforces its own rules, on the incoming value only. Held state
-passed those rules when it was admitted and is not checked again, so updating
-authority data affects later checks without removing or displacing anything
-accepted before ([CAD038](https://docs.convex.world/docs/cad/lattice_auth)).
-Reconciling a fork combines two held values and checks neither. Raw cursor access
-remains trusted application code; component boundaries are not a sandbox between
-code sharing a process.
+component's merge enforces its own rules, on the incoming value only and as it
+merges. Held state passed those rules when it was admitted and is not checked again.
+A merge checks the incoming value where it differs from what is held, and all of it
+where nothing is held, so its cost follows the change rather than the size of the
+value. Updating authority data affects later checks without removing or displacing
+anything accepted before ([CAD038](https://docs.convex.world/docs/cad/lattice_auth)).
+Reconciling a fork must give the same result as merging, and both sides are held
+values, so it repeats none of these checks. Raw cursor access remains trusted
+application code; component boundaries are not a sandbox between code sharing a
+process.
 
 ## Retention, durability and networking
 
