@@ -394,7 +394,7 @@ public class MailMergeTest {
 	public void testIncompleteLocalDataFailsTheMergeAndChangesNothing() {
 		MailEnvelope e1=toBob(1000,"one");
 		MailEnvelope e2=toBob(1001,"two");
-		// An entry whose payload this store cannot read is not a data error in the entry
+		// An entry whose payload this store cannot read is not invalid input
 		SignedData<ACell> incomplete=SignedData.create(ALICE.getAccountKey(),Ed25519Signature.ZERO,
 			Ref.forHash(e2.signed().getValueRef().getHash(),new MemoryStore()));
 		Index<ABlob,SignedData<ACell>> held=entries(e1);

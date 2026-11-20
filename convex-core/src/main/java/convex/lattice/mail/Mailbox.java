@@ -18,7 +18,7 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.InvalidStructureException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
@@ -35,9 +35,9 @@ import convex.lattice.cursor.AForkableCursor;
  * An envelope is valid at its key when its signature verifies, it is addressed to
  * this mailbox and the key is its own; a receipt when, in addition, it names this
  * mailbox and its signer is authorised for the mailbox DID. Each received entry is
- * judged alone: one that is invalid, is not signed data, sits under a key of the wrong
- * shape or fails its check with a data error is dropped, and the rest merge. A
- * received mailbox that is not an index is dropped.</p>
+ * judged alone: one that is invalid, is not signed data or sits under a key of the
+ * wrong shape is dropped, and the rest merge. A received mailbox that is not an index
+ * is dropped.</p>
  *
  * <p>Anyone holding this view may {@link #deposit}. Opening and receiving are the
  * recipient's: {@link #open} needs the decryptors for the recipient's keys and
@@ -270,17 +270,15 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	}
 
 	/**
-	 * Merges one received item, keeping the held value where the received item has a
-	 * data error. Incomplete local data is not a data error in the item and propagates.
+	 * Merges one received item, keeping the held value if the received item is invalid
+	 * input: of a type or cell structure the rule does not expect. Any other failure
+	 * propagates.
 	 */
 	static <T> T mergeReceived(T held,Supplier<T> merge) {
 		try {
 			return merge.get();
-		} catch (MissingDataException e) {
-			// Received values arrive complete, so missing data is this store's and says nothing about the item
-			throw e;
-		} catch (RuntimeException | StackOverflowError e) {
-			// A malformed received item, a deeply nested one included, is dropped alone
+		} catch (ClassCastException | InvalidStructureException e) {
+			// Invalid input drops the received item alone; any other failure is a bug or this store's
 			return held;
 		}
 	}

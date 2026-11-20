@@ -33,8 +33,8 @@ import convex.lattice.cursor.Cursors;
  *
  * <p>An incoming region merges mailbox by mailbox, each by its mailbox's rule. A key
  * that is not a canonical base DID has no mailbox and is dropped, as is a delivery
- * at a path beneath one, a received mailbox that is not an index, and one whose merge
- * fails with a data error. A delivered region that is not a hash map is dropped. The
+ * at a path beneath one and a received mailbox that is not an index. A delivered
+ * region that is not a hash map is dropped. The
  * authoriser bound here decides which signers may issue receipts for each DID;
  * without one, only a {@code did:key} owner may.</p>
  *
