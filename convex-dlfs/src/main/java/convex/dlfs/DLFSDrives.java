@@ -208,7 +208,7 @@ public final class DLFSDrives extends AMapComponent<AString, AVector<ACell>, AHa
 		return createDrive(driveName,Long.MAX_VALUE);
 	}
 
-	/** Deletes a drive and closes its cached local NIO view. */
+	/** Deletes a drive and closes its cached local NIO view, unless the drive has been created again meanwhile. */
 	public boolean deleteDrive(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		AString name=Strings.create(driveName);
