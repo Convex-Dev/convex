@@ -179,6 +179,7 @@ public class MailMergeTest {
 		Index<ABlob,SignedData<ACell>> v2=entries(receipt(BOB,BOB_DID,e1),e3);
 		ComponentsTest.doJoinTests(bobsMailbox(DIDKeyAuthorizer.CONVEX,null),v1,v2);
 		assertSame(v1,merge(v1,Index.none()));
+		assertEquals(v1,merge(Index.none(),v1));
 
 		Index<ABlob,SignedData<ACell>> merged=merge(v1,v2);
 		assertEquals(3,merged.count());
@@ -192,6 +193,7 @@ public class MailMergeTest {
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m2=Maps.of(BOB_DID,v2,ALICE_DID,entries(toAlice));
 		ComponentsTest.doJoinTests(Mail.create(),m1,m2);
 		assertSame(m1,mergeRegion(m1,Maps.empty()));
+		assertEquals(m1,mergeRegion(Maps.empty(),m1));
 		assertEquals(merged,mergeRegion(m1,m2).get(BOB_DID));
 	}
 

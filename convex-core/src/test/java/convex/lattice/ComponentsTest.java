@@ -23,7 +23,12 @@ import convex.lattice.cursor.Root;
  *
  * <p>Held cells are kept wherever a result equals them, so that held state converges
  * on stored cells rather than on equal copies: where these checks expect the held
- * object itself, an equal value is not enough.</p>
+ * object itself, an equal value is not enough. A root keeps its object when an update
+ * gives an equal value, and a fork where at most one side changed publishes without
+ * calling the component's reconcile, so for a component bound to a root those checks
+ * hold whatever the component builds. The component's own rules are exercised by the
+ * values it merges, the deliveries it refuses and the changes on both sides. Objects
+ * nested within a value are not checked.</p>
  */
 public class ComponentsTest {
 
