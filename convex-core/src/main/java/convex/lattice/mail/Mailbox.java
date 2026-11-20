@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
-import java.util.function.Supplier;
 
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
@@ -18,7 +17,6 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidStructureException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
@@ -264,23 +262,9 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 			@Override
 			public ACell merge(Object key,ACell a,ACell b) {
 				if (b==null || !isKey(key) || !(b instanceof SignedData<?> entry)) return a;
-				return mergeReceived(a,() -> mergeEntry(did,(ABlob)key,authorizer,(SignedData<ACell>)a,(SignedData<ACell>)entry));
+				return mergeEntry(did,(ABlob)key,authorizer,(SignedData<ACell>)a,(SignedData<ACell>)entry);
 			}
 		});
-	}
-
-	/**
-	 * Merges one received item, keeping the held value if the received item is invalid
-	 * input: of a type or cell structure the rule does not expect. Any other failure
-	 * propagates.
-	 */
-	static <T> T mergeReceived(T held,Supplier<T> merge) {
-		try {
-			return merge.get();
-		} catch (ClassCastException | InvalidStructureException e) {
-			// Invalid input drops the received item alone; any other failure is a bug or this store's
-			return held;
-		}
 	}
 
 	/** True iff a key has the shape of an entry key. */

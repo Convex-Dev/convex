@@ -215,7 +215,7 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 			@Override
 			public ACell merge(Object key,ACell a,ACell b) {
 				if (b==null || !isMailbox(key) || !(b instanceof Index)) return a;
-				return Mailbox.mergeReceived(a,() -> Mailbox.mergeEntries((AString)key,authorizer,(Index<ABlob,SignedData<ACell>>)a,b));
+				return Mailbox.mergeEntries((AString)key,authorizer,(Index<ABlob,SignedData<ACell>>)a,b);
 			}
 		});
 	}
