@@ -10,6 +10,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.IndexComponent;
 import convex.lattice.MapComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.Regions;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.UnionSet;
@@ -42,7 +43,9 @@ import convex.lattice.generic.SetLattice;
  * larger ones, including a transaction on the root application spanning other
  * regions. The shop merges its value part by part, with each part's rule, so
  * concurrent changes to a fork, or to the shop under an exclusive transaction's
- * claim, are kept. {@link #open} builds the root application over a plain root;
+ * claim, are kept. Changes that together would sell more than is in stock are a
+ * conflict instead: a concurrent order runs again and finds the item out of stock,
+ * and a fork that oversold fails to sync. {@link #open} builds the root application over a plain root;
  * a service that stores or replicates it registers it with a host instead,
  * {@code host.addApplication(new ShopApp(host.cursor()))}.</p>
  */
@@ -183,7 +186,7 @@ public final class ShopExample {
 		}
 	}
 
-	/** Counts of items in stock. Concurrent changes to a count both apply. */
+	/** Counts of items in stock. Concurrent changes to a count both apply, unless together they would take it below zero. */
 	public static final class Stock extends IndexComponent<Keyword,CVMLong> {
 		public Stock(AForkableCursor<Index<Keyword,CVMLong>> cursor) { super(cursor); }
 
@@ -207,12 +210,19 @@ public final class ShopExample {
 			});
 		}
 
-		/** Applies each side's change to every count, as a difference from the base. */
+		/**
+		 * Applies each side's change to every count, as a difference from the base.
+		 *
+		 * @throws MergeConflictException If the changes together take a count below zero
+		 */
 		static Index<Keyword,CVMLong> merge(Index<Keyword,CVMLong> base,Index<Keyword,CVMLong> own,Index<Keyword,CVMLong> other) {
 			Index<Keyword,CVMLong> merged=other;
 			if (own!=null) for (Keyword item:own.keySet()) {
 				long change=count(own,item)-count(base,item);
-				if (change!=0) merged=adjust(merged,item,change);
+				if (change==0) continue;
+				merged=adjust(merged,item,change);
+				// Each side checked only its own count, so together they may have taken more than there was
+				if (count(merged,item)<0) throw new MergeConflictException("Oversold: "+item);
 			}
 			return merged;
 		}

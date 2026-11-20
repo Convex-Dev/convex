@@ -39,7 +39,8 @@
  *       {@link convex.lattice.app.ShopApplicationTest}: an application in its
  *       {@code :app} region, making its parts on its own cursor when they are
  *       needed; its operations are transactions over them, and its merge keeps
- *       concurrent changes to a fork or under an exclusive transaction's claim.</li>
+ *       concurrent changes to a fork or under an exclusive transaction's claim,
+ *       except those that together oversell.</li>
  * </ul>
  *
  * <p>Network delivery and propagation scenarios belong in {@code convex.node.app}

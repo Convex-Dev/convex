@@ -16,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.lattice.MergeConflictException;
 import convex.lattice.app.ShopExample.Shop;
 import convex.lattice.app.ShopExample.Stock;
 import convex.lattice.cursor.Root;
@@ -110,7 +111,32 @@ class ShopApplicationTest {
 		assertEquals(Maps.of(CVMLong.ONE,TEA,CVMLong.create(2),TEA),at(shop,ORDERS));
 	}
 
-	@Test void aShopTransactionRetriesOnTopOfAConcurrentCommit() {
+	@Test void aForkThatOversoldFailsToSyncAndKeepsItsOrder() {
+		var shop=open().shop();
+		shop.list(TEA,1);
+		var draft=shop.fork();
+		draft.order(1,TEA);
+		shop.order(2,TEA);
+		assertThrows(MergeConflictException.class,draft::sync,"both took the last one");
+		assertEquals(stock(TEA,0),at(shop,STOCK),"the shop is unchanged");
+		assertEquals(Maps.of(CVMLong.create(2),TEA),at(shop,ORDERS));
+		assertEquals(Maps.of(CVMLong.ONE,TEA),at(draft,ORDERS),"the fork keeps its order");
+	}
+
+	@Test void concurrentOrdersForTheLastItemDoNotOversell() {
+		var shop=open().shop();
+		shop.list(TEA,1);
+		var runs=new AtomicInteger();
+		assertThrows(IllegalStateException.class,() -> shop.execute(s -> {
+			if (runs.incrementAndGet()==1) shop.order(2,TEA); // another order takes the last one during the run
+			s.order(1,TEA);
+		}),"out of stock when it runs again");
+		assertEquals(2,runs.get(),"the conflict ran it again");
+		assertEquals(stock(TEA,0),at(shop,STOCK));
+		assertEquals(Maps.of(CVMLong.create(2),TEA),at(shop,ORDERS),"only the order that found stock");
+	}
+
+	@Test void aShopTransactionMergesAConcurrentRestock() {
 		var shop=open().shop();
 		shop.list(TEA,1);
 		var runs=new AtomicInteger();

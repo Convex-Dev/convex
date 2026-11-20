@@ -528,7 +528,8 @@ A check in the callback then holds only against the changes that `reconcile`
 refuses, so a combining merge must itself keep any invariant its component promises.
 A stock count that merges by adding each side's change lets two orders that each saw
 the last item both commit; one that throws `MergeConflictException` rather than
-produce a negative count makes the later order repeat and fail its check. In the same
+produce a negative count makes the later order repeat and fail its check, as
+[ShopExample](../src/test/java/convex/lattice/app/ShopExample.java)'s stock does. In the same
 way, under a region container, a check against one region that guards a write to
 another does not repeat when the region it read changes.
 
