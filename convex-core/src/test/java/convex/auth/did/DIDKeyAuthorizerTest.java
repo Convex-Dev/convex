@@ -1,6 +1,7 @@
 package convex.auth.did;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -48,6 +49,18 @@ public class DIDKeyAuthorizerTest {
 
 		assertTrue(authorizer.safeAuthorises(web,current.getAccountKey()));
 		assertFalse(authorizer.safeAuthorises(web,AKeyPair.generate().getAccountKey()));
+	}
+
+	@Test
+	void testFailingCheckIsNotAuthorisedButJvmFailurePropagates() {
+		AKeyPair owner=AKeyPair.generate();
+		AString did=DID.forKey(owner.getAccountKey());
+
+		DIDKeyAuthorizer failing=(d,k) -> { throw new IllegalStateException("resolver unavailable"); };
+		assertFalse(failing.safeAuthorises(did,owner.getAccountKey()));
+
+		DIDKeyAuthorizer broken=(d,k) -> { throw new InternalError("JVM failure"); };
+		assertThrows(InternalError.class,() -> broken.safeAuthorises(did,owner.getAccountKey()));
 	}
 
 	@Test

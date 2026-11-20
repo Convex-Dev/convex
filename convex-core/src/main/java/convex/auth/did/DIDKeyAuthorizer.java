@@ -10,6 +10,7 @@ import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
+import convex.core.util.Utils;
 
 /**
  * Resolves whether an {@link AccountKey} is currently authorised for a DID.
@@ -82,11 +83,15 @@ public interface DIDKeyAuthorizer {
 		return (did,key) -> safeAuthorises(did,key)||other.safeAuthorises(did,key);
 	}
 
-	/** Fail-closed invocation suitable for security boundaries. */
+	/**
+	 * Fail-closed invocation suitable for security boundaries: a check that fails counts
+	 * as not authorised, unless the failure is of the JVM itself, which propagates.
+	 */
 	default boolean safeAuthorises(AString did, AccountKey key) {
 		try {
 			return DID.isCanonicalBase(did) && key!=null && authorises(did,key);
 		} catch (Throwable t) {
+			Utils.checkRequestFailure(t);
 			return false;
 		}
 	}
