@@ -119,7 +119,9 @@ different versions.
 **Keep callbacks pure.** An update function or transaction callback may run more
 than once and works only on the value or private view it is given; one that throws
 commits nothing. External effects, such as sending a message, happen after the call
-returns.
+returns. The exception is an `exclusive()` callback, which runs once; its commit can
+still fail after the effect, where a write that bypasses its boundary conflicts with
+the run.
 
 **Choose the component by what the operation reads.** A transaction records no
 reads: it learns of a concurrent change only through its component's `reconcile`.
@@ -144,7 +146,9 @@ Put the check and the write it guards where concurrent change is
 refused: in one component with the default `reconcile`, or under a merge that
 enforces the invariant itself, such as one that throws `MergeConflictException`
 rather than produce a negative count, so that the later order repeats and fails its
-check. Where neither fits, use `exclusive()` on a component holding both. A
+check. Where neither fits, use `exclusive()` on a component holding both; on a
+staged component this orders only work on its copy, and its sync still reconciles
+with the destination by its `reconcile`. A
 component's merge must preserve any invariant the component promises; a check made
 only in the callback does not constrain it.
 
