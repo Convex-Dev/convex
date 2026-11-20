@@ -33,6 +33,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.MemoryStore;
+import convex.lattice.ComponentsTest;
 import convex.lattice.cursor.Root;
 
 /** Merge rules of the mail region: the entry register, the mailbox index and the DID map. */
@@ -83,28 +84,6 @@ public class MailMergeTest {
 	static AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergeRegion(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
 			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
 		return Mail.connect(new Root<>(own),null).merge(other);
-	}
-
-	/**
-	 * The laws a replicated merge keeps: the empty value and an absent incoming value
-	 * change nothing, merging is commutative, and replaying either input leaves the
-	 * result as it is.
-	 */
-	static <V extends ACell> void checkMergeLaws(BinaryOperator<V> merge, V empty, V v1, V v2) {
-		for (V v:List.of(v1,v2)) {
-			assertEquals(v,merge.apply(empty,v));
-			assertSame(v,merge.apply(v,empty));
-			assertSame(v,merge.apply(v,null));
-			assertEquals(v,merge.apply(null,v));
-		}
-		V merged=merge.apply(v1,v2);
-		assertEquals(merged,merge.apply(v2,v1));
-		assertEquals(merged,merge.apply(empty,merged));
-		assertSame(merged,merge.apply(merged,empty));
-		assertSame(merged,merge.apply(merged,v1));
-		assertSame(merged,merge.apply(merged,v2));
-		assertEquals(merged,merge.apply(v1,merged));
-		assertEquals(merged,merge.apply(v2,merged));
 	}
 
 	@Test
@@ -198,7 +177,8 @@ public class MailMergeTest {
 		MailEnvelope e3=toBob(3000,"three");
 		Index<ABlob,SignedData<ACell>> v1=entries(e1,e2);
 		Index<ABlob,SignedData<ACell>> v2=entries(receipt(BOB,BOB_DID,e1),e3);
-		checkMergeLaws(MailMergeTest::merge,Index.none(),v1,v2);
+		ComponentsTest.doJoinTests(bobsMailbox(DIDKeyAuthorizer.CONVEX,null),v1,v2);
+		assertSame(v1,merge(v1,Index.none()));
 
 		Index<ABlob,SignedData<ACell>> merged=merge(v1,v2);
 		assertEquals(3,merged.count());
@@ -210,7 +190,8 @@ public class MailMergeTest {
 		MailEnvelope toAlice=envelope(BOB,BOB_DID,ALICE_DID,ALICE,1500,"reply");
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m1=Maps.of(BOB_DID,v1);
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m2=Maps.of(BOB_DID,v2,ALICE_DID,entries(toAlice));
-		checkMergeLaws(MailMergeTest::mergeRegion,Maps.empty(),m1,m2);
+		ComponentsTest.doJoinTests(Mail.create(),m1,m2);
+		assertSame(m1,mergeRegion(m1,Maps.empty()));
 		assertEquals(merged,mergeRegion(m1,m2).get(BOB_DID));
 	}
 
@@ -331,12 +312,12 @@ public class MailMergeTest {
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> empty=Maps.empty();
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> emptyMailbox=Maps.of(BOB_DID,Index.none());
 		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(emptyMailbox,empty));
-		checkMergeLaws(MailMergeTest::mergeRegion,empty,emptyMailbox,Maps.of(BOB_DID,entries(toBob(1000,"hello"))));
+		ComponentsTest.doJoinTests(Mail.create(),emptyMailbox,Maps.of(BOB_DID,entries(toBob(1000,"hello"))));
 
 		// A delivery whose every entry is rejected merges as the empty mailbox does
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> forged=Maps.of(BOB_DID,entries(receipt(CAROL,BOB_DID,toBob(1000,"hello"))));
 		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(empty,forged));
-		assertSame(emptyMailbox,mergeRegion(emptyMailbox,forged));
+		ComponentsTest.doRefusalTests(Mail.create(),emptyMailbox,forged);
 	}
 
 	@Test
