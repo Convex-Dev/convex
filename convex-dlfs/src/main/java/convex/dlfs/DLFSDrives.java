@@ -44,6 +44,9 @@ public final class DLFSDrives extends AMapComponent<AString, AVector<ACell>, AHa
 	private final DLFSLattice files;
 	private final MapLattice<AString,AVector<ACell>> values;
 	private final DLFSLocation location;
+	// Cached views by name. Each change for a name runs in its compute and reads the
+	// registry there, so a view is cached only while its name is live and closed only
+	// once it is not; a deletion and a creation of the same name cannot split that.
 	private final ConcurrentHashMap<AString,DLFSDrive> drives=new ConcurrentHashMap<>();
 
 	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,Persister persister,DLFSLocation location,
@@ -107,12 +110,22 @@ public final class DLFSDrives extends AMapComponent<AString, AVector<ACell>, AHa
 	public DLFSDrive drive(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
 		AString name=Strings.create(driveName);
-		AHashMap<AString,AVector<ACell>> registry=cursor().getOrDefault(null);
-		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
+		if (!isLive(name)) return null;
 		return drives.compute(name,(key,existing)->{
+			if (!isLive(key)) {
+				// Deleted since the check above, before its eviction ran
+				if (existing!=null) closeView(existing);
+				return null;
+			}
 			if (existing!=null && existing.isOpen()) return existing;
 			return new DLFSDrive(key,entry(key),persister,location.child(key),clock,files);
 		});
+	}
+
+	/** Whether the registry holds a live drive under a name. */
+	private boolean isLive(AString name) {
+		AHashMap<AString,AVector<ACell>> registry=cursor().getOrDefault(null);
+		return registry!=null && status(registry.get(name))==DriveStatus.LIVE;
 	}
 
 	@Override
@@ -235,7 +248,6 @@ public final class DLFSDrives extends AMapComponent<AString, AVector<ACell>, AHa
 		DriveStatus targetStatus=status(oldTarget);
 		if (targetStatus==DriveStatus.LIVE || (oldTarget!=null && targetStatus!=DriveStatus.DELETED)) return false;
 		closeCached(oldKey);
-		closeCached(newKey);
 		return true;
 	}
 
@@ -285,9 +297,16 @@ public final class DLFSDrives extends AMapComponent<AString, AVector<ACell>, AHa
 		return clock.get();
 	}
 
+	/** Closes the cached view of a name a deletion or rename took away, unless the name is live again. */
 	private void closeCached(AString name) {
-		DLFSDrive drive=drives.remove(name);
-		if (drive==null) return;
+		drives.computeIfPresent(name,(key,drive)->{
+			if (isLive(key)) return drive;
+			closeView(drive);
+			return null;
+		});
+	}
+
+	private static void closeView(DLFSDrive drive) {
 		try {
 			drive.close();
 		} catch (IOException e) {

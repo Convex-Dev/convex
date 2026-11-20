@@ -8,6 +8,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
+import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSDrives;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
@@ -157,6 +159,59 @@ public class DLFSDrivesTest {
 		var drives=DLFSDrives.wrap(cursor,() -> time);
 		assertNull(drives.getOrCreateDrive("home"));
 		assertEquals(DLFSDrives.DriveStatus.DELETED,drives.driveStatus("home"));
+	}
+
+	@Test
+	public void aDriveCreatedAgainBeforeADeletionClosesItsViewStaysOpen() throws Exception {
+		var time=CVMLong.create(100);
+		var drives=new AtomicReference<DLFSDrives>();
+		var recreated=new AtomicReference<DLFSDrive>();
+		var armed=new AtomicBoolean();
+		var cursor=new Root<AHashMap<AString,AVector<ACell>>>(Maps.empty()) {
+			@Override
+			public AHashMap<AString,AVector<ACell>> getAndUpdate(
+					UnaryOperator<AHashMap<AString,AVector<ACell>>> update) {
+				var previous=super.getAndUpdate(update);
+				// The drive is created again and opened after the deletion commits, before it closes the cached view
+				if (armed.compareAndSet(true,false)) recreated.set(drives.get().getOrCreateDrive("home"));
+				return previous;
+			}
+		};
+		drives.set(DLFSDrives.wrap(cursor,() -> time));
+		var old=drives.get().getOrCreateDrive("home");
+		Files.writeString(old.fileSystem().getPath("/old.txt"),"deleted");
+		armed.set(true);
+
+		assertTrue(drives.get().deleteDrive("home"));
+		assertNotNull(recreated.get());
+		assertTrue(recreated.get().isOpen(),"the deletion must not close the view of the drive created again");
+		assertSame(recreated.get(),drives.get().drive("home"));
+		// A view is bound to the name, so it shows the drive created again
+		assertFalse(Files.exists(recreated.get().fileSystem().getPath("/old.txt")));
+	}
+
+	@Test
+	public void aDriveDeletedWhileBeingOpenedIsNotOpened() {
+		var time=CVMLong.create(100);
+		var drives=new AtomicReference<DLFSDrives>();
+		var armed=new AtomicBoolean();
+		var cursor=new Root<AHashMap<AString,AVector<ACell>>>(Maps.empty()) {
+			@Override
+			public AHashMap<AString,AVector<ACell>> get() {
+				var value=super.get();
+				// The drive is deleted after opening has checked it is live
+				if (armed.compareAndSet(true,false)) assertTrue(drives.get().deleteDrive("home"));
+				return value;
+			}
+		};
+		drives.set(DLFSDrives.wrap(cursor,() -> time));
+		assertNotNull(drives.get().createDrive("home"));
+		armed.set(true);
+
+		assertNull(drives.get().drive("home"));
+		assertFalse(armed.get());
+		assertEquals(DLFSDrives.DriveStatus.DELETED,drives.get().driveStatus("home"));
+		assertNull(drives.get().drive("home"));
 	}
 
 	/** Forces two updates to prepare from the same input, exercising the CAS retry. */
