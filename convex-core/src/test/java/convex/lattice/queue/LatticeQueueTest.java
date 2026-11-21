@@ -11,6 +11,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ComponentsTest;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 
@@ -63,6 +64,11 @@ public class LatticeQueueTest {
 		assertEquals(0,queue.truncate(1));
 		assertEquals(10,queue.startOffset(),"truncation must not move a supplied initial offset backwards");
 		assertEquals(CVMLong.TWO,queue.getMeta(CVMLong.ONE));
+	}
+
+	@Test void keepsTheComponentReconcileRules() {
+		var queue=new LatticeQueue(new Root<>(),() -> CVMLong.ONE);
+		ComponentsTest.doEditTests(queue,null,q -> q.offer(Strings.create("x")),q -> q.setMeta(Keyword.intern("owner"),Strings.create("y")));
 	}
 
 	// ===== Empty Queue =====

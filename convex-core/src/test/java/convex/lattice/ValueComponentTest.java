@@ -50,6 +50,12 @@ class ValueComponentTest {
 		}
 	}
 
+	@Test void keepsTheComponentReconcileRules() {
+		var component=new ValueComponent<ACell>(new Root<>());
+		ComponentsTest.doEditTests(component,CVMLong.create(1000),
+			value -> value.cursor().set(Strings.create("a")),value -> value.cursor().set(Strings.create("b")));
+	}
+
 	@Test void baseHasValuesButNoImplicitNamespaceOrMerge() {
 		var root=Root.<ACell>create(null);
 		var base=new ALatticeComponent<>(root) {};

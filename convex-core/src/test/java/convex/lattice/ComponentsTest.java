@@ -1,15 +1,18 @@
 package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 import convex.core.data.ACell;
 import convex.core.data.CAD3Encoder;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.Root;
@@ -146,6 +149,82 @@ public class ComponentsTest {
 	@SafeVarargs
 	public static <V extends ACell> void doRefusalTests(ALatticeComponent<V> component, V held, V... refused) {
 		for (V r:refused) assertSame(held,mergeInto(component,held,r));
+	}
+
+	/**
+	 * Checks a component through its domain operations, as for one with no merge: two
+	 * edits, each of which changes the value, applied to a fork and to its destination.
+	 * A fork where neither changed leaves the destination's object as it is; where only
+	 * the destination changed, the fork takes the destination's object; where only the
+	 * fork changed, the destination takes the fork's value; and where both changed, sync
+	 * gives the value of applying the two edits one after the other, in either order, or
+	 * fails with a conflict that changes neither side. Each edit must give the same value
+	 * whenever it is applied to the same value, so any clock it reads must be fixed.
+	 *
+	 * @param component Component configured for the edits; rebound, never changed
+	 * @param start Value both sides start from
+	 * @param a First edit
+	 * @param b Second edit
+	 */
+	public static <V extends ACell,C extends ALatticeComponent<V>> void doEditTests(C component, V start,
+			Consumer<? super C> a, Consumer<? super C> b) {
+		V va=edited(component,start,a);
+		V vb=edited(component,start,b);
+		assertEquals(va,edited(component,start,a),"An edit must give the same value each time");
+		assertEquals(vb,edited(component,start,b),"An edit must give the same value each time");
+		assertNotEquals(start,va,"Each edit must change the value");
+		assertNotEquals(start,vb,"Each edit must change the value");
+
+		// Neither side changed: the destination keeps its object
+		Root<V> root=Cursors.root(start);
+		ForkedCursor<V> fork=root.fork();
+		rebound(component,fork).sync();
+		assertSame(start,root.get());
+
+		// Only the destination changed: the fork takes the destination's object
+		root=Cursors.root(start);
+		fork=root.fork();
+		C working=rebound(component,fork);
+		b.accept(rebound(component,root));
+		V published=root.get();
+		working.sync();
+		assertSame(published,root.get());
+		assertSame(published,fork.get());
+
+		// Only the fork changed: the destination takes the fork's value
+		root=Cursors.root(start);
+		fork=root.fork();
+		working=rebound(component,fork);
+		a.accept(working);
+		working.sync();
+		assertEquals(va,root.get());
+
+		// Both changed: the two edits in one order, or a conflict
+		root=Cursors.root(start);
+		fork=root.fork();
+		working=rebound(component,fork);
+		a.accept(working);
+		b.accept(rebound(component,root));
+		V result=syncOrConflict(working,fork,root);
+		if (result!=null) {
+			assertTrue(result.equals(edited(component,start,a,b))||result.equals(edited(component,start,b,a)),
+				"Reconciled value must be the two edits applied in one order");
+		}
+	}
+
+	/** The value a component holding a start value holds after the edits, applied in order to one instance. */
+	@SafeVarargs
+	static <V extends ACell,C extends ALatticeComponent<V>> V edited(C component, V start, Consumer<? super C>... edits) {
+		Root<V> root=Cursors.root(start);
+		C target=rebound(component,root);
+		for (Consumer<? super C> edit:edits) edit.accept(target);
+		return root.get();
+	}
+
+	/** The component's counterpart on a cursor; a component's rebind returns its own class. */
+	@SuppressWarnings("unchecked")
+	private static <V extends ACell,C extends ALatticeComponent<V>> C rebound(C component, AForkableCursor<V> cursor) {
+		return (C)component.rebind(cursor);
 	}
 
 	/** Merges a delivery into a component holding a value, returning the value it then holds. */
