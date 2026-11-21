@@ -41,10 +41,11 @@ class ApplicationIngressTest {
 			super(host.cursor().fork(),host::persist);
 			this.rule=rule;
 		}
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell incoming) {
 			merges++;
 			if (ignore) return cursor().get();
-			return cursor().updateAndGet(own -> rule.merge(own,incoming));
+			return cursor().updateAndGet(own -> rule.merge(own,(Index<Keyword,ACell>)incoming));
 		}
 		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
 			if (path.length>0) {
@@ -112,8 +113,9 @@ class ApplicationIngressTest {
 		var root=LatticeHost.create(LATTICE.zero(),null);
 		List<Index<Keyword,ACell>> delivered=new ArrayList<>();
 		var app=new App(LATTICE,root) {
-			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
-				delivered.add(incoming);
+			@SuppressWarnings("unchecked")
+			@Override public Index<Keyword,ACell> merge(ACell incoming) {
+				delivered.add((Index<Keyword,ACell>)incoming);
 				return super.merge(incoming);
 			}
 		};
@@ -138,9 +140,10 @@ class ApplicationIngressTest {
 	private static final class Board extends LatticeComponent<Index<Keyword,ACell>> {
 		int merges;
 		Board(AForkableCursor<Index<Keyword,ACell>> cursor) { super(BOARD_LATTICE,cursor); }
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell incoming) {
 			merges++;
-			return cursor().updateAndGet(own -> BOARD_LATTICE.merge(getContext(),own,incoming));
+			return cursor().updateAndGet(own -> BOARD_LATTICE.merge(getContext(),own,(Index<Keyword,ACell>)incoming));
 		}
 	}
 
@@ -245,7 +248,9 @@ class ApplicationIngressTest {
 			super(FOUR,host);
 			this.interests=List.of(interests);
 		}
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell root) {
+			Index<Keyword,ACell> incoming=(Index<Keyword,ACell>)root;
 			Index<Keyword,ACell> wanted=FOUR.zero();
 			for (Keyword region:interests) {
 				ACell value=incoming.get(region);

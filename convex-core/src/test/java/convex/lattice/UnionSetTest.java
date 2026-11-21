@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ASet;
 import convex.core.data.Sets;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.Root;
 import convex.test.lattice.ComponentChecks;
@@ -13,6 +14,7 @@ import convex.test.lattice.ComponentChecks;
 class UnionSetTest {
 	@Test void keepsTheComponentMergeRules() {
 		assertNull(ComponentChecks.checkCommutingDeliveries(new UnionSet<>(Root.<ASet<CVMLong>>create(null)),Sets.<CVMLong>of(1,2),Sets.<CVMLong>of(2,3)));
+		assertNull(ComponentChecks.checkRefusedDeliveries(new UnionSet<>(Root.<ASet<CVMLong>>create(null)),Sets.<CVMLong>of(1,2),CVMLong.ONE,Vectors.of(3)));
 	}
 
 	@Test void independentDraftsConvergeAndRepeatedSyncIsInert() {

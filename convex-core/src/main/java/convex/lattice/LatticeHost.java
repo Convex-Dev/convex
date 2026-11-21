@@ -213,10 +213,11 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * Delivery is not atomic across applications: earlier successful merges remain
 	 * if a later application fails. Retry is safe for lattice merges.
 	 *
-	 * @param other Incoming root value
+	 * @param other Incoming root value, which each application judges
 	 * @return Current published root, which may not yet include the incoming state
 	 */
-	public V merge(V other) {
+	@Override
+	public V merge(ACell other) {
 		List<ALatticeComponent<V>> configured=applications;
 		for (ALatticeComponent<V> application:configured) application.merge(other);
 		return cursor().get();

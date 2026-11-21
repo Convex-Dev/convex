@@ -26,8 +26,9 @@ class ApplicationLifecycleTest {
 
 	private static class Values extends ALatticeComponent<ASet<CVMLong>> {
 		Values(AForkableCursor<ASet<CVMLong>> cursor) { super(cursor); }
-		@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
-			return cursor().updateAndGet(own -> union(own,incoming));
+		@SuppressWarnings("unchecked")
+		@Override public ASet<CVMLong> merge(ACell incoming) {
+			return cursor().updateAndGet(own -> union(own,(ASet<CVMLong>)incoming));
 		}
 		@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 			return union(own,other);
@@ -89,7 +90,7 @@ class ApplicationLifecycleTest {
 				assertTrue(host.cursor().get().isEmpty());
 				if (fail) throw new IllegalStateException("later child failed");
 			}
-			@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) { return child.merge(incoming); }
+			@Override public ASet<CVMLong> merge(ACell incoming) { return child.merge(incoming); }
 			@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 				return union(own,other);
 			}
@@ -109,8 +110,9 @@ class ApplicationLifecycleTest {
 		var publish=new CountDownLatch(1);
 		class App extends ALatticeApplication<ASet<CVMLong>> {
 			App() { super(host.cursor().fork(),host::persist); }
-			@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
-				return cursor().updateAndGet(own -> union(own,incoming));
+			@SuppressWarnings("unchecked")
+			@Override public ASet<CVMLong> merge(ACell incoming) {
+				return cursor().updateAndGet(own -> union(own,(ASet<CVMLong>)incoming));
 			}
 			@Override protected ASet<CVMLong> reconcile(ASet<CVMLong> own,ASet<CVMLong> other) {
 				return union(own,other);

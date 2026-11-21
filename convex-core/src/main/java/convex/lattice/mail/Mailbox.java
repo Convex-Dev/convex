@@ -195,21 +195,15 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	/**
 	 * Merges an incoming mailbox value into this mailbox, entry by entry, by the
-	 * register rule.
+	 * register rule. A value that is not an index changes nothing.
 	 *
-	 * @param incoming Incoming mailbox value
+	 * @param incoming Incoming mailbox value, of any type
 	 * @return Current working value
 	 */
 	@Override
-	public Index<ABlob,SignedData<ACell>> merge(Index<ABlob,SignedData<ACell>> incoming) {
+	public Index<ABlob,SignedData<ACell>> merge(ACell incoming) {
+		if (incoming!=null && !(incoming instanceof Index)) return cursor().getOrDefault(null);
 		return cursor().updateAndGet(held -> mergeEntries(did,authorizer,held,incoming));
-	}
-
-	/** Drops a delivered mailbox that is not an index; routes other deliveries as every component does. */
-	@Override
-	public Index<ABlob,SignedData<ACell>> mergeAt(ACell value,ACell... path) {
-		if (path.length==0 && value!=null && !(value instanceof Index)) return cursor().getOrDefault(null);
-		return super.mergeAt(value,path);
 	}
 
 	/**

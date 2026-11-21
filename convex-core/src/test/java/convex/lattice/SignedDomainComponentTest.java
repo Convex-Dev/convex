@@ -138,7 +138,8 @@ class SignedDomainComponentTest {
 		}
 		assertSame(second,destination.get(),"a replica needs no private key to adopt a valid envelope");
 		component.mergeAt(ALICE.signData(CVMLong.create(100)),CVMLong.ZERO);
-		assertThrows(IllegalArgumentException.class,() -> component.mergeAt(CVMLong.create(100)));
-		assertSame(second,destination.get());
+		component.merge(CVMLong.create(100));
+		component.mergeAt(CVMLong.create(100));
+		assertSame(second,destination.get(),"a value that is not an envelope changes nothing");
 	}
 }

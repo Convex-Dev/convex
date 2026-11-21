@@ -61,7 +61,7 @@ class ComponentSyncTest {
 		@Override public Record rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Record(cursor,clock);
 		}
-		@Override public AHashMap<Keyword,ACell> merge(AHashMap<Keyword,ACell> incoming) { return edits.merge(incoming); }
+		@Override public AHashMap<Keyword,ACell> merge(ACell incoming) { return edits.merge(incoming); }
 		@Override protected AHashMap<Keyword,ACell> reconcile(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 			return Timestamped.lattice().merge(own,other);
 		}

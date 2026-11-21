@@ -280,12 +280,12 @@ public class ConvexDBMergeTest {
 
 		AHashMap<AString, Index<Keyword, ACell>> settingsOnly = Maps.of(DB_NAME, Index.of(ConvexDB.KEY_CONFIG, Index.none()));
 		AHashMap<AString, Index<Keyword, ACell>> noTables = Maps.of(DB_NAME, Index.of(ConvexDB.KEY_TABLES, Index.none()));
-		assertNull(ComponentChecks.checkRefusedDeliveries(cdb, base, settingsOnly, noTables));
+		assertNull(ComponentChecks.checkRefusedDeliveries(cdb, base, settingsOnly, noTables, CVMLong.ONE, Index.none()));
 
 		// A database delivered within the map or at its name merges as the database alone merges it
 		ConvexDB held = new ConvexDB(Cursors.root(base), RowLWW::merge, clock);
 		assertNull(ComponentChecks.checkChildDeliveries(held, DB_NAME, held.database(DB),
-			withRow2.value().get(DB_NAME), settingsOnly.get(DB_NAME), noTables.get(DB_NAME)));
+			withRow2.value().get(DB_NAME), settingsOnly.get(DB_NAME), noTables.get(DB_NAME), CVMLong.ONE, Maps.empty()));
 
 		assertNull(ComponentChecks.checkConcurrentEdits(cdb, base, c -> insert(c.database(DB), 2), c -> insert(c.database(DB), 3)));
 	}
@@ -329,11 +329,9 @@ public class ConvexDBMergeTest {
 		assertEquals(0, db.tables().getRowCount(FROZEN));
 		before = host.cursor().get();
 
-		// Paths into the entry other than its rows are refused
-		assertThrows(UnsupportedOperationException.class,
-			() -> host.mergeAt(Vectors.empty(), DB_NAME, ConvexDB.KEY_TABLES, PLAIN, CVMLong.ZERO));
-		assertThrows(UnsupportedOperationException.class,
-			() -> host.mergeAt(row, DB_NAME, ConvexDB.KEY_TABLES, PLAIN, CVMLong.ONE, key(2), CVMLong.ZERO));
+		// Paths into the entry other than its rows carry nothing
+		host.mergeAt(Vectors.empty(), DB_NAME, ConvexDB.KEY_TABLES, PLAIN, CVMLong.ZERO);
+		host.mergeAt(row, DB_NAME, ConvexDB.KEY_TABLES, PLAIN, CVMLong.ONE, key(2), CVMLong.ZERO);
 		assertSame(before, host.cursor().get());
 	}
 

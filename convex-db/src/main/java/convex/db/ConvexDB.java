@@ -249,17 +249,17 @@ public class ConvexDB extends AMapComponent<AString, Index<Keyword, ACell>, AHas
 	 * This database map's merge: a union of database names, with each database's state
 	 * merged by the policy of its {@link #database(AString)} component. Databases merge
 	 * independently, since nothing spans them. It is a pure function that reads and
-	 * writes no state. Entries that are not database states are ignored, and an absent
-	 * map stays absent when nothing is accepted.
+	 * writes no state. Each database judges its own entry, and an absent map stays
+	 * absent when nothing is accepted.
 	 *
 	 * @param own Established database map, kept on ties; null if absent
-	 * @param other Database map to merge in; null if absent
+	 * @param incoming Database map to merge in, of any type; null if absent. A value
+	 *        that is not a hash map is not merged.
 	 * @return Merged database map
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public AHashMap<AString, Index<Keyword, ACell>> mergeValues(AHashMap<AString, Index<Keyword, ACell>> own,
-			AHashMap<AString, Index<Keyword, ACell>> other) {
-		ACell incoming = other;
+			ACell incoming) {
 		if (!(incoming instanceof AHashMap)) return own;
 		// Foreign entries stay untyped until they are checked as database states
 		AHashMap<AString, ACell> base = (own == null) ? Maps.empty() : (AHashMap) own;
@@ -271,16 +271,17 @@ public class ConvexDB extends AMapComponent<AString, Index<Keyword, ACell>, AHas
 
 			@Override
 			public ACell merge(Object key, ACell a, ACell b) {
-				if (!(key instanceof AString name) || !(b instanceof Index)) return a;
+				if (!(key instanceof AString name)) return a;
 				if (a != null && !(a instanceof Index)) return a;
-				return database(name).mergeValues((Index<Keyword, ACell>) a, (Index<Keyword, ACell>) b);
+				// The database judges its own incoming state
+				return database(name).mergeValues((Index<Keyword, ACell>) a, b);
 			}
 		});
 		return (own == null && merged.isEmpty()) ? null : (AHashMap) merged;
 	}
 
 	@Override
-	public AHashMap<AString, Index<Keyword, ACell>> merge(AHashMap<AString, Index<Keyword, ACell>> incoming) {
+	public AHashMap<AString, Index<Keyword, ACell>> merge(ACell incoming) {
 		return cursor().updateAndGet(own -> mergeValues(own, incoming));
 	}
 

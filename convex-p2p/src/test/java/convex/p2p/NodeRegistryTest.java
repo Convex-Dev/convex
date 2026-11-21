@@ -38,6 +38,16 @@ public class NodeRegistryTest {
 		alice.registry().setMaxRecords(BOUND);
 	}
 
+	/** The registry, not the application holding it, judges a delivered region. */
+	@Test void aRegionThatIsNotAnIndexChangesNothing() {
+		var before=host.cursor().get();
+		host.merge(CVMLong.ONE);
+		host.merge(Index.of(P2PLattice.KEY_P2P,CVMLong.ONE));
+		host.merge(Index.of(P2PLattice.KEY_P2P,Maps.empty()));
+		host.mergeAt(CVMLong.ONE,P2PLattice.KEY_P2P);
+		assertSame(before,host.cursor().get());
+	}
+
 	@Test void aFullRegistryKeepsItsBound() {
 		alice.merge(registry(records(0,10,1)));
 		assertEquals(BOUND,held().count());

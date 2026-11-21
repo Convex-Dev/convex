@@ -279,7 +279,8 @@ class KeyedRegionsTest {
 		app.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
 		app.create(B,(AForkableCursor<ASet<CVMLong>> cursor) -> new Members(cursor));
 		assertNull(ComponentChecks.checkCommutingDeliveries(app,Index.<Keyword,ACell>of(A,CVMLong.create(300),B,Sets.of(1)),Index.<Keyword,ACell>of(A,CVMLong.create(500),B,Sets.of(2))));
-		assertNull(ComponentChecks.checkRefusedDeliveries(app,Index.<Keyword,ACell>of(A,CVMLong.create(300)),Index.<Keyword,ACell>of(UNKNOWN,CVMLong.create(900))));
+		assertNull(ComponentChecks.checkRefusedDeliveries(app,Index.<Keyword,ACell>of(A,CVMLong.create(300)),Index.<Keyword,ACell>of(UNKNOWN,CVMLong.create(900)),
+			CVMLong.ONE,Maps.of(A,CVMLong.create(900))));
 
 		var single=SingleRegion.create(emptyRoot(),A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
 		assertNull(ComponentChecks.checkCommutingDeliveries(single,Index.<Keyword,ACell>of(A,CVMLong.create(300)),Index.<Keyword,ACell>of(A,CVMLong.create(500))));
@@ -310,7 +311,9 @@ class KeyedRegionsTest {
 		IndexOnlyRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
 		IndexOnlyRegions(AForkableCursor<Index<Keyword,ACell>> cursor,Regions source) { super(cursor,source); }
 		@Override public IndexOnlyRegions rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new IndexOnlyRegions(cursor,this); }
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell value) {
+			Index<Keyword,ACell> incoming=(Index<Keyword,ACell>)value;
 			Index<Keyword,ACell> checked=incoming;
 			for (long i=0;incoming!=null && i<incoming.count();i++) {
 				MapEntry<Keyword,ACell> entry=incoming.entryAt(i);
@@ -325,7 +328,9 @@ class KeyedRegionsTest {
 		OverwritingRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
 		OverwritingRegions(AForkableCursor<Index<Keyword,ACell>> cursor,Regions source) { super(cursor,source); }
 		@Override public OverwritingRegions rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new OverwritingRegions(cursor,this); }
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell value) {
+			Index<Keyword,ACell> incoming=(Index<Keyword,ACell>)value;
 			if (incoming==null) return cursor().getOrDefault(null);
 			return cursor().updateAndGet(own -> {
 				Index<Keyword,ACell> result=(own==null)?Index.none():own;
@@ -604,7 +609,9 @@ class KeyedRegionsTest {
 		var host=LatticeHost.create();
 		var app=new TestRegions(host);
 		var child=app.counter(A);
-		assertThrows(ClassCastException.class,() -> app.mergeAt(CVMLong.ONE));
+		app.merge(CVMLong.ONE);
+		app.mergeAt(CVMLong.ONE);
+		app.mergeAt(Maps.of(A,CVMLong.ONE));
 		assertNull(child.cursor().get());
 		assertEquals(Index.none(),host.cursor().get());
 	}
@@ -640,7 +647,7 @@ class KeyedRegionsTest {
 			app.merge(Index.of(A,stranger.signData(payload)));
 			app.mergeAt(stranger.signData(payload),A);
 			assertNull(child.cursor().get());
-			assertThrows(IllegalArgumentException.class,() -> app.mergeAt(payload,A));
+			app.mergeAt(payload,A);
 			app.mergeAt(payload,A,Keywords.VALUE);
 			assertNull(child.cursor().get(),"delivery cannot cross a signature boundary");
 			app.merge(Index.of(A,owner.signData(payload)));

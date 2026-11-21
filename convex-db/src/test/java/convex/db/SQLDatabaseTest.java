@@ -606,7 +606,7 @@ public class SQLDatabaseTest {
 		Index<Keyword, ACell> settingsOnly = Index.of(ConvexDB.KEY_CONFIG, Index.none());
 		Index<Keyword, ACell> noTables = Index.of(ConvexDB.KEY_TABLES, Index.none());
 		Index<Keyword, ACell> earlier = withRow(SQLDatabase.create("db", kp, kp.getAccountKey(), RowLWW::merge, () -> CVMLong.create(50)), 2).value();
-		assertNull(ComponentChecks.checkRefusedDeliveries(db, row1, settingsOnly, noTables, earlier));
+		assertNull(ComponentChecks.checkRefusedDeliveries(db, row1, settingsOnly, noTables, earlier, CVMLong.ONE, Maps.empty()));
 
 		assertNull(ComponentChecks.checkConcurrentEdits(db, row1, d -> d.tables().insert("t", 2), d -> d.tables().insert("t", 3)));
 	}

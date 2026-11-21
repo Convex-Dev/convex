@@ -456,15 +456,18 @@ public class SQLDatabase extends AMapComponent<Keyword, ACell, Index<Keyword, AC
 	 * and writes no state.
 	 *
 	 * @param own Established database state; null if absent
-	 * @param other Database state to merge in; null if absent
+	 * @param other Database state to merge in, of any type; null if absent. A value that
+	 *        is not an index is not merged.
 	 * @return Merged database state
 	 */
-	public Index<Keyword, ACell> mergeValues(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
-		return policy.apply(own, other);
+	@SuppressWarnings("unchecked")
+	public Index<Keyword, ACell> mergeValues(Index<Keyword, ACell> own, ACell other) {
+		if (other != null && !(other instanceof Index)) return own;
+		return policy.apply(own, (Index<Keyword, ACell>) other);
 	}
 
 	@Override
-	public Index<Keyword, ACell> merge(Index<Keyword, ACell> incoming) {
+	public Index<Keyword, ACell> merge(ACell incoming) {
 		return cursor().updateAndGet(own -> mergeValues(own, incoming));
 	}
 
@@ -494,7 +497,8 @@ public class SQLDatabase extends AMapComponent<Keyword, ACell, Index<Keyword, AC
 		}
 		ACell tables = value;
 		if (path.length > 1) {
-			if (!(path[1] instanceof AString name) || !isEntryPath(path)) return super.mergeAtPath(value, path);
+			// A path naming nothing in a table store carries nothing to merge
+			if (!(path[1] instanceof AString name) || !isEntryPath(path)) return cursor().getOrDefault(null);
 			ACell entry = (path.length == 2) ? value : rowsEntry(value, path);
 			if (entry == null) return cursor().getOrDefault(null);
 			tables = Index.of(name, entry);

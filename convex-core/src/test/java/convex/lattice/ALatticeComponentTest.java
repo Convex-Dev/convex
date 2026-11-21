@@ -61,9 +61,10 @@ public class ALatticeComponentTest {
 			return own.includeAll(other);
 		}
 
+		@SuppressWarnings("unchecked")
 		@Override
-		public ASet<ACell> merge(ASet<ACell> incoming) {
-			return cursor().updateAndGet(own -> own.includeAll(incoming));
+		public ASet<ACell> merge(ACell incoming) {
+			return cursor().updateAndGet(own -> own.includeAll((ASet<ACell>)incoming));
 		}
 
 		void add(ACell value) {
@@ -82,9 +83,10 @@ public class ALatticeComponentTest {
 			super(cursor);
 		}
 
+		@SuppressWarnings("unchecked")
 		@Override
-		public ASet<ACell> merge(ASet<ACell> incoming) {
-			return cursor().updateAndGet(own -> own.includeAll(incoming));
+		public ASet<ACell> merge(ACell incoming) {
+			return cursor().updateAndGet(own -> own.includeAll((ASet<ACell>)incoming));
 		}
 	}
 

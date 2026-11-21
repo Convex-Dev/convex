@@ -52,9 +52,13 @@ public class P2PRegion extends AMapComponent<Keyword,ACell,Index<Keyword,ACell>>
 		return new NodeRecords(entry(P2PLattice.KEY_NODES)).node(owner,signer);
 	}
 
+	/** Merges an incoming region as its lattice declares; a value that is not an index changes nothing. */
+	@SuppressWarnings("unchecked")
 	@Override
-	public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
-		return cursor().updateAndGet(own -> P2PLattice.P2P_LATTICE.merge(own,incoming));
+	public Index<Keyword,ACell> merge(ACell incoming) {
+		if (incoming!=null && !(incoming instanceof Index)) return cursor().getOrDefault(null);
+		Index<Keyword,ACell> region=(Index<Keyword,ACell>)incoming;
+		return cursor().updateAndGet(own -> P2PLattice.P2P_LATTICE.merge(own,region));
 	}
 
 	@Override

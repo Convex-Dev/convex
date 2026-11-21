@@ -278,15 +278,19 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		return result;
 	}
 
-	/** Delivers present registered entries, without publishing staged children. */
+	/**
+	 * Delivers present registered entries, without publishing staged children. Each
+	 * region judges its own entry; a value that is not an index changes nothing.
+	 */
 	@Override
-	public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+	public Index<Keyword,ACell> merge(ACell incoming) {
+		// Any delivery is a first use, which freezes registration, whatever it carries
 		var selected=regions();
-		if (incoming!=null) {
+		if (incoming instanceof Index<?,?> index) {
 			for (var entry:selected.entrySet()) {
 				Keyword key=entry.getKey();
 				Region region=entry.getValue();
-				if (region.delivered && incoming.containsKey(key)) region.child().mergeAt(incoming.get(key));
+				if (region.delivered && index.containsKey(key)) region.child().mergeAt(index.get(key));
 			}
 		}
 		return cursor().getOrDefault(null);

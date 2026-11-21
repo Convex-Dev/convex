@@ -605,7 +605,10 @@ recreate operations must supply timestamps that express that order.
 Merge is the acceptance boundary for incoming data. Recognising the shape of a
 candidate accepts neither its signature, its owner nor its contents, so each
 component's merge enforces its own rules, on the incoming value only and as it
-merges. Held state passed those rules when it was admitted and is not checked again.
+merges. Its parameter is any cell, since untrusted data has no type until it is
+checked: a value that is not of the component's type changes nothing. Each value is
+judged by the component that defines it: a container hands its children's values on
+unchecked, and checks only what it defines itself, such as its keys. Held state passed those rules when it was admitted and is not checked again.
 A merge checks the incoming value where it differs from what is held, and all of it
 where nothing is held, so its cost follows the change rather than the size of the
 value. Updating authority data affects later checks without removing or displacing

@@ -70,6 +70,8 @@ public class LatticeKVTest {
 		assertNull(ComponentChecks.checkDeliveries(kv,
 			Index.of(a,KVEntry.createValue(Strings.create("x"),CVMLong.create(1000))),
 			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(1000)))));
+		assertNull(ComponentChecks.checkRefusedDeliveries(kv,
+			Index.of(a,KVEntry.createValue(Strings.create("x"),CVMLong.create(1000))),CVMLong.ONE,Vectors.of(a)));
 	}
 
 	@Test public void forksRetainTheClockForWritesAndExpiry() {

@@ -257,7 +257,7 @@ public class PersistedCellsHeldSoftlyTest {
 			return storage().get();
 		}
 
-		@Override public AHashMap<ACell,ACell> merge(AHashMap<ACell,ACell> incoming) {
+		@Override public AHashMap<ACell,ACell> merge(ACell incoming) {
 			return cursor().get();
 		}
 

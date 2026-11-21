@@ -38,10 +38,11 @@ class NodeApplicationIngressTest {
 		int merges;
 		boolean ignore;
 		App(LatticeHost<Index<Keyword,ACell>> host) { super(host.cursor().fork(),host::persist); }
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell incoming) {
 			merges++;
 			if (ignore) return cursor().get();
-			return cursor().updateAndGet(own -> LATTICE.merge(own,incoming));
+			return cursor().updateAndGet(own -> LATTICE.merge(own,(Index<Keyword,ACell>)incoming));
 		}
 		/** A path delivery is reduced to a root by the lattice, then merged here. */
 		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {

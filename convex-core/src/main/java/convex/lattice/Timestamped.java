@@ -81,9 +81,14 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 
 	public ALattice<V> getLattice() { return ordering; }
 
-	/** Selects a complete incoming record without consulting the clock or re-stamping. */
-	@Override public V merge(V incoming) {
-		return unstamped.updateAndGet(own -> getLattice().merge(own,incoming));
+	/**
+	 * Selects a complete incoming record without consulting the clock or re-stamping.
+	 * The ordering lattice judges the incoming value.
+	 */
+	@SuppressWarnings("unchecked")
+	@Override public V merge(ACell incoming) {
+		V record=(V)incoming;
+		return unstamped.updateAndGet(own -> getLattice().merge(own,record));
 	}
 
 	/**

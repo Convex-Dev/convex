@@ -178,6 +178,7 @@ public class MailMergeTest {
 		Index<ABlob,SignedData<ACell>> v1=entries(e1,e2);
 		Index<ABlob,SignedData<ACell>> v2=entries(receipt(BOB,BOB_DID,e1),e3);
 		assertNull(ComponentChecks.checkCommutingDeliveries(bobsMailbox(DIDKeyAuthorizer.CONVEX,null),v1,v2));
+		assertNull(ComponentChecks.checkRefusedDeliveries(bobsMailbox(DIDKeyAuthorizer.CONVEX,null),v1,CVMLong.ONE,Maps.empty()));
 		assertSame(v1,merge(v1,Index.none()));
 		assertEquals(v1,merge(Index.none(),v1));
 
@@ -319,7 +320,7 @@ public class MailMergeTest {
 		// A delivery whose every entry is rejected merges as the empty mailbox does
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> forged=Maps.of(BOB_DID,entries(receipt(CAROL,BOB_DID,toBob(1000,"hello"))));
 		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(empty,forged));
-		assertNull(ComponentChecks.checkRefusedDeliveries(Mail.create(),emptyMailbox,forged));
+		assertNull(ComponentChecks.checkRefusedDeliveries(Mail.create(),emptyMailbox,forged,CVMLong.ONE,Index.none()));
 	}
 
 	/** A mailbox delivered within the region or at its DID merges as the mailbox alone merges it. */

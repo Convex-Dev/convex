@@ -23,8 +23,12 @@ public class UnionSet<V extends ACell> extends SetComponent<V> {
 
 	@Override public UnionSet<V> fork() { return rebind(storage.fork()); }
 
-	@Override public ASet<V> merge(ASet<V> incoming) {
-		return storage.updateAndGet(own -> SetLattice.<V>create().merge(own,incoming));
+	/** Takes the union with an incoming set; a value that is not a set changes nothing. */
+	@SuppressWarnings("unchecked")
+	@Override public ASet<V> merge(ACell incoming) {
+		if (incoming!=null && !(incoming instanceof ASet)) return storage.getOrDefault(null);
+		ASet<V> other=(ASet<V>)incoming;
+		return storage.updateAndGet(own -> SetLattice.<V>create().merge(own,other));
 	}
 
 	@Override protected ASet<V> reconcile(ASet<V> own,ASet<V> other) {

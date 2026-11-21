@@ -93,17 +93,20 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 		return record.cursor();
 	}
 
-	/** Takes a complete record into the private copy if it is newer. Nothing is re-stamped or signed. */
+	/**
+	 * Takes a complete record into the private copy if it is newer. Nothing is re-stamped
+	 * or signed. A value that is not a hash map changes nothing.
+	 */
 	@Override
-	public AHashMap<Keyword,ACell> merge(AHashMap<Keyword,ACell> incoming) {
+	public AHashMap<Keyword,ACell> merge(ACell incoming) {
+		if (incoming!=null && !(incoming instanceof AHashMap)) return cursor().getOrDefault(null);
 		return record.merge(incoming);
 	}
 
-	/** Accepts only a complete record at this level; any other value or path changes nothing. */
-	@SuppressWarnings("unchecked")
+	/** Accepts a complete record at this level only; a path changes nothing. */
 	@Override
 	public AHashMap<Keyword,ACell> mergeAt(ACell incoming,ACell... path) {
-		if (path.length!=0 || !(incoming instanceof AHashMap<?,?> map)) return cursor().getOrDefault(null);
-		return merge((AHashMap<Keyword,ACell>)map);
+		if (path.length!=0) return cursor().getOrDefault(null);
+		return merge(incoming);
 	}
 }

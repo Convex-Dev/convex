@@ -165,8 +165,9 @@ public class SharedApplicationInternalsTest {
 			node=new P2PRegion(hostEntry(cursor(),Keywords.P2P)).node(nodeOwner,null).rebind(nodeState.cursor());
 		}
 
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> HOST_ROOT.merge(VERIFY,own,other));
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell other) {
+			return cursor().updateAndGet(own -> HOST_ROOT.merge(VERIFY,own,(Index<Keyword,ACell>)other));
 		}
 
 		@Override protected Index<Keyword,ACell> reconcile(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {

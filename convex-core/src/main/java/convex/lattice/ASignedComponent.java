@@ -87,14 +87,19 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	 * Verifies a complete envelope. Live views preserve selected signatures or sign
 	 * a synthesised payload; unsigned drafts merge privately without signing or
 	 * re-stamping. A draft never writes directly to the original signed destination.
+	 * A value that is not a signed envelope changes nothing.
 	 */
-	public V merge(SignedData<V> incoming) {
+	@SuppressWarnings("unchecked")
+	@Override
+	public V merge(ACell incoming) {
+		if (incoming!=null && !(incoming instanceof SignedData<?>)) return storage.getOrDefault(null);
+		SignedData<V> envelope=(SignedData<V>)incoming;
 		if (destination!=null) {
-			SignedData<V> result=destination.updateAndGet(own -> lattice.mergeAndSign(own,incoming,signer));
+			SignedData<V> result=destination.updateAndGet(own -> lattice.mergeAndSign(own,envelope,signer));
 			return result==null?null:result.getValue();
 		}
-		if (incoming==null || lattice.merge(null,incoming)==null) return storage.getOrDefault(null);
-		return storage.updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
+		if (envelope==null || lattice.merge(null,envelope)==null) return storage.getOrDefault(null);
+		return storage.updateAndGet(own -> lattice.getValueLattice().merge(own,envelope.getValue()));
 	}
 
 	/**
@@ -135,13 +140,9 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	}
 
 	/** Incoming delivery stops at the signed boundary; interior paths introduce no data. */
-	@SuppressWarnings("unchecked")
 	@Override
 	public V mergeAt(ACell incoming,ACell... path) {
 		if (path.length!=0) return cursor().getOrDefault(null);
-		if (incoming!=null && !(incoming instanceof SignedData<?>)) {
-			throw new IllegalArgumentException("Signed component requires a complete envelope");
-		}
-		return merge((SignedData<V>)incoming);
+		return merge(incoming);
 	}
 }

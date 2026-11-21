@@ -56,5 +56,5 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 
 	/** Accepts incoming state according to this application's domain policy, without publishing it. */
 	@Override
-	public abstract V merge(V incoming);
+	public abstract V merge(ACell incoming);
 }

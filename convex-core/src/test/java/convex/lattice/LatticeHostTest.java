@@ -13,6 +13,7 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Keyword;
+import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
@@ -50,7 +51,7 @@ public class LatticeHostTest {
 		class Receiver extends ALatticeComponent<CVMLong> {
 			private final int id;
 			Receiver(int id) { super(host.cursor()); this.id=id; }
-			@Override public CVMLong merge(CVMLong incoming) {
+			@Override public CVMLong merge(ACell incoming) {
 				received.add(id);
 				return cursor().get();
 			}
@@ -76,7 +77,7 @@ public class LatticeHostTest {
 		var entered=new CountDownLatch(2);
 		var release=new CountDownLatch(1);
 		host.addApplication(new ALatticeComponent<CVMLong>(host.cursor()) {
-			@Override public CVMLong merge(CVMLong incoming) {
+			@Override public CVMLong merge(ACell incoming) {
 				entered.countDown();
 				try {
 					release.await();
@@ -94,7 +95,7 @@ public class LatticeHostTest {
 			try {
 				assertTrue(entered.await(5,TimeUnit.SECONDS),"Incoming callbacks can run concurrently");
 				host.addApplication(new ALatticeComponent<CVMLong>(host.cursor()) {
-					@Override public CVMLong merge(CVMLong incoming) {
+					@Override public CVMLong merge(ACell incoming) {
 						lateDeliveries.incrementAndGet();
 						return cursor().get();
 					}

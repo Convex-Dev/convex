@@ -286,7 +286,7 @@ class P2PComponentStorageTest {
 		// A record signed by another key, and a section the region does not declare
 		Index<Keyword,ACell> wrongSigner=Index.of(P2PLattice.KEY_NODES,Maps.of(KEY,BOB.signData(SECOND)));
 		Index<Keyword,ACell> undeclared=Index.of(NOTE,CVMLong.ONE);
-		assertNull(ComponentChecks.checkRefusedDeliveries(region,alice,wrongSigner,undeclared));
+		assertNull(ComponentChecks.checkRefusedDeliveries(region,alice,wrongSigner,undeclared,CVMLong.ONE,Maps.empty()));
 	}
 
 	@Test void identitiesKeepTheComponentMergeRules() {

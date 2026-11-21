@@ -100,7 +100,7 @@ public class DLFSApplicationTest {
 		// The other owner's envelope under this owner's key
 		Index<Keyword,ACell> misfiled=Index.of(Keywords.FS,
 			Maps.of(OWNER.getAccountKey(),other.dlfs().value().get(OTHER.getAccountKey())));
-		assertNull(ComponentChecks.checkRefusedDeliveries(app,mine.value(),misfiled));
+		assertNull(ComponentChecks.checkRefusedDeliveries(app,mine.value(),misfiled,CVMLong.ONE,Maps.empty()));
 		// A delivery for the region at :fs merges as the region alone merges it
 		assertNull(ComponentChecks.checkChildDeliveries(mine,Keywords.FS,mine.dlfs(),
 			other.dlfs().value(),misfiled.get(Keywords.FS),CVMLong.ONE));

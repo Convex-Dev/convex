@@ -168,14 +168,16 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	 * Merges an incoming root projected to what this node wants ({@link #project}).
 	 * The registry takes the {@code :p2p} region and the lattice merge the rest,
 	 * verifying each owner's slot. A path delivery arrives here reduced to its path,
-	 * so the same projection selects it.
+	 * so the same projection selects it. A value that is not an index changes nothing.
 	 */
 	@Override
 	@SuppressWarnings("unchecked")
-	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-		Index<Keyword,ACell> wanted=project(other);
+	public Index<Keyword,ACell> merge(ACell other) {
+		if (!(other instanceof Index<?,?>)) return cursor().get();
+		Index<Keyword,ACell> wanted=project((Index<Keyword,ACell>)other);
 		if (wanted==null) return cursor().get();
-		if (wanted.get(P2PLattice.KEY_P2P) instanceof Index<?,?> region) registry.merge((Index<Keyword,ACell>)region);
+		// The registry judges its own region
+		registry.merge(wanted.get(P2PLattice.KEY_P2P));
 		Index<Keyword,ACell> rest=wanted.dissoc(P2PLattice.KEY_P2P);
 		return cursor().updateAndGet(own -> lattice.merge(own,rest));
 	}

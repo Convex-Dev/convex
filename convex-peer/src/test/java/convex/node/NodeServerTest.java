@@ -1187,7 +1187,7 @@ public class NodeServerTest {
 				LatticeHost<ASet<ACell>> host=LatticeHost.create(Sets.empty(),ingressStore)) {
 			ASet<ACell> value=Sets.of(Blobs.createRandom(400));
 			var indifferent=new ALatticeApplication<ASet<ACell>>(host.cursor().fork(),host::persist) {
-				@Override public ASet<ACell> merge(ASet<ACell> incoming) { return cursor().get(); }
+				@Override public ASet<ACell> merge(ACell incoming) { return cursor().get(); }
 			};
 			host.addApplication(indifferent);
 			try (NodeServer<ASet<ACell>> node=new TestNode<>(host,null)) {

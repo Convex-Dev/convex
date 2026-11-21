@@ -77,8 +77,9 @@ public class ApplicationPublicationTest {
 		void add(long value) { owner.cursor().updateAndGet(v -> v.include(CVMLong.create(value))); }
 		void editRegister(long value) { cursor().<CVMLong>path(REGISTER).set(CVMLong.create(value)); }
 
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
-			if (incoming!=null) owner.merge(signed(incoming));
+		@SuppressWarnings("unchecked")
+		@Override public Index<Keyword,ACell> merge(ACell incoming) {
+			if (incoming!=null) owner.merge(signed((Index<Keyword,ACell>)incoming));
 			// This application deliberately ignores all other incoming subtrees.
 			return cursor().get();
 		}

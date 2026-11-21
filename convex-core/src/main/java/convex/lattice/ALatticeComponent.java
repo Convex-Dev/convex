@@ -346,14 +346,16 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * it declares, and the component delegates to it, in whole or in part, or applies
 	 * another rule. Merge is the acceptance boundary for incoming data, so it enforces
 	 * any ownership, validity or limits itself, on the incoming value only: held state
-	 * was accepted when it arrived and is not checked again. A component that receives
+	 * was accepted when it arrived and is not checked again. The incoming value may be
+	 * of any type; one that is not of this component's value type, or that it otherwise
+	 * does not accept, leaves the working state unchanged. A component that receives
 	 * nothing need not define one; the base refuses, so a delivery routed to it fails
 	 * rather than vanishing.
 	 *
-	 * @param other Incoming value at this level
+	 * @param other Incoming value at this level, of any type; null if absent
 	 * @return Current working value
 	 */
-	public V merge(V other) {
+	public V merge(ACell other) {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no merge for incoming values");
 	}
 
@@ -375,9 +377,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Unresolved paths go to {@link #mergeAtPath}; no value shape is inferred.
 	 * Returns current working state, not a publication acknowledgement.
 	 */
-	@SuppressWarnings("unchecked")
 	public V mergeAt(ACell value, ACell... path) {
-		if (path.length==0) return merge((V)value);
+		if (path.length==0) return merge(value);
 		ALatticeComponent<ACell> child=child(path[0]);
 		if (child!=null) {
 			child.mergeAt(value,Arrays.copyOfRange(path,1,path.length));

@@ -146,21 +146,18 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 	}
 
 	/**
-	 * Merges an incoming region into this one, mailbox by mailbox.
+	 * Merges an incoming region into this one, mailbox by mailbox. A value that is not a
+	 * hash map changes nothing.
 	 *
-	 * @param incoming Incoming region value
+	 * @param incoming Incoming region value, of any type
 	 * @return Current working value
 	 */
+	@SuppressWarnings("unchecked")
 	@Override
-	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> merge(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> incoming) {
-		return cursor().updateAndGet(held -> mergeMailboxes(held,incoming));
-	}
-
-	/** Drops a delivered region that is not a hash map; routes other deliveries as every component does. */
-	@Override
-	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergeAt(ACell value,ACell... path) {
-		if (path.length==0 && value!=null && !(value instanceof AHashMap)) return cursor().getOrDefault(null);
-		return super.mergeAt(value,path);
+	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> merge(ACell incoming) {
+		if (incoming!=null && !(incoming instanceof AHashMap)) return cursor().getOrDefault(null);
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> region=(AHashMap<ACell,Index<ABlob,SignedData<ACell>>>)incoming;
+		return cursor().updateAndGet(held -> mergeMailboxes(held,region));
 	}
 
 	/** Resolves the mailbox at a canonical base DID, for deliveries beneath it. */
@@ -216,7 +213,8 @@ public final class Mail extends AMapComponent<ACell,Index<ABlob,SignedData<ACell
 
 			@Override
 			public ACell merge(Object key,ACell a,ACell b) {
-				if (b==null || !isMailbox(key) || !(b instanceof Index)) return a;
+				// The mailbox judges its own incoming value
+				if (b==null || !isMailbox(key)) return a;
 				return Mailbox.mergeEntries((AString)key,authorizer,(Index<ABlob,SignedData<ACell>>)a,b);
 			}
 		});

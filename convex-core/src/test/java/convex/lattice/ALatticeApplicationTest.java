@@ -100,8 +100,9 @@ public class ALatticeApplicationTest {
 		var host=LatticeHost.create(LATTICE.zero(),null);
 		AtomicInteger calls=new AtomicInteger();
 		var app=new ALatticeApplication<Index<Keyword,ACell>>(host.cursor().fork(),host::persist) {
-			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-				return cursor().updateAndGet(own -> LATTICE.merge(own,other));
+			@SuppressWarnings("unchecked")
+			@Override public Index<Keyword,ACell> merge(ACell other) {
+				return cursor().updateAndGet(own -> LATTICE.merge(own,(Index<Keyword,ACell>)other));
 			}
 			@Override protected void beforeSync() {
 				new Items(this).add(CVMLong.ONE);

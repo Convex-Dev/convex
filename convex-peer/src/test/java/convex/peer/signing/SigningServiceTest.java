@@ -77,8 +77,9 @@ public class SigningServiceTest {
 		}
 
 		@Override
-		public Index<Keyword, ACell> merge(Index<Keyword, ACell> other) {
-			return cursor().updateAndGet(own -> LATTICE.merge(own, other));
+		@SuppressWarnings("unchecked")
+		public Index<Keyword, ACell> merge(ACell other) {
+			return cursor().updateAndGet(own -> LATTICE.merge(own, (Index<Keyword, ACell>) other));
 		}
 
 		@Override

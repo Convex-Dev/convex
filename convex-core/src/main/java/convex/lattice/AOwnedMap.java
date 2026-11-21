@@ -70,10 +70,22 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	/** The same owner-bound rule used for delivery, publication and local authoring. */
 	public final SignedLattice<V> signingFor(K owner) { return rule(owner); }
 
-	/** Merges verified envelopes using this component's merge policy. */
+	/**
+	 * Merges verified envelopes using this component's merge policy. A value that is not
+	 * a map of this collection's representation changes nothing.
+	 */
+	@SuppressWarnings("unchecked")
 	@Override
-	public M merge(M incoming) {
-		return storage.updateAndGet(own -> mergeWorkingValues(own,incoming));
+	public M merge(ACell incoming) {
+		if (incoming!=null) {
+			try {
+				if (!owners.checkForeign((M)incoming)) return storage.getOrDefault(null);
+			} catch (ClassCastException e) {
+				return storage.getOrDefault(null);
+			}
+		}
+		M other=(M)incoming;
+		return storage.updateAndGet(own -> mergeWorkingValues(own,other));
 	}
 
 	/** Publication conflicts use the same merge policy as incoming deliveries. */
@@ -95,20 +107,6 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		M merged=mergeValues(own,other);
 		// Empty or wholly rejected delivery must not materialise an absent collection.
 		return own==null && merged!=null && merged.isEmpty()?null:merged;
-	}
-
-	/** Whole-map deliveries must have this collection's representation. */
-	@SuppressWarnings("unchecked")
-	@Override public M mergeAt(ACell value,ACell... path) {
-		if (path.length!=0) return mergeAtPath(value,path);
-		if (value!=null) {
-			try {
-				if (!owners.checkForeign((M)value)) return storage.getOrDefault(null);
-			} catch (ClassCastException e) {
-				return storage.getOrDefault(null);
-			}
-		}
-		return merge((M)value);
 	}
 
 	/** Delivers one complete owner envelope; paths inside an envelope introduce no data. */

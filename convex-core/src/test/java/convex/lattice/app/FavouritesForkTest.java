@@ -107,7 +107,9 @@ class FavouritesForkTest {
 		draft.merge(BOB.signData(newer));
 		draft.merge(SignedData.create(ALICE.getAccountKey(),envelope.getSignature(),Ref.get(newer)));
 		draft.mergeAt(ALICE.signData(newer),ITEMS);
-		assertThrows(IllegalArgumentException.class,() -> draft.mergeAt(payload));
+		// A value that is not an envelope changes nothing
+		draft.merge(payload);
+		draft.mergeAt(payload);
 		assertSame(payload,draft.value());
 		assertNull(app.component().get(ALICE.getAccountKey()));
 	}

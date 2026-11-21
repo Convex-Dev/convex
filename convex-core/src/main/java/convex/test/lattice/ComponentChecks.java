@@ -92,11 +92,10 @@ public final class ComponentChecks {
 
 	/**
 	 * Checks that each refused delivery leaves a held value as it is, as the same
-	 * object. Deliveries arrive as untrusted data does, through
-	 * {@link ALatticeComponent#mergeAt}, so a refused delivery need not be of the
-	 * component's value type. The held value must already have any container a refused
-	 * delivery brings with it, since a component may keep a delivered container whose
-	 * contents it refuses.
+	 * object, whether merged or delivered through {@link ALatticeComponent#mergeAt}.
+	 * A refused delivery need not be of the component's value type. The held value must
+	 * already have any container a refused delivery brings with it, since a component
+	 * may keep a delivered container whose contents it refuses.
 	 *
 	 * @param <V> Value type
 	 * @param component Component configured for the deliveries
@@ -108,8 +107,11 @@ public final class ComponentChecks {
 		return run(() -> {
 			for (int i=0;i<refused.length;i++) {
 				Root<V> root=Cursors.root(held);
+				component.rebind(root).merge(refused[i]);
+				require(held==root.get(),"Refused delivery "+i+" must leave the held object as it is when merged");
+				root=Cursors.root(held);
 				component.rebind(root).mergeAt(refused[i]);
-				require(held==root.get(),"Refused delivery "+i+" must leave the held object as it is");
+				require(held==root.get(),"Refused delivery "+i+" must leave the held object as it is when delivered");
 			}
 		});
 	}

@@ -65,9 +65,12 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 		return lattice;
 	}
 
+	/** Merges with the lattice, which judges the incoming value. */
+	@SuppressWarnings("unchecked")
 	@Override
-	public V merge(V incoming) {
-		return cursor().updateAndGet(own -> lattice.merge(getContext(),own,incoming));
+	public V merge(ACell incoming) {
+		V other=(V)incoming;
+		return cursor().updateAndGet(own -> lattice.merge(getContext(),own,other));
 	}
 
 	/** Reconciles declared lattice values while preserving unrelated destination keys. */
