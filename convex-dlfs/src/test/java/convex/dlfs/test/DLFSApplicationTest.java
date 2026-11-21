@@ -2,9 +2,12 @@ package convex.dlfs.test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +36,7 @@ import convex.lattice.LatticeHost;
 import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /** Component boundaries, independent of transport or disk-store lifecycle. */
 public class DLFSApplicationTest {
@@ -82,6 +86,35 @@ public class DLFSApplicationTest {
 		rebound.drives(OWNER.getAccountKey()).createDrive("home");
 		assertNotNull(draft.get().get(Keywords.FS));
 		assertSame(before,host.cursor().get());
+	}
+
+	@Test void keepsTheComponentRules() throws Exception {
+		var app=files(owned(LatticeHost.create()));
+		var mine=files(owned(LatticeHost.create()));
+		Files.writeString(mine.drives(OWNER.getAccountKey()).createDrive("home").fileSystem().getPath("/mine"),"mine");
+		var other=new DLFSApplication(owned(LatticeHost.create()),OTHER::signData,() -> CVMLong.create(100),
+			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
+		Files.writeString(other.drives(OTHER.getAccountKey()).createDrive("home").fileSystem().getPath("/other"),"other");
+		assertNull(ComponentChecks.checkCommutingDeliveries(app,mine.value(),other.value()));
+
+		// The other owner's envelope under this owner's key
+		Index<Keyword,ACell> misfiled=Index.of(Keywords.FS,
+			Maps.of(OWNER.getAccountKey(),other.dlfs().value().get(OTHER.getAccountKey())));
+		assertNull(ComponentChecks.checkRefusedDeliveries(app,mine.value(),misfiled));
+
+		// Each side writes another file in the owner's drive, which the author signs again
+		assertNull(ComponentChecks.checkConcurrentEdits(app,mine.value(),writes("/a","a"),writes("/b","b")));
+	}
+
+	/** An edit writing a file in the owner's home drive. */
+	private static Consumer<DLFSApplication> writes(String path,String text) {
+		return app -> {
+			try {
+				Files.writeString(app.drives(OWNER.getAccountKey()).drive("home").fileSystem().getPath(path),text);
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		};
 	}
 
 	@Test void applicationsOnOneHostHaveIndependentTimestampAdmission() {
