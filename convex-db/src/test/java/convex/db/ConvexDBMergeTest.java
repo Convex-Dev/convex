@@ -282,6 +282,11 @@ public class ConvexDBMergeTest {
 		AHashMap<AString, Index<Keyword, ACell>> noTables = Maps.of(DB_NAME, Index.of(ConvexDB.KEY_TABLES, Index.none()));
 		assertNull(ComponentChecks.checkRefusedDeliveries(cdb, base, settingsOnly, noTables));
 
+		// A database delivered within the map or at its name merges as the database alone merges it
+		ConvexDB held = new ConvexDB(Cursors.root(base), RowLWW::merge, clock);
+		assertNull(ComponentChecks.checkChildDeliveries(held, DB_NAME, held.database(DB),
+			withRow2.value().get(DB_NAME), settingsOnly.get(DB_NAME), noTables.get(DB_NAME)));
+
 		assertNull(ComponentChecks.checkConcurrentEdits(cdb, base, c -> insert(c.database(DB), 2), c -> insert(c.database(DB), 3)));
 	}
 

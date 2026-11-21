@@ -322,6 +322,17 @@ public class MailMergeTest {
 		assertNull(ComponentChecks.checkRefusedDeliveries(Mail.create(),emptyMailbox,forged));
 	}
 
+	/** A mailbox delivered within the region or at its DID merges as the mailbox alone merges it. */
+	@Test
+	public void testRegionMergesEachMailboxAsTheMailboxDoes() {
+		MailEnvelope held=toBob(1000,"hello");
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> region=Maps.of(BOB_DID,entries(held));
+		Mail mail=Mail.connect(new Root<>(region),null);
+		assertNull(ComponentChecks.checkChildDeliveries(mail,BOB_DID,mail.mailbox(BOB_DID),
+			entries(toBob(2000,"again")),entries(receipt(BOB,BOB_DID,held)),entries(receipt(CAROL,BOB_DID,held)),
+			CVMLong.ONE,Maps.empty()));
+	}
+
 	@Test
 	public void testEntryDeliveryBindsKey() {
 		MailEnvelope e1=toBob(1000,"one");

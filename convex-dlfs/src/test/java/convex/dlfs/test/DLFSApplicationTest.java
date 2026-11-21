@@ -101,6 +101,9 @@ public class DLFSApplicationTest {
 		Index<Keyword,ACell> misfiled=Index.of(Keywords.FS,
 			Maps.of(OWNER.getAccountKey(),other.dlfs().value().get(OTHER.getAccountKey())));
 		assertNull(ComponentChecks.checkRefusedDeliveries(app,mine.value(),misfiled));
+		// A delivery for the region at :fs merges as the region alone merges it
+		assertNull(ComponentChecks.checkChildDeliveries(mine,Keywords.FS,mine.dlfs(),
+			other.dlfs().value(),misfiled.get(Keywords.FS),CVMLong.ONE));
 
 		// Each side writes another file in the owner's drive, which the author signs again
 		assertNull(ComponentChecks.checkConcurrentEdits(app,mine.value(),writes("/a","a"),writes("/b","b")));

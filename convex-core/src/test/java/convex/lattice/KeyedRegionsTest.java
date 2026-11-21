@@ -285,6 +285,56 @@ class KeyedRegionsTest {
 		assertNull(ComponentChecks.checkCommutingDeliveries(single,Index.<Keyword,ACell>of(A,CVMLong.create(300)),Index.<Keyword,ACell>of(A,CVMLong.create(500))));
 	}
 
+	@Test void eachRegionMergesItsOwnDeliveries() {
+		var app=new Regions(Root.create(Index.<Keyword,ACell>of(A,CVMLong.create(300),B,Sets.of(1))));
+		var counter=app.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		var members=app.create(B,(AForkableCursor<ASet<CVMLong>> cursor) -> new Members(cursor));
+		// Regions of different types, each given values it takes and values it keeps its own over
+		assertNull(ComponentChecks.checkChildDeliveries(app,A,counter,CVMLong.create(500),CVMLong.create(100),null));
+		assertNull(ComponentChecks.checkChildDeliveries(app,B,members,Sets.of(2),Sets.of(1)));
+	}
+
+	@Test void childDeliveryCheckReportsAContainerThatChecksOrMergesForItsChild() {
+		Index<Keyword,ACell> held=Index.of(A,CVMLong.create(300));
+		var checking=new IndexOnlyRegions(Root.create(held));
+		var checked=checking.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		assertNotNull(ComponentChecks.checkChildDeliveries(checking,A,checked,CVMLong.create(500)));
+
+		var overwriting=new OverwritingRegions(Root.create(held));
+		var bypassed=overwriting.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		assertNotNull(ComponentChecks.checkChildDeliveries(overwriting,A,bypassed,CVMLong.create(100)));
+	}
+
+	/** Regions that wrongly assume every region holds an index, dropping any other region value delivered whole. */
+	private static class IndexOnlyRegions extends Regions {
+		IndexOnlyRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+		IndexOnlyRegions(AForkableCursor<Index<Keyword,ACell>> cursor,Regions source) { super(cursor,source); }
+		@Override public IndexOnlyRegions rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new IndexOnlyRegions(cursor,this); }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+			Index<Keyword,ACell> checked=incoming;
+			for (long i=0;incoming!=null && i<incoming.count();i++) {
+				MapEntry<Keyword,ACell> entry=incoming.entryAt(i);
+				if (!(entry.getValue() instanceof Index)) checked=checked.dissoc(entry.getKey());
+			}
+			return super.merge(checked);
+		}
+	}
+
+	/** Regions that wrongly take each region value delivered whole as it is, without the region's merge. */
+	private static class OverwritingRegions extends Regions {
+		OverwritingRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+		OverwritingRegions(AForkableCursor<Index<Keyword,ACell>> cursor,Regions source) { super(cursor,source); }
+		@Override public OverwritingRegions rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new OverwritingRegions(cursor,this); }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+			if (incoming==null) return cursor().getOrDefault(null);
+			return cursor().updateAndGet(own -> {
+				Index<Keyword,ACell> result=(own==null)?Index.none():own;
+				for (long i=0;i<incoming.count();i++) result=result.assoc(incoming.entryAt(i).getKey(),incoming.entryAt(i).getValue());
+				return result;
+			});
+		}
+	}
+
 	@Test void containerForksLikeAnyComponentThatRebinds() {
 		var root=emptyRoot();
 		var app=new Regions(root);

@@ -3,6 +3,7 @@ package convex.test.lattice;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.CAD3Encoder;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
@@ -109,6 +110,47 @@ public final class ComponentChecks {
 				Root<V> root=Cursors.root(held);
 				component.rebind(root).mergeAt(refused[i]);
 				require(held==root.get(),"Refused delivery "+i+" must leave the held object as it is");
+			}
+		});
+	}
+
+	/**
+	 * Checks that a component hands deliveries for one of its children to that child,
+	 * neither checking them on the child's behalf nor merging them without the child.
+	 * Each delivery is made to the component holding its current value, at the child's
+	 * key as a path and within that value; each way must change the value at the key as
+	 * delivering it to the child alone does, and change nothing else. Where the child
+	 * keeps its value, the component must keep its object. A check the component makes of
+	 * a child's value is seen only for a delivery the child judges differently.
+	 *
+	 * @param <V> Value type, a map
+	 * @param component Component holding a value
+	 * @param key Key of the child in the component's value
+	 * @param child The component's child at the key
+	 * @param deliveries Deliveries for the child, of any type
+	 * @return The first rule broken, or null
+	 */
+	public static <V extends AMap<?,?>> String checkChildDeliveries(ALatticeComponent<V> component, ACell key,
+			ALatticeComponent<?> child, ACell... deliveries) {
+		return run(() -> {
+			require(component.exists() && component.value()!=null,"The component must hold a value");
+			V held=component.value();
+			ACell place=held.get(key);
+			requireEqual(place,child.exists()?child.value():null,"The child must hold the component's value at the key");
+			for (int i=0;i<deliveries.length;i++) {
+				ACell delivery=deliveries[i];
+				ACell expected=deliveredToChild(child,place,delivery);
+				Root<V> root=Cursors.root(held);
+				component.rebind(root).mergeAt(delivery,key);
+				requireChildPlace(held,root.get(),key,place,expected,"Delivery "+i+" at the child's path");
+				// A whole value cannot carry an absent entry
+				if (delivery==null) continue;
+				@SuppressWarnings("unchecked")
+				V whole=(V)held.assoc(key,delivery);
+				require(whole!=null,"The key must be a valid key of the component's value");
+				root=Cursors.root(held);
+				component.rebind(root).mergeAt(whole);
+				requireChildPlace(held,root.get(),key,place,expected,"Delivery "+i+" within the component's value");
 			}
 		});
 	}
@@ -242,6 +284,27 @@ public final class ComponentChecks {
 		C target=rebound(component,root);
 		for (Consumer<? super C> edit:edits) edit.accept(target);
 		return root.get();
+	}
+
+	/** The value a child holding a place holds after a delivery. */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> ACell deliveredToChild(ALatticeComponent<T> child, ACell place, ACell delivery) {
+		Root<T> root=Cursors.root((T)place);
+		child.rebind(root).mergeAt(delivery);
+		return root.get();
+	}
+
+	/**
+	 * Requires a container's value after a delivery for its child to differ from the held
+	 * value only at the child's key, where it holds what the child alone holds.
+	 */
+	private static void requireChildPlace(AMap<?,?> held, AMap<?,?> result, ACell key, ACell place, ACell expected, String delivery) {
+		if (expected==place) {
+			require(result==held,delivery+" must leave the component's object as it is, as the child keeps its value");
+			return;
+		}
+		requireEqual(expected,(result==null)?null:result.get(key),delivery+" must give the value the child gives");
+		requireEqual(held.dissoc(key),(result==null)?null:result.dissoc(key),delivery+" must change nothing but the child's value");
 	}
 
 	/** The component's counterpart on a cursor; a component's rebind returns its own class. */

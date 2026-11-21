@@ -618,7 +618,9 @@ process.
 `ComponentChecks`, in `convex.test.lattice`, checks a component against these merge
 and reconcile rules for its tests. Given sample deliveries, or two domain edits for a
 component that receives none, each check returns the first rule the component breaks,
-or null, so a test asserts that the result is null.
+or null, so a test asserts that the result is null. Given a container's child and
+deliveries for it, `checkChildDeliveries` checks that the container leaves each one to
+the child, judging none of them itself.
 
 ## Retention, durability and networking
 
