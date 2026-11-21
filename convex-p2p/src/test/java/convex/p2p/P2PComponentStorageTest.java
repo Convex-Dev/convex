@@ -26,6 +26,7 @@ import convex.lattice.MergeConflictException;
 import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /** Domain storage properties need neither a node nor a disk store. */
 class P2PComponentStorageTest {
@@ -270,5 +271,47 @@ class P2PComponentStorageTest {
 		assertThrows(MergeConflictException.class,draft::sync);
 		assertSame(before,root.get(),"a refused sync changes nothing");
 		assertEquals(forkNewer?THIRD:SECOND,draft.value(),"the fork keeps its edits");
+	}
+
+	@Test void regionKeepsTheComponentMergeRules() {
+		AccountKey bob=BOB.getAccountKey();
+		var region=new P2PRegion(new Root<>());
+		Index<Keyword,ACell> alice=Index.of(P2PLattice.KEY_NODES,Maps.of(KEY,ALICE.signData(FIRST)));
+		Index<Keyword,ACell> both=Index.of(P2PLattice.KEY_NODES,Maps.of(KEY,ALICE.signData(FIRST),bob,BOB.signData(FIRST)));
+		Index<Keyword,ACell> newer=Index.of(P2PLattice.KEY_NODES,Maps.of(KEY,ALICE.signData(SECOND)));
+		assertNull(ComponentChecks.checkCommutingDeliveries(region,both,newer));
+		// Two records of a node at one timestamp tie: the held record stays
+		Index<Keyword,ACell> tied=Index.of(P2PLattice.KEY_NODES,Maps.of(KEY,ALICE.signData(FIRST.assoc(NOTE,CVMLong.ONE))));
+		assertNull(ComponentChecks.checkDeliveries(region,alice,tied));
+		// A record signed by another key, and a section the region does not declare
+		Index<Keyword,ACell> wrongSigner=Index.of(P2PLattice.KEY_NODES,Maps.of(KEY,BOB.signData(SECOND)));
+		Index<Keyword,ACell> undeclared=Index.of(NOTE,CVMLong.ONE);
+		assertNull(ComponentChecks.checkRefusedDeliveries(region,alice,wrongSigner,undeclared));
+	}
+
+	@Test void identitiesKeepTheComponentMergeRules() {
+		AccountKey bob=BOB.getAccountKey();
+		var identities=new P2PIdentities(new Root<>());
+		AHashMap<ACell,SignedData<ACell>> alice=Maps.of(KEY,ALICE.signData(FIRST));
+		AHashMap<ACell,SignedData<ACell>> both=Maps.of(KEY,ALICE.signData(FIRST),bob,BOB.signData(FIRST));
+		AHashMap<ACell,SignedData<ACell>> newer=Maps.of(KEY,ALICE.signData(SECOND));
+		assertNull(ComponentChecks.checkCommutingDeliveries(identities,both,newer));
+		// Two records of a user at one timestamp tie: the held record stays
+		AHashMap<ACell,SignedData<ACell>> tied=Maps.of(KEY,ALICE.signData(FIRST.assoc(NOTE,CVMLong.ONE)));
+		assertNull(ComponentChecks.checkDeliveries(identities,alice,tied));
+		// A record signed by another key, an entry that is not a signed record, and a value that is not an owner map
+		AHashMap<ACell,ACell> wrongSigner=Maps.of(KEY,BOB.signData(SECOND));
+		AHashMap<ACell,ACell> unsigned=Maps.of(KEY,CVMLong.ONE);
+		assertNull(ComponentChecks.checkRefusedDeliveries(identities,alice,wrongSigner,unsigned,CVMLong.ONE));
+	}
+
+	@Test void identityKeepsTheComponentReconcileRules() {
+		var identity=new P2PIdentity(new Root<>(),KEY);
+		assertNull(ComponentChecks.checkConcurrentEdits(identity,FIRST,i -> i.setIdentity(SECOND),i -> i.setIdentity(THIRD)));
+	}
+
+	@Test void nodeRecordKeepsTheComponentReconcileRules() {
+		var node=new P2PNodeRecord(new Root<>(),KEY);
+		assertNull(ComponentChecks.checkConcurrentEdits(node,FIRST,n -> n.setNodeInfo(SECOND),n -> n.setNodeInfo(THIRD)));
 	}
 }

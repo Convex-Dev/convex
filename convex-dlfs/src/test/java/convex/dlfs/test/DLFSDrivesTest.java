@@ -2,6 +2,8 @@ package convex.dlfs.test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -9,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.Test;
@@ -28,6 +31,7 @@ import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFSNode;
+import convex.test.lattice.ComponentChecks;
 
 public class DLFSDrivesTest {
 
@@ -212,6 +216,31 @@ public class DLFSDrivesTest {
 		assertFalse(armed.get());
 		assertEquals(DLFSDrives.DriveStatus.DELETED,drives.get().driveStatus("home"));
 		assertNull(drives.get().drive("home"));
+	}
+
+	@Test
+	public void drivesKeepsTheComponentReconcileRules() {
+		var drives=DLFSDrives.create(() -> CVMLong.create(100));
+		AHashMap<AString,AVector<ACell>> none=Maps.empty();
+		assertNull(ComponentChecks.checkConcurrentEdits(drives,none,
+			d -> d.createDrive("a"),d -> d.createDrive("b")));
+	}
+
+	@Test
+	public void driveKeepsTheComponentReconcileRules() {
+		var drive=DLFSDrives.create(() -> CVMLong.create(100)).createDrive("home");
+		assertNull(ComponentChecks.checkConcurrentEdits(drive,drive.value(),writes("/a.txt","a"),writes("/b.txt","b")));
+	}
+
+	/** An edit writing a file in a drive. */
+	private static Consumer<DLFSDrive> writes(String path,String text) {
+		return drive -> {
+			try {
+				Files.writeString(drive.fileSystem().getPath(path),text);
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		};
 	}
 
 	/** Forces two updates to prepare from the same input, exercising the CAS retry. */

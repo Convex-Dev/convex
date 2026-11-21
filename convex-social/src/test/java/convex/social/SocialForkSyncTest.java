@@ -13,10 +13,12 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /** Forks of feeds and follows, where both sides changed. */
 class SocialForkSyncTest {
@@ -85,5 +87,24 @@ class SocialForkSyncTest {
 		laterLive.unfollow(BOB);
 		earlier.sync();
 		assertEquals(Set.of(),laterLive.getActive(),"The destination's later unfollow wins");
+	}
+
+	@Test void feedKeepsTheComponentReconcileRules() {
+		// Posts put under fixed keys, since a new post's key has a random salt
+		assertNull(ComponentChecks.checkConcurrentEdits(feed(new Root<>()),Index.<Blob,ACell>none(),
+			f -> f.put(SocialPost.createKey(1,1),SocialPost.createPost("one",1)),
+			f -> f.put(SocialPost.createKey(2,1),SocialPost.createPost("two",2))));
+	}
+
+	@Test void followsKeepsTheComponentReconcileRules() {
+		AHashMap<ACell,ACell> none=Maps.empty();
+		assertNull(ComponentChecks.checkConcurrentEdits(new Follows(new Root<>(),() -> CVMLong.ONE),none,
+			f -> f.follow(BOB),f -> f.follow(CAROL)));
+	}
+
+	@Test void socialUserKeepsTheComponentReconcileRules() {
+		assertNull(ComponentChecks.checkConcurrentEdits(new SocialUser(new Root<>(),AUTHOR,() -> CVMLong.ONE),Index.<Keyword,ACell>none(),
+			u -> u.feed().put(SocialPost.createKey(1,1),SocialPost.createPost("one",1)),
+			u -> u.follows().follow(BOB)));
 	}
 }

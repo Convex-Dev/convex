@@ -22,6 +22,7 @@ import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
@@ -33,6 +34,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerMapLattice;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * Tests for the cursor-based Social application API.
@@ -69,6 +71,39 @@ public class SocialAppTest {
 			for (AKeyPair key:keys) if (DID.forKey(key.getAccountKey()).equals(owner)) return key.signData(value);
 			return null;
 		};
+	}
+
+	@Test void keepsTheComponentMergeRules() {
+		var alice=AKeyPair.createSeeded(825);
+		var bob=AKeyPair.createSeeded(826);
+		var aliceDid=DID.forKey(alice.getAccountKey());
+		var bobDid=DID.forKey(bob.getAccountKey());
+		var author=Social.create(wallet(alice,bob),() -> CVMLong.create(100));
+		var relay=Social.create(null,() -> CVMLong.create(100));
+		var first=withPost(alice,1000,"first");
+		var second=withPost(alice,2000,"second");
+		var bobs=withPost(bob,3000,"bob");
+		assertNull(ComponentChecks.checkCommutingDeliveries(author,first,bobs));
+		// The author signs the merge of an owner's divergent values; a relay keeps its own
+		assertNull(ComponentChecks.checkDeliveries(author,first,second));
+		assertNull(ComponentChecks.checkDeliveries(relay,first,second));
+
+		var signed=first.get(aliceDid);
+		ACell[] refused={
+			Maps.of(bobDid,signed),
+			Maps.of(aliceDid,bobs.get(bobDid)),
+			Maps.of(aliceDid,SignedData.create(alice.getAccountKey(),signed.getSignature(),Ref.get(Index.none()))),
+			Maps.of(aliceDid,alice.signData(CVMLong.ONE)),
+			CVMLong.ONE};
+		assertNull(ComponentChecks.checkRefusedDeliveries(author,first,refused));
+		assertNull(ComponentChecks.checkRefusedDeliveries(relay,first,refused));
+	}
+
+	/** The owner map an author holds after putting one post in the owner's feed. */
+	private static AHashMap<ACell,SignedData<Index<Keyword,ACell>>> withPost(AKeyPair owner,long timestamp,String text) {
+		var social=Social.create(wallet(owner),() -> CVMLong.create(100));
+		social.user(owner.getAccountKey()).feed().put(SocialPost.createKey(timestamp,0),SocialPost.createPost(text,timestamp));
+		return social.value();
 	}
 
 	/** An application at the root level over an in-memory root holding the lattice's zero. */

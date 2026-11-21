@@ -39,6 +39,7 @@ import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLRow;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * Merges use the policy whatever wraps a database supplies: every route by which
@@ -261,6 +262,27 @@ public class ConvexDBMergeTest {
 		host.merge(remoteWithRow2(host.cursor().get()));
 		assertTrue(has(cdb.database(DB), FROZEN, 2), "RowLWW merges rows by key");
 		assertTrue(has(cdb.database(DB), PLAIN, 2));
+	}
+
+	@Test
+	public void testKeepsTheComponentMergeRules() {
+		Supplier<CVMLong> clock = () -> CVMLong.create(100);
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge, clock);
+		ConvexDB source = ConvexDB.create(RowLWW::merge, counter());
+		populate(source.database(DB));
+		AHashMap<AString, Index<Keyword, ACell>> base = source.value();
+		// Two nodes that started from the same root, each writing another row
+		ConvexDB withRow2 = new ConvexDB(Cursors.root(base), RowLWW::merge, clock);
+		insert(withRow2.database(DB), 2);
+		ConvexDB withRow3 = new ConvexDB(Cursors.root(base), RowLWW::merge, clock);
+		insert(withRow3.database(DB), 3);
+		assertNull(ComponentChecks.checkCommutingDeliveries(cdb, withRow2.value(), withRow3.value()));
+
+		AHashMap<AString, Index<Keyword, ACell>> settingsOnly = Maps.of(DB_NAME, Index.of(ConvexDB.KEY_CONFIG, Index.none()));
+		AHashMap<AString, Index<Keyword, ACell>> noTables = Maps.of(DB_NAME, Index.of(ConvexDB.KEY_TABLES, Index.none()));
+		assertNull(ComponentChecks.checkRefusedDeliveries(cdb, base, settingsOnly, noTables));
+
+		assertNull(ComponentChecks.checkConcurrentEdits(cdb, base, c -> insert(c.database(DB), 2), c -> insert(c.database(DB), 3)));
 	}
 
 	/** Delivered rows merge as those of a whole entry would: only rows written since the table was created or dropped. */

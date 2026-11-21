@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.function.BiPredicate;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,7 @@ import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * Tests for SQLDatabase and SQLSchema.
@@ -583,5 +585,29 @@ public class SQLDatabaseTest {
 		standalone.tables().createTable("t", new String[]{"id"});
 		var export = standalone.exportReplica();
 		assertThrows(IllegalStateException.class, () -> db.mergeReplicas(export));
+	}
+
+	@Test
+	public void testKeepsTheComponentMergeRules() {
+		AKeyPair kp = AKeyPair.createSeeded(7817);
+		Supplier<CVMLong> clock = () -> CVMLong.create(100);
+		Supplier<SQLDatabase> fresh = () -> SQLDatabase.create("db", kp, kp.getAccountKey(), RowLWW::merge, clock);
+		SQLDatabase db = fresh.get();
+		Index<Keyword, ACell> row1 = withRow(fresh.get(), 1).value();
+		Index<Keyword, ACell> row2 = withRow(fresh.get(), 2).value();
+		assertNull(ComponentChecks.checkCommutingDeliveries(db, row1, row2));
+
+		// A table created at the same time with another schema ties: the held entry stays
+		SQLDatabase otherSchema = fresh.get();
+		otherSchema.tables().createTable("t", new String[]{"key"});
+		assertNull(ComponentChecks.checkDeliveries(db, row1, otherSchema.value()));
+
+		// Settings alone, an empty table store, and a row of an earlier table of the same name
+		Index<Keyword, ACell> settingsOnly = Index.of(ConvexDB.KEY_CONFIG, Index.none());
+		Index<Keyword, ACell> noTables = Index.of(ConvexDB.KEY_TABLES, Index.none());
+		Index<Keyword, ACell> earlier = withRow(SQLDatabase.create("db", kp, kp.getAccountKey(), RowLWW::merge, () -> CVMLong.create(50)), 2).value();
+		assertNull(ComponentChecks.checkRefusedDeliveries(db, row1, settingsOnly, noTables, earlier));
+
+		assertNull(ComponentChecks.checkConcurrentEdits(db, row1, d -> d.tables().insert("t", 2), d -> d.tables().insert("t", 3)));
 	}
 }

@@ -11,13 +11,19 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.Maps;
+import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLPath;
 import convex.lattice.fs.impl.DLFSLocal;
+import convex.test.lattice.ComponentChecks;
 
 /** The ownership boundary is independent of context, filesystem views and publication. */
 public class DLFSOwnershipTest {
@@ -52,6 +58,39 @@ public class DLFSOwnershipTest {
 		var fs=relay.drives(ALICE.getAccountKey()).drive("home").fileSystem();
 		assertEquals("left",Files.readString(fs.getPath("/left")));
 		assertEquals("right",Files.readString(fs.getPath("/right")));
+	}
+
+	@Test void keepsTheComponentMergeRules() throws Exception {
+		var left=author();
+		Files.writeString(left.drives(ALICE.getAccountKey()).createDrive("home")
+			.fileSystem().getPath("/left"),"left");
+		var right=author();
+		Files.writeString(right.drives(ALICE.getAccountKey()).createDrive("home")
+			.fileSystem().getPath("/right"),"right");
+		var bobs=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null,BOB::signData,CLOCK);
+		Files.writeString(bobs.drives(BOB.getAccountKey()).createDrive("home")
+			.fileSystem().getPath("/bob"),"bob");
+		var relay=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null,null,CLOCK);
+		assertNull(ComponentChecks.checkCommutingDeliveries(author(),left.value(),bobs.value()));
+		// The author signs the merge of an owner's divergent values; a relay keeps its own
+		assertNull(ComponentChecks.checkDeliveries(author(),left.value(),right.value()));
+		assertNull(ComponentChecks.checkDeliveries(relay,left.value(),right.value()));
+
+		var signed=left.value().get(ALICE.getAccountKey());
+		// Stamped beyond the clock's admission bound, in a drive the held value has
+		var future=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null,ALICE::signData,
+			() -> CVMLong.create(CLOCK.get().longValue()+DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW+1));
+		Files.writeString(future.drives(ALICE.getAccountKey()).createDrive("home")
+			.fileSystem().getPath("/future"),"future");
+		ACell[] refused={
+			Maps.of(BOB.getAccountKey(),signed),
+			Maps.of(ALICE.getAccountKey(),bobs.value().get(BOB.getAccountKey())),
+			Maps.of(ALICE.getAccountKey(),SignedData.create(ALICE.getAccountKey(),signed.getSignature(),Ref.get(Maps.empty()))),
+			Maps.of(ALICE.getAccountKey(),ALICE.signData(CVMLong.ONE)),
+			future.value(),
+			CVMLong.ONE};
+		assertNull(ComponentChecks.checkRefusedDeliveries(author(),left.value(),refused));
+		assertNull(ComponentChecks.checkRefusedDeliveries(relay,left.value(),refused));
 	}
 
 	@Test void customOwnerRuleControlsExistingViewsAndIncomingEnvelopes() throws Exception {
