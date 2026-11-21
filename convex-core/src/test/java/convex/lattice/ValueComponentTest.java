@@ -29,6 +29,7 @@ import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Transactions;
 import convex.lattice.cursor.PathCursor;
+import convex.test.lattice.ComponentChecks;
 
 class ValueComponentTest {
 	private static final AString DATA=Strings.create("data");
@@ -52,8 +53,8 @@ class ValueComponentTest {
 
 	@Test void keepsTheComponentReconcileRules() {
 		var component=new ValueComponent<ACell>(new Root<>());
-		ComponentsTest.doEditTests(component,CVMLong.create(1000),
-			value -> value.cursor().set(Strings.create("a")),value -> value.cursor().set(Strings.create("b")));
+		assertNull(ComponentChecks.checkConcurrentEdits(component,CVMLong.create(1000),
+			value -> value.cursor().set(Strings.create("a")),value -> value.cursor().set(Strings.create("b"))));
 	}
 
 	@Test void baseHasValuesButNoImplicitNamespaceOrMerge() {

@@ -21,8 +21,8 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ComponentsTest;
 import convex.lattice.cursor.Cursors;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * Tests for the LatticeKV key-value store.
@@ -63,13 +63,13 @@ public class LatticeKVTest {
 		LatticeKV kv=LatticeKV.create(Strings.create("replica"),() -> CVMLong.create(5000));
 		AString a=Strings.create("a");
 		AString b=Strings.create("b");
-		ComponentsTest.doJoinTests(kv,
+		assertNull(ComponentChecks.checkCommutingDeliveries(kv,
 			Index.of(a,KVEntry.createValue(Strings.create("x"),CVMLong.create(1000)),b,KVEntry.createValue(Strings.create("y"),CVMLong.create(1000))),
-			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(2000))));
+			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(2000)))));
 		// Equal timestamps tie: the held entry stays
-		ComponentsTest.doMergeTests(kv,
+		assertNull(ComponentChecks.checkDeliveries(kv,
 			Index.of(a,KVEntry.createValue(Strings.create("x"),CVMLong.create(1000))),
-			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(1000))));
+			Index.of(a,KVEntry.createValue(Strings.create("z"),CVMLong.create(1000)))));
 	}
 
 	@Test public void forksRetainTheClockForWritesAndExpiry() {

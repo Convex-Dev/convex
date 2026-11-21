@@ -24,6 +24,7 @@ import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.SignedLattice;
+import convex.test.lattice.ComponentChecks;
 
 public class SignedComponentTest {
 
@@ -66,9 +67,9 @@ public class SignedComponentTest {
 	@Test
 	public void testKeepsTheComponentReconcileRules() {
 		var component=new SignedComponent<>(SIGNED,new Root<SignedData<ASet<CVMLong>>>(),KEY::signData);
-		ComponentsTest.doEditTests(component,Sets.of(1),
+		assertNull(ComponentChecks.checkConcurrentEdits(component,Sets.of(1),
 			set -> set.cursor().updateAndGet(s -> s.include(CVMLong.create(2))),
-			set -> set.cursor().updateAndGet(s -> s.include(CVMLong.create(3))));
+			set -> set.cursor().updateAndGet(s -> s.include(CVMLong.create(3)))));
 	}
 
 	/** A whole-record payload keeps one side, so local edits on both sides conflict; incoming ties keep the own value. */

@@ -20,9 +20,9 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ComponentsTest;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * Executable contracts for the composition in {@link FavouritesExample}.
@@ -44,13 +44,13 @@ class FavouritesApplicationTest {
 		var index=new FavouritesIndex(new Root<>());
 		var charlie=CHARLIE.getAccountKey();
 		var alice=ALICE.getAccountKey();
-		ComponentsTest.doJoinTests(index,
+		assertNull(ComponentChecks.checkCommutingDeliveries(index,
 			Index.of(charlie,CHARLIE.signData(Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(1))),alice,ALICE.signData(Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(2)))),
-			Index.of(charlie,CHARLIE.signData(Maps.of(TIMESTAMP,CVMLong.TWO,items,Sets.of(3)))));
+			Index.of(charlie,CHARLIE.signData(Maps.of(TIMESTAMP,CVMLong.TWO,items,Sets.of(3))))));
 		// Two records of one owner at one timestamp tie: the held record stays
-		ComponentsTest.doMergeTests(index,
+		assertNull(ComponentChecks.checkDeliveries(index,
 			Index.of(charlie,CHARLIE.signData(Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(1)))),
-			Index.of(charlie,CHARLIE.signData(Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(4)))));
+			Index.of(charlie,CHARLIE.signData(Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(4))))));
 	}
 
 	/** Relay policy understands ordering and authorship, not every field in the signed payload. */

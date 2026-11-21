@@ -17,11 +17,11 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALocalComponent;
-import convex.lattice.ComponentsTest;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /** A third-party domain can bind local records to forks and transaction drafts. */
 class LocalComponentRebindTest {
@@ -61,9 +61,9 @@ class LocalComponentRebindTest {
 
 	@Test void notesKeepTheComponentMergeRules() {
 		var notes=new Notes(new Root<AHashMap<Keyword,ACell>>(),() -> CVMLong.create(5000));
-		ComponentsTest.doJoinTests(notes,
+		assertNull(ComponentChecks.checkCommutingDeliveries(notes,
 			Maps.of(Timestamped.TIMESTAMP,CVMLong.create(1000),VALUE,Strings.create("first")),
-			Maps.of(Timestamped.TIMESTAMP,CVMLong.create(2000),VALUE,Strings.create("second")));
+			Maps.of(Timestamped.TIMESTAMP,CVMLong.create(2000),VALUE,Strings.create("second"))));
 	}
 
 	@Test void nestedForkReinstallsStampingAndStopsAtItsDestination() {

@@ -18,7 +18,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ASignedComponent;
-import convex.lattice.ComponentsTest;
 import convex.lattice.LatticeHost;
 import convex.lattice.OwnedIndex;
 import convex.lattice.SingleRegion;
@@ -26,6 +25,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SignedLattice;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * An owner identity can author through several public keys. The host stores
@@ -92,14 +92,13 @@ class OwnedScoresApplicationTest {
 	}
 
 	/** Different authorised signers update one owner slot; a replica verifies and keeps the winner's envelope. */
-	@SuppressWarnings({"unchecked","rawtypes"})
 	@Test void scoresKeepTheComponentMergeRules() {
 		var authority=new Authority();
 		authority.authorise(TEAM,ALICE.getAccountKey(),BOB.getAccountKey());
 		var scores=new Scores(new Root<>(),authority);
 		Index<AString,SignedData<AInteger>> alice=Index.of(TEAM,ALICE.signData(CVMLong.create(10)));
-		ComponentsTest.doJoinTests(scores,alice,Index.of(TEAM,BOB.signData(CVMLong.create(20))));
-		ComponentsTest.doRefusalTests(scores,alice,(Index)Index.of(TEAM,STRANGER.signData(CVMLong.create(30))));
+		assertNull(ComponentChecks.checkCommutingDeliveries(scores,alice,Index.of(TEAM,BOB.signData(CVMLong.create(20)))));
+		assertNull(ComponentChecks.checkRefusedDeliveries(scores,alice,Index.of(TEAM,STRANGER.signData(CVMLong.create(30)))));
 	}
 
 	@Test void twoAuthorisedUsersShareAnIdentityAndAReplicaNeedsNoSigningKey() {

@@ -34,6 +34,7 @@ import convex.lattice.cursor.Root;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.SignedLattice;
+import convex.test.lattice.ComponentChecks;
 
 /** The same owner rule applies to complete maps, owner paths and local authoring. */
 class OwnedComponentsTest {
@@ -267,7 +268,6 @@ class OwnedComponentsTest {
 		}
 	}
 
-	@SuppressWarnings({"unchecked","rawtypes"})
 	@Test void ownedCollectionsKeepTheComponentMergeRules() {
 		var alice=ALICE.signData(CVMLong.ONE);
 		var bob=BOB.signData(CVMLong.TWO);
@@ -279,21 +279,21 @@ class OwnedComponentsTest {
 		var wrongPayload=ALICE.signData(Strings.create("wrong payload"));
 
 		var index=new OwnedIndex<AString,AInteger>(new Root<>(),MaxLattice.INSTANCE,VERIFIER);
-		ComponentsTest.doJoinTests(index,Index.of(A,alice,B,bob),Index.of(A,higher));
-		ComponentsTest.doMergeTests(index,Index.of(A,alice),Index.of(A,tied));
-		ComponentsTest.doRefusalTests(index,Index.of(A,alice),
-			(Index)Index.of(A,wrongSigner),(Index)Index.of(UNKNOWN,unknownOwner),(Index)Index.of(A,wrongPayload),(Index)Index.of(A,CVMLong.create(9)));
+		assertNull(ComponentChecks.checkCommutingDeliveries(index,Index.of(A,alice,B,bob),Index.of(A,higher)));
+		assertNull(ComponentChecks.checkDeliveries(index,Index.of(A,alice),Index.of(A,tied)));
+		assertNull(ComponentChecks.checkRefusedDeliveries(index,Index.of(A,alice),
+			Index.of(A,wrongSigner),Index.of(UNKNOWN,unknownOwner),Index.of(A,wrongPayload),Index.of(A,CVMLong.create(9))));
 
 		var map=new OwnedMap<AString,AInteger>(new Root<>(),MaxLattice.INSTANCE,VERIFIER);
-		ComponentsTest.doJoinTests(map,Maps.of(A,alice,B,bob),Maps.of(A,higher));
-		ComponentsTest.doMergeTests(map,Maps.of(A,alice),Maps.of(A,tied));
-		ComponentsTest.doRefusalTests(map,Maps.of(A,alice),
-			(AHashMap)Maps.of(A,wrongSigner),(AHashMap)Maps.of(UNKNOWN,unknownOwner),(AHashMap)Maps.of(A,wrongPayload),(AHashMap)Maps.of(A,CVMLong.create(9)));
+		assertNull(ComponentChecks.checkCommutingDeliveries(map,Maps.of(A,alice,B,bob),Maps.of(A,higher)));
+		assertNull(ComponentChecks.checkDeliveries(map,Maps.of(A,alice),Maps.of(A,tied)));
+		assertNull(ComponentChecks.checkRefusedDeliveries(map,Maps.of(A,alice),
+			Maps.of(A,wrongSigner),Maps.of(UNKNOWN,unknownOwner),Maps.of(A,wrongPayload),Maps.of(A,CVMLong.create(9))));
 
 		var keyed=new KeyOwnedIndex<AInteger>(new Root<>(),MaxLattice.INSTANCE);
 		AccountKey aliceKey=ALICE.getAccountKey();
-		ComponentsTest.doJoinTests(keyed,Index.of(aliceKey,alice,BOB.getAccountKey(),bob),Index.of(aliceKey,ALICE.signData(CVMLong.create(3))));
-		ComponentsTest.doRefusalTests(keyed,Index.of(aliceKey,alice),(Index)Index.of(aliceKey,wrongSigner));
+		assertNull(ComponentChecks.checkCommutingDeliveries(keyed,Index.of(aliceKey,alice,BOB.getAccountKey(),bob),Index.of(aliceKey,ALICE.signData(CVMLong.create(3)))));
+		assertNull(ComponentChecks.checkRefusedDeliveries(keyed,Index.of(aliceKey,alice),Index.of(aliceKey,wrongSigner)));
 	}
 
 	@Test void independentOwnersCommuteAndRepeatedDeliveryIsIdempotent() {

@@ -33,8 +33,8 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.MemoryStore;
-import convex.lattice.ComponentsTest;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /** Merge rules of the mail region: the entry register, the mailbox index and the DID map. */
 public class MailMergeTest {
@@ -177,7 +177,7 @@ public class MailMergeTest {
 		MailEnvelope e3=toBob(3000,"three");
 		Index<ABlob,SignedData<ACell>> v1=entries(e1,e2);
 		Index<ABlob,SignedData<ACell>> v2=entries(receipt(BOB,BOB_DID,e1),e3);
-		ComponentsTest.doJoinTests(bobsMailbox(DIDKeyAuthorizer.CONVEX,null),v1,v2);
+		assertNull(ComponentChecks.checkCommutingDeliveries(bobsMailbox(DIDKeyAuthorizer.CONVEX,null),v1,v2));
 		assertSame(v1,merge(v1,Index.none()));
 		assertEquals(v1,merge(Index.none(),v1));
 
@@ -191,7 +191,7 @@ public class MailMergeTest {
 		MailEnvelope toAlice=envelope(BOB,BOB_DID,ALICE_DID,ALICE,1500,"reply");
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m1=Maps.of(BOB_DID,v1);
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> m2=Maps.of(BOB_DID,v2,ALICE_DID,entries(toAlice));
-		ComponentsTest.doJoinTests(Mail.create(),m1,m2);
+		assertNull(ComponentChecks.checkCommutingDeliveries(Mail.create(),m1,m2));
 		assertSame(m1,mergeRegion(m1,Maps.empty()));
 		assertEquals(m1,mergeRegion(Maps.empty(),m1));
 		assertEquals(merged,mergeRegion(m1,m2).get(BOB_DID));
@@ -314,12 +314,12 @@ public class MailMergeTest {
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> empty=Maps.empty();
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> emptyMailbox=Maps.of(BOB_DID,Index.none());
 		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(emptyMailbox,empty));
-		ComponentsTest.doJoinTests(Mail.create(),emptyMailbox,Maps.of(BOB_DID,entries(toBob(1000,"hello"))));
+		assertNull(ComponentChecks.checkCommutingDeliveries(Mail.create(),emptyMailbox,Maps.of(BOB_DID,entries(toBob(1000,"hello")))));
 
 		// A delivery whose every entry is rejected merges as the empty mailbox does
 		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> forged=Maps.of(BOB_DID,entries(receipt(CAROL,BOB_DID,toBob(1000,"hello"))));
 		assertEquals(mergeRegion(empty,emptyMailbox),mergeRegion(empty,forged));
-		ComponentsTest.doRefusalTests(Mail.create(),emptyMailbox,forged);
+		assertNull(ComponentChecks.checkRefusedDeliveries(Mail.create(),emptyMailbox,forged));
 	}
 
 	@Test

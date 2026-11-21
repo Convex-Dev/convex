@@ -25,7 +25,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.ComponentsTest;
 import convex.lattice.LatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
@@ -37,6 +36,7 @@ import convex.lattice.cursor.Root;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.IndexLattice;
+import convex.test.lattice.ComponentChecks;
 
 /**
  * A task board with stable IDs and independently ordered task records:
@@ -160,13 +160,13 @@ class TaskBoardApplicationTest {
 		var board=new Board(new Root<>(),() -> CVMLong.create(50));
 		var t1=Strings.create("t1");
 		var t2=Strings.create("t2");
-		ComponentsTest.doJoinTests(board,
+		assertNull(ComponentChecks.checkCommutingDeliveries(board,
 			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("one")),t2,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("two"))),
-			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(6),TITLE,Strings.create("one, renamed"))));
+			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(6),TITLE,Strings.create("one, renamed")))));
 		// Two versions of a task at one timestamp tie: the held version stays
-		ComponentsTest.doMergeTests(board,
+		assertNull(ComponentChecks.checkDeliveries(board,
 			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("one"))),
-			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("other"))));
+			Index.of(t1,Maps.of(Timestamped.TIMESTAMP,CVMLong.create(5),TITLE,Strings.create("other")))));
 	}
 
 	@Test void taskOperationsPreserveUnfamiliarFields() {

@@ -11,10 +11,10 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ComponentsTest;
 import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 public class LatticeQueueTest {
 
@@ -69,8 +69,8 @@ public class LatticeQueueTest {
 
 	@Test void keepsTheComponentReconcileRules() {
 		var queue=new LatticeQueue(new Root<>(),() -> CVMLong.ONE);
-		ComponentsTest.doEditTests(queue,null,q -> q.offer(Strings.create("x")),q -> q.setMeta(Keyword.intern("owner"),Strings.create("y")));
-		ComponentsTest.doEditTests(queue,null,q -> q.offer(Strings.create("x")),q -> q.offer(Strings.create("y")));
+		assertNull(ComponentChecks.checkConcurrentEdits(queue,null,q -> q.offer(Strings.create("x")),q -> q.setMeta(Keyword.intern("owner"),Strings.create("y"))));
+		assertNull(ComponentChecks.checkConcurrentEdits(queue,null,q -> q.offer(Strings.create("x")),q -> q.offer(Strings.create("y"))));
 	}
 
 	/** A bare queue assumes no order between writers, so entries appended on both sides conflict. */

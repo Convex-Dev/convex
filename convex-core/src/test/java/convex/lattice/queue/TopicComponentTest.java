@@ -11,9 +11,9 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ComponentsTest;
 import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 /** Domain navigation shares standard container policy without inventing data on reads. */
 class TopicComponentTest {
@@ -80,16 +80,16 @@ class TopicComponentTest {
 		var topic=new LatticeTopic(topicRoot,() -> CVMLong.ONE);
 		topic.setNumPartitions(1);
 		var configured=topicRoot.get();
-		ComponentsTest.doEditTests(topic,configured,t -> t.offer(Strings.create("k"),Strings.create("x")),t -> t.setMeta(NAME,Strings.create("y")));
-		ComponentsTest.doEditTests(topic,configured,t -> t.offer(Strings.create("k"),Strings.create("x")),t -> t.offer(Strings.create("k"),Strings.create("y")));
+		assertNull(ComponentChecks.checkConcurrentEdits(topic,configured,t -> t.offer(Strings.create("k"),Strings.create("x")),t -> t.setMeta(NAME,Strings.create("y"))));
+		assertNull(ComponentChecks.checkConcurrentEdits(topic,configured,t -> t.offer(Strings.create("k"),Strings.create("x")),t -> t.offer(Strings.create("k"),Strings.create("y"))));
 
 		var mqRoot=new Root<AHashMap<ACell,Index<Keyword,ACell>>>();
 		var mq=new LatticeMQ(mqRoot,() -> CVMLong.ONE);
 		mq.topic("a").setNumPartitions(1);
 		mq.topic("b").setNumPartitions(1);
 		var topics=mqRoot.get();
-		ComponentsTest.doEditTests(mq,topics,m -> m.topic("a").offer(Strings.create("k"),Strings.create("x")),m -> m.topic("b").offer(Strings.create("k"),Strings.create("y")));
-		ComponentsTest.doEditTests(mq,topics,m -> m.topic("a").offer(Strings.create("k"),Strings.create("x")),m -> m.topic("a").offer(Strings.create("k"),Strings.create("y")));
+		assertNull(ComponentChecks.checkConcurrentEdits(mq,topics,m -> m.topic("a").offer(Strings.create("k"),Strings.create("x")),m -> m.topic("b").offer(Strings.create("k"),Strings.create("y"))));
+		assertNull(ComponentChecks.checkConcurrentEdits(mq,topics,m -> m.topic("a").offer(Strings.create("k"),Strings.create("x")),m -> m.topic("a").offer(Strings.create("k"),Strings.create("y"))));
 
 		// One partition appended on both sides is a conflict for the topic and for the message queue
 		var topicDraft=topic.rebind(topicRoot.fork());

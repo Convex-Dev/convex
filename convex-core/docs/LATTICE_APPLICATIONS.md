@@ -615,6 +615,11 @@ values, so it repeats none of these checks. Raw cursor access remains trusted
 application code; component boundaries are not a sandbox between code sharing a
 process.
 
+`ComponentChecks`, in `convex.test.lattice`, checks a component against these merge
+and reconcile rules for its tests. Given sample deliveries, or two domain edits for a
+component that receives none, each check returns the first rule the component breaks,
+or null, so a test asserts that the result is null.
+
 ## Retention, durability and networking
 
 The host can have no store, a memory store or a durable store. Opening restores

@@ -17,6 +17,7 @@ import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
+import convex.test.lattice.ComponentChecks;
 
 /** A component whose merge, path delivery and publication are a supplied lattice, registered at a host root. */
 class LatticeComponentTest {
@@ -25,7 +26,7 @@ class LatticeComponentTest {
 
 	@Test void keepsTheComponentMergeRules() {
 		var component=new LatticeComponent<>(LATTICE,new Root<Index<Keyword,ACell>>());
-		ComponentsTest.doJoinTests(component,Index.<Keyword,ACell>of(ITEMS,Sets.of(1,2)),Index.<Keyword,ACell>of(ITEMS,Sets.of(2,3)));
+		assertNull(ComponentChecks.checkCommutingDeliveries(component,Index.<Keyword,ACell>of(ITEMS,Sets.of(1,2)),Index.<Keyword,ACell>of(ITEMS,Sets.of(2,3))));
 	}
 
 	@Test void stagedRootAcceptsPathsButWaitsForPublication() {

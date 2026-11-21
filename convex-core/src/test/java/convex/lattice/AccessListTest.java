@@ -24,6 +24,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
+import convex.test.lattice.ComponentChecks;
 
 class AccessListTest {
 
@@ -51,8 +52,8 @@ class AccessListTest {
 	/** A bare entry lists a key until it is removed; reads and no-op edits create nothing. */
 	@Test void keepsTheComponentReconcileRules() {
 		var component=new AccessList<ABlobLike<?>>(new Root<>(),() -> CVMLong.create(10));
-		ComponentsTest.doEditTests(component,null,list -> list.add(A),list -> list.add(B));
-		ComponentsTest.doEditTests(component,Index.of(A,Maps.empty()),list -> list.remove(A),list -> list.add(B,until(20)));
+		assertNull(ComponentChecks.checkConcurrentEdits(component,null,list -> list.add(A),list -> list.add(B)));
+		assertNull(ComponentChecks.checkConcurrentEdits(component,Index.of(A,Maps.empty()),list -> list.remove(A),list -> list.add(B,until(20))));
 	}
 
 	@Test void aBareEntryListsAKeyUntilRemoved() {
