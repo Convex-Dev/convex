@@ -12,6 +12,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ComponentsTest;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 
@@ -69,6 +70,31 @@ public class LatticeQueueTest {
 	@Test void keepsTheComponentReconcileRules() {
 		var queue=new LatticeQueue(new Root<>(),() -> CVMLong.ONE);
 		ComponentsTest.doEditTests(queue,null,q -> q.offer(Strings.create("x")),q -> q.setMeta(Keyword.intern("owner"),Strings.create("y")));
+		ComponentsTest.doEditTests(queue,null,q -> q.offer(Strings.create("x")),q -> q.offer(Strings.create("y")));
+	}
+
+	/** A bare queue assumes no order between writers, so entries appended on both sides conflict. */
+	@Test void entriesAppendedOnBothSidesConflict() {
+		var root=new Root<AVector<ACell>>();
+		var live=new LatticeQueue(root,() -> CVMLong.ONE);
+		live.offer(Strings.create("first"));
+		var fork=root.fork();
+		var draft=live.rebind(fork);
+		draft.offer(Strings.create("x"));
+		live.offer(Strings.create("y"));
+		var published=root.get();
+		var working=fork.get();
+		assertThrows(MergeConflictException.class,draft::sync);
+		assertSame(published,root.get());
+		assertSame(working,fork.get());
+
+		// Appends on one side still publish beside a truncation on the other
+		var trimmed=live.fork();
+		trimmed.offer(Strings.create("z"));
+		live.truncate(1);
+		trimmed.sync();
+		assertEquals(Strings.create("z"),live.peekLast());
+		assertEquals(1,live.startOffset());
 	}
 
 	// ===== Empty Queue =====
@@ -341,7 +367,7 @@ public class LatticeQueueTest {
 	}
 
 	@Test
-	public void testForkSyncLongerWins() {
+	public void testForkSyncAfterAnotherForkAppendedConflicts() {
 		LatticeQueue root = LatticeQueue.create();
 		root.offer(Strings.create("base"));
 
@@ -356,11 +382,12 @@ public class LatticeQueueTest {
 		fork2.offer(Strings.create("f2-a"));
 
 		fork1.sync();
-		fork2.sync();
+		// Both have appended since fork2 last agreed with the root, and neither order is right
+		assertThrows(MergeConflictException.class, fork2::sync);
 
-		// fork1's entries should win (longer)
 		assertEquals(4L, root.size());
 		assertEquals(Strings.create("f1-c"), root.peek(3));
+		assertEquals(Strings.create("f2-a"), fork2.peekLast());
 	}
 
 	// ===== Entry Timestamps =====

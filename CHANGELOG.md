@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Keep a mail receipt once accepted, even after its signer is no longer authorised, instead of letting a redelivered envelope replace it. ([Lattice mail](docs/proposals/lattice-mail.md#merge-rule))
+- Report a conflict when a forked queue, topic or message queue syncs after entries were also appended at its destination, instead of dropping one side's entries. ([CAD040](https://docs.convex.world/docs/cad/lattice_queue))
 
 ## [0.8.20] - 2026-11-18
 

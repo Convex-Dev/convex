@@ -12,6 +12,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ComponentsTest;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.Root;
 
 /** Domain navigation shares standard container policy without inventing data on reads. */
@@ -80,6 +81,7 @@ class TopicComponentTest {
 		topic.setNumPartitions(1);
 		var configured=topicRoot.get();
 		ComponentsTest.doEditTests(topic,configured,t -> t.offer(Strings.create("k"),Strings.create("x")),t -> t.setMeta(NAME,Strings.create("y")));
+		ComponentsTest.doEditTests(topic,configured,t -> t.offer(Strings.create("k"),Strings.create("x")),t -> t.offer(Strings.create("k"),Strings.create("y")));
 
 		var mqRoot=new Root<AHashMap<ACell,Index<Keyword,ACell>>>();
 		var mq=new LatticeMQ(mqRoot,() -> CVMLong.ONE);
@@ -87,6 +89,17 @@ class TopicComponentTest {
 		mq.topic("b").setNumPartitions(1);
 		var topics=mqRoot.get();
 		ComponentsTest.doEditTests(mq,topics,m -> m.topic("a").offer(Strings.create("k"),Strings.create("x")),m -> m.topic("b").offer(Strings.create("k"),Strings.create("y")));
+		ComponentsTest.doEditTests(mq,topics,m -> m.topic("a").offer(Strings.create("k"),Strings.create("x")),m -> m.topic("a").offer(Strings.create("k"),Strings.create("y")));
+
+		// One partition appended on both sides is a conflict for the topic and for the message queue
+		var topicDraft=topic.rebind(topicRoot.fork());
+		topicDraft.offer(Strings.create("k"),Strings.create("x"));
+		topic.offer(Strings.create("k"),Strings.create("y"));
+		assertThrows(MergeConflictException.class,topicDraft::sync);
+		var mqDraft=mq.fork();
+		mqDraft.topic("a").offer(Strings.create("k"),Strings.create("x"));
+		mq.topic("a").offer(Strings.create("k"),Strings.create("y"));
+		assertThrows(MergeConflictException.class,mqDraft::sync);
 	}
 
 	@Test void operationsInspectOnlyTheirOwnSectionAndPreserveSiblings() {

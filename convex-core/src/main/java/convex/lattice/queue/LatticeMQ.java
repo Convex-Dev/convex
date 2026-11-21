@@ -7,10 +7,12 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.MapEntry;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.MapComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.MapLattice;
@@ -135,5 +137,31 @@ public class LatticeMQ extends MapComponent<ACell, Index<Keyword, ACell>> {
 			AHashMap<ACell, Index<Keyword, ACell>> own,
 			AHashMap<ACell, Index<Keyword, ACell>> other) {
 		return TOPIC_MAP.merge(own,other);
+	}
+
+	/**
+	 * Reconciles as any component does, except that entries appended to one partition of
+	 * a topic on both sides since they last agreed are a conflict, as for a bare queue.
+	 *
+	 * @throws MergeConflictException If both sides appended entries to one partition
+	 */
+	@Override
+	protected AHashMap<ACell, Index<Keyword, ACell>> reconcile(AHashMap<ACell, Index<Keyword, ACell>> base,
+			AHashMap<ACell, Index<Keyword, ACell>> own,AHashMap<ACell, Index<Keyword, ACell>> other) {
+		if (appendedOnBothSides(base,own,other)) throw new MergeConflictException("Entries were appended to a topic partition on both sides");
+		return super.reconcile(base,own,other);
+	}
+
+	/** Whether entries were appended to one partition of any topic on both sides since the state they last agreed on. */
+	private static boolean appendedOnBothSides(AHashMap<ACell, Index<Keyword, ACell>> base,
+			AHashMap<ACell, Index<Keyword, ACell>> own,AHashMap<ACell, Index<Keyword, ACell>> other) {
+		if (own==null || other==null) return false;
+		long n=own.count();
+		for (long i=0;i<n;i++) {
+			MapEntry<ACell, Index<Keyword, ACell>> topic=own.entryAt(i);
+			Index<Keyword, ACell> was=(base==null)?null:base.get(topic.getKey());
+			if (LatticeTopic.appendedOnBothSides(was,topic.getValue(),other.get(topic.getKey()))) return true;
+		}
+		return false;
 	}
 }

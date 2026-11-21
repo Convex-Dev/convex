@@ -8,10 +8,12 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.MapEntry;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.IndexComponent;
 import convex.lattice.MapComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -178,5 +180,32 @@ public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	@Override
 	protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
 		return TopicLattice.INSTANCE.merge(own,other);
+	}
+
+	/**
+	 * Reconciles as any component does, except that entries appended to one partition on
+	 * both sides since they last agreed are a conflict, as for a bare queue.
+	 *
+	 * @throws MergeConflictException If both sides appended entries to one partition
+	 */
+	@Override
+	protected Index<Keyword, ACell> reconcile(Index<Keyword, ACell> base,Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		if (appendedOnBothSides(base,own,other)) throw new MergeConflictException("Entries were appended to a topic partition on both sides");
+		return super.reconcile(base,own,other);
+	}
+
+	/** Whether entries were appended to one partition of a topic on both sides since the state they last agreed on. */
+	static boolean appendedOnBothSides(Index<Keyword, ACell> base,Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		AHashMap<ACell, AVector<ACell>> ownParts=TopicLattice.getPartitions(own);
+		AHashMap<ACell, AVector<ACell>> otherParts=TopicLattice.getPartitions(other);
+		if (ownParts==null || otherParts==null) return false;
+		AHashMap<ACell, AVector<ACell>> baseParts=TopicLattice.getPartitions(base);
+		long n=ownParts.count();
+		for (long i=0;i<n;i++) {
+			MapEntry<ACell, AVector<ACell>> partition=ownParts.entryAt(i);
+			AVector<ACell> was=(baseParts==null)?null:baseParts.get(partition.getKey());
+			if (LatticeQueue.appendedOnBothSides(was,partition.getValue(),otherParts.get(partition.getKey()))) return true;
+		}
+		return false;
 	}
 }

@@ -10,6 +10,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -21,8 +22,9 @@ import convex.lattice.cursor.Cursors;
  * independently. Supports truncation for reclaiming space while preserving
  * offset continuity.</p>
  *
- * <p>Use {@link #fork()} and {@link #sync()} for conflict-free distributed
- * replication with lattice merge semantics.</p>
+ * <p>A {@link #fork()} publishes with {@link #sync()}, which fails with a conflict,
+ * changing nothing, if entries were appended both in the fork and at its destination
+ * since they last agreed.</p>
  *
  * <h2>Concurrency</h2>
  * <ul>
@@ -340,5 +342,29 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	@Override
 	protected AVector<ACell> reconcile(AVector<ACell> own,AVector<ACell> other) {
 		return QueueLattice.INSTANCE.merge(own,other);
+	}
+
+	/**
+	 * Reconciles as any component does, except that entries appended on both sides since
+	 * they last agreed are a conflict.
+	 *
+	 * @throws MergeConflictException If both sides appended entries
+	 */
+	@Override
+	protected AVector<ACell> reconcile(AVector<ACell> base,AVector<ACell> own,AVector<ACell> other) {
+		// A bare queue assumes no order between writers, so it cannot order the two sides' entries
+		if (appendedOnBothSides(base,own,other)) throw new MergeConflictException("Entries were appended to the queue on both sides");
+		return super.reconcile(base,own,other);
+	}
+
+	/** Whether entries were appended to a queue on both sides since the state they last agreed on. */
+	static boolean appendedOnBothSides(AVector<ACell> base,AVector<ACell> own,AVector<ACell> other) {
+		long end=endOffset(base);
+		return endOffset(own)>end && endOffset(other)>end;
+	}
+
+	/** The absolute offset after a queue's last entry, unchanged by truncation; zero for an absent queue. */
+	private static long endOffset(AVector<ACell> state) {
+		return (state==null)?0:QueueLattice.getStartOffset(state)+QueueLattice.getEntries(state).count();
 	}
 }
